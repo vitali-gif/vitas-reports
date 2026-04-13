@@ -138,7 +138,7 @@ export default function AdminPage() {
     if (!selectedMonth || reports.length === 0) return null;
     destroyCharts();
     const currentReports = reports.filter(r => r.month === selectedMonth);
-    if (currentReports.length === 0) return <div className="welcome-center"><div className="icon">\ud83d\udced</div><h3>No data for this month</h3></div>;
+    if (currentReports.length === 0) return <div className="welcome-center"><div className="icon">📭</div><h3>No data for this month</h3></div>;
     let allRows = [];
     currentReports.forEach(r => { allRows = allRows.concat(r.data || []); });
     const data = aggregateRows(allRows);
@@ -155,13 +155,13 @@ export default function AdminPage() {
 
     const kpi = (label, value, color, current, prev, isCost) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null;
-      return (<div className={`kpi-card ${color}`} key={label}><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}>{ch.pct > 0 ? '\u25b2' : '\u25bc'} {Math.abs(ch.pct).toFixed(1)}%</div>}</div>);
+      return (<div className={`kpi-card ${color}`} key={label}><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}>{ch.pct > 0 ? '▲' : '▼'} {Math.abs(ch.pct).toFixed(1)}%</div>}</div>);
     };
 
     const buildTable = (items, prevItems, labelName) => {
       const entries = Object.entries(items).sort((a, b) => b[1].spend - a[1].spend);
       const showCh = !!prevItems;
-      const changeBadge = (curr, prev, isCost) => { if (!prev || prev === 0) return null; const pct = ((curr - prev) / prev) * 100; const isPos = isCost ? pct < 0 : pct > 0; return <span className={`change-badge ${isPos ? 'positive' : 'negative'}`}>{pct > 0 ? '\u25b2' : '\u25bc'} {Math.abs(pct).toFixed(1)}%</span>; };
+      const changeBadge = (curr, prev, isCost) => { if (!prev || prev === 0) return null; const pct = ((curr - prev) / prev) * 100; const isPos = isCost ? pct < 0 : pct > 0; return <span className={`change-badge ${isPos ? 'positive' : 'negative'}`}>{pct > 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</span>; };
       return (<div className="table-wrapper"><table className="data-table"><thead><tr><th>{labelName}</th><th>Budget</th>{showCh && <th>Change</th>}<th>Leads</th>{showCh && <th>Change</th>}<th>CPL</th>{showCh && <th>Change</th>}<th>Clicks</th><th>CTR</th><th>CPM</th></tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const prev = prevItems?.[name]; const prevCpl = prev && prev.leads > 0 ? prev.spend / prev.leads : 0; const cplClass = cpl > 0 && cpl < 50 ? 'cpl-good' : cpl < 100 ? 'cpl-ok' : 'cpl-bad'; return (<tr key={name}><td style={{fontWeight: 600}}>{name}</td><td>{formatCurrency(d.spend)}</td>{showCh && <td>{prev ? changeBadge(d.spend, prev.spend, true) : '-'}</td>}<td>{d.leads}</td>{showCh && <td>{prev ? changeBadge(d.leads, prev.leads) : '-'}</td>}<td><span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></td>{showCh && <td>{prev ? changeBadge(cpl, prevCpl, true) : '-'}</td>}<td>{formatNum(d.clicks)}</td><td>{ctr.toFixed(2)}%</td><td>{formatCurrency(cpm)}</td></tr>); })}</tbody></table></div>);
     };
 
@@ -191,43 +191,43 @@ export default function AdminPage() {
     return (
       <>
         <div className="kpi-grid">
-          {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(t.spend), '', t.spend, p?.spend, true)}
-          {kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(t.leads), 'green', t.leads, p?.leads)}
-          {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(t.cpl), 'purple', t.cpl, p?.cpl, true)}
-          {kpi('\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea', formatNum(t.impressions), 'cyan', t.impressions, p?.impressions)}
-          {kpi('\u05d7\u05e9\u05d9\u05e4\u05d4 \u05d9\u05d9\u05d7\u05d5\u05d3\u05d9\u05ea', formatNum(t.reach), 'pink', t.reach, p?.reach)}
-          {kpi('\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd', formatNum(t.clicks), 'orange', t.clicks, p?.clicks)}
+          {kpi('תקציב', formatCurrency(t.spend), '', t.spend, p?.spend, true)}
+          {kpi('לידים', formatNum(t.leads), 'green', t.leads, p?.leads)}
+          {kpi('עלות לליד', formatCurrency(t.cpl), 'purple', t.cpl, p?.cpl, true)}
+          {kpi('חשיפות', formatNum(t.impressions), 'cyan', t.impressions, p?.impressions)}
+          {kpi('חשיפה ייחודית', formatNum(t.reach), 'pink', t.reach, p?.reach)}
+          {kpi('קליקים', formatNum(t.clicks), 'orange', t.clicks, p?.clicks)}
           {kpi('CPC', formatCurrency(t.cpc), 'red', t.cpc, p?.cpc, true)}
           {kpi('CPM', formatCurrency(t.cpm), 'purple', t.cpm, p?.cpm, true)}
           {kpi('CTR', t.ctr.toFixed(2) + '%', 'green', t.ctr, p?.ctr)}
-          {kpi('\u05d0\u05d7\u05d5\u05d6 \u05d4\u05de\u05e8\u05d4', t.convRate.toFixed(2) + '%', '', t.convRate, p?.convRate)}
-          {kpi('\u05ea\u05d3\u05d9\u05e8\u05d5\u05ea', t.frequency.toFixed(2), 'orange', t.frequency, p?.frequency, true)}
+          {kpi('אחוז המרה', t.convRate.toFixed(2) + '%', '', t.convRate, p?.convRate)}
+          {kpi('תדירות', t.frequency.toFixed(2), 'orange', t.frequency, p?.frequency, true)}
         </div>
-        {trendData.length > 1 && (<div className="section"><div className="section-title">\ud83d\udcc8 \u05de\u05d2\u05de\u05d5\u05ea \u05d7\u05d5\u05d3\u05e9\u05d9\u05d5\u05ea</div><div className="chart-grid"><div className="chart-card"><h4>\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>\u05ea\u05e7\u05e6\u05d9\u05d1 \u05d5\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
-        {campNames.length > 0 && (<div className="section"><div className="section-title">\ud83c\udfaf \u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd</div><div className="chart-grid"><div className="chart-card"><h4>\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df')}</div>)}
-        <div className="section"><div className="section-title">\ud83d\udccb \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea</div>{buildTable(data.adSets, prevData?.adSets, '\u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea')}</div>
-        <div className="section"><div className="section-title">\ud83d\udcdd \u05de\u05d5\u05d3\u05e2\u05d5\u05ea</div>{buildTable(data.ads, prevData?.ads, '\u05de\u05d5\u05d3\u05e2\u05d4')}{adEntries.filter(([,a]) => a.text).map(([name, ad]) => { const cpl = ad.leads > 0 ? ad.spend / ad.leads : 0; const cplClass = cpl > 0 && cpl < 50 ? 'cpl-good' : cpl < 100 ? 'cpl-ok' : 'cpl-bad'; return (<div className="ad-text-card" key={name}><div className="ad-name">{name}</div><div className="ad-body" onClick={e => e.currentTarget.classList.toggle('expanded')}>{ad.text}</div><div className="ad-metrics"><div>Budget: <span>{formatCurrency(ad.spend)}</span></div><div>Leads: <span>{ad.leads}</span></div><div>CPL: <span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></div></div></div>); })}</div>
-        {genderNames.length > 0 && (<div className="section"><div className="section-title">\ud83d\udc64 \u05de\u05d2\u05d3\u05e8</div><div className="chart-grid"><div className="chart-card"><h4>\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1</h4><div className="chart-container"><canvas id="genderChart"></canvas></div></div></div></div>)}
-        {ageNames.length > 0 && (<div className="section"><div className="section-title">\ud83d\udcca \u05d2\u05d9\u05dc</div><div className="chart-grid"><div className="chart-card"><h4>\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL \u05dc\u05e4\u05d9 \u05d2\u05d9\u05dc</h4><div className="chart-container"><canvas id="ageChart"></canvas></div></div></div></div>)}
+        {trendData.length > 1 && (<div className="section"><div className="section-title">📈 מגמות חודשיות</div><div className="chart-grid"><div className="chart-card"><h4>לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
+        {campNames.length > 0 && (<div className="section"><div className="section-title">🎯 קמפיינים</div><div className="chart-grid"><div className="chart-card"><h4>התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין')}</div>)}
+        <div className="section"><div className="section-title">📋 קבוצות מודעות</div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות')}</div>
+        <div className="section"><div className="section-title">📝 מודעות</div>{buildTable(data.ads, prevData?.ads, 'מודעה')}{adEntries.filter(([,a]) => a.text).map(([name, ad]) => { const cpl = ad.leads > 0 ? ad.spend / ad.leads : 0; const cplClass = cpl > 0 && cpl < 50 ? 'cpl-good' : cpl < 100 ? 'cpl-ok' : 'cpl-bad'; return (<div className="ad-text-card" key={name}><div className="ad-name">{name}</div><div className="ad-body" onClick={e => e.currentTarget.classList.toggle('expanded')}>{ad.text}</div><div className="ad-metrics"><div>Budget: <span>{formatCurrency(ad.spend)}</span></div><div>Leads: <span>{ad.leads}</span></div><div>CPL: <span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></div></div></div>); })}</div>
+        {genderNames.length > 0 && (<div className="section"><div className="section-title">👤 מגדר</div><div className="chart-grid"><div className="chart-card"><h4>התפלגות תקציב</h4><div className="chart-container"><canvas id="genderChart"></canvas></div></div></div></div>)}
+        {ageNames.length > 0 && (<div className="section"><div className="section-title">📊 גיל</div><div className="chart-grid"><div className="chart-card"><h4>לידים ו-CPL לפי גיל</h4><div className="chart-container"><canvas id="ageChart"></canvas></div></div></div></div>)}
       </>
     );
   }, [selectedMonth, compareEnabled, reports]);
 
-  if (loading) return <div className="loading-page">\u05d8\u05d5\u05e2\u05df...</div>;
+  if (loading) return <div className="loading-page">טוען...</div>;
 
   if (!session) {
     return (
       <div className="login-container">
         <h1 className="logo" style={{fontSize: '3em'}}>VITAS</h1>
-        <p className="subtitle">\u05de\u05e2\u05e8\u05db\u05ea \u05d3\u05d5\u05d7\u05d5\u05ea \u05e9\u05d9\u05d5\u05d5\u05e7 \u05d3\u05d9\u05d2\u05d9\u05d8\u05dc\u05d9</p>
+        <p className="subtitle">מערכת דוחות שיווק דיגיטלי</p>
         <div className="card">
           <form onSubmit={handleAuth}>
-            <div className="form-group"><label>\u05d0\u05d9\u05de\u05d9\u05d9\u05dc</label><input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} dir="ltr" required /></div>
-            <div className="form-group"><label>\u05e1\u05d9\u05e1\u05de\u05d4</label><input className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} dir="ltr" required /></div>
+            <div className="form-group"><label>אימייל</label><input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} dir="ltr" required /></div>
+            <div className="form-group"><label>סיסמה</label><input className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} dir="ltr" required /></div>
             {authError && <p style={{color: 'var(--danger)', fontSize: '0.85em', marginBottom: 10}}>{authError}</p>}
-            <button className="btn btn-primary btn-lg" style={{width: '100%'}} type="submit">{isSignUp ? '\u05d4\u05e8\u05e9\u05de\u05d4' : '\u05db\u05e0\u05d9\u05e1\u05d4'}</button>
+            <button className="btn btn-primary btn-lg" style={{width: '100%'}} type="submit">{isSignUp ? 'הרשמה' : 'כניסה'}</button>
           </form>
-          <p style={{textAlign: 'center', marginTop: 15, fontSize: '0.85em', color: 'var(--text-secondary)'}}><span style={{cursor: 'pointer', color: 'var(--accent)'}} onClick={() => setIsSignUp(!isSignUp)}>{isSignUp ? '\u05d9\u05e9 \u05dc\u05d9 \u05d7\u05e9\u05d1\u05d5\u05df \u2014 \u05db\u05e0\u05d9\u05e1\u05d4' : '\u05de\u05e9\u05ea\u05de\u05e9 \u05d7\u05d3\u05e9 \u2014 \u05d4\u05e8\u05e9\u05de\u05d4'}</span></p>
+          <p style={{textAlign: 'center', marginTop: 15, fontSize: '0.85em', color: 'var(--text-secondary)'}}><span style={{cursor: 'pointer', color: 'var(--accent)'}} onClick={() => setIsSignUp(!isSignUp)}>{isSignUp ? 'יש לי חשבון — כניסה' : 'משתמש חדש — הרשמה'}</span></p>
         </div>
       </div>
     );
@@ -237,32 +237,32 @@ export default function AdminPage() {
 
   return (
     <>
-      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className={`nav-btn ${view === 'upload' ? 'active' : ''}`} onClick={() => setView('upload')}>\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd</button><button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>\ud83d\udccb \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4</button><button className="nav-btn danger" onClick={handleLogout}>\u05d9\u05e6\u05d9\u05d0\u05d4</button></div></div></div>
+      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className={`nav-btn ${view === 'upload' ? 'active' : ''}`} onClick={() => setView('upload')}>📤 העלאת נתונים</button><button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>📋 היסטוריה</button><button className="nav-btn danger" onClick={handleLogout}>יציאה</button></div></div></div>
       <div className="app-layout">
         <div className="sidebar"><div style={{padding: '0 15px', marginBottom: 20}}>
-          <div className="sidebar-title">\u05dc\u05e7\u05d5\u05d7\u05d5\u05ea</div>
+          <div className="sidebar-title">לקוחות</div>
           {clients.map(client => (<div key={client.id}>
             <div className={`client-item ${selectedClient?.id === client.id ? 'active' : ''}`} onClick={() => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}><div className="client-dot" style={{background: client.color}}></div>{client.name}</div>
-            {selectedClient?.id === client.id && client.projects?.map(proj => (<div key={proj.id} className={`project-item ${selectedProject?.id === proj.id ? 'active' : ''}`} onClick={() => selectProject(client, proj)}>\ud83d\udcc2 {proj.name}</div>))}
-            {selectedClient?.id === client.id && (<><div className="add-btn indent" onClick={() => setShowAddProject(true)}>+ \u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8</div><div style={{padding: '5px 25px'}}><div className="link-box" style={{marginTop: 5}}><small>\u05dc\u05d9\u05e0\u05e7 \u05dc\u05dc\u05e7\u05d5\u05d7:</small><input readOnly value={typeof window !== 'undefined' ? `${window.location.origin}/client/${client.token}` : ''} onClick={e => {e.target.select(); navigator.clipboard?.writeText(e.target.value); showToast('\u05d4\u05dc\u05d9\u05e0\u05e7 \u05d4\u05d5\u05e2\u05ea\u05e7!');}} /></div></div></>)}
+            {selectedClient?.id === client.id && client.projects?.map(proj => (<div key={proj.id} className={`project-item ${selectedProject?.id === proj.id ? 'active' : ''}`} onClick={() => selectProject(client, proj)}>📂 {proj.name}</div>))}
+            {selectedClient?.id === client.id && (<><div className="add-btn indent" onClick={() => setShowAddProject(true)}>+ הוסף פרויקט</div><div style={{padding: '5px 25px'}}><div className="link-box" style={{marginTop: 5}}><small>לינק ללקוח:</small><input readOnly value={typeof window !== 'undefined' ? `${window.location.origin}/client/${client.token}` : ''} onClick={e => {e.target.select(); navigator.clipboard?.writeText(e.target.value); showToast('הלינק הועתק!');}} /></div></div></>)}
           </div>))}
-          <div className="add-btn" onClick={() => setShowAddClient(true)}>+ \u05d4\u05d5\u05e1\u05e3 \u05dc\u05e7\u05d5\u05d7</div>
+          <div className="add-btn" onClick={() => setShowAddClient(true)}>+ הוסף לקוח</div>
         </div></div>
 
         <div className="main-content">
-          {view === 'welcome' && (<div className="welcome-center"><div className="icon">\ud83d\udcca</div><h2>\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd</h2><p>\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05de\u05d4\u05ea\u05e4\u05e8\u05d9\u05d8 \u05db\u05d3\u05d9 \u05dc\u05e6\u05e4\u05d5\u05ea \u05d1\u05d3\u05d5\u05d7, \u05d0\u05d5 \u05d4\u05e2\u05dc\u05d4 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd</p></div>)}
+          {view === 'welcome' && (<div className="welcome-center"><div className="icon">📊</div><h2>ברוכים הבאים</h2><p>בחר פרויקט מהתפריט כדי לצפות בדוח, או העלה נתונים חדשים</p></div>)}
 
           {view === 'upload' && (<>
-            <h2 style={{fontSize: '1.8em', fontWeight: 800, marginBottom: 20}}>\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd</h2>
-            <div className="card"><h3 style={{marginBottom: 15, fontWeight: 700}}>\u05d4\u05d2\u05d3\u05e8\u05d5\u05ea</h3>
-              <div className="form-row"><div className="form-group"><label>\u05dc\u05e7\u05d5\u05d7</label><select className="form-input" value={uploadClient} onChange={e => setUploadClient(e.target.value)}><option value="">\u05d1\u05d7\u05e8 \u05dc\u05e7\u05d5\u05d7</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div className="form-group"><label>\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8</label><select className="form-input" value={uploadProject} onChange={e => setUploadProject(e.target.value)}><option value="">\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8</option>{getClientProjects(uploadClient).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></div>
-              <div className="form-row"><div className="form-group"><label>\u05de\u05e7\u05d5\u05e8</label><select className="form-input" value={uploadSource} onChange={e => setUploadSource(e.target.value)}><option value="facebook">Facebook Ads</option><option value="google">Google Ads</option><option value="crm">CRM</option></select></div><div className="form-group"><label>\u05d7\u05d5\u05d3\u05e9</label><input className="form-input" type="month" value={uploadMonth} onChange={e => setUploadMonth(e.target.value)} /></div></div>
+            <h2 style={{fontSize: '1.8em', fontWeight: 800, marginBottom: 20}}>📤 העלאת נתונים</h2>
+            <div className="card"><h3 style={{marginBottom: 15, fontWeight: 700}}>הגדרות</h3>
+              <div className="form-row"><div className="form-group"><label>לקוח</label><select className="form-input" value={uploadClient} onChange={e => setUploadClient(e.target.value)}><option value="">בחר לקוח</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div className="form-group"><label>פרויקט</label><select className="form-input" value={uploadProject} onChange={e => setUploadProject(e.target.value)}><option value="">בחר פרויקט</option>{getClientProjects(uploadClient).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></div>
+              <div className="form-row"><div className="form-group"><label>מקור</label><select className="form-input" value={uploadSource} onChange={e => setUploadSource(e.target.value)}><option value="facebook">Facebook Ads</option><option value="google">Google Ads</option><option value="crm">CRM</option></select></div><div className="form-group"><label>חודש</label><input className="form-input" type="month" value={uploadMonth} onChange={e => setUploadMonth(e.target.value)} /></div></div>
             </div>
             <div className="upload-area" onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('dragover'); }} onDragLeave={e => e.currentTarget.classList.remove('dragover')} onDrop={handleDrop} onClick={() => document.getElementById('fileInput').click()}>
-              {uploading ? (<><div className="spinner" style={{borderColor: 'rgba(59,130,246,0.3)', borderTopColor: 'var(--accent)', width: 40, height: 40}}></div><h3 style={{marginTop: 15}}>\u05de\u05e2\u05d1\u05d3...</h3></>) : (<><div className="upload-icon">\ud83d\udcc1</div><h3>\u05d2\u05e8\u05d5\u05e8 \u05e7\u05d5\u05d1\u05e5 \u05d0\u05e7\u05e1\u05dc \u05dc\u05db\u05d0\u05df</h3><p style={{color: 'var(--text-secondary)'}}>\u05d0\u05d5 \u05dc\u05d7\u05e5 \u05dc\u05d1\u05d7\u05d9\u05e8\u05ea \u05e7\u05d5\u05d1\u05e5</p></>)}
+              {uploading ? (<><div className="spinner" style={{borderColor: 'rgba(59,130,246,0.3)', borderTopColor: 'var(--accent)', width: 40, height: 40}}></div><h3 style={{marginTop: 15}}>מעבד...</h3></>) : (<><div className="upload-icon">📁</div><h3>גרור קובץ אקסל לכאן</h3><p style={{color: 'var(--text-secondary)'}}>או לחץ לבחירת קובץ</p></>)}
               <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style={{display: 'none'}} onChange={e => { if (e.target.files.length) handleFile(e.target.files[0]); }} />
             </div>
-            {uploadResult?.success && (<div className="card" style={{borderColor: 'var(--success)', borderWidth: 2}}><h3 style={{color: 'var(--success)'}}>\u2705 \u05d4\u05d5\u05e2\u05dc\u05d4 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4!</h3><p style={{color: 'var(--text-secondary)', marginBottom: 15}}>{uploadResult.fileName} \u2014 {uploadResult.rowCount} \u05e9\u05d5\u05e8\u05d5\u05ea</p><div className="kpi-grid"><div className="kpi-card"><div className="kpi-label">\u05ea\u05e7\u05e6\u05d9\u05d1</div><div className="kpi-value">{formatCurrency(uploadResult.totals.spend)}</div></div><div className="kpi-card green"><div className="kpi-label">\u05dc\u05d9\u05d3\u05d9\u05dd</div><div className="kpi-value">{uploadResult.totals.leads}</div></div><div className="kpi-card purple"><div className="kpi-label">CPL</div><div className="kpi-value">{formatCurrency(uploadResult.totals.cpl)}</div></div></div></div>)}
+            {uploadResult?.success && (<div className="card" style={{borderColor: 'var(--success)', borderWidth: 2}}><h3 style={{color: 'var(--success)'}}>✅ הועלה בהצלחה!</h3><p style={{color: 'var(--text-secondary)', marginBottom: 15}}>{uploadResult.fileName} — {uploadResult.rowCount} שורות</p><div className="kpi-grid"><div className="kpi-card"><div className="kpi-label">תקציב</div><div className="kpi-value">{formatCurrency(uploadResult.totals.spend)}</div></div><div className="kpi-card green"><div className="kpi-label">לידים</div><div className="kpi-value">{uploadResult.totals.leads}</div></div><div className="kpi-card purple"><div className="kpi-label">CPL</div><div className="kpi-value">{formatCurrency(uploadResult.totals.cpl)}</div></div></div></div>)}
           </>)}
 
           {view === 'dashboard' && selectedProject && (<>
@@ -270,19 +270,19 @@ export default function AdminPage() {
               <h2 style={{fontSize: '1.8em', fontWeight: 800}}>{selectedClient?.name} / {selectedProject.name}</h2>
               <div style={{display: 'flex', gap: 10, alignItems: 'center'}}>
                 <select className="form-input" style={{width: 'auto'}} value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>{[...new Set(reports.map(r => r.month))].sort().reverse().map(m => (<option key={m} value={m}>{formatMonth(m)}</option>))}</select>
-                <label style={{fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer'}}><input type="checkbox" checked={compareEnabled} onChange={e => setCompareEnabled(e.target.checked)} />\u05d4\u05e9\u05d5\u05d5\u05d0\u05d4 \u05dc\u05d7\u05d5\u05d3\u05e9 \u05e7\u05d5\u05d3\u05dd</label>
+                <label style={{fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer'}}><input type="checkbox" checked={compareEnabled} onChange={e => setCompareEnabled(e.target.checked)} />השוואה לחודש קודם</label>
               </div>
             </div>
-            {reports.length === 0 ? (<div className="welcome-center"><div className="icon">\ud83d\udced</div><h3>\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d3\u05d9\u05d9\u05df</h3><button className="btn btn-primary btn-lg" onClick={() => setView('upload')} style={{marginTop: 15}}>\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd</button></div>) : renderDashboard()}
+            {reports.length === 0 ? (<div className="welcome-center"><div className="icon">📭</div><h3>אין נתונים עדיין</h3><button className="btn btn-primary btn-lg" onClick={() => setView('upload')} style={{marginTop: 15}}>📤 העלאת נתונים</button></div>) : renderDashboard()}
           </>)}
 
-          {view === 'history' && (<><h2 style={{fontSize: '1.8em', fontWeight: 800, marginBottom: 20}}>\ud83d\udccb \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4</h2><HistoryView clients={clients} showToast={showToast} onRefresh={loadClients} /></>)}
+          {view === 'history' && (<><h2 style={{fontSize: '1.8em', fontWeight: 800, marginBottom: 20}}>📋 היסטוריה</h2><HistoryView clients={clients} showToast={showToast} onRefresh={loadClients} /></>)}
         </div>
       </div>
 
-      <div className={`modal-overlay ${showAddClient ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddClient(false); }}><div className="modal"><h3>\u05d4\u05d5\u05e1\u05e3 \u05dc\u05e7\u05d5\u05d7 \u05d7\u05d3\u05e9</h3><div className="form-group"><label>\u05e9\u05dd \u05dc\u05e7\u05d5\u05d7</label><input className="form-input" value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: \u05e9.\u05d1\u05e8\u05d5\u05da" /></div><div className="form-group"><label>\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd (\u05de\u05d5\u05e4\u05e8\u05d3\u05d9\u05dd \u05d1\u05e4\u05e1\u05d9\u05e7\u05d9\u05dd)</label><input className="form-input" value={newClientProjects} onChange={e => setNewClientProjects(e.target.value)} placeholder="\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK, ONCE" /></div><div className="form-group"><label>\u05e6\u05d1\u05e2</label><select className="form-input" value={newClientColor} onChange={e => setNewClientColor(e.target.value)}><option value="#3b82f6">\u05db\u05d7\u05d5\u05dc</option><option value="#10b981">\u05d9\u05e8\u05d5\u05e7</option><option value="#8b5cf6">\u05e1\u05d2\u05d5\u05dc</option><option value="#f59e0b">\u05db\u05ea\u05d5\u05dd</option><option value="#ec4899">\u05d5\u05e8\u05d5\u05d3</option></select></div><div className="modal-actions"><button className="btn btn-primary" onClick={addClient}>\u05d4\u05d5\u05e1\u05e3</button><button className="btn btn-outline" onClick={() => setShowAddClient(false)}>\u05d1\u05d9\u05d8\u05d5\u05dc</button></div></div></div>
+      <div className={`modal-overlay ${showAddClient ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddClient(false); }}><div className="modal"><h3>הוסף לקוח חדש</h3><div className="form-group"><label>שם לקוח</label><input className="form-input" value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="לדוגמה: ש.ברוך" /></div><div className="form-group"><label>פרויקטים (מופרדים בפסיקים)</label><input className="form-input" value={newClientProjects} onChange={e => setNewClientProjects(e.target.value)} placeholder="לדוגמה: HI PARK, ONCE" /></div><div className="form-group"><label>צבע</label><select className="form-input" value={newClientColor} onChange={e => setNewClientColor(e.target.value)}><option value="#3b82f6">כחול</option><option value="#10b981">ירוק</option><option value="#8b5cf6">סגול</option><option value="#f59e0b">כתום</option><option value="#ec4899">ורוד</option></select></div><div className="modal-actions"><button className="btn btn-primary" onClick={addClient}>הוסף</button><button className="btn btn-outline" onClick={() => setShowAddClient(false)}>ביטול</button></div></div></div>
 
-      <div className={`modal-overlay ${showAddProject ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddProject(false); }}><div className="modal"><h3>\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05dc-{selectedClient?.name}</h3><div className="form-group"><label>\u05e9\u05dd \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8</label><input className="form-input" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder="\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK" /></div><div className="modal-actions"><button className="btn btn-primary" onClick={addProject}>\u05d4\u05d5\u05e1\u05e3</button><button className="btn btn-outline" onClick={() => setShowAddProject(false)}>\u05d1\u05d9\u05d8\u05d5\u05dc</button></div></div></div>
+      <div className={`modal-overlay ${showAddProject ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddProject(false); }}><div className="modal"><h3>הוסף פרויקט ל-{selectedClient?.name}</h3><div className="form-group"><label>שם פרויקט</label><input className="form-input" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder="לדוגמה: HI PARK" /></div><div className="modal-actions"><button className="btn btn-primary" onClick={addProject}>הוסף</button><button className="btn btn-outline" onClick={() => setShowAddProject(false)}>ביטול</button></div></div></div>
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
     </>
@@ -300,20 +300,20 @@ function HistoryView({ clients }) {
   }, []);
 
   const deleteReport = async (id) => {
-    if (!confirm('\u05dc\u05de\u05d7\u05d5\u05e7 \u05d0\u05ea \u05d4\u05d4\u05e2\u05dc\u05d0\u05d4?')) return;
+    if (!confirm('למחוק את ההעלאה?')) return;
     await supabase.from('reports').delete().eq('id', id);
     setReports(prev => prev.filter(r => r.id !== id));
   };
 
-  if (reports.length === 0) return <div className="welcome-center"><div className="icon">\ud83d\udced</div><h3>\u05d0\u05d9\u05df \u05d4\u05e2\u05dc\u05d0\u05d5\u05ea \u05e2\u05d3\u05d9\u05d9\u05df</h3></div>;
+  if (reports.length === 0) return <div className="welcome-center"><div className="icon">📭</div><h3>אין העלאות עדיין</h3></div>;
 
   return reports.map(r => (
     <div className="card" key={r.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
       <div>
-        <h4 style={{fontWeight: 700}}>{r.projects?.clients?.name} / {r.projects?.name} \u2014 {formatMonth(r.month)}</h4>
+        <h4 style={{fontWeight: 700}}>{r.projects?.clients?.name} / {r.projects?.name} — {formatMonth(r.month)}</h4>
         <p style={{color: 'var(--text-secondary)', fontSize: '0.9em'}}>{r.source === 'facebook' ? 'Facebook' : r.source === 'google' ? 'Google' : 'CRM'} | {r.file_name} | {r.row_count} rows</p>
       </div>
-      <button className="btn btn-danger" style={{fontSize: '0.8em', padding: '6px 12px'}} onClick={() => deleteReport(r.id)}>\ud83d\uddd1</button>
+      <button className="btn btn-danger" style={{fontSize: '0.8em', padding: '6px 12px'}} onClick={() => deleteReport(r.id)}>🗑</button>
     </div>
   ));
 }
