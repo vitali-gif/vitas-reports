@@ -173,14 +173,16 @@ export default function AdminPage() {
     destroyCharts();
     const currentReports = reports.filter(r => r.month === selectedMonth);
     if (currentReports.length === 0) return <div className="welcome-center"><div className="icon">📭</div><h3>No data for this month</h3></div>;
-    let allRows = [];
-    currentReports.forEach(r => { allRows = allRows.concat(r.data || []); });
-    const data = aggregateRows(allRows);
+  const displayReports = dashTab === 'all' ? currentReports : dashTab === 'facebook' ? currentReports.filter(r => r.source === 'facebook') : currentReports.filter(r => r.source && r.source.startsWith('google'))
+  let allRows = []
+  displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data) })
+  const data = aggregateRows(allRows)
     let prevData = null;
     if (compareEnabled) {
       const prevMonth = getPrevMonth(selectedMonth);
-      const prevReports = reports.filter(r => r.month === prevMonth);
-      if (prevReports.length > 0) { let prevRows = []; prevReports.forEach(r => { prevRows = prevRows.concat(r.data || []); }); prevData = aggregateRows(prevRows); }
+    const prevReports = reports.filter(r => r.month === prevMonth)
+    const displayPrev = dashTab === 'all' ? prevReports : dashTab === 'facebook' ? prevReports.filter(r => r.source === 'facebook') : prevReports.filter(r => r.source && r.source.startsWith('google'))
+    if (displayPrev.length) { let prevRows = []; displayPrev.forEach(r => { prevRows = prevRows.concat(r.data) }); prevData = aggregateRows(prevRows) }
     }
     const allMonths = [...new Set(reports.map(r => r.month))].sort();
     const trendData = allMonths.map(m => { let mRows = []; reports.filter(r => r.month === m).forEach(r => { mRows = mRows.concat(r.data || []); }); return { month: m, ...aggregateRows(mRows).totals }; });
