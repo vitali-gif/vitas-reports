@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [reports, setReports] = useState([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [compareEnabled, setCompareEnabled] = useState(false)
+  const [dashTab, setDashTab] = useState('all')
   const chartsRef = useRef([])
   const [showAddClient, setShowAddClient] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
@@ -116,8 +117,12 @@ export default function AdminPage() {
       }
       let mapped;
       if (uploadSource === 'facebook') mapped = mapFacebookRows(json);
-      else if (uploadSource === 'google') mapped = mapGoogleRows(json);
+      else if (uploadSource === 'google_pmax' || uploadSource === 'google_search') mapped = mapGoogleRows(json);
       else mapped = json;
+      // Auto-set campaign name based on source type
+      if (uploadSource === 'google_pmax') mapped = mapped.map(r => ({ ...r, campaign: 'PMAX' }));
+      else if (uploadSource === 'google_search') mapped = mapped.map(r => ({ ...r, campaign: 'Search' }));
+
       const summary = aggregateRows(mapped);
       const { error } = await supabase.from('reports').upsert({
         project_id: uploadProject, source: uploadSource, month: uploadMonth,
@@ -208,20 +213,40 @@ export default function AdminPage() {
     const genderNames = Object.keys(data.genders).filter(g => g !== 'unknown');
     const ageNames = Object.keys(data.ages).filter(a => a !== 'unknown');
 
+    // Split by source for tabs
+    const fbReports = currentReports.filter(r => r.source === 'facebook');
+    const gReports = currentReports.filter(r => r.source && r.source.startsWith('google'));
+    const hasFb = fbReports.length > 0;
+    const hasG = gReports.length > 0;
+    let fbTotals = null, gTotals = null;
+    if (hasFb) { let rows = []; fbReports.forEach(r => { rows = rows.concat(r.data || []); }); fbTotals = aggregateRows(rows).totals; }
+    if (hasG) { let rows = []; gReports.forEach(r => { rows = rows.concat(r.data || []); }); gTotals = aggregateRows(rows).totals; }
+    const activeT = dashTab === 'facebook' && fbTotals ? fbTotals : dashTab === 'google' && gTotals ? gTotals : t;
+    const activeP = dashTab !== 'all' ? null : p;
+
     return (
       <>
+        {/* Source Tabs */}
+        {(hasFb && hasG) && (
+          <div style={{display:'flex', gap:'8px', marginBottom:'20px'}}>
+            <button className={`btn ${dashTab === 'all' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setDashTab('all')}>הכל</button>
+            <button className={`btn ${dashTab === 'facebook' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setDashTab('facebook')}>Facebook</button>
+            <button className={`btn ${dashTab === 'google' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setDashTab('google')}>Google</button>
+          </div>
+        )}
+
         <div className="kpi-grid">
-          {kpi('תקציב', formatCurrency(t.spend), '', t.spend, p?.spend, true)}
-          {kpi('לידים', formatNum(t.leads), 'green', t.leads, p?.leads)}
-          {kpi('עלות לליד', formatCurrency(t.cpl), 'purple', t.cpl, p?.cpl, true)}
-          {kpi('חשיפות', formatNum(t.impressions), 'cyan', t.impressions, p?.impressions)}
-          {kpi('חשיפה ייחודית', formatNum(t.reach), 'pink', t.reach, p?.reach)}
-          {kpi('קליקים', formatNum(t.clicks), 'orange', t.clicks, p?.clicks)}
-          {kpi('CPC', formatCurrency(t.cpc), 'red', t.cpc, p?.cpc, true)}
-          {kpi('CPM', formatCurrency(t.cpm), 'purple', t.cpm, p?.cpm, true)}
-          {kpi('CTR', t.ctr.toFixed(2) + '%', 'green', t.ctr, p?.ctr)}
-          {kpi('אחוז המרה', t.convRate.toFixed(2) + '%', '', t.convRate, p?.convRate)}
-          {kpi('תדירות', t.frequency.toFixed(2), 'orange', t.frequency, p?.frequency, true)}
+          {kpi('תקציב', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
+          {kpi('לידים', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
+          {kpi('עלות לליד', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
+          {kpi('חשיפות', formatNum(activeT.impressions), 'cyan', activeT.impressions, activeP?.impressions)}
+          {kpi('חשיפה ייחודית', formatNum(activeT.reach), 'pink', activeT.reach, activeP?.reach)}
+          {kpi('קליקים', formatNum(activeT.clicks), 'orange', activeT.clicks, activeP?.clicks)}
+          {kpi('CPC', formatCurrency(activeT.cpc), 'red', activeT.cpc, activeP?.cpc, true)}
+          {kpi('CPM', formatCurrency(activeT.cpm), 'purple', activeT.cpm, activeP?.cpm, true)}
+          {kpi('CTR', activeT.ctr.toFixed(2) + '%', 'green', activeT.ctr, activeP?.ctr)}
+          {kpi('אחוז המרה', activeT.convRate.toFixed(2) + '%', '', activeT.convRate, activeP?.convRate)}
+          {kpi('תדירות', activeT.frequency.toFixed(2), 'orange', activeT.frequency, activeP?.frequency, true)}
         </div>
         {trendData.length > 1 && (<div className="section"><div className="section-title">📈 מגמות חודשיות</div><div className="chart-grid"><div className="chart-card"><h4>לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
         {campNames.length > 0 && (<div className="section"><div className="section-title">🎯 קמפיינים</div><div className="chart-grid"><div className="chart-card"><h4>התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין')}</div>)}
@@ -331,7 +356,7 @@ function HistoryView({ clients }) {
     <div className="card" key={r.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
       <div>
         <h4 style={{fontWeight: 700}}>{r.projects?.clients?.name} / {r.projects?.name} — {formatMonth(r.month)}</h4>
-        <p style={{color: 'var(--text-secondary)', fontSize: '0.9em'}}>{r.source === 'facebook' ? 'Facebook' : r.source === 'google' ? 'Google' : 'CRM'} | {r.file_name} | {r.row_count} rows</p>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.9em'}}>{r.source === 'facebook' ? 'Facebook' : r.source === 'google_pmax' ? 'Google PMax' : r.source === 'google_search' ? 'Google Search' : r.source === 'google' ? 'Google' : 'CRM'} | {r.file_name} | {r.row_count} rows</p>
       </div>
       <button className="btn btn-danger" style={{fontSize: '0.8em', padding: '6px 12px'}} onClick={() => deleteReport(r.id)}>🗑</button>
     </div>
