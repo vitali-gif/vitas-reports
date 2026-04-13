@@ -87,6 +87,15 @@ export default function AdminPage() {
     showToast('Project "' + newProjectName + '" added');
   };
 
+  const handleResetData = async () => {
+    if (!selectedProject) return alert('בחר פרויקט קודם');
+    if (!confirm('האם אתה בטוח שברצונך למחוק את כל הנתונים של הפרויקט הזה?')) return;
+    const { error } = await supabase.from('reports').delete().eq('project_id', selectedProject.id);
+    if (error) return alert('שגיאה: ' + error.message);
+    setReports([]);
+    alert('הנתונים נמחקו בהצלחה');
+  };
+
   const handleFile = async (file) => {
     if (!uploadClient || !uploadProject || !uploadMonth) { showToast('Please fill all fields'); return; }
     setUploading(true); setUploadResult(null);
@@ -299,7 +308,7 @@ export default function AdminPage() {
 
           {view === 'upload' && (<>
             <h2 style={{fontSize: '1.8em', fontWeight: 800, marginBottom: 20}}>📤 העלאת נתונים</h2>
-            <div className="card"><h3 style={{marginBottom: 15, fontWeight: 700}}>הגדרות</h3>
+            <div className="card"><div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}><h3 style={{fontWeight: 700, margin: 0}}>הגדרות</h3><button className="btn" style={{background: '#e74c3c', color: '#fff', padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13}} onClick={handleResetData}>🗑️ איפוס נתונים</button></div>
               <div className="form-row"><div className="form-group"><label>לקוח</label><select className="form-input" value={uploadClient} onChange={e => setUploadClient(e.target.value)}><option value="">בחר לקוח</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div className="form-group"><label>פרויקט</label><select className="form-input" value={uploadProject} onChange={e => setUploadProject(e.target.value)}><option value="">בחר פרויקט</option>{getClientProjects(uploadClient).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></div>
               <div className="form-row"><div className="form-group"><label>מקור</label><select className="form-input" value={uploadSource} onChange={e => setUploadSource(e.target.value)}><option value="facebook">Facebook Ads</option><option value="google_pmax">Google Ads PMax</option><option value="google_search">Google Ads Search</option><option value="crm">CRM</option></select></div><div className="form-group"><label>חודש</label><input className="form-input" type="month" value={uploadMonth} onChange={e => setUploadMonth(e.target.value)} /></div></div>
             </div>
