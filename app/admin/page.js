@@ -267,7 +267,7 @@ export default function AdminPage() {
         {ageNames.length > 0 && (<div className="section"><div className="section-title">📊 גיל</div><div className="chart-grid"><div className="chart-card"><h4>לידים ו-CPL לפי גיל</h4><div className="chart-container"><canvas id="ageChart"></canvas></div></div></div></div>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports]);
+  }, [selectedMonth, compareEnabled, reports, dashTab])
 
   if (loading) return <div className="loading-page">טוען...</div>;
 
