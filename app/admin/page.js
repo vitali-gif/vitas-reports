@@ -91,9 +91,29 @@ export default function AdminPage() {
     setUploading(true); setUploadResult(null);
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      let json;
+      const bytes = new Uint8Array(data);
+      // Detect UTF-16 BOM (Google Ads CSV export)
+      if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
+        const text = new TextDecoder('utf-16le').decode(data);
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+        // Find header row (first line with tabs = actual data header)
+        let headerIdx = lines.findIndex(l => l.includes('\t'));
+        if (headerIdx < 0) headerIdx = 0;
+        const headers = lines[headerIdx].split('\t');
+        json = [];
+        for (let i = headerIdx + 1; i < lines.length; i++) {
+          const vals = lines[i].split('\t');
+          if (vals.length < 2) continue;
+          const row = {};
+          headers.forEach((h, j) => { row[h.trim()] = (vals[j] || '').replace(/^"|"$/g, '').trim(); });
+          json.push(row);
+        }
+      } else {
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      }
       let mapped;
       if (uploadSource === 'facebook') mapped = mapFacebookRows(json);
       else if (uploadSource === 'google') mapped = mapGoogleRows(json);
