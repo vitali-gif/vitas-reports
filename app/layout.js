@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'VITAS Reports - \u05DE\u05E2\u05E8\u05DB\u05EA \u05D3\u05D5\u05D7\u05D5\u05EA',
-  description: '\u05DE\u05E2\u05E8\u05DB\u05EA \u05D3\u05D5\u05D7\u05D5\u05EA \u05DC\u05DC\u05E7\u05D5\u05D7\u05D5\u05EA',
+  title: 'VITAS Reports - מערכת דוחות',
+  description: 'מערכת דוחות ללקוחות',
 };
 
 export default function RootLayout({ children }) {
