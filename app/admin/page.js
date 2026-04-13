@@ -228,8 +228,8 @@ export default function AdminPage() {
     const hasFb = fbReports.length > 0;
     const hasG = gReports.length > 0;
     let fbTotals = null, gTotals = null;
-    if (hasFb) { let rows = []; fbReports.forEach(r => { rows = rows.concat(r.data || []); }); fbTotals = aggregateRows(rows).totals; }
-    if (hasG) { let rows = []; gReports.forEach(r => { rows = rows.concat(r.data || []); }); gTotals = aggregateRows(rows).totals; }
+    if (hasFb) { let fbRows = []; fbReports.forEach(r => { if (r.data) fbRows = fbRows.concat(r.data); }); fbTotals = aggregateRows(fbRows).totals; }
+    if (hasG) { let gRows = []; gReports.forEach(r => { if (r.data) gRows = gRows.concat(r.data); }); gTotals = aggregateRows(gRows).totals; }
     const activeT = dashTab === 'facebook' && fbTotals ? fbTotals : dashTab === 'google' && gTotals ? gTotals : t;
     const activeP = dashTab !== 'all' ? null : p;
 
