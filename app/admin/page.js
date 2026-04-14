@@ -144,6 +144,13 @@ export default function AdminPage() {
             });
           }
         }
+        // Decode HTML entities in CRM data
+        const decHtml = s => String(s ?? '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+        json = json.map(row => {
+          const obj = {};
+          Object.entries(row).forEach(([k, v]) => { obj[decHtml(k)] = decHtml(v); });
+          return obj;
+        });
         mapped = mapCrmRows(json);
         summary = aggregateCrmRows(mapped);
       } else if (uploadSource === 'crm_reports') {
