@@ -131,6 +131,19 @@ export default function AdminPage() {
         else if (uploadSource === 'google_search') mapped = mapped.map(r => ({ ...r, campaign: 'Search' }));
         summary = aggregateRows(mapped);
       } else if (uploadSource === 'crm') {
+        if (json.length >= 2) {
+          const fv = Object.values(json[0]).map(v => String(v).trim());
+          if (fv.some(v => v.includes('תואמו') || v.includes('בוצעו') || (v.includes('סה') && v.includes('לידים')))) {
+            const origKeys = Object.keys(json[0]);
+            const nh = {};
+            origKeys.forEach(k => { const s = String(json[0][k] || '').trim(); nh[k] = s || k; });
+            json = json.slice(1).map(row => {
+              const obj = {};
+              origKeys.forEach(k => { obj[nh[k]] = row[k]; });
+              return obj;
+            });
+          }
+        }
         mapped = mapCrmRows(json);
         summary = aggregateCrmRows(mapped);
       } else if (uploadSource === 'crm_reports') {
