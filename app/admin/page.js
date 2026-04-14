@@ -505,6 +505,17 @@ export default function AdminPage() {
       });
     }
 
+    // Extract CRM totals for "all" tab KPI display
+    let crmTotals = null;
+    if (dashTab === 'all') {
+      const crmReps = currentReports.filter(r => r.source === 'crm');
+      if (crmReps.length > 0) {
+        let allCrmR = [];
+        crmReps.forEach(r => { if (r.data) allCrmR = allCrmR.concat(r.data); });
+        crmTotals = aggregateCrmRows(allCrmR).totals;
+      }
+    }
+
     let prevData = null;
     if (compareEnabled) {
       const prevMonth = getPrevMonth(selectedMonth);
@@ -538,16 +549,19 @@ export default function AdminPage() {
     };
 
     const buildTable = (items, prevItems, labelName) => {
+      if (!items || Object.keys(items).length === 0) return null;
       const entries = Object.entries(items).sort((a, b) => b[1].spend - a[1].spend);
-      const showCh = !!prevItems;
-      const changeBadge = (curr, prev, isCost) => {
-        if (!prev || prev === 0) return null;
-        const pct = ((curr - prev) / prev) * 100;
-        const isPos = isCost ? pct < 0 : pct > 0;
-        return <span className={`change-badge ${isPos ? 'positive' : 'negative'}`}>{pct > 0 ? '\u25b2' : '\u25bc'} {Math.abs(pct).toFixed(1)}%</span>;
+      const showCh = compareEnabled && prevItems;
+      const ch = (cur, prev, isCost) => {
+        if (!showCh || prev == null) return null;
+        const pct = changePercent(cur, prev, isCost);
+        if (!pct) return null;
+        const isPos = isCost ? pct.pct < 0 : pct.pct > 0;
+        return <span className={`change-badge ${isPos ? 'positive' : 'negative'}`}>{pct.pct > 0 ? '\u25b2' : '\u25bc'} {Math.abs(pct.pct).toFixed(1)}%</span>;
       };
-      return (<div className="table-wrapper"><table className="data-table"><thead><tr><th>{labelName}</th><th>Budget</th>{showCh && <th>Change</th>}<th>Leads</th>{showCh && <th>Change</th>}<th>CPL</th>{showCh && <th>Change</th>}<th>Clicks</th><th>CTR</th><th>CPM</th></tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const prev = prevItems?.[name]; const prevCpl = prev && prev.leads > 0 ? prev.spend / prev.leads : 0; const cplClass = cpl > 0 && cpl < 50 ? 'cpl-good' : cpl < 100 ? 'cpl-ok' : 'cpl-bad'; return (<tr key={name}><td style={{fontWeight: 600}}>{name}</td><td>{formatCurrency(d.spend)}</td>{showCh && <td>{prev ? changeBadge(d.spend, prev.spend, true) : '-'}</td>}<td>{d.leads}</td>{showCh && <td>{prev ? changeBadge(d.leads, prev.leads) : '-'}</td>}<td><span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></td>{showCh && <td>{prev ? changeBadge(cpl, prevCpl, true) : '-'}</td>}<td>{formatNum(d.clicks)}</td><td>{ctr.toFixed(2)}%</td><td>{formatCurrency(cpm)}</td></tr>); })}</tbody></table></div>);
+      return (<div className="table-wrapper"><table className="data-table"><thead><tr><th>{labelName}</th><th>{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</th><th>{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</th><th>{'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'}</th><th>CTR</th><th>CPM</th><th>{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</th><th>{'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</th><th>{'\u05ea\u05e7\u05e6\u05d9\u05d1 \u05e9\u05e0\u05d5\u05e6\u05dc'}</th></tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{name}</td><td>{formatNum(d.clicks)}</td><td>{formatNum(d.impressions)}</td><td>{formatCurrency(cpc)}</td><td>{ctr.toFixed(2)}%</td><td>{formatCurrency(cpm)}</td><td><strong>{d.leads}</strong></td><td><span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>); })}</tbody></table></div>);
     };
+
 
     setTimeout(() => {
       destroyCharts();
@@ -562,10 +576,23 @@ export default function AdminPage() {
         createChart('campLeads', 'bar', campNames2, [{ label: 'Leads', data: campNames2.map(n => data.campaigns[n].leads), backgroundColor: 'rgba(16,185,129,0.7)', yAxisID: 'y' }, { label: 'CPL', data: campNames2.map(n => data.campaigns[n].leads > 0 ? data.campaigns[n].spend / data.campaigns[n].leads : 0), borderColor: '#ef4444', type: 'line', yAxisID: 'y1', tension: 0.3 }], { y: { position: 'right' }, y1: { position: 'left', grid: { drawOnChartArea: false } } });
       }
       const gn = Object.keys(data.genders).filter(g => g !== 'unknown');
-      if (gn.length > 0) createChart('genderChart', 'doughnut', gn, [{ data: gn.map(g => data.genders[g].spend), backgroundColor: ['rgba(59,130,246,0.7)', 'rgba(236,72,153,0.7)', 'rgba(139,92,246,0.7)'] }]);
+      const gnAll = Object.keys(data.genders);
+      if (gnAll.length > 0) {
+        const gLabels = gnAll.map(g => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2');
+        createChart('genderSpendChart', 'doughnut', gLabels, [{ data: gnAll.map(g => data.genders[g].spend), backgroundColor: ['rgba(236,72,153,0.7)', 'rgba(59,130,246,0.7)', 'rgba(245,158,11,0.7)'], borderColor: ['#fff','#fff','#fff'], borderWidth: 3 }]);
+        createChart('genderLeadsChart', 'doughnut', gLabels, [{ data: gnAll.map(g => data.genders[g].leads), backgroundColor: ['rgba(236,72,153,0.7)', 'rgba(59,130,246,0.7)', 'rgba(245,158,11,0.7)'], borderColor: ['#fff','#fff','#fff'], borderWidth: 3 }]);
+      }
       const an = Object.keys(data.ages).filter(a => a !== 'unknown').sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999));
-      if (an.length > 0) createChart('ageChart', 'bar', an, [{ label: 'Leads', data: an.map(a => data.ages[a].leads), backgroundColor: 'rgba(59,130,246,0.7)', yAxisID: 'y' }, { label: 'CPL', data: an.map(a => data.ages[a].leads > 0 ? data.ages[a].spend / data.ages[a].leads : 0), borderColor: '#ef4444', type: 'line', yAxisID: 'y1', tension: 0.3 }], { y: { position: 'right' }, y1: { position: 'left', grid: { drawOnChartArea: false } } });
-    }, 200);
+      if (an.length > 0) {
+        createChart('ageSpendLeads', 'bar', an, [{ label: '\u05d4\u05d5\u05e6\u05d0\u05d4', data: an.map(a => data.ages[a].spend), backgroundColor: 'rgba(59,130,246,0.15)', borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y' }, { label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: an.map(a => data.ages[a].leads), backgroundColor: 'rgba(16,185,129,0.15)', borderColor: '#10b981', borderWidth: 2, yAxisID: 'y1' }], { y: { position: 'right', title: { display: true, text: '\u05d4\u05d5\u05e6\u05d0\u05d4 (\u20aa)' } }, y1: { position: 'left', title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd' }, grid: { drawOnChartArea: false } } });
+        const ageCPLdata = an.map(a => data.ages[a].leads > 0 ? data.ages[a].spend / data.ages[a].leads : 0);
+        const ageCPLcolors = ageCPLdata.map(v => v < 80 ? '#10b981' : v < 120 ? '#3b82f6' : v < 150 ? '#8b5cf6' : '#ef4444');
+        const ageCPLbg = ageCPLdata.map(v => v < 80 ? 'rgba(16,185,129,0.15)' : v < 120 ? 'rgba(59,130,246,0.15)' : v < 150 ? 'rgba(139,92,246,0.15)' : 'rgba(239,68,68,0.15)');
+        createChart('ageCPL', 'bar', an, [{ label: 'CPL (\u20aa)', data: ageCPLdata, backgroundColor: ageCPLbg, borderColor: ageCPLcolors, borderWidth: 2 }]);
+        createChart('ageRates', 'bar', an, [{ label: 'CTR %', data: an.map(a => data.ages[a].impressions > 0 ? (data.ages[a].clicks / data.ages[a].impressions * 100) : 0), backgroundColor: 'rgba(6,182,212,0.15)', borderColor: '#06b6d4', borderWidth: 2 }, { label: '\u05d0\u05d7\u05d5\u05d6 \u05d4\u05de\u05e8\u05d4 %', data: an.map(a => data.ages[a].clicks > 0 ? (data.ages[a].leads / data.ages[a].clicks * 100) : 0), backgroundColor: 'rgba(139,92,246,0.15)', borderColor: '#8b5cf6', borderWidth: 2 }]);
+        createChart('ageCPM', 'bar', an, [{ label: 'CPM (\u20aa)', data: an.map(a => data.ages[a].impressions > 0 ? (data.ages[a].spend / data.ages[a].impressions * 1000) : 0), backgroundColor: 'rgba(245,158,11,0.15)', borderColor: '#f59e0b', borderWidth: 2 }]);
+      }
+
 
     const campNames = Object.keys(data.campaigns);
     const adEntries = Object.entries(data.ads).sort((a, b) => b[1].spend - a[1].spend).slice(0, 10);
@@ -611,31 +638,33 @@ export default function AdminPage() {
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP?.leads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
-          {kpi('\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea', formatNum(activeT.impressions), 'cyan', activeT.impressions, activeP?.impressions)}
-          {kpi('\u05d7\u05e9\u05d9\u05e4\u05d4 \u05d9\u05d9\u05d7\u05d5\u05d3\u05d9\u05ea', formatNum(activeT.reach), 'pink', activeT.reach, activeP?.reach)}
-          {kpi('\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd', formatNum(activeT.clicks), 'orange', activeT.clicks, activeP?.clicks)}
-          {kpi('CPC', formatCurrency(activeT.cpc), 'red', activeT.cpc, activeP?.cpc, true)}
-          {kpi('CPM', formatCurrency(activeT.cpm), 'purple', activeT.cpm, activeP?.cpm, true)}
-          {kpi('CTR', activeT.ctr.toFixed(2) + '%', 'green', activeT.ctr, activeP?.ctr)}
-          {kpi('\u05d0\u05d7\u05d5\u05d6 \u05d4\u05de\u05e8\u05d4', activeT.convRate.toFixed(2) + '%', '', activeT.convRate, activeP?.convRate)}
-          {kpi('\u05ea\u05d3\u05d9\u05e8\u05d5\u05ea', activeT.frequency.toFixed(2), 'orange', activeT.frequency, activeP?.frequency, true)}
+          {dashTab === 'all' && crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.scheduled || 0), 'cyan', crmTotals.scheduled, null) : null}
+          {dashTab === 'all' && crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.held || 0), 'orange', crmTotals.held, null) : null}
+          {dashTab === 'all' && crmTotals ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, null) : null}
+          {dashTab === 'all' && crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, null) : null}
         </div>
 
         {/* FUNNEL */}
         <div className="section">
           <div className="section-header" style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
             <div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udd3d'}</div>
-            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>{'\u05de\u05e9\u05e4\u05da \u05e9\u05d9\u05d5\u05d5\u05e7\u05d9'}</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>{'\u05dd\u05d7\u05e9\u05d9\u05e4\u05d4 \u05d5\u05e2\u05d3 \u05dc\u05d9\u05d3'}</div></div>
+            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>{'\u05de\u05e9\u05e4\u05dc \u05e9\u05d9\u05d5\u05d5\u05e7\u05d9'}</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>{'\u05de\u05e7\u05dc\u05d9\u05e7 \u05d5\u05e2\u05d3 \u05d7\u05d5\u05d6\u05d4'}</div></div>
           </div>
           <div className="card" style={{padding:'24px'}}>
             <div className="funnel">
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(activeT.impressions)}</div><div className="funnel-label">{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</div></div>
-              <div className="funnel-arrow">{'\u2190'}</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.reach)}</div><div className="funnel-label">{'\u05ea\u05e4\u05d5\u05e6\u05d4'}</div><div className="funnel-rate">{activeT.impressions > 0 ? (activeT.reach / activeT.impressions * 100).toFixed(1) : 0}% {'\u05dd\u05d4\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</div></div>
-              <div className="funnel-arrow">{'\u2190'}</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(activeT.clicks)}</div><div className="funnel-label">{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</div><div className="funnel-rate">CTR: {activeT.ctr ? activeT.ctr.toFixed(2) : 0}%</div></div>
-              <div className="funnel-arrow">{'\u2190'}</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(activeT.leads)}</div><div className="funnel-label">{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</div><div className="funnel-rate">{'\u05d4\u05de\u05e8\u05d4'}: {activeT.convRate ? activeT.convRate.toFixed(2) : 0}%</div></div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(activeT.clicks)}</div><div className="funnel-label">{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</div></div>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.impressions)}</div><div className="funnel-label">{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</div></div>
+              {dashTab === 'all' && crmTotals ? <><div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--cyan)'}}>{formatNum(crmTotals.scheduled || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05de\u05ea\u05d5\u05d0\u05de\u05d5\u05ea'}</div></div>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(crmTotals.held || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5'}</div></div>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(crmTotals.registrations || 0)}</div><div className="funnel-label">{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</div></div>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-3)'}}>{formatNum(crmTotals.contracts || 0)}</div><div className="funnel-label">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div></div></> : <>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(activeT.leads)}</div><div className="funnel-label">{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</div><div className="funnel-rate">{'\u05d4\u05de\u05e8\u05d4'}: {activeT.convRate.toFixed(2)}%</div></div></>}
             </div>
             <div style={{textAlign:'center',marginTop:'10px',fontSize:'0.85em',color:'var(--text-secondary)'}}>
               {'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpl)}</strong> &nbsp;|&nbsp; {'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'}: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpc)}</strong> &nbsp;|&nbsp; CPM: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpm)}</strong>
@@ -643,18 +672,116 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc8'}</div>{'\u05de\u05d2\u05dd\u05d5\u05ea \u05d7\u05d5\u05d3\u05e9\u05d9\u05d5\u05ea'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcc8 \u05ea\u05e7\u05e6\u05d9\u05d1 \u05d5\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
+        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc8'}</div>{'\u05de\u05d2\u05de\u05d5\u05ea \u05d7\u05d5\u05d3\u05e9\u05d9\u05d5\u05ea'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcc8 \u05ea\u05e7\u05e6\u05d9\u05d1 \u05d5\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
 
         {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df')}</div>)}
 
         <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable(data.adSets, prevData?.adSets, '\u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea')}</div>
 
-        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable(data.ads, prevData?.ads, '\u05de\u05d5\u05d3\u05e2\u05d4')}{adEntries.filter(([,a]) => a.text).map(([name, ad]) => { const cpl = ad.leads > 0 ? ad.spend / ad.leads : 0; const cplClass = cpl > 0 && cpl < 50 ? 'cpl-good' : cpl < 100 ? 'cpl-ok' : 'cpl-bad'; return (<div className="ad-text-card" key={name}><div className="ad-name">{name}</div><div className="ad-body" onClick={e => e.currentTarget.classList.toggle('expanded')}>{ad.text}</div><div className="ad-metrics"><div>Budget: <span>{formatCurrency(ad.spend)}</span></div><div>Leads: <span>{ad.leads}</span></div><div>CPL: <span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></div></div></div>); })}</div>
+        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4')}</div>
 
-        {genderNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83d\udc64'}</div>{'\u05de\u05d2\u05d3\u05e8'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="genderChart"></canvas></div></div></div></div>)}
+        {/* GENDER SECTION - 3 cards + 2 doughnut charts */}
+        {genderNames.length > 0 && (() => {
+          const gd = data.genders;
+          const genderMap = { female: { label: '\u05e0\u05e9\u05d9\u05dd', emoji: '\ud83d\udc69' }, male: { label: '\u05d2\u05d1\u05e8\u05d9\u05dd', emoji: '\ud83d\udc68' }, unknown: { label: '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2', emoji: '\u2753' } };
+          const gKeys = ['female', 'male', 'unknown'].filter(g => gd[g]);
+          return (<div className="section">
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\u26a7'}</div>{'\u05e4\u05d9\u05dc\u05d5\u05d7 \u05de\u05d2\u05d3\u05e8\u05d9'}</div>
+            <div className="grid-3" style={{marginBottom:'20px'}}>
+              {gKeys.map(g => { const d = gd[g]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; return (
+                <div className="card" key={g}><div className="card-body" style={{textAlign:'center'}}>
+                  <div style={{fontSize:'2em'}}>{genderMap[g]?.emoji || '\ud83d\udc64'}</div>
+                  <div style={{fontWeight:700,fontSize:'1.1em',margin:'8px 0'}}>{genderMap[g]?.label || g}</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',textAlign:'center',fontSize:'0.85em'}}>
+                    <div>{'\u05d4\u05d5\u05e6\u05d0\u05d4'}<br/><strong>{formatCurrency(d.spend)}</strong></div>
+                    <div>{'\u05dc\u05d9\u05d3\u05d9\u05dd'}<br/><strong>{d.leads}</strong></div>
+                    <div>CPL<br/><strong>{formatCurrency(cpl)}</strong></div>
+                    <div>{'\u05d4\u05de\u05e8\u05d4'}<br/><strong>{conv.toFixed(2)}%</strong></div>
+                    <div>CTR<br/><strong>{ctr.toFixed(2)}%</strong></div>
+                    <div>CPM<br/><strong>{formatCurrency(cpm)}</strong></div>
+                  </div>
+                </div></div>); })}
+            </div>
+            <div className="chart-grid">
+              <div className="chart-card"><h4>{'\ud83d\udcb0 \u05d7\u05dc\u05d5\u05e7\u05ea \u05d4\u05d5\u05e6\u05d0\u05d4'}</h4><div className="chart-container"><canvas id="genderSpendChart"></canvas></div></div>
+              <div className="chart-card"><h4>{'\ud83d\udc65 \u05dc\u05d9\u05d3\u05d9\u05dd \u05dc\u05e4\u05d9 \u05de\u05d2\u05d3\u05e8'}</h4><div className="chart-container"><canvas id="genderLeadsChart"></canvas></div></div>
+            </div>
+          </div>);
+        })()}
 
-        {ageNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcca'}</div>{'\u05d2\u05d9\u05dc'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL \u05dc\u05e4\u05d9 \u05d2\u05d9\u05dc'}</h4><div className="chart-container"><canvas id="ageChart"></canvas></div></div></div></div>)}
-        </>)}
+        {/* AGE SECTION - full table + 4 charts */}
+        {ageNames.length > 0 && (() => {
+          const ad = data.ages;
+          const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb; });
+          return (<div className="section">
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc5'}</div>{'\u05e4\u05d9\u05dc\u05d5\u05d7 \u05d2\u05d9\u05dc\u05d0\u05d9'}</div>
+            <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
+              <table className="data-table"><thead><tr>
+                <th>{'\u05d2\u05d9\u05dc'}</th><th>{'\u05d4\u05d5\u05e6\u05d0\u05d4'}</th><th>{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</th><th>CPL</th><th>{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</th><th>CPC</th><th>CTR</th><th>{'\u05d4\u05de\u05e8\u05d4'}</th><th>CPM</th>
+              </tr></thead><tbody>
+                {sortedAges.map(age => { const d = ad[age]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
+                  <tr key={age}>
+                    <td style={{fontWeight:600}}>{age}</td>
+                    <td>{formatCurrency(d.spend)}</td>
+                    <td><strong>{d.leads}</strong></td>
+                    <td><span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></td>
+                    <td>{formatNum(d.clicks)}</td>
+                    <td>{formatCurrency(cpc)}</td>
+                    <td>{ctr.toFixed(2)}%</td>
+                    <td>{conv.toFixed(2)}%</td>
+                    <td>{formatCurrency(cpm)}</td>
+                  </tr>); })}
+              </tbody></table>
+            </div></div>
+            <div className="chart-grid">
+              <div className="chart-card"><h4>{'\ud83d\udcb0 \u05d4\u05d5\u05e6\u05d0\u05d4 \u05d5\u05dc\u05d9\u05d3\u05d9\u05dd'}</h4><div className="chart-container"><canvas id="ageSpendLeads"></canvas></div></div>
+              <div className="chart-card"><h4>{'\ud83d\udcc8 \u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3 (CPL)'}</h4><div className="chart-container"><canvas id="ageCPL"></canvas></div></div>
+            </div>
+            <div className="chart-grid">
+              <div className="chart-card"><h4>{'\ud83d\uddb1 CTR \u05d1\u05d0\u05d7\u05d5\u05d6 \u05d4\u05de\u05e8\u05d4'}</h4><div className="chart-container"><canvas id="ageRates"></canvas></div></div>
+              <div className="chart-card"><h4>{'\ud83d\udce1 CPM'}</h4><div className="chart-container"><canvas id="ageCPM"></canvas></div></div>
+            </div>
+          </div>);
+        })()}
+
+        {/* INSIGHTS SECTION */}
+        <div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udca1'}</div>{'\u05ea\u05d5\u05d1\u05e0\u05d5\u05ea \u05d5\u05d4\u05de\u05dc\u05e6\u05d5\u05ea'}</div>
+          {(() => {
+            const camps = Object.entries(data.campaigns);
+            const ads2 = Object.entries(data.ads);
+            const bestCamp = camps.sort((a,b) => { const ca = a[1].leads > 0 ? a[1].spend/a[1].leads : 9999; const cb = b[1].leads > 0 ? b[1].spend/b[1].leads : 9999; return ca - cb; })[0];
+            const worstCamp = camps.sort((a,b) => { const ca = a[1].leads > 0 ? a[1].spend/a[1].leads : 0; const cb = b[1].leads > 0 ? b[1].spend/b[1].leads : 0; return cb - ca; })[0];
+            const bestAd = ads2.sort((a,b) => { const ca = a[1].leads > 0 ? a[1].spend/a[1].leads : 9999; const cb = b[1].leads > 0 ? b[1].spend/b[1].leads : 9999; return ca - cb; })[0];
+            const bestAge = ageNames.length > 0 ? ageNames.sort((a,b) => { const da = data.ages[a]; const db = data.ages[b]; const ca = da.leads > 0 ? da.spend/da.leads : 9999; const cb = db.leads > 0 ? db.spend/db.leads : 9999; return ca - cb; })[0] : null;
+            const worstAge = ageNames.length > 0 ? ageNames.sort((a,b) => { const da = data.ages[a]; const db = data.ages[b]; const ca = da.leads > 0 ? da.spend/da.leads : 0; const cb = db.leads > 0 ? db.spend/db.leads : 0; return cb - ca; })[0] : null;
+            return (<>
+              <div className="insight-box" style={{background:'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',border:'1px solid #bfdbfe',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
+                <h3 style={{fontSize:'1em',color:'var(--accent-dark)',marginBottom:'10px'}}>{'\ud83c\udfc6 \u05de\u05d4 \u05e2\u05d5\u05d1\u05d3 \u05d4\u05db\u05d9 \u05d8\u05d5\u05d1'}</h3>
+                <ul style={{listStyle:'none',padding:0}}>
+                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05e7\u05de\u05e4\u05d9\u05d9\u05df'} <strong>{bestCamp[0]}</strong> - CPL {'\u05d4\u05e0\u05de\u05d5\u05da \u05d1\u05d9\u05d5\u05ea\u05e8'} ({formatCurrency(bestCamp[1].leads > 0 ? bestCamp[1].spend/bestCamp[1].leads : 0)}) {'\u05e2\u05dd'} {bestCamp[1].leads} {'\u05dc\u05d9\u05d3\u05d9\u05dd'}</li>}
+                  {bestAd && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05de\u05d5\u05d3\u05e2\u05d4'} <strong>{bestAd[0]}</strong> - {bestAd[1].leads} {'\u05dc\u05d9\u05d3\u05d9\u05dd'} {'\u05d1-'}{formatCurrency(bestAd[1].leads > 0 ? bestAd[1].spend/bestAd[1].leads : 0)} {'\u05dc\u05dc\u05d9\u05d3'}</li>}
+                  {bestAge && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d2\u05d9\u05dc\u05d0\u05d9'} <strong>{bestAge}</strong> - CPL {'\u05d4\u05e0\u05de\u05d5\u05da \u05d1\u05d9\u05d5\u05ea\u05e8'} ({formatCurrency(data.ages[bestAge].leads > 0 ? data.ages[bestAge].spend/data.ages[bestAge].leads : 0)})</li>}
+                </ul>
+              </div>
+              <div className="insight-box" style={{background:'linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%)',border:'1px solid #fecaca',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
+                <h3 style={{fontSize:'1em',color:'#dc2626',marginBottom:'10px'}}>{'\u26a0\ufe0f \u05de\u05d4 \u05e6\u05e8\u05d9\u05da \u05dc\u05e9\u05e4\u05e8'}</h3>
+                <ul style={{listStyle:'none',padding:0}}>
+                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05e7\u05de\u05e4\u05d9\u05d9\u05df'} <strong>{worstCamp[0]}</strong> - CPL {'\u05d2\u05d1\u05d5\u05d4'} ({formatCurrency(worstCamp[1].leads > 0 ? worstCamp[1].spend/worstCamp[1].leads : 0)}). {'\u05e9\u05d5\u05d5\u05d4 \u05dc\u05e9\u05e7\u05d5\u05dc \u05e9\u05d9\u05e0\u05d5\u05d9 \u05e7\u05e8\u05d9\u05d0\u05d9\u05d9\u05d8\u05d9\u05d1.'}</li>}
+                  {worstAge && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d2\u05d9\u05dc\u05d0\u05d9'} <strong>{worstAge}</strong> - CPL {'\u05d4\u05d2\u05d1\u05d5\u05d4 \u05d1\u05d9\u05d5\u05ea\u05e8'} ({formatCurrency(data.ages[worstAge].leads > 0 ? data.ages[worstAge].spend/data.ages[worstAge].leads : 0)})</li>}
+                </ul>
+              </div>
+              <div className="insight-box" style={{background:'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',border:'1px solid #86efac',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
+                <h3 style={{fontSize:'1em',color:'#059669',marginBottom:'10px'}}>{'\ud83c\udfaf \u05d4\u05de\u05dc\u05e6\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d4\u05d1\u05d0'}</h3>
+                <ul style={{listStyle:'none',padding:0}}>
+                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d4\u05d2\u05d3\u05dc\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1 \u05dc-'}<strong>{bestCamp[0]}</strong> - {'\u05d4-CPL \u05d4\u05e0\u05de\u05d5\u05da \u05d1\u05d9\u05d5\u05ea\u05e8 \u05e2\u05dd \u05e4\u05d5\u05d8\u05e0\u05e6\u05d9\u05d0\u05dc \u05dc\u05d4\u05d2\u05d3\u05dc\u05d4'}</li>}
+                  {bestAge && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d7\u05d9\u05d6\u05d5\u05e7 \u05d2\u05d9\u05dc\u05d0\u05d9'} <strong>{bestAge}</strong> - {'\u05d4\u05db\u05d9 \u05d0\u05e4\u05e7\u05d8\u05d9\u05d1\u05d9\u05d9\u05dd \u05de\u05d1\u05d7\u05d9\u05e0\u05ea \u05e2\u05dc\u05d5\u05ea'}</li>}
+                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d1\u05d3\u05d9\u05e7\u05d4 \u05de\u05d7\u05d3\u05e9 \u05e9\u05dc'} <strong>{worstCamp[0]}</strong> - {'\u05d4\u05d7\u05dc\u05e4\u05ea \u05e7\u05e8\u05d9\u05d0\u05d9\u05d9\u05d8\u05d9\u05d1 \u05d0\u05d5 \u05d4\u05e4\u05e1\u05e7\u05d4'}</li>}
+                </ul>
+              </div>
+            </>);
+          })()}
+        </div>
       </>
     );
   }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard]);
