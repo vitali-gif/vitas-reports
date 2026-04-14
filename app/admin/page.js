@@ -189,9 +189,14 @@ export default function AdminPage() {
     const t = data.totals;
     const p = prevData?.totals;
 
-    const kpi = (label, value, color, current, prev, isCost) => {
-      const ch = prev != null ? changePercent(current, prev, isCost) : null;
-      return (<div className={`kpi-card ${color}`} key={label}><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}>{ch.pct > 0 ? '▲' : '▼'} {Math.abs(ch.pct).toFixed(1)}%</div>}</div>);
+  const kpiIcons = { 'הוצאה': '₪', 'לידים': '👥', 'CPL': '💰', 'חשיפות': '👁', 'תפוצה': '📡', 'קליקים': '🖱', 'CPC': '💸', 'CPM': '📊', 'CTR': '📈', 'המרה': '🔄', 'תדירות': '🔄' }
+  const kpiColors = { green: 'rgba(16,185,129,0.1)', purple: 'rgba(139,92,246,0.1)', orange: 'rgba(245,158,11,0.1)', pink: 'rgba(236,72,153,0.1)', cyan: 'rgba(6,182,212,0.1)', red: 'rgba(239,68,68,0.1)' }
+  const kpiTextColors = { green: 'var(--success)', purple: 'var(--purple)', orange: 'var(--warning)', pink: 'var(--pink)', cyan: 'var(--cyan)', red: 'var(--danger)' }
+  const kpi = (label, value, color, current, prev, isCost) => {
+    const ch = prev != null ? changePercent(current, prev, isCost) : null
+    const icon = kpiIcons[label] || '📊'
+    return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '▲' : '▼'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>
+  }
     };
 
     const buildTable = (items, prevItems, labelName) => {
@@ -239,10 +244,10 @@ export default function AdminPage() {
       <>
         {/* Source Tabs */}
         {(hasFb && hasG) && (
-          <div style={{display:'flex', gap:'8px', marginBottom:'20px'}}>
-            <button className={`btn ${dashTab === 'all' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setDashTab('all')}>הכל</button>
-            <button className={`btn ${dashTab === 'facebook' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setDashTab('facebook')}>Facebook</button>
-            <button className={`btn ${dashTab === 'google' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setDashTab('google')}>Google</button>
+          <div className="client-tabs">
+            <button className={`client-tab ${dashTab === 'all' ? 'active' : ''}`} onClick={() => setDashTab('all')}>הכל</button>
+            <button className={`client-tab ${dashTab === 'facebook' ? 'active' : ''}`} onClick={() => setDashTab('facebook')}>Facebook</button>
+            <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>
           </div>
         )}
 
@@ -259,12 +264,36 @@ export default function AdminPage() {
           {kpi('אחוז המרה', activeT.convRate.toFixed(2) + '%', '', activeT.convRate, activeP?.convRate)}
           {kpi('תדירות', activeT.frequency.toFixed(2), 'orange', activeT.frequency, activeP?.frequency, true)}
         </div>
-        {trendData.length > 1 && (<div className="section"><div className="section-title">📈 מגמות חודשיות</div><div className="chart-grid"><div className="chart-card"><h4>לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
-        {campNames.length > 0 && (<div className="section"><div className="section-title">🎯 קמפיינים</div><div className="chart-grid"><div className="chart-card"><h4>התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין')}</div>)}
-        <div className="section"><div className="section-title">📋 קבוצות מודעות</div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות')}</div>
-        <div className="section"><div className="section-title">📝 מודעות</div>{buildTable(data.ads, prevData?.ads, 'מודעה')}{adEntries.filter(([,a]) => a.text).map(([name, ad]) => { const cpl = ad.leads > 0 ? ad.spend / ad.leads : 0; const cplClass = cpl > 0 && cpl < 50 ? 'cpl-good' : cpl < 100 ? 'cpl-ok' : 'cpl-bad'; return (<div className="ad-text-card" key={name}><div className="ad-name">{name}</div><div className="ad-body" onClick={e => e.currentTarget.classList.toggle('expanded')}>{ad.text}</div><div className="ad-metrics"><div>Budget: <span>{formatCurrency(ad.spend)}</span></div><div>Leads: <span>{ad.leads}</span></div><div>CPL: <span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></div></div></div>); })}</div>
-        {genderNames.length > 0 && (<div className="section"><div className="section-title">👤 מגדר</div><div className="chart-grid"><div className="chart-card"><h4>התפלגות תקציב</h4><div className="chart-container"><canvas id="genderChart"></canvas></div></div></div></div>)}
-        {ageNames.length > 0 && (<div className="section"><div className="section-title">📊 גיל</div><div className="chart-grid"><div className="chart-card"><h4>לידים ו-CPL לפי גיל</h4><div className="chart-container"><canvas id="ageChart"></canvas></div></div></div></div>)}
+
+          {/* FUNNEL */}
+          <div className="section">
+            <div className="section-header" style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
+              <div className="section-icon" style={{background:'var(--gradient-2)'}}>🔽</div>
+              <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>משפך שיווקי</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>מחשיפה ועד ליד</div></div>
+            </div>
+            <div className="card" style={{padding:'24px'}}>
+              <div className="funnel">
+                <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(activeT.impressions)}</div><div className="funnel-label">חשיפות</div></div>
+                <div className="funnel-arrow">←</div>
+                <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.reach)}</div><div className="funnel-label">תפוצה</div><div className="funnel-rate">{activeT.impressions > 0 ? (activeT.reach / activeT.impressions * 100).toFixed(1) : 0}% מהחשיפות</div></div>
+                <div className="funnel-arrow">←</div>
+                <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(activeT.clicks)}</div><div className="funnel-label">קליקים</div><div className="funnel-rate">CTR: {activeT.ctr ? activeT.ctr.toFixed(2) : 0}%</div></div>
+                <div className="funnel-arrow">←</div>
+                <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(activeT.leads)}</div><div className="funnel-label">לידים</div><div className="funnel-rate">המרה: {activeT.convRate ? activeT.convRate.toFixed(2) : 0}%</div></div>
+              </div>
+              <div style={{textAlign:'center',marginTop:'10px',fontSize:'0.85em',color:'var(--text-secondary)'}}>
+                עלות לליד: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpl)}</strong> &nbsp;|&nbsp;
+                עלות לקליק: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpc)}</strong> &nbsp;|&nbsp;
+                CPM: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpm)}</strong>
+              </div>
+            </div>
+          </div>
+        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>מגמות חודשיות</div><div className="chart-grid"><div className="chart-card"><h4>💰 לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>📈 תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
+        {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>קמפיינים</div><div className="chart-grid"><div className="chart-card"><h4>📊 התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>💰 לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין')}</div>)}
+        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות מודעות</div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות')}</div>
+        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>📝</div>מודעות</div>{buildTable(data.ads, prevData?.ads, 'מודעה')}{adEntries.filter(([,a]) => a.text).map(([name, ad]) => { const cpl = ad.leads > 0 ? ad.spend / ad.leads : 0; const cplClass = cpl > 0 && cpl < 50 ? 'cpl-good' : cpl < 100 ? 'cpl-ok' : 'cpl-bad'; return (<div className="ad-text-card" key={name}><div className="ad-name">{name}</div><div className="ad-body" onClick={e => e.currentTarget.classList.toggle('expanded')}>{ad.text}</div><div className="ad-metrics"><div>Budget: <span>{formatCurrency(ad.spend)}</span></div><div>Leads: <span>{ad.leads}</span></div><div>CPL: <span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></div></div></div>); })}</div>
+        {genderNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>👤</div>מגדר</div><div className="chart-grid"><div className="chart-card"><h4>📊 התפלגות תקציב</h4><div className="chart-container"><canvas id="genderChart"></canvas></div></div></div></div>)}
+        {ageNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📊</div>גיל</div><div className="chart-grid"><div className="chart-card"><h4>📊 לידים ו-CPL לפי גיל</h4><div className="chart-container"><canvas id="ageChart"></canvas></div></div></div></div>)}
       </>
     );
   }, [selectedMonth, compareEnabled, reports, dashTab])
