@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
-import { formatCurrency, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, aggregateRows, aggregateCrmRows, changePercent, getPrevMonth, COLORS } from '../../lib/helpers'
+import { formatCurrency, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS } from '../../lib/helpers'
 import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
 
@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [selectedMonth, setSelectedMonth] = useState('')
   const [compareEnabled, setCompareEnabled] = useState(false)
   const [dashTab, setDashTab] = useState('all')
+  const [crmSubTab, setCrmSubTab] = useState('sources')
   const chartsRef = useRef([])
   const [showAddClient, setShowAddClient] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
@@ -86,7 +87,7 @@ export default function AdminPage() {
 
   const handleResetData = async () => {
     if (!selectedProject) return alert('\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05e7\u05d5\u05d3\u05dd');
-    if (!confirm('\u05d4\u05d0\u05dd \u05d0\u05ea\u05d4 \u05d1\u05d8\u05d5\u05d7 \u05e9\u05d1\u05e8\u05e6\u05d5\u05e0\u05da \u05dc\u05de\u05d7\u05d5\u05e7 \u05d0\u05ea \u05db\u05dc \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d4\u05d6\u05d4?')) return;
+    if (!confirm('\u05d4\u05d0\u05dd \u05d0\u05ea\u05d4 \u05d1\u05d8\u05d5\u05d7 \u05e9\u05d1\u05d8\u05e6\u05d5\u05e0\u05da \u05dc\u05de\u05d7\u05d5\u05e7 \u05d0\u05ea \u05db\u05dc \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d4\u05d6\u05d4?')) return;
     const { error } = await supabase.from('reports').delete().eq('project_id', selectedProject.id);
     if (error) return alert('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + error.message);
     setReports([]); alert('\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e0\u05de\u05d7\u05e7\u05d5 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4');
@@ -132,6 +133,9 @@ export default function AdminPage() {
       } else if (uploadSource === 'crm') {
         mapped = mapCrmRows(json);
         summary = aggregateCrmRows(mapped);
+      } else if (uploadSource === 'crm_reports') {
+        mapped = mapCrmReportRows(json);
+        summary = aggregateCrmReportRows(mapped);
       } else {
         mapped = json;
         summary = {};
@@ -151,6 +155,8 @@ export default function AdminPage() {
 
       if (uploadSource === 'crm') {
         setUploadResult({ success: true, fileName: file.name, rowCount: mapped.length, crmTotals: summary.totals });
+      } else if (uploadSource === 'crm_reports') {
+        setUploadResult({ success: true, fileName: file.name, rowCount: mapped.length, crmReportTotals: summary.totals });
       } else {
         setUploadResult({ success: true, fileName: file.name, rowCount: mapped.length, totals: summary.totals });
       }
@@ -189,6 +195,87 @@ export default function AdminPage() {
     chartsRef.current.push(chart);
   };
 
+  const renderCrmReportDashboard = useCallback(() => {
+    if (!selectedMonth || reports.length === 0) return null;
+    destroyCharts();
+
+    const crmRepReports = reports.filter(r => r.month === selectedMonth && r.source === 'crm_reports');
+    if (crmRepReports.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udcad'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 CRM \u05d3\u05d5\u05d7\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d6\u05d4'}</h3></div>;
+
+    let allRows = [];
+    crmRepReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
+    const repData = aggregateCrmReportRows(allRows);
+    const rt = repData.totals;
+
+    const cityEntries = Object.entries(repData.cities).sort((a, b) => b[1] - a[1]);
+    const objEntries = Object.entries(repData.objectionTypes).sort((a, b) => b[1] - a[1]);
+    const cityNames = cityEntries.map(([n]) => n);
+    const objNames = objEntries.map(([n]) => n);
+
+    setTimeout(() => {
+      destroyCharts();
+      if (cityNames.length > 0) {
+        createChart('crmRepCityChart', 'bar', cityNames, [{
+          label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: cityNames.map(n => repData.cities[n]),
+          backgroundColor: COLORS.slice(0, cityNames.length)
+        }], { y: { beginAtZero: true, position: 'right' } });
+      }
+      if (objNames.length > 0) {
+        createChart('crmRepObjChart', 'doughnut', objNames, [{
+          data: objNames.map(n => repData.objectionTypes[n]),
+          backgroundColor: COLORS.slice(0, objNames.length)
+        }]);
+      }
+    }, 200);
+
+    return (
+      <>
+        <div className="kpi-grid">
+          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>{'\ud83d\udcdd'}</div><div className="kpi-label">{'\u05e1\u05d4"\u05db \u05e9\u05d5\u05d8\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(rt.totalRows)}</div></div>
+          <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>{'\ud83c\udfd8\ufe0f'}</div><div className="kpi-label">{'\u05e2\u05e8\u05d9\u05dd \u05d9\u05d9\u05d7\u05d5\u05d3\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(rt.uniqueCities)}</div></div>
+          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>{'\u26a0\ufe0f'}</div><div className="kpi-label">{'\u05e2\u05dd \u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(rt.withObjections)}</div></div>
+          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>{'\ud83d\udcc5'}</div><div className="kpi-label">{'\u05e2\u05dd \u05e4\u05d2\u05d9\u05e9\u05d4/\u05de\u05e9\u05d9\u05de\u05d4'}</div><div className="kpi-value">{formatNum(rt.withMeeting)}</div></div>
+          <div className="kpi-card pink"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(236,72,153,0.1)',color:'var(--pink)'}}>{'\ud83d\udcca'}</div><div className="kpi-label">{'% \u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{rt.objectionRate.toFixed(1)}%</div></div>
+          <div className="kpi-card cyan"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(6,182,212,0.1)',color:'var(--cyan)'}}>{'\ud83d\udcca'}</div><div className="kpi-label">{'% \u05e4\u05d2\u05d9\u05e9\u05d5\u05ea'}</div><div className="kpi-value">{rt.meetingRate.toFixed(1)}%</div></div>
+        </div>
+
+        {/* Data Table */}
+        <div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de\u05e4\u05d5\u05e8\u05d8\u05d9\u05dd'}</div>
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead><tr>
+                <th>#</th>
+                <th>{'\u05db\u05ea\u05d5\u05d1\u05ea/\u05d9\u05d9\u05e9\u05d5\u05d1'}</th>
+                <th>{'\u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</th>
+                <th>{'\u05de\u05e9\u05d9\u05dd\u05d4/\u05e4\u05d2\u05d9\u05e9\u05d4 \u05d0\u05d7\u05e8\u05d5\u05e0\u05d4'}</th>
+              </tr></thead>
+              <tbody>
+                {allRows.map((row, i) => (
+                  <tr key={i}>
+                    <td>{i + 1}</td>
+                    <td style={{fontWeight:600}}>{row.address || '-'}</td>
+                    <td>{row.objections || '-'}</td>
+                    <td>{row.lastMeeting || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Charts */}
+        <div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udcc8'}</div>{'\u05d2\u05e8\u05e4\u05d9\u05dd'}</div>
+          <div className="chart-grid">
+            <div className="chart-card"><h4>{'\ud83c\udfd8\ufe0f \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05dc\u05e4\u05d9 \u05d9\u05d9\u05e9\u05d5\u05d1'}</h4><div className="chart-container"><canvas id="crmRepCityChart"></canvas></div></div>
+            <div className="chart-card"><h4>{'\u26a0\ufe0f \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</h4><div className="chart-container"><canvas id="crmRepObjChart"></canvas></div></div>
+          </div>
+        </div>
+      </>
+    );
+  }, [selectedMonth, reports]);
+
   const renderCrmDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
     destroyCharts();
@@ -216,7 +303,7 @@ export default function AdminPage() {
 
     const crmKpi = (label, value, color, current, prev, isCost) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null;
-      const icons = { '\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd': '\u05d1\u05e9', '\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd': '\u2705', '\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd': '\u274c', '\u05ea\u05d5\u05d0\u05de\u05d5': '\u05e4\u05d2', '\u05d1\u05d5\u05e6\u05e2\u05d5': '\u05e8\u05d8', '\u05d1\u05d5\u05d8\u05dc\u05d5': '\u05d1\u05d8', '\u05d4\u05e8\u05e9\u05de\u05d5\u05ea': '\u05d4\u05e8', '\u05e9\u05d5\u05d5\u05d9 \u05d4\u05e8\u05e9\u05de\u05d5\u05ea': '\u20aa', '\u05d7\u05d5\u05d6\u05d9\u05dd': '\u05d7\u05d6', '\u05e9\u05d5\u05d5\u05d9 \u05d7\u05d5\u05d6\u05d9\u05dd': '\u20aa', '% \u05ea\u05d9\u05d0\u05d5\u05dd': '%', '% \u05d1\u05d9\u05e6\u05d5\u05e2': '%', '% \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d5\u05ea': '%', '% \u05d7\u05d5\u05d6\u05d9\u05dd': '%' };
+      const icons = { '\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd': '\u05d1\u05e9', '\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd': '\u2705', '\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd': '\u274c', '\u05ea\u05d5\u05d0\u05de\u05d5': '\u05e4\u05d2', '\u05d1\u05d5\u05e6\u05e2\u05d5': '\u05e9\u05d8', '\u05d1\u05d5\u05d8\u05dc\u05d5': '\u05d1\u05d8', '\u05d4\u05e8\u05e9\u05de\u05d5\u05ea': '\u05d4\u05e8', '\u05e9\u05d5\u05d5\u05d9 \u05d4\u05e8\u05e9\u05de\u05d5\u05ea': '\u20aa', '\u05d7\u05d5\u05d6\u05d9\u05dd': '\u05d7\u05d6', '\u05e9\u05d5\u05d5\u05d9 \u05d7\u05d5\u05d6\u05d9\u05dd': '\u20aa', '% \u05ea\u05d9\u05d0\u05d5\u05dd': '%', '% \u05d1\u05d9\u05e6\u05d5\u05e2': '%', '% \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d5\u05ea': '%', '% \u05d7\u05d5\u05d6\u05d9\u05dd': '%' };
       const icon = icons[label] || '\ud83d\udcca';
       const kpiColors = { green: 'rgba(16,185,129,0.1)', purple: 'rgba(139,92,246,0.1)', orange: 'rgba(245,158,11,0.1)', pink: 'rgba(236,72,153,0.1)', cyan: 'rgba(6,182,212,0.1)', red: 'rgba(239,68,68,0.1)' };
       const kpiTextColors = { green: 'var(--success)', purple: 'var(--purple)', orange: 'var(--warning)', pink: 'var(--pink)', cyan: 'var(--cyan)', red: 'var(--danger)' };
@@ -235,9 +322,9 @@ export default function AdminPage() {
         ], { y: { beginAtZero: true, position: 'right' } });
 
         createChart('crmFunnelChart', 'bar', sourceNames, [
-          { label: '\u05ea\u05d5\u05d0\u05de\u05d5', data: sourceNames.map(n => crmData.sources[n].meetingsScheduled), backgroundColor: 'rgba(139,92,246,0.7)' },
+          { label: '\u05ea\u05d5\u05d0\u05dd\u05d5', data: sourceNames.map(n => crmData.sources[n].meetingsScheduled), backgroundColor: 'rgba(139,92,246,0.7)' },
           { label: '\u05d1\u05d5\u05e6\u05e2\u05d5', data: sourceNames.map(n => crmData.sources[n].meetingsCompleted), backgroundColor: 'rgba(245,158,11,0.7)' },
-          { label: '\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', data: sourceNames.map(n => crmData.sources[n].registrations), backgroundColor: 'rgba(236,72,153,0.7)' },
+          { label: '\u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', data: sourceNames.map(n => crmData.sources[n].registrations), backgroundColor: 'rgba(236,72,153,0.7)' },
           { label: '\u05d7\u05d5\u05d6\u05d9\u05dd', data: sourceNames.map(n => crmData.sources[n].contracts), backgroundColor: 'rgba(6,182,212,0.7)' },
         ], { y: { beginAtZero: true, position: 'right' } });
 
@@ -376,7 +463,7 @@ export default function AdminPage() {
     if (currentReports.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>No data for this month</h3></div>;
 
     const displayReports = dashTab === 'all'
-      ? currentReports.filter(r => r.source !== 'crm')
+      ? currentReports.filter(r => r.source !== 'crm' && r.source !== 'crm_reports')
       : dashTab === 'facebook'
       ? currentReports.filter(r => r.source === 'facebook')
       : dashTab === 'google'
@@ -413,7 +500,7 @@ export default function AdminPage() {
     const allMonths = [...new Set(reports.map(r => r.month))].sort();
     const trendData = allMonths.map(m => {
       let mRows = [];
-      reports.filter(r => r.month === m && r.source !== 'crm').forEach(r => { mRows = mRows.concat(r.data || []); });
+      reports.filter(r => r.month === m && r.source !== 'crm' && r.source !== 'crm_reports').forEach(r => { mRows = mRows.concat(r.data || []); });
       return { month: m, ...aggregateRows(mRows).totals };
     });
 
@@ -468,9 +555,10 @@ export default function AdminPage() {
     const fbReports = currentReports.filter(r => r.source === 'facebook');
     const gReports = currentReports.filter(r => r.source && r.source.startsWith('google'));
     const crmReports = currentReports.filter(r => r.source === 'crm');
+    const crmRepReports = currentReports.filter(r => r.source === 'crm_reports');
     const hasFb = fbReports.length > 0;
     const hasG = gReports.length > 0;
-    const hasCrm = crmReports.length > 0;
+    const hasCrm = crmReports.length > 0 || crmRepReports.length > 0;
 
     let fbTotals = null, gTotals = null;
     if (hasFb) { let fbRows = []; fbReports.forEach(r => { if (r.data) fbRows = fbRows.concat(r.data); }); fbTotals = aggregateRows(fbRows).totals; }
@@ -492,7 +580,13 @@ export default function AdminPage() {
           {hasCrm && <button className={`client-tab ${dashTab === 'crm' ? 'active' : ''}`} onClick={() => setDashTab('crm')}>CRM</button>}
         </div>
 
-        {dashTab === 'crm' ? renderCrmDashboard() : (<>
+        {dashTab === 'crm' ? (<>
+          <div className="client-tabs" style={{marginBottom: 15}}>
+            <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>{'\ud83d\udcc2 \u05de\u05e7\u05d5\u05e8\u05d5\u05ea \u05d4\u05d2\u05e2\u05d4'}</button>
+            <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>{'\ud83d\udcca \u05de\u05d7\u05d5\u05dc\u05dc \u05d3\u05d5\u05d7\u05d5\u05ea'}</button>
+          </div>
+          {crmSubTab === 'sources' ? renderCrmDashboard() : renderCrmReportDashboard()}
+        </>) : (<>
         <div className="kpi-grid">
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP?.leads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
@@ -511,13 +605,13 @@ export default function AdminPage() {
         <div className="section">
           <div className="section-header" style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
             <div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udd3d'}</div>
-            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>{'\u05de\u05e9\u05e4\u05dc \u05e9\u05d9\u05d5\u05d5\u05e7\u05d9'}</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>{'\u05de\u05d7\u05e9\u05d9\u05e4\u05d4 \u05d5\u05e2\u05d3 \u05dc\u05d9\u05d3'}</div></div>
+            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>{'\u05de\u05e9\u05e4\u05da \u05e9\u05d9\u05d5\u05d5\u05e7\u05d9'}</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>{'\u05dd\u05d7\u05e9\u05d9\u05e4\u05d4 \u05d5\u05e2\u05d3 \u05dc\u05d9\u05d3'}</div></div>
           </div>
           <div className="card" style={{padding:'24px'}}>
             <div className="funnel">
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(activeT.impressions)}</div><div className="funnel-label">{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</div></div>
               <div className="funnel-arrow">{'\u2190'}</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.reach)}</div><div className="funnel-label">{'\u05ea\u05e4\u05d5\u05e6\u05d4'}</div><div className="funnel-rate">{activeT.impressions > 0 ? (activeT.reach / activeT.impressions * 100).toFixed(1) : 0}% {'\u05de\u05d4\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</div></div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.reach)}</div><div className="funnel-label">{'\u05ea\u05e4\u05d5\u05e6\u05d4'}</div><div className="funnel-rate">{activeT.impressions > 0 ? (activeT.reach / activeT.impressions * 100).toFixed(1) : 0}% {'\u05dd\u05d4\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</div></div>
               <div className="funnel-arrow">{'\u2190'}</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(activeT.clicks)}</div><div className="funnel-label">{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</div><div className="funnel-rate">CTR: {activeT.ctr ? activeT.ctr.toFixed(2) : 0}%</div></div>
               <div className="funnel-arrow">{'\u2190'}</div>
@@ -529,7 +623,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc8'}</div>{'\u05de\u05d2\u05de\u05d5\u05ea \u05d7\u05d5\u05d3\u05e9\u05d9\u05d5\u05ea'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcc8 \u05ea\u05e7\u05e6\u05d9\u05d1 \u05d5\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
+        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc8'}</div>{'\u05de\u05d2\u05dd\u05d5\u05ea \u05d7\u05d5\u05d3\u05e9\u05d9\u05d5\u05ea'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcc8 \u05ea\u05e7\u05e6\u05d9\u05d1 \u05d5\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
 
         {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df')}</div>)}
 
@@ -543,7 +637,7 @@ export default function AdminPage() {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, renderCrmDashboard]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard]);
 
   if (loading) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
@@ -555,7 +649,7 @@ export default function AdminPage() {
         <div className="card">
           <form onSubmit={handleAuth}>
             <div className="form-group"><label>{'\u05d0\u05d9\u05de\u05d9\u05d9\u05dc'}</label><input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} dir="ltr" required /></div>
-            <div className="form-group"><label>{'\u05e1\u05d9\u05e1\u05de\u05d4'}</label><input className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} dir="ltr" required /></div>
+            <div className="form-group"><label>{'\u05e1\u05d9\u05e1\u05dd\u05d4'}</label><input className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} dir="ltr" required /></div>
             {authError && <p style={{color: 'var(--danger)', fontSize: '0.85em', marginBottom: 10}}>{authError}</p>}
             <button className="btn btn-primary btn-lg" style={{width: '100%'}} type="submit">{isSignUp ? '\u05d4\u05e8\u05e9\u05de\u05d4' : '\u05db\u05e0\u05d9\u05e1\u05d4'}</button>
           </form>
@@ -580,19 +674,19 @@ export default function AdminPage() {
           {clients.map(client => (<div key={client.id}>
             <div className={`client-item ${selectedClient?.id === client.id ? 'active' : ''}`} onClick={() => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}><div className="client-dot" style={{background: client.color}}></div>{client.name}</div>
             {selectedClient?.id === client.id && client.projects?.map(proj => (<div key={proj.id} className={`project-item ${selectedProject?.id === proj.id ? 'active' : ''}`} onClick={() => selectProject(client, proj)}>{'\ud83d\udcc2'} {proj.name}</div>))}
-            {selectedClient?.id === client.id && (<><div className="add-btn indent" onClick={() => setShowAddProject(true)}>+ {'\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</div><div style={{padding: '5px 25px'}}><div className="link-box" style={{marginTop: 5}}><small>{'\u05dc\u05d9\u05e0\u05e7 \u05dc\u05db\u05e7\u05d5\u05d7'}:</small><input readOnly value={typeof window !== 'undefined' ? `${window.location.origin}/client/${client.token}` : ''} onClick={e => {e.target.select(); navigator.clipboard?.writeText(e.target.value); showToast('\u05d4\u05dc\u05d9\u05e0\u05e7 \u05d4\u05d5\u05e2\u05ea\u05e7!');}} /></div></div></>)}
+            {selectedClient?.id === client.id && (<><div className="add-btn indent" onClick={() => setShowAddProject(true)}>+ {'\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</div><div style={{padding: '5px 25px'}}><div className="link-box" style={{marginTop: 5}}><small>{'\u05dc\u05d9\u05e0\u05e7 \u05dc\u05dc\u05e7\u05d5\u05d7'}:</small><input readOnly value={typeof window !== 'undefined' ? `${window.location.origin}/client/${client.token}` : ''} onClick={e => {e.target.select(); navigator.clipboard?.writeText(e.target.value); showToast('\u05d4\u05dc\u05d9\u05e0\u05e7 \u05d4\u05d5\u05e2\u05ea\u05e7!');}} /></div></div></>)}
           </div>))}
           <div className="add-btn" onClick={() => setShowAddClient(true)}>+ {'\u05d4\u05d5\u05e1\u05e3 \u05dc\u05e7\u05d5\u05d7'}</div>
         </div></div>
 
         <div className="main-content">
-          {view === 'welcome' && (<div className="welcome-center"><div className="icon">{'\ud83d\udcca'}</div><h2>{'\u05d1\u05d8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05de\u05d4\u05ea\u05e4\u05e8\u05d9\u05d8 \u05db\u05d3\u05d9 \u05dc\u05e6\u05e4\u05d5\u05ea \u05d1\u05d3\u05d5\u05d7, \u05d0\u05d5 \u05d4\u05e2\u05dc\u05d4 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd'}</p></div>)}
+          {view === 'welcome' && (<div className="welcome-center"><div className="icon">{'\ud83d\udcca'}</div><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05de\u05d4\u05ea\u05e4\u05e8\u05d9\u05d8 \u05db\u05d3\u05d9 \u05dc\u05e6\u05e4\u05d5\u05ea \u05d1\u05d3\u05d5\u05d7, \u05d0\u05d5 \u05d4\u05e2\u05dc\u05d4 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd'}</p></div>)}
 
           {view === 'upload' && (<>
             <h2 style={{fontSize: '1.8em', fontWeight: 800, marginBottom: 20}}>{'\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</h2>
             <div className="card"><div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}><h3 style={{fontWeight: 700, margin: 0}}>{'\u05d4\u05d2\u05d3\u05e8\u05d5\u05ea'}</h3><button className="btn" style={{background: '#e74c3c', color: '#fff', padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13}} onClick={handleResetData}>{'\ud83d\uddd1\ufe0f \u05d0\u05d9\u05e4\u05d5\u05e1 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button></div>
               <div className="form-row"><div className="form-group"><label>{'\u05dc\u05e7\u05d5\u05d7'}</label><select className="form-input" value={uploadClient} onChange={e => setUploadClient(e.target.value)}><option value="">{'\u05d1\u05d7\u05e8 \u05dc\u05e7\u05d5\u05d7'}</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div className="form-group"><label>{'\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</label><select className="form-input" value={uploadProject} onChange={e => setUploadProject(e.target.value)}><option value="">{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</option>{getClientProjects(uploadClient).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></div>
-              <div className="form-row"><div className="form-group"><label>{'\u05de\u05e7\u05d5\u05e8'}</label><select className="form-input" value={uploadSource} onChange={e => setUploadSource(e.target.value)}><option value="facebook">Facebook Ads</option><option value="google_pmax">Google Ads PMax</option><option value="google_search">Google Ads Search</option><option value="crm">CRM {'\u05de\u05e7\u05d5\u05e8\u05d5\u05ea \u05d4\u05d2\u05e2\u05d4'}</option></select></div><div className="form-group"><label>{'\u05d7\u05d5\u05d3\u05e9'}</label><input className="form-input" type="month" value={uploadMonth} onChange={e => setUploadMonth(e.target.value)} /></div></div>
+              <div className="form-row"><div className="form-group"><label>{'\u05de\u05e7\u05d5\u05e8'}</label><select className="form-input" value={uploadSource} onChange={e => setUploadSource(e.target.value)}><option value="facebook">Facebook Ads</option><option value="google_pmax">Google Ads PMax</option><option value="google_search">Google Ads Search</option><option value="crm">CRM {'\u05de\u05e7\u05d5\u05e8\u05d5\u05ea \u05d4\u05d2\u05e2\u05d4'}</option><option value="crm_reports">CRM {'\u05de\u05d7\u05d5\u05dc\u05dc \u05d3\u05d5\u05d7\u05d5\u05ea'}</option></select></div><div className="form-group"><label>{'\u05d7\u05d5\u05d3\u05e9'}</label><input className="form-input" type="month" value={uploadMonth} onChange={e => setUploadMonth(e.target.value)} /></div></div>
             </div>
             <div className="upload-area" onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('dragover'); }} onDragLeave={e => e.currentTarget.classList.remove('dragover')} onDrop={handleDrop} onClick={() => document.getElementById('fileInput').click()}>
               {uploading ? (<><div className="spinner" style={{borderColor: 'rgba(59,130,246,0.3)', borderTopColor: 'var(--accent)', width: 40, height: 40}}></div><h3 style={{marginTop: 15}}>{'\u05de\u05e2\u05d1\u05d3...'}</h3></>) : (<><div className="upload-icon">{'\ud83d\udcc1'}</div><h3>{'\u05d2\u05e8\u05d5\u05e8 \u05e7\u05d5\u05d1\u05e5 \u05d0\u05e7\u05e1\u05dc \u05dc\u05db\u05d0\u05df'}</h3><p style={{color: 'var(--text-secondary)'}}>{'\u05d0\u05d5 \u05dc\u05d7\u05e5 \u05dc\u05d1\u05d7\u05d9\u05e8\u05ea \u05e7\u05d5\u05d1\u05e5'}</p></>)}
@@ -614,6 +708,13 @@ export default function AdminPage() {
                   <div className="kpi-card purple"><div className="kpi-label">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div><div className="kpi-value">{formatNum(uploadResult.crmTotals.contracts)}</div></div>
                   <div className="kpi-card orange"><div className="kpi-label">{'\u05e9\u05d5\u05d5\u05d9 \u05d7\u05d5\u05d6\u05d9\u05dd'}</div><div className="kpi-value">{formatCurrency(uploadResult.crmTotals.contractValue)}</div></div>
                 </div>
+              ) : uploadResult.crmReportTotals ? (
+                <div className="kpi-grid">
+                  <div className="kpi-card"><div className="kpi-label">{'\u05e1\u05d4"\u05db \u05e9\u05d5\u05e8\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(uploadResult.crmReportTotals.totalRows)}</div></div>
+                  <div className="kpi-card green"><div className="kpi-label">{'\u05e2\u05e8\u05d9\u05dd \u05d9\u05d9\u05d7\u05d5\u05d3\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(uploadResult.crmReportTotals.uniqueCities)}</div></div>
+                  <div className="kpi-card purple"><div className="kpi-label">{'\u05e2\u05dd \u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(uploadResult.crmReportTotals.withObjections)}</div></div>
+                  <div className="kpi-card orange"><div className="kpi-label">{'\u05e2\u05dd \u05e4\u05d2\u05d9\u05e9\u05d4'}</div><div className="kpi-value">{formatNum(uploadResult.crmReportTotals.withMeeting)}</div></div>
+                </div>
               ) : null}
             </div>)}
           </>)}
@@ -633,7 +734,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div className={`modal-overlay ${showAddClient ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddClient(false); }}><div className="modal"><h3>{'\u05d4\u05d5\u05e1\u05e3 \u05dc\u05e7\u05d5\u05d7 \u05d7\u05d3\u05e9'}</h3><div className="form-group"><label>{'\u05e9\u05dd \u05dc\u05e7\u05d5\u05d7'}</label><input className="form-input" value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: \u05e9.\u05d1\u05e8\u05d5\u05da'} /></div><div className="form-group"><label>{'\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd (\u05de\u05d5\u05e4\u05e8\u05d3\u05d9\u05dd \u05d1\u05e4\u05e1\u05d9\u05e7\u05d9\u05dd)'}</label><input className="form-input" value={newClientProjects} onChange={e => setNewClientProjects(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK, ONCE'} /></div><div className="form-group"><label>{'\u05e6\u05d1\u05e2'}</label><select className="form-input" value={newClientColor} onChange={e => setNewClientColor(e.target.value)}><option value="#3b82f6">{'\u05db\u05d7\u05d5\u05dc'}</option><option value="#10b981">{'\u05d9\u05e8\u05d5\u05e7'}</option><option value="#8b5cf6">{'\u05e1\u05d2\u05d5\u05dc'}</option><option value="#f59e0b">{'\u05db\u05ea\u05d5\u05dd'}</option><option value="#ec4899">{'\u05d5\u05e8\u05d5\u05d3'}</option></select></div><div className="modal-actions"><button className="btn btn-primary" onClick={addClient}>{'\u05d4\u05d5\u05e1\u05e3'}</button><button className="btn btn-outline" onClick={() => setShowAddClient(false)}>{'\u05d1\u05d9\u05d8\u05d5\u05dc'}</button></div></div></div>
+      <div className={`modal-overlay ${showAddClient ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddClient(false); }}><div className="modal"><h3>{'\u05d4\u05d5\u05e1\u05e3 \u05dc\u05e7\u05d5\u05d7 \u05d7\u05d3\u05e9'}</h3><div className="form-group"><label>{'\u05e9\u05dd \u05dc\u05e7\u05d5\u05d7'}</label><input className="form-input" value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: \u05e9.\u05d1\u05e8\u05d5\u05dc'} /></div><div className="form-group"><label>{'\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd (\u05de\u05d5\u05e4\u05e8\u05d3\u05d9\u05dd \u05d1\u05e4\u05e1\u05d9\u05e7\u05d9\u05dd)'}</label><input className="form-input" value={newClientProjects} onChange={e => setNewClientProjects(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK, ONCE'} /></div><div className="form-group"><label>{'\u05e6\u05d1\u05e2'}</label><select className="form-input" value={newClientColor} onChange={e => setNewClientColor(e.target.value)}><option value="#3b82f6">{'\u05db\u05d7\u05d5\u05dc'}</option><option value="#10b981">{'\u05d9\u05e8\u05d5\u05e7'}</option><option value="#8b5cf6">{'\u05e1\u05d2\u05d5\u05dc'}</option><option value="#f59e0b">{'\u05db\u05ea\u05d5\u05dd'}</option><option value="#ec4899">{'\u05d5\u05e8\u05d5\u05d3'}</option></select></div><div className="modal-actions"><button className="btn btn-primary" onClick={addClient}>{'\u05d4\u05d5\u05e1\u05e3'}</button><button className="btn btn-outline" onClick={() => setShowAddClient(false)}>{'\u05d1\u05d9\u05d8\u05d5\u05dc'}</button></div></div></div>
 
       <div className={`modal-overlay ${showAddProject ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddProject(false); }}><div className="modal"><h3>{'\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05dc-'}{selectedClient?.name}</h3><div className="form-group"><label>{'\u05e9\u05dd \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</label><input className="form-input" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK'} /></div><div className="modal-actions"><button className="btn btn-primary" onClick={addProject}>{'\u05d4\u05d5\u05e1\u05e3'}</button><button className="btn btn-outline" onClick={() => setShowAddProject(false)}>{'\u05d1\u05d9\u05d8\u05d5\u05dc'}</button></div></div></div>
 
@@ -664,6 +765,7 @@ function HistoryView({ clients }) {
     if (source === 'google_search') return 'Google Search';
     if (source === 'google') return 'Google';
     if (source === 'crm') return 'CRM \u05de\u05e7\u05d5\u05e8\u05d5\u05ea \u05d4\u05d2\u05e2\u05d4';
+    if (source === 'crm_reports') return 'CRM \u05de\u05d7\u05d5\u05dc\u05dc \u05d3\u05d5\u05d7\u05d5\u05ea';
     return source;
   };
 
