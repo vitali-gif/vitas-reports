@@ -196,8 +196,7 @@ export default function AdminPage() {
     const ch = prev != null ? changePercent(current, prev, isCost) : null
     const icon = kpiIcons[label] || '📊'
     return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '▲' : '▼'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>
-  }
-    };
+  };
 
     const buildTable = (items, prevItems, labelName) => {
       const entries = Object.entries(items).sort((a, b) => b[1].spend - a[1].spend);
