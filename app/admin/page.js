@@ -701,10 +701,10 @@ export default function AdminPage() {
 
         <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable(data.adSets, prevData?.adSets, '\u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea', 'adsets')}</div>
 
-{!isPmax && (<>        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div></>)}
+{!isPmax &&         <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>}
 
-{!isPmax && (<>        {/* GENDER SECTION - 3 cards + 2 doughnut charts */}
-        {genderNames.length > 0 && (() => {
+        {/* GENDER SECTION - 3 cards + 2 doughnut charts */}
+        {!isPmax && genderNames.length > 0 && (() => {
           const gd = data.genders;
           const genderMap = { female: { label: '\u05e0\u05e9\u05d9\u05dd', emoji: '\ud83d\udc69' }, male: { label: '\u05d2\u05d1\u05e8\u05d9\u05dd', emoji: '\ud83d\udc68' }, unknown: { label: '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2', emoji: '\u2753' } };
           const gKeys = ['female', 'male', 'unknown'].filter(g => gd[g]);
@@ -730,10 +730,10 @@ export default function AdminPage() {
               <div className="chart-card"><h4>{'\ud83d\udc65 \u05dc\u05d9\u05d3\u05d9\u05dd \u05dc\u05e4\u05d9 \u05de\u05d2\u05d3\u05e8'}</h4><div className="chart-container"><canvas id="genderLeadsChart"></canvas></div></div>
             </div>
           </div>);
-        })()</>)}}
+        })()}
 
-{!isPmax && (<>        {/* AGE SECTION - full table + 4 charts */}
-        {ageNames.length > 0 && (() => {
+        {/* AGE SECTION - full table + 4 charts */}
+        {!isPmax && ageNames.length > 0 && (() => {
           const ad = data.ages;
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb; });
           return (<div className="section">
@@ -755,7 +755,7 @@ export default function AdminPage() {
               <div className="chart-card"><h4>{'\ud83d\udce1 CPM'}</h4><div className="chart-container"><canvas id="ageCPM"></canvas></div></div>
             </div>
           </div>);
-        })()</>)}}
+        })()}
 
         {/* INSIGHTS SECTION */}
         <div className="section">
