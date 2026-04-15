@@ -338,18 +338,6 @@ export default function AdminPage() {
     setTimeout(() => {
       destroyCharts();
       if (sourceNames.length > 0) {
-        createChart('crmLeadsChart', 'bar', sourceNames, [
-          { label: '\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', data: sourceNames.map(n => crmData.sources[n].totalLeads), backgroundColor: 'rgba(59,130,246,0.7)' },
-          { label: '\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', data: sourceNames.map(n => crmData.sources[n].relevantLeads), backgroundColor: 'rgba(16,185,129,0.7)' },
-        ], { y: { beginAtZero: true, position: 'right' } });
-
-        createChart('crmFunnelChart', 'bar', sourceNames, [
-          { label: '\u05ea\u05d5\u05d0\u05dd\u05d5', data: sourceNames.map(n => crmData.sources[n].meetingsScheduled), backgroundColor: 'rgba(139,92,246,0.7)' },
-          { label: '\u05d1\u05d5\u05e6\u05e2\u05d5', data: sourceNames.map(n => crmData.sources[n].meetingsCompleted), backgroundColor: 'rgba(245,158,11,0.7)' },
-          { label: '\u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', data: sourceNames.map(n => crmData.sources[n].registrations), backgroundColor: 'rgba(236,72,153,0.7)' },
-          { label: '\u05d7\u05d5\u05d6\u05d9\u05dd', data: sourceNames.map(n => crmData.sources[n].contracts), backgroundColor: 'rgba(6,182,212,0.7)' },
-        ], { y: { beginAtZero: true, position: 'right' } });
-
         createChart('crmPieChart', 'doughnut', sourceNames, [{
           data: sourceNames.map(n => crmData.sources[n].totalLeads),
           backgroundColor: COLORS.slice(0, sourceNames.length)
@@ -467,9 +455,7 @@ export default function AdminPage() {
         {/* CRM Charts */}
         <div className="section">
           <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udcc8'}</div>{'\u05d2\u05e8\u05e4\u05d9\u05dd'}</div>
-          <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr 1fr'}}>
-            <div className="chart-card"><h4>{'\ud83d\udcca \u05dc\u05d9\u05d3\u05d9\u05dd \u05dc\u05e4\u05d9 \u05de\u05e7\u05d5\u05e8'}</h4><div className="chart-container"><canvas id="crmLeadsChart"></canvas></div></div>
-            <div className="chart-card"><h4>{'\ud83c\udfaf \u05de\u05e9\u05e4\u05da \u05dc\u05e4\u05d9 \u05de\u05e7\u05d5\u05e8'}</h4><div className="chart-container"><canvas id="crmFunnelChart"></canvas></div></div>
+          <div className="chart-grid" style={{gridTemplateColumns: '1fr'}}>
             <div className="chart-card"><h4>{'\ud83e\udde9 \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05dc\u05d9\u05d3\u05d9\u05dd'}</h4><div className="chart-container"><canvas id="crmPieChart"></canvas></div></div>
           </div>
         </div>
@@ -661,8 +647,8 @@ export default function AdminPage() {
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP?.leads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
-          {dashTab === 'all' && crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.scheduled || 0), 'cyan', crmTotals.scheduled, null) : null}
-          {dashTab === 'all' && crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.held || 0), 'orange', crmTotals.held, null) : null}
+          {dashTab === 'all' && crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, null) : null}
+          {dashTab === 'all' && crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, null) : null}
           {dashTab === 'all' && crmTotals ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, null) : null}
           {dashTab === 'all' && crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, null) : null}
         </div>
@@ -671,7 +657,7 @@ export default function AdminPage() {
         <div className="section">
           <div className="section-header" style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
             <div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udd3d'}</div>
-            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>{'\u05de\u05e9\u05e4\u05dc \u05e9\u05d9\u05d5\u05d5\u05e7\u05d9'}</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>{'\u05de\u05e7\u05dc\u05d9\u05e7 \u05d5\u05e2\u05d3 \u05d7\u05d5\u05d6\u05d4'}</div></div>
+            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>{'\u05de\u05e9\u05e4\u05da \u05e9\u05d9\u05d5\u05d5\u05e7\u05d9'}</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>{'\u05de\u05e7\u05dc\u05d9\u05e7 \u05d5\u05e2\u05d3 \u05d7\u05d5\u05d6\u05d4'}</div></div>
           </div>
           <div className="card" style={{padding:'24px'}}>
             <div className="funnel">
@@ -679,9 +665,9 @@ export default function AdminPage() {
               <div className="funnel-arrow">&larr;</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.impressions)}</div><div className="funnel-label">{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</div></div>
               {dashTab === 'all' && crmTotals ? <><div className="funnel-arrow">&larr;</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--cyan)'}}>{formatNum(crmTotals.scheduled || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05de\u05ea\u05d5\u05d0\u05de\u05d5\u05ea'}</div></div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--cyan)'}}>{formatNum(crmTotals.meetingsScheduled || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05de\u05ea\u05d5\u05d0\u05de\u05d5\u05ea'}</div></div>
               <div className="funnel-arrow">&larr;</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(crmTotals.held || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5'}</div></div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(crmTotals.meetingsCompleted || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5'}</div></div>
               <div className="funnel-arrow">&larr;</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(crmTotals.registrations || 0)}</div><div className="funnel-label">{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</div></div>
               <div className="funnel-arrow">&larr;</div>
