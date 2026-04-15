@@ -333,20 +333,26 @@ export default function AdminPage() {
       let _fbRows = []; _fbR.forEach(r => { if (r.data) _fbRows = _fbRows.concat(r.data); });
       const _fbAgg = aggregateRows(_fbRows);
       _platformSpend += _fbAgg.totals.spend || 0;
+      const _fbLeads = _fbAgg.totals.leads || 0;
       if (!crmData.sources['Facebook']) {
-        const _fbLeads = _fbAgg.totals.leads || 0;
         crmData.totals.totalLeads += _fbLeads;
         crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads };
+      } else {
+        crmData.totals.totalLeads -= (crmData.sources['Facebook'].totalLeads || 0);
+        crmData.totals.totalLeads += _fbLeads;
       }
     }
     if (_gR.length > 0) {
       let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data); });
       const _gAgg = aggregateRows(_gRows);
       _platformSpend += _gAgg.totals.spend || 0;
+      const _gLeads = _gAgg.totals.leads || 0;
       if (!crmData.sources['Google']) {
-        const _gLeads = _gAgg.totals.leads || 0;
         crmData.totals.totalLeads += _gLeads;
         crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads };
+      } else {
+        crmData.totals.totalLeads -= (crmData.sources['Google'].totalLeads || 0);
+        crmData.totals.totalLeads += _gLeads;
       }
     }
 
