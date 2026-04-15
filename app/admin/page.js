@@ -310,6 +310,7 @@ export default function AdminPage() {
     const crmData = aggregateCrmRows(allCrmRows);
 
     // Add platform leads to CRM totals
+    let _platformSpend = 0;
     const _fbR = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
     const _gR = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
     const _emptySource = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
@@ -318,6 +319,7 @@ export default function AdminPage() {
       const _fbAgg = aggregateRows(_fbRows);
       const _fbLeads = _fbAgg.totals.leads || 0;
       crmData.totals.totalLeads += _fbLeads;
+      _platformSpend += _fbAgg.totals.spend || 0;
       crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads };
     }
     if (_gR.length > 0) {
@@ -325,6 +327,7 @@ export default function AdminPage() {
       const _gAgg = aggregateRows(_gRows);
       const _gLeads = _gAgg.totals.leads || 0;
       crmData.totals.totalLeads += _gLeads;
+      _platformSpend += _gAgg.totals.spend || 0;
       crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads };
     }
 
@@ -344,7 +347,7 @@ export default function AdminPage() {
 
     const crmKpi = (label, value, color, current, prev, isCost) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null;
-      const icons = { '\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd': '\u05d1\u05e9', '\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd': '\u2705', '\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd': '\u274c', '\u05ea\u05d5\u05d0\u05de\u05d5': '\u05e4\u05d2', '\u05d1\u05d5\u05e6\u05e2\u05d5': '\u05e9\u05d8', '\u05d1\u05d5\u05d8\u05dc\u05d5': '\u05d1\u05d8', '\u05d4\u05e8\u05e9\u05de\u05d5\u05ea': '\u05d4\u05e8', '\u05e9\u05d5\u05d5\u05d9 \u05d4\u05e8\u05e9\u05de\u05d5\u05ea': '\u20aa', '\u05d7\u05d5\u05d6\u05d9\u05dd': '\u05d7\u05d6', '\u05e9\u05d5\u05d5\u05d9 \u05d7\u05d5\u05d6\u05d9\u05dd': '\u20aa', '% \u05ea\u05d9\u05d0\u05d5\u05dd': '%', '% \u05d1\u05d9\u05e6\u05d5\u05e2': '%', '% \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d5\u05ea': '%', '% \u05d7\u05d5\u05d6\u05d9\u05dd': '%' };
+      const icons = { 'סה"כ לידים': 'בש', 'רלוונטיים': '✅', 'לא רלוונטיים': '❌', 'פגישות שתואמו': 'פג', 'פגישות שבוצעו': 'שט', 'פגישות שבוטלו': 'בט', 'הרשמות': 'הר', 'שווי הרשמות': '₪', 'חוזים': 'חז', 'שווי חוזים': '₪', 'אחוז המרה לפגישה שתואמה': '%', 'אחוז המרה לפגישות שבוצעו': '%', '% רלוונטיות': '%', 'עלות פגישה שבוצעה': '₪' };
       const icon = icons[label] || '\ud83d\udcca';
       const kpiColors = { green: 'rgba(16,185,129,0.1)', purple: 'rgba(139,92,246,0.1)', orange: 'rgba(245,158,11,0.1)', pink: 'rgba(236,72,153,0.1)', cyan: 'rgba(6,182,212,0.1)', red: 'rgba(239,68,68,0.1)' };
       const kpiTextColors = { green: 'var(--success)', purple: 'var(--purple)', orange: 'var(--warning)', pink: 'var(--pink)', cyan: 'var(--cyan)', red: 'var(--danger)' };
@@ -371,16 +374,17 @@ export default function AdminPage() {
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
           {crmKpi('\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.irrelevantLeads), 'red', ct.irrelevantLeads, cp?.irrelevantLeads, true)}
           {crmKpi('% \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d5\u05ea', ct.relevantRate.toFixed(1) + '%', 'cyan', ct.relevantRate, cp?.relevantRate)}
-          {crmKpi('\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled)}
-          {crmKpi('\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted)}
-          {crmKpi('% \u05ea\u05d9\u05d0\u05d5\u05dd', ct.scheduledRate.toFixed(1) + '%', 'pink', ct.scheduledRate, cp?.scheduledRate)}
-          {crmKpi('% \u05d1\u05d9\u05e6\u05d5\u05e2', ct.completedRate.toFixed(1) + '%', '', ct.completedRate, cp?.completedRate)}
-          {crmKpi('\u05d1\u05d5\u05d8\u05dc\u05d5', formatNum(ct.meetingsCancelled), 'red', ct.meetingsCancelled, cp?.meetingsCancelled, true)}
+          {crmKpi('פגישות שתואמו', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled)}
+          {crmKpi('פגישות שבוצעו', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted)}
+          {crmKpi('אחוז המרה לפגישה שתואמה', ct.scheduledRate.toFixed(1) + '%', 'pink', ct.scheduledRate, cp?.scheduledRate)}
+          {crmKpi('אחוז המרה לפגישות שבוצעו', ct.completedRate.toFixed(1) + '%', '', ct.completedRate, cp?.completedRate)}
+          {crmKpi('עלות פגישה שבוצעה', ct.meetingsCompleted > 0 ? formatCurrency(_platformSpend / ct.meetingsCompleted) : '₪0', 'purple', 0, 0)}
+          {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled), 'red', ct.meetingsCancelled, cp?.meetingsCancelled, true)}
           {crmKpi('\u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations)}
           {crmKpi('\u05e9\u05d5\u05d5\u05d9 \u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', formatCurrency(ct.registrationValue), 'purple', ct.registrationValue, cp?.registrationValue)}
           {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'cyan', ct.contracts, cp?.contracts)}
           {crmKpi('\u05e9\u05d5\u05d5\u05d9 \u05d7\u05d5\u05d6\u05d9\u05dd', formatCurrency(ct.contractValue), 'orange', ct.contractValue, cp?.contractValue)}
-          {crmKpi('% \u05d7\u05d5\u05d6\u05d9\u05dd', ct.contractRate.toFixed(1) + '%', 'pink', ct.contractRate, cp?.contractRate)}
+          
         </div>
 
         {/* CRM Funnel */}
