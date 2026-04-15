@@ -495,7 +495,7 @@ export default function AdminPage() {
       : dashTab === 'google'
       ? currentReports.filter(r => r.source && r.source.startsWith('google'))
       : [];
-    const isPmax = dashTab === 'google_pmax';
+    const isPmax = dashTab === 'google_pmax' || (dashTab === 'google' && displayReports.length > 0 && displayReports.every(r => r.source === 'google_pmax'));
 
     let allRows = [];
     displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
