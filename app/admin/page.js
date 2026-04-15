@@ -316,14 +316,14 @@ export default function AdminPage() {
     if (_fbR.length > 0) {
       let _fbRows = []; _fbR.forEach(r => { if (r.data) _fbRows = _fbRows.concat(r.data); });
       const _fbAgg = aggregateRows(_fbRows);
-      const _fbLeads = _fbAgg.leads || 0;
+      const _fbLeads = _fbAgg.totals.leads || 0;
       crmData.totals.totalLeads += _fbLeads;
       crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads };
     }
     if (_gR.length > 0) {
       let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data); });
       const _gAgg = aggregateRows(_gRows);
-      const _gLeads = _gAgg.leads || 0;
+      const _gLeads = _gAgg.totals.leads || 0;
       crmData.totals.totalLeads += _gLeads;
       crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads };
     }
