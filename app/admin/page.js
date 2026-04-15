@@ -309,6 +309,25 @@ export default function AdminPage() {
     crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
     const crmData = aggregateCrmRows(allCrmRows);
 
+    // Add platform leads to CRM totals
+    const _fbR = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
+    const _gR = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
+    const _emptySource = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
+    if (_fbR.length > 0) {
+      let _fbRows = []; _fbR.forEach(r => { if (r.data) _fbRows = _fbRows.concat(r.data); });
+      const _fbAgg = aggregateRows(_fbRows);
+      const _fbLeads = _fbAgg.leads || 0;
+      crmData.totals.totalLeads += _fbLeads;
+      crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads };
+    }
+    if (_gR.length > 0) {
+      let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data); });
+      const _gAgg = aggregateRows(_gRows);
+      const _gLeads = _gAgg.leads || 0;
+      crmData.totals.totalLeads += _gLeads;
+      crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads };
+    }
+
     let prevCrmData = null;
     if (compareEnabled) {
       const prevMonth = getPrevMonth(selectedMonth);
