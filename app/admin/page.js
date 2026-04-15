@@ -309,7 +309,22 @@ export default function AdminPage() {
     crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
     const crmData = aggregateCrmRows(allCrmRows);
 
-    // Add platform leads to CRM totals
+    // Merge Facebook campaign sources into single 'Facebook' entry
+    const _fbCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('פייסבוק') || k.toLowerCase().includes('facebook'));
+    if (_fbCrmKeys.length > 0) {
+      const _fbMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
+      _fbCrmKeys.forEach(k => { Object.keys(_fbMerged).forEach(f => { _fbMerged[f] += crmData.sources[k][f] || 0; }); delete crmData.sources[k]; });
+      crmData.sources['Facebook'] = _fbMerged;
+    }
+    // Merge Google campaign sources into single 'Google' entry
+    const _gCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('גוגל') || k.toLowerCase().includes('google'));
+    if (_gCrmKeys.length > 0) {
+      const _gMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
+      _gCrmKeys.forEach(k => { Object.keys(_gMerged).forEach(f => { _gMerged[f] += crmData.sources[k][f] || 0; }); delete crmData.sources[k]; });
+      crmData.sources['Google'] = _gMerged;
+    }
+
+    // Add platform leads to CRM totals (only if CRM doesn't already have that source)
     let _platformSpend = 0;
     const _fbR = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
     const _gR = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
@@ -317,18 +332,22 @@ export default function AdminPage() {
     if (_fbR.length > 0) {
       let _fbRows = []; _fbR.forEach(r => { if (r.data) _fbRows = _fbRows.concat(r.data); });
       const _fbAgg = aggregateRows(_fbRows);
-      const _fbLeads = _fbAgg.totals.leads || 0;
-      crmData.totals.totalLeads += _fbLeads;
       _platformSpend += _fbAgg.totals.spend || 0;
-      crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads };
+      if (!crmData.sources['Facebook']) {
+        const _fbLeads = _fbAgg.totals.leads || 0;
+        crmData.totals.totalLeads += _fbLeads;
+        crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads };
+      }
     }
     if (_gR.length > 0) {
       let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data); });
       const _gAgg = aggregateRows(_gRows);
-      const _gLeads = _gAgg.totals.leads || 0;
-      crmData.totals.totalLeads += _gLeads;
       _platformSpend += _gAgg.totals.spend || 0;
-      crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads };
+      if (!crmData.sources['Google']) {
+        const _gLeads = _gAgg.totals.leads || 0;
+        crmData.totals.totalLeads += _gLeads;
+        crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads };
+      }
     }
 
     let prevCrmData = null;
