@@ -35,6 +35,8 @@ export default function AdminPage() {
   const [newClientColor, setNewClientColor] = useState('#3b82f6')
   const [newProjectName, setNewProjectName] = useState('')
   const [toast, setToast] = useState('')
+  const [sortConfig, setSortConfig] = useState({});
+  const handleSort = (tableId, key) => { setSortConfig(prev => { const cur = prev[tableId]; if (cur && cur.key === key) return {...prev, [tableId]: {key, dir: cur.dir === 'desc' ? 'asc' : 'desc'}}; return {...prev, [tableId]: {key, dir: 'desc'}}; }); };
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   useEffect(() => {
@@ -548,18 +550,23 @@ export default function AdminPage() {
       return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '\u25b2' : '\u25bc'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>;
     };
 
-    const buildTable = (items, prevItems, labelName) => {
+    const buildTable = (items, prevItems, labelName, tableId) => {
       if (!items || Object.keys(items).length === 0) return null;
-      const entries = Object.entries(items).sort((a, b) => b[1].spend - a[1].spend);
+      const cols = [{key:'name',label:labelName,get:(_,n)=>n},{key:'clicks',label:'קליקים',get:d=>d.clicks},{key:'impressions',label:'חשיפות',get:d=>d.impressions},{key:'cpc',label:'עלות לקליק',get:d=>d.clicks>0?d.spend/d.clicks:0},{key:'ctr',label:'CTR',get:d=>d.impressions>0?(d.clicks/d.impressions*100):0},{key:'cpm',label:'CPM',get:d=>d.impressions>0?(d.spend/d.impressions*1000):0},{key:'leads',label:'לידים',get:d=>d.leads},{key:'cpl',label:'עלות לליד',get:d=>d.leads>0?d.spend/d.leads:0},{key:'spend',label:'תקציב שנוצל',get:d=>d.spend}];
+      const sc = sortConfig[tableId];
+      let entries = Object.entries(items);
+      if (sc) { const col = cols.find(c=>c.key===sc.key); if(col){entries.sort((a,b)=>{const va=col.get(a[1],a[0]),vb=col.get(b[1],b[0]);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}} else { entries.sort((a, b) => b[1].spend - a[1].spend); }
       const showCh = compareEnabled && prevItems;
       const ch = (cur, prev, isCost) => {
         if (!showCh || prev == null) return null;
         const pct = changePercent(cur, prev, isCost);
         if (!pct) return null;
         const isPos = isCost ? pct.pct < 0 : pct.pct > 0;
-        return <span className={`change-badge ${isPos ? 'positive' : 'negative'}`}>{pct.pct > 0 ? '\u25b2' : '\u25bc'} {Math.abs(pct.pct).toFixed(1)}%</span>;
+        return <span className={`change-badge ${isPos ? 'positive' : 'negative'}`}>{pct.pct > 0 ? '▲' : '▼'} {Math.abs(pct.pct).toFixed(1)}%</span>;
       };
-      return (<div className="table-wrapper"><table className="data-table"><thead><tr><th>{labelName}</th><th>{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</th><th>{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</th><th>{'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'}</th><th>CTR</th><th>CPM</th><th>{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</th><th>{'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</th><th>{'\u05ea\u05e7\u05e6\u05d9\u05d1 \u05e9\u05e0\u05d5\u05e6\u05dc'}</th></tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{name}</td><td>{formatNum(d.clicks)}</td><td>{formatNum(d.impressions)}</td><td>{formatCurrency(cpc)}</td><td>{ctr.toFixed(2)}%</td><td>{formatCurrency(cpm)}</td><td><strong>{d.leads}</strong></td><td><span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>); })}</tbody></table></div>);
+      const sortIcon = (key) => { if(!sc||sc.key!==key) return ' ⇅'; return sc.dir==='desc'?' ▼':' ▲'; };
+      const thStyle = {cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'};
+      return (<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{name}</td><td>{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td>{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td>{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td>{ctr.toFixed(2)}%</td><td>{formatCurrency(cpm)}</td><td>{d.leads} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>);
     };
 
 
@@ -674,11 +681,11 @@ export default function AdminPage() {
 
         {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc8'}</div>{'\u05de\u05d2\u05de\u05d5\u05ea \u05d7\u05d5\u05d3\u05e9\u05d9\u05d5\u05ea'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcc8 \u05ea\u05e7\u05e6\u05d9\u05d1 \u05d5\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
 
-        {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df')}</div>)}
+        {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
 
-        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable(data.adSets, prevData?.adSets, '\u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea')}</div>
+        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable(data.adSets, prevData?.adSets, '\u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea', 'adsets')}</div>
 
-        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4')}</div>
+        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>
 
         {/* GENDER SECTION - 3 cards + 2 doughnut charts */}
         {genderNames.length > 0 && (() => {
@@ -717,20 +724,10 @@ export default function AdminPage() {
             <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc5'}</div>{'\u05e4\u05d9\u05dc\u05d5\u05d7 \u05d2\u05d9\u05dc\u05d0\u05d9'}</div>
             <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
-                <th>{'\u05d2\u05d9\u05dc'}</th><th>{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</th><th>{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</th><th>{'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'}</th><th>CTR</th><th>CPM</th><th>{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</th><th>{'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</th><th>{'\u05ea\u05e7\u05e6\u05d9\u05d1 \u05e9\u05e0\u05d5\u05e6\u05dc'}</th>
+                {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
               </tr></thead><tbody>
-                {sortedAges.map(age => { const d = ad[age]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
-                  <tr key={age}>
-                    <td style={{fontWeight:600}}>{age}</td>
-                    <td>{formatNum(d.clicks)}</td>
-                    <td>{formatNum(d.impressions)}</td>
-                    <td>{formatCurrency(cpc)}</td>
-                    <td>{ctr.toFixed(2)}%</td>
-                    <td>{formatCurrency(cpm)}</td>
-                    <td><strong>{d.leads}</strong></td>
-                    <td><span className={`cpl-badge ${cplClass}`}>{formatCurrency(cpl)}</span></td>
-                    <td>{formatCurrency(d.spend)}</td>
-                  </tr>); })}
+                {(()=>{const ageCols={age:(d,n)=>n,clicks:d=>d.clicks,impressions:d=>d.impressions,cpc:d=>d.clicks>0?d.spend/d.clicks:0,ctr:d=>d.impressions>0?(d.clicks/d.impressions*100):0,cpm:d=>d.impressions>0?(d.spend/d.impressions*1000):0,leads:d=>d.leads,cpl:d=>d.leads>0?d.spend/d.leads:0,spend:d=>d.spend};const sc=sortConfig['ages'];let sorted=[...sortedAges];if(sc&&ageCols[sc.key]){sorted.sort((a,b)=>{const va=ageCols[sc.key](ad[a],a),vb=ageCols[sc.key](ad[b],b);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}return sorted.map(age => { const d = ad[age]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
+                  <tr key={age}><td style={{fontWeight:600}}>{age}</td><td>{formatNum(d.clicks)}</td><td>{formatNum(d.impressions)}</td><td>{formatCurrency(cpc)}</td><td>{ctr.toFixed(2)}%</td><td>{formatCurrency(cpm)}</td><td>{d.leads}</td><td><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>);});})()}
               </tbody></table>
             </div></div>
             <div className="chart-grid">
@@ -758,25 +755,25 @@ export default function AdminPage() {
             return (<>
               <div className="insight-box" style={{background:'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',border:'1px solid #bfdbfe',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
                 <h3 style={{fontSize:'1em',color:'var(--accent-dark)',marginBottom:'10px'}}>{'\ud83c\udfc6 \u05de\u05d4 \u05e2\u05d5\u05d1\u05d3 \u05d4\u05db\u05d9 \u05d8\u05d5\u05d1'}</h3>
-                <ul style={{listStyle:'none',padding:0}}>
-                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05e7\u05de\u05e4\u05d9\u05d9\u05df'} <strong>{bestCamp[0]}</strong> - CPL {'\u05d4\u05e0\u05de\u05d5\u05da \u05d1\u05d9\u05d5\u05ea\u05e8'} ({formatCurrency(bestCamp[1].leads > 0 ? bestCamp[1].spend/bestCamp[1].leads : 0)}) {'\u05e2\u05dd'} {bestCamp[1].leads} {'\u05dc\u05d9\u05d3\u05d9\u05dd'}</li>}
-                  {bestAd && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05de\u05d5\u05d3\u05e2\u05d4'} <strong>{bestAd[0]}</strong> - {bestAd[1].leads} {'\u05dc\u05d9\u05d3\u05d9\u05dd'} {'\u05d1-'}{formatCurrency(bestAd[1].leads > 0 ? bestAd[1].spend/bestAd[1].leads : 0)} {'\u05dc\u05dc\u05d9\u05d3'}</li>}
-                  {bestAge && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d2\u05d9\u05dc\u05d0\u05d9'} <strong>{bestAge}</strong> - CPL {'\u05d4\u05e0\u05de\u05d5\u05da \u05d1\u05d9\u05d5\u05ea\u05e8'} ({formatCurrency(data.ages[bestAge].leads > 0 ? data.ages[bestAge].spend/data.ages[bestAge].leads : 0)})</li>}
+                <ul style={{listStyle:'none',padding:0,direction:'rtl',textAlign:'right'}}>
+                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>{'\ud83d\udca1'} {'\u05e7\u05de\u05e4\u05d9\u05d9\u05df'} <strong>{bestCamp[0]}</strong> - CPL {'\u05d4\u05e0\u05de\u05d5\u05da \u05d1\u05d9\u05d5\u05ea\u05e8'} ({formatCurrency(bestCamp[1].leads > 0 ? bestCamp[1].spend/bestCamp[1].leads : 0)}) {'\u05e2\u05dd'} {bestCamp[1].leads} {'\u05dc\u05d9\u05d3\u05d9\u05dd'}</li>}
+                  {bestAd && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>{'\ud83d\udca1'} {'\u05de\u05d5\u05d3\u05e2\u05d4'} <strong>{bestAd[0]}</strong> - {bestAd[1].leads} {'\u05dc\u05d9\u05d3\u05d9\u05dd'} {'\u05d1-'}{formatCurrency(bestAd[1].leads > 0 ? bestAd[1].spend/bestAd[1].leads : 0)} {'\u05dc\u05dc\u05d9\u05d3'}</li>}
+                  {bestAge && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>{'\ud83d\udca1'} {'\u05d2\u05d9\u05dc\u05d0\u05d9'} <strong>{bestAge}</strong> - CPL {'\u05d4\u05e0\u05de\u05d5\u05da \u05d1\u05d9\u05d5\u05ea\u05e8'} ({formatCurrency(data.ages[bestAge].leads > 0 ? data.ages[bestAge].spend/data.ages[bestAge].leads : 0)})</li>}
                 </ul>
               </div>
               <div className="insight-box" style={{background:'linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%)',border:'1px solid #fecaca',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
                 <h3 style={{fontSize:'1em',color:'#dc2626',marginBottom:'10px'}}>{'\u26a0\ufe0f \u05de\u05d4 \u05e6\u05e8\u05d9\u05da \u05dc\u05e9\u05e4\u05e8'}</h3>
-                <ul style={{listStyle:'none',padding:0}}>
-                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05e7\u05de\u05e4\u05d9\u05d9\u05df'} <strong>{worstCamp[0]}</strong> - CPL {'\u05d2\u05d1\u05d5\u05d4'} ({formatCurrency(worstCamp[1].leads > 0 ? worstCamp[1].spend/worstCamp[1].leads : 0)}). {'\u05e9\u05d5\u05d5\u05d4 \u05dc\u05e9\u05e7\u05d5\u05dc \u05e9\u05d9\u05e0\u05d5\u05d9 \u05e7\u05e8\u05d9\u05d0\u05d9\u05d9\u05d8\u05d9\u05d1.'}</li>}
-                  {worstAge && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d2\u05d9\u05dc\u05d0\u05d9'} <strong>{worstAge}</strong> - CPL {'\u05d4\u05d2\u05d1\u05d5\u05d4 \u05d1\u05d9\u05d5\u05ea\u05e8'} ({formatCurrency(data.ages[worstAge].leads > 0 ? data.ages[worstAge].spend/data.ages[worstAge].leads : 0)})</li>}
+                <ul style={{listStyle:'none',padding:0,direction:'rtl',textAlign:'right'}}>
+                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>{'\ud83d\udca1'} {'\u05e7\u05de\u05e4\u05d9\u05d9\u05df'} <strong>{worstCamp[0]}</strong> - CPL {'\u05d2\u05d1\u05d5\u05d4'} ({formatCurrency(worstCamp[1].leads > 0 ? worstCamp[1].spend/worstCamp[1].leads : 0)}). {'\u05e9\u05d5\u05d5\u05d4 \u05dc\u05e9\u05e7\u05d5\u05dc \u05e9\u05d9\u05e0\u05d5\u05d9 \u05e7\u05e8\u05d9\u05d0\u05d9\u05d9\u05d8\u05d9\u05d1.'}</li>}
+                  {worstAge && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>{'\ud83d\udca1'} {'\u05d2\u05d9\u05dc\u05d0\u05d9'} <strong>{worstAge}</strong> - CPL {'\u05d4\u05d2\u05d1\u05d5\u05d4 \u05d1\u05d9\u05d5\u05ea\u05e8'} ({formatCurrency(data.ages[worstAge].leads > 0 ? data.ages[worstAge].spend/data.ages[worstAge].leads : 0)})</li>}
                 </ul>
               </div>
               <div className="insight-box" style={{background:'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',border:'1px solid #86efac',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
                 <h3 style={{fontSize:'1em',color:'#059669',marginBottom:'10px'}}>{'\ud83c\udfaf \u05d4\u05de\u05dc\u05e6\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d4\u05d1\u05d0'}</h3>
-                <ul style={{listStyle:'none',padding:0}}>
-                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d4\u05d2\u05d3\u05dc\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1 \u05dc-'}<strong>{bestCamp[0]}</strong> - {'\u05d4-CPL \u05d4\u05e0\u05de\u05d5\u05da \u05d1\u05d9\u05d5\u05ea\u05e8 \u05e2\u05dd \u05e4\u05d5\u05d8\u05e0\u05e6\u05d9\u05d0\u05dc \u05dc\u05d4\u05d2\u05d3\u05dc\u05d4'}</li>}
-                  {bestAge && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d7\u05d9\u05d6\u05d5\u05e7 \u05d2\u05d9\u05dc\u05d0\u05d9'} <strong>{bestAge}</strong> - {'\u05d4\u05db\u05d9 \u05d0\u05e4\u05e7\u05d8\u05d9\u05d1\u05d9\u05d9\u05dd \u05de\u05d1\u05d7\u05d9\u05e0\u05ea \u05e2\u05dc\u05d5\u05ea'}</li>}
-                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em'}}>{'\ud83d\udca1'} {'\u05d1\u05d3\u05d9\u05e7\u05d4 \u05de\u05d7\u05d3\u05e9 \u05e9\u05dc'} <strong>{worstCamp[0]}</strong> - {'\u05d4\u05d7\u05dc\u05e4\u05ea \u05e7\u05e8\u05d9\u05d0\u05d9\u05d9\u05d8\u05d9\u05d1 \u05d0\u05d5 \u05d4\u05e4\u05e1\u05e7\u05d4'}</li>}
+                <ul style={{listStyle:'none',padding:0,direction:'rtl',textAlign:'right'}}>
+                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>{'\ud83d\udca1'} {'\u05d4\u05d2\u05d3\u05dc\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1 \u05dc-'}<strong>{bestCamp[0]}</strong> - {'\u05d4-CPL \u05d4\u05e0\u05de\u05d5\u05da \u05d1\u05d9\u05d5\u05ea\u05e8 \u05e2\u05dd \u05e4\u05d5\u05d8\u05e0\u05e6\u05d9\u05d0\u05dc \u05dc\u05d4\u05d2\u05d3\u05dc\u05d4'}</li>}
+                  {bestAge && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>{'\ud83d\udca1'} {'\u05d7\u05d9\u05d6\u05d5\u05e7 \u05d2\u05d9\u05dc\u05d0\u05d9'} <strong>{bestAge}</strong> - {'\u05d4\u05db\u05d9 \u05d0\u05e4\u05e7\u05d8\u05d9\u05d1\u05d9\u05d9\u05dd \u05de\u05d1\u05d7\u05d9\u05e0\u05ea \u05e2\u05dc\u05d5\u05ea'}</li>}
+                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>{'\ud83d\udca1'} {'\u05d1\u05d3\u05d9\u05e7\u05d4 \u05de\u05d7\u05d3\u05e9 \u05e9\u05dc'} <strong>{worstCamp[0]}</strong> - {'\u05d4\u05d7\u05dc\u05e4\u05ea \u05e7\u05e8\u05d9\u05d0\u05d9\u05d9\u05d8\u05d9\u05d1 \u05d0\u05d5 \u05d4\u05e4\u05e1\u05e7\u05d4'}</li>}
                 </ul>
               </div>
             </>);
@@ -785,7 +782,7 @@ export default function AdminPage() {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, sortConfig]);
 
   if (loading) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
@@ -813,7 +810,7 @@ export default function AdminPage() {
   };
 
   return (
-    <>
+    <div dir="rtl" style={{direction:'rtl',textAlign:'right'}}>
       <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className={`nav-btn ${view === 'upload' ? 'active' : ''}`} onClick={() => setView('upload')}>{'\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>{'\ud83d\udccb \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
 
       <div className="app-layout">
@@ -887,7 +884,7 @@ export default function AdminPage() {
       <div className={`modal-overlay ${showAddProject ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddProject(false); }}><div className="modal"><h3>{'\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05dc-'}{selectedClient?.name}</h3><div className="form-group"><label>{'\u05e9\u05dd \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</label><input className="form-input" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK'} /></div><div className="modal-actions"><button className="btn btn-primary" onClick={addProject}>{'\u05d4\u05d5\u05e1\u05e3'}</button><button className="btn btn-outline" onClick={() => setShowAddProject(false)}>{'\u05d1\u05d9\u05d8\u05d5\u05dc'}</button></div></div></div>
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
-    </>
+    </div>
   );
 }
 
