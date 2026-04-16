@@ -154,6 +154,14 @@ export default function AdminPage() {
           return obj;
         });
         mapped = mapCrmRows(json);
+        // Ignore totalLeads (column C) for rows containing Facebook/Google — platform data provides these leads separately
+        mapped = mapped.map(row => {
+          const src = String(row.source || '').toLowerCase();
+          if (src.includes('facebook') || src.includes('פייסבוק') || src.includes('google') || src.includes('גוגל')) {
+            return { ...row, totalLeads: 0 };
+          }
+          return row;
+        });
         summary = aggregateCrmRows(mapped);
       } else if (uploadSource === 'crm_reports') {
         mapped = mapCrmReportRows(json);
