@@ -308,7 +308,7 @@ export default function ClientPage() {
             <div className="funnel">
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(ct.totalLeads)}</div><div className="funnel-label">סה"כ לידים</div></div>
               <div className="funnel-arrow">←</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(ct.relevantLeads)}</div><div className="funnel-label">רלוונטיים</div><div className="funnel-rate"={ct.relevantRate.toFixed(1)}%</div></div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(ct.relevantLeads)}</div><div className="funnel-label">רלוונטיים</div><div className="funnel-rate">{ct.relevantRate.toFixed(1)}%</div></div>
               <div className="funnel-arrow">←</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(-ppurple)'}}>{formatNum(ct.meetingsScheduled)}</div><div className="funnel-label">תואמו</div><div className="funnel-rate">{ct.scheduledRate.toFixed(1)}%</div></div>
               <div className="funnel-arrow">←</div>
