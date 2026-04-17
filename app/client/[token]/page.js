@@ -110,7 +110,7 @@ export default function ClientPage() {
     destroyCharts()
 
     const crmRepReports = reports.filter(r => r.month === selectedMonth && r.source === 'crm_reports')
-    if (crmRepReports.length === 0) return <div className="welcome-center"><div className="icon">ð­</div><h3>××× × ×ª×× × CRM ×××××ª ×××××© ××</h3></div>
+    if (crmRepReports.length === 0) return <div className="welcome-center"><div className="icon">💭</div><h3>אין נתוני CRM דוחות לחודש זה</h3></div>
 
     let allRows = []
     crmRepReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data) })
@@ -126,7 +126,7 @@ export default function ClientPage() {
       destroyCharts()
       if (cityNames.length > 0) {
         createChart('crmRepCityChart', 'bar', cityNames, [{
-          label: '×××××', data: cityNames.map(n => repData.cities[n]),
+          label: 'לידים', data: cityNames.map(n => repData.cities[n]),
           backgroundColor: COLORS.slice(0, cityNames.length)
         }], { y: { beginAtZero: true, position: 'right' } })
       }
@@ -141,149 +141,652 @@ export default function ClientPage() {
     return (
       <>
         <div className="kpi-grid">
-          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>ð</div><div className="kpi-label">×¡×"× ×©××¨××ª</div><div className="kpi-value">{formatNum(rt.totalRows)}</div></div>
-          <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(-success)'}}>ðï¸ï¸</div><div className="kpi-label" >×¢×¨×× ××××××××ª</div><div className="kpi-value">{formatNum(rt.uniqueCities)}</div></div>
-          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(-prgð'}}>â ï¸</div><div className="kpi-label">×¢× ××ª× ××××××ª</div><div className="kpi-value">{formatNum(rt.withObjections)}</div></div>
-          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>ð</div><div className="kpi-label">×¢× ×¤×××©×/××©×××</div><div className="kpi-value">{formatNum(rt.withMeeting)}</div></div>
-          <div className="kpi-card pink"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(236,72,153,0.1)',color:'var(--pink)'}}>ð</div><div className="kpi-label">% ××ª× ××××××ª</div><div className="kpi-value">{rt.objectionRate.toFixed(1)}%</div></div>
-          <div className="kpi-card cyan"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(6,182,212,0.1)',color:'v"Ö7âw×Óï	ù8£ÂöFcãÆFb6Æ74æÖSÒ&·ÖÆ&VÂ#âR
-zMy-yzy]z£ÂöFcãÆFb6Æ74æÖSÒ&·×fÇVR#ç·'BæÖVWFæu&FRçFôfVBÒSÂöFcãÂöFcà¢ÂöFcà ¢ÆFb6Æ74æÖSÒ'6V7Föâ#à¢ÆFb6Æ74æÖSÒ'6V7Föâ×FFÆR#ãÆFb6Æ74æÖSÒ'6V7FöâÖ6öâ"7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖw&FVçBÓw×Óï	ù8³ÂöFcíz
-z­y]z
-yyÒ
-yízMy]zyyyÓÂöFcà¢ÆFb6Æ74æÖSÒ'F&ÆR×w&W"#à¢ÇF&ÆR6Æ74æÖSÒ&FF×F&ÆR#à¢ÇFVCãÇG#à¢ÇFâ3Â÷Fà¢ÇFíy½z­y]yz¢ýyyzy]yÂ÷Fà¢ÇFíyMz­z
-y-y=y]yy]z£Â÷Fà¢ÇFíyízyyíyBýzMy-yzyB
-y
-y}zy]z
-yCÂ÷Fà¢Â÷G#ãÂ÷FVCà¢ÇF&öGà¢¶ÆÅ&÷w2æÖ&÷rÂÓâ¢ÇG"¶W×¶Óà¢ÇFCç¶²ÓÂ÷FCà¢ÇFB7GÆS×·¶föçEvVvC£c×Óç·&÷ræFG&W72ÇÂrÒwÓÂ÷FCà¢ÇFCç·&÷ræö&¦V7Föç2ÇÂrÒwÓÂ÷FCà¢ÇFCç·&÷ræÆ7DÖVWFærÇÂrÒwÓÂ÷FCà¢Â÷G#à¢Ð¢Â÷F&öGà¢Â÷F&ÆSà¢ÂöFcà¢ÂöFcà ¢ÆFb6Æ74æÖSÒ'6V7Föâ#à¢ÆFb6Æ74æÖSÒ'6V7Föâ×FFÆR#ãÆFb6Æ74æÖSÒ'6V7FöâÖ6öâ"7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖw&FVçBÓ"w×Óï	ù8ÂöFcíy-zzMyyÓÂöFcà¢ÆFb6Æ74æÖSÒ&6'BÖw&B#à¢ÆFb6Æ74æÖSÒ&6'BÖ6&B#ãÆCï	øùûò
-yMz­zMyÍy-y]z¢
-yÍzMy
-yyzy]yÂöCãÆFb6Æ74æÖSÒ&6'BÖ6öçFæW"#ãÆ6çf2CÒ&7&Õ&W6G6'B#ãÂö6çf3ãÂöFcãÂöFcà¢ÆFb6Æ74æÖSÒ&6'BÖ6&B#ãÆCî)ªûò
-yMz­zMyÍy-y]z¢
-yMz­z
-y-y=y]yy]z£ÂöCãÆFb6Æ74æÖSÒ&6'BÖ6öçFæW"#ãÆ6çf2CÒ&7&Õ&Wö&¤6'B#ãÂö6çf3ãÂöFcãÂöFcà¢ÂöFcà¢ÂöFcà¢Âóà¢¢ÒÂ·6VÆV7FVDÖöçFÂ&W÷'G5Ò ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÒ5$Ò4õU$4U25T"ÕD"ÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÐ¢6öç7B&VæFW$7&ÔF6&ö&BÒW6T6ÆÆ&6²Óâ°¢b6VÆV7FVDÖöçFÇÂ&W÷'G2æÆVæwFÓÓÒ&WGW&âçVÆÀ¢FW7G&÷6'G2 ¢6öç7B7&Õ&W÷'G2Ò&W÷'G2æfÇFW""Óâ"æÖöçFÓÓÒ6VÆV7FVDÖöçFbb"ç6÷W&6RÓÓÒv7&Òr¢b7&Õ&W÷'G2æÆVæwFÓÓÒ&WGW&âÆFb6Æ74æÖSÒ'vVÆ6öÖRÖ6VçFW"#ãÆFb6Æ74æÖSÒ&6öâ#ï	ù*ÓÂöFcãÆ3íy
-yyò
-z
-z­y]z
-y5$Ò
-yÍy}y]y=z
-ymyCÂö3ãÂöFcà ¢ÆWBÆÄ7&Õ&÷w2ÒµÐ¢7&Õ&W÷'G2æf÷$V6"Óâ²b"æFFÆÄ7&Õ&÷w2ÒÆÄ7&Õ&÷w2æ6öæ6B"æFFÒ¢6öç7B7&ÔFFÒvw&VvFT7&Õ&÷w2ÆÄ7&Õ&÷w2 ¢òòÖW&vRf6V&öö²6×vâ6÷W&6W2çFò6ævÆRtf6V&öö²rVçG'¢6öç7Böf$7&Ô¶W2Òö&¦V7Bæ¶W27&ÔFFç6÷W&6W2æfÇFW"²Óâ²ææ6ÇVFW2}zMyyzyy]zrrÇÂ²çFôÆ÷vW$66Rææ6ÇVFW2vf6V&öö²r¢böf$7&Ô¶W2æÆVæwFâ°¢6öç7Böf$ÖW&vVBÒ²F÷FÄÆVG3¢Â&VÆWfçDÆVG3¢Â'&VÆWfçDÆVG3¢ÂÖVWFæw566VGVÆVC¢ÂÖVWFæw46ö×ÆWFVC¢ÂÖVWFæw46æ6VÆÆVC¢Â&Vv7G&Föç3¢Â&Vv7G&FöåfÇVS¢Â6öçG&7G3¢Â6öçG&7EfÇVS¢Ð¢öf$7&Ô¶W2æf÷$V6²Óâ²ö&¦V7Bæ¶W2öf$ÖW&vVBæf÷$V6bÓâ²öf$ÖW&vVE¶eÒ³Ò7&ÔFFç6÷W&6W5¶µÕ¶eÒÇÂÒ²FVÆWFR7&ÔFFç6÷W&6W5¶µÒÒ¢7&ÔFFç6÷W&6W5²tf6V&öö²uÒÒöf$ÖW&vV@¢Ð¢òòÖW&vRvöövÆR6×vâ6÷W&6W2çFò6ævÆRtvöövÆRrVçG'¢6öç7Böt7&Ô¶W2Òö&¦V7Bæ¶W27&ÔFFç6÷W&6W2æfÇFW"²Óâ²ææ6ÇVFW2}y-y]y-yÂrÇÂ²çFôÆ÷vW$66Rææ6ÇVFW2vvöövÆRr¢böt7&Ô¶W2æÆVæwFâ°¢6öç7BötÖW&vVBÒ²F÷FÄÆVG3¢Â&VÆWfçDÆVG3¢Â'&VÆWfçDÆVG3¢ÂÖVWFæw566VGVÆVC¢ÂÖVWFæw46ö×ÆWFVC¢ÂÖVWFæw46æ6VÆÆVC¢Â&Vv7G&Föç3¢Â&Vv7G&FöåfÇVS¢Â6öçG&7G3¢Â6öçG&7EfÇVS¢Ð¢öt7&Ô¶W2æf÷$V6²Óâ²ö&¦V7Bæ¶W2ötÖW&vVBæf÷$V6bÓâ²ötÖW&vVE¶eÒ³Ò7&ÔFFç6÷W&6W5¶µÕ¶eÒÇÂÒ²FVÆWFR7&ÔFFç6÷W&6W5¶µÒÒ¢7&ÔFFç6÷W&6W5²tvöövÆRuÒÒötÖW&vV@¢Ð ¢òòFBÆFf÷&ÒÆVG2Fò5$ÒF÷FÇ0¢ÆWB÷ÆFf÷&Õ7VæBÒ ¢6öç7Böf%"Ò&W÷'G2æfÇFW""Óâ"æÖöçFÓÓÒ6VÆV7FVDÖöçFbb"ç6÷W&6RÓÓÒvf6V&öö²r¢6öç7Böu"Ò&W÷'G2æfÇFW""Óâ"æÖöçFÓÓÒ6VÆV7FVDÖöçFbb"ç6÷W&6Rbb"ç6÷W&6Rç7F'G5vFvvöövÆRr¢6öç7BöV×G6÷W&6RÒ²F÷FÄÆVG3¢Â&VÆWfçDÆVG3¢Â'&VÆWfçDÆVG3¢ÂÖVWFæw566VGVÆVC¢ÂÖVWFæw46ö×ÆWFVC¢ÂÖVWFæw46æ6VÆÆVC¢Â&Vv7G&Föç3¢Â&Vv7G&FöåfÇVS¢Â6öçG&7G3¢Â6öçG&7EfÇVS¢Ð¢böf%"æÆVæwFâ°¢ÆWBöf%&÷w2ÒµÓ²öf%"æf÷$V6"Óâ²b"æFFöf%&÷w2Òöf%&÷w2æ6öæ6B"æFFÒ¢6öç7Böf$vrÒvw&VvFU&÷w2öf%&÷w2¢÷ÆFf÷&Õ7VæB³Òöf$vrçF÷FÇ2ç7VæBÇÂ ¢6öç7Böf$ÆVG2Òöf$vrçF÷FÇ2æÆVG2ÇÂ ¢b7&ÔFFç6÷W&6W5²tf6V&öö²uÒ°¢7&ÔFFçF÷FÇ2çF÷FÄÆVG2³Òöf$ÆVG0¢7&ÔFFç6÷W&6W5²tf6V&öö²uÒÒ²ââåöV×G6÷W&6RÂF÷FÄÆVG3¢öf$ÆVG2Ð¢ÒVÇ6R°¢7&ÔFFçF÷FÇ2çF÷FÄÆVG2ÓÒ7&ÔFFç6÷W&6W5²tf6V&öö²uÒçF÷FÄÆVG2ÇÂ¢7&ÔFFçF÷FÇ2çF÷FÄÆVG2³Òöf$ÆVG0¢Ð¢Ð¢böu"æÆVæwFâ°¢ÆWBöu&÷w2ÒµÓ²öu"æf÷$V6"Óâ²b"æFFöu&÷w2Òöu&÷w2æ6öæ6B"æFFÒ¢6öç7BötvrÒvw&VvFU&÷w2öu&÷w2¢÷ÆFf÷&Õ7VæB³ÒötvrçF÷FÇ2ç7VæBÇÂ ¢6öç7BötÆVG2ÒötvrçF÷FÇ2æÆVG2ÇÂ ¢b7&ÔFFç6÷W&6W5²tvöövÆRuÒ°¢7&ÔFFçF÷FÇ2çF÷FÄÆVG2³ÒötÆVG0¢7&ÔFFç6÷W&6W5²tvöövÆRuÒÒ²ââåöV×G6÷W&6RÂF÷FÄÆVG3¢ötÆVG2Ð¢ÒVÇ6R°¢7&ÔFFçF÷FÇ2çF÷FÄÆVG2ÓÒ7&ÔFFç6÷W&6W5²tvöövÆRuÒçF÷FÄÆVG2ÇÂ¢7&ÔFFçF÷FÇ2çF÷FÄÆVG2³ÒötÆVG0¢Ð¢Ð ¢ÆWB&Wd7&ÔFFÒçVÆÀ¢b6ö×&TVæ&ÆVB°¢6öç7B&WdÖöçFÒvWE&WdÖöçF6VÆV7FVDÖöçF¢6öç7B&Wd7&Õ&W÷'G2Ò&W÷'G2æfÇFW""Óâ"æÖöçFÓÓÒ&WdÖöçFbb"ç6÷W&6RÓÓÒv7&Òr¢b&Wd7&Õ&W÷'G2æÆVæwFâ°¢ÆWB&We&÷w2ÒµÐ¢&Wd7&Õ&W÷'G2æf÷$V6"Óâ²&We&÷w2Ò&We&÷w2æ6öæ6B"æFFÇÂµÒÒ¢&Wd7&ÔFFÒvw&VvFT7&Õ&÷w2&We&÷w2¢Ð¢Ð ¢6öç7B7BÒ7&ÔFFçF÷FÇ0¢6öç7B7Ò&Wd7&ÔFFòçF÷FÇ0 ¢6öç7B7&Ô·ÒÆ&VÂÂfÇVRÂ6öÆ÷"Â7W'&VçBÂ&WbÂ46÷7BÓâ°¢6öç7B6Ò&WbÒçVÆÂò6ævUW&6VçB7W'&VçBÂ&WbÂ46÷7B¢çVÆÀ¢6öç7B6öç2Ò²}zyB-y²
-yÍyy=yyÒs¢}yzrÂ}zyÍy]y]z
-yyyyÒs¢~)ÈRrÂ}yÍy
-zyÍy]y]z
-yyyyÒs¢~)ØÂrÂ}zMy-yzy]z¢
-zz­y]y
-yíyRs¢}zMy"rÂ}zMy-yzy]z¢
-zz­y]y
-yíyRs¢}zyrÂ}zMy-yzy]z¢
-zyy]yyÍyRs¢}yyrÂ}yMzzyíy]z¢s¢}yMzrÂ}zy]y]y
-yMzzyíy]z¢s¢~(*¢rÂ}y}y]ymyyÒs¢}y}ybrÂ}zy]y]y
-y}y]ymyyÒs¢~(*¢rÂ}y
-y}y]yb
-yMyízyB
-yÍzMy-yzyB
-zz­y]y
-yíyBs¢rRrÂ}y
-y}y]yb
-yMyízyB
-yÍzMy-yzy]z¢
-zyy]zmz-yRs¢rRrÂrR
-zyÍy]y]z
-yyy]z¢s¢rRrÂ}z-yÍy]z¢
-zMy-yzyB
-zyy]zmz-yBs¢~(*¢rÐ¢6öç7B6öâÒ6öç5¶Æ&VÅÒÇÂ	ù8¢p¢6öç7B·6öÆ÷'2Ò²w&VVã¢w&v&bÃRÃ#ÃãrÂW'ÆS¢w&v&3Ã"Ã#CbÃãrÂ÷&ævS¢w&v&#CRÃSÃÃãrÂæ³¢w&v&#3bÃs"ÃS2ÃãrÂ7ã¢w&v&bÃ"Ã#"ÃãrÂ&VC¢w&v&#3ÃcÃcÃãrÐ¢6öç7B·FWD6öÆ÷'2Ò²w&VVã¢wf"×7V66W72rÂW'ÆS¢wf"Ò×W'ÆRrÂ÷&ævS¢wf"Ò×v&æærrÂæ³¢wf"Ò×æ²rÂ7ã¢wf"ÒÖ7ârÂ&VC¢wf"ÒÖFævW"rÐ¢&WGW&âÆFb6Æ74æÖS×¶·Ö6&BG¶6öÆ÷'ÖÒ¶W×¶Æ&VÇÓãÆFb6Æ74æÖSÒ&·Ö66VçB#ãÂöFcãÆFb6Æ74æÖSÒ&·Ö6öâ"7GÆS×·¶&6¶w&÷VæC¢·6öÆ÷'5¶6öÆ÷%ÒÇÂw&v&SÃ3Ã#CbÃãrÂ6öÆ÷#¢·FWD6öÆ÷'5¶6öÆ÷%ÒÇÂwf"ÒÖ66VçBw×Óç¶6öçÓÂöFcãÆFb6Æ74æÖSÒ&·ÖÆ&VÂ#ç¶f÷&ÖDçVÒ7BçF÷FÄÆVG2ÓÂöFcãÆFb6Æ74æÖSÒ&·×fÇVR#ç·fÇVWÓÂöFcç¶6bbÆFb6Æ74æÖS×¶·Ö6ævRG¶6æ4vööBòwWr¢vF÷vâwÖÓãÇ7â6Æ74æÖSÒ&'&÷r#ç¶6ç7Bâò~)k"r¢~)kÂwÓÂ÷7ãâ´ÖFæ'26ç7BçFôfVBÒSÂöFcçÓÂöFcà¢Ð ¢6öç7B6÷W&6TVçG&W2Òö&¦V7BæVçG&W27&ÔFFç6÷W&6W2ç6÷'BÂ"Óâ%³ÒçF÷FÄÆVG2Ò³ÒçF÷FÄÆVG2¢6öç7B6÷W&6TæÖW2Ò6÷W&6TVçG&W2æÖ¶æÖUÒÓâæÖR ¢6WEFÖV÷WBÓâ°¢FW7G&÷6'G2¢b6÷W&6TæÖW2æÆVæwFâ°¢7&VFT6'Bv7&ÕT6'BrÂvF÷VvçWBrÂ6÷W&6TæÖW2Â·°¢FF¢6÷W&6TæÖW2æÖâÓâ7&ÔFFç6÷W&6W5¶åÒçF÷FÄÆVG2À¢&6¶w&÷VæD6öÆ÷#¢4ôÄõ%2ç6Æ6RÂ6÷W&6TæÖW2æÆVæwF¢ÕÒ¢Ð¢ÒÂ# ¢&WGW&â¢Ãà¢ÆFb6Æ74æÖSÒ&·Öw&B#à¢¶7&Ô·}zyB-y²
-yÍyy=yyÒrÂf÷&ÖDçVÒ7BçF÷FÄÆVG2ÂrrÂ7BçF÷FÄÆVG2Â7òçF÷FÄÆVG2Ð¢¶7&Ô·}zyÍy]y]z
-yyyyÒrÂf÷&ÖDçVÒ7Bç&VÆWfçDÆVG2Âvw&VVârÂ7Bç&VÆWfçDÆVG2Â7òç&VÆWfçDÆVG2Ð¢¶7&Ô·}yÍy
-zyÍy]y]z
-yyyyÒrÂf÷&ÖDçVÒ7Bæ'&VÆWfçDÆVG2Âw&VBrÂ7Bæ'&VÆWfçDÆVG2Â7òæ'&VÆWfçDÆVG2ÂG'VRÐ¢¶7&Ô·rR
-zyÍy]y]z
-yyy]z¢rÂ7Bç&VÆWfçE&FRçFôfVB²rRrÂv7ârÂ7Bç&VÆWfçE&FRÂ7òç&VÆWfçE&FRÐ¢¶7&Ô·}zMy-yzy]z¢
-zz­y]y
-yíyRrÂf÷&ÖDçVÒ7BæÖVWFæw566VGVÆVBÂwW'ÆRrÂ7BæÖVWFæw566VGVÆVBÂ7òæÖVWFæw566VGVÆVBÐ¢¶7&Ô·}zMy-yzy]z¢
-zyy]zmz-yRrÂf÷&ÖDçVÒ7BæÖVWFæw46ö×ÆWFVBÂv÷&ævRrÂ7BæÖVWFæw46ö×ÆWFVBÂ7òæÖVWFæw46ö×ÆWFVBÐ¢¶7&Ô·}y
-y}y]yb
-yMyízyB
-yÍzMy-yzyB
-zz­y]y
-yíyBrÂ7Bç66VGVÆVE&FRçFôfVB²rRrÂwæ²rÂ7Bç66VGVÆVE&FRÂ7òç66VGVÆVE&FRÐ¢¶7&Ô·}y
-y}y]yb
-yMyízyB
-yÍzMy-yzy]z¢
-zyy]zmz-yRrÂ7Bæ6ö×ÆWFVE&FRçFôfVB²rRrÂrrÂ7Bæ6ö×ÆWFVE&FRÂ7òæ6ö×ÆWFVE&FRÐ¢¶7&Ô·}z-yÍy]z¢
-zMy-yzyB
-zyy]zmz-yBrÂ7BæÖVWFæw46ö×ÆWFVBâòf÷&ÖD7W'&Væ7÷ÆFf÷&Õ7VæBò7BæÖVWFæw46ö×ÆWFVB¢~(*£rÂwW'ÆRrÂÂÐ¢¶7&Ô·}zMy-yzy]z¢
-zyy]yyÍyRrÂf÷&ÖDçVÒ7BæÖVWFæw46æ6VÆÆVBÂw&VBrÂ7BæÖVWFæw46æ6VÆÆVBÂ7òæÖVWFæw46æ6VÆÆVBÂG'VRÐ¢¶7&Ô·}yMzzyíy]z¢rÂf÷&ÖDçVÒ7Bç&Vv7G&Föç2Âvw&VVârÂ7Bç&Vv7G&Föç2Â7òç&Vv7G&Föç2Ð¢¶7&Ô·}zy]y]y
-yMzzyíy]z¢rÂf÷&ÖD7W'&Væ77Bç&Vv7G&FöåfÇVRÂwW'ÆRrÂ7Bç&Vv7G&FöåfÇVRÂ7òç&Vv7G&FöåfÇVRÐ¢¶7&Ô·}y}y]ymyyÒrÂf÷&ÖDçVÒ7Bæ6öçG&7G2Âv7ârÂ7Bæ6öçG&7G2Â7òæ6öçG&7G2Ð¢¶7&Ô·}zy]y]y
-y}y]ymyyÒrÂf÷&ÖD7W'&Væ77Bæ6öçG&7EfÇVRÂv÷&ævRrÂ7Bæ6öçG&7EfÇVRÂ7òæ6öçG&7EfÇVRÐ¢ÂöFcà ¢²ò¢5$ÒgVææVÂ¢÷Ð¢ÆFb6Æ74æÖSÒ'6V7Föâ#à¢ÆFb6Æ74æÖSÒ'6V7FöâÖVFW""7GÆS×·¶F7Æ¢vfÆWrÆÆväFV×3¢v6VçFW"rÆv¢s'rÆÖ&vä&÷GFöÓ¢s#w×Óà¢ÆFb6Æ74æÖSÒ'6V7FöâÖ6öâ"7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖw&FVçBÓ"w×Óï	ùx.ûóÂöFcà¢ÆFcãÆ"7GÆS×·¶föçE6¦S¢sã6VÒrÆföçEvVvC£sÆ6öÆ÷#¢wf"Ò×&Ö'rÆÖ&vã£×ÓíyízzMy¢
-yÍyy=yyÓÂö#ãÆFb7GÆS×·¶föçE6¦S¢sãVVÒrÆ6öÆ÷#¢wf"Ò×FWB×6V6öæF'w×ÓíyíyÍyy2
-y]z-y2
-y}y]ymyCÂöFcãÂöFcà¢ÂöFcà¢ÆFb6Æ74æÖSÒ&6&B"7GÆS×··FFæs¢s#Gw×Óà¢ÆFb6Æ74æÖSÒ&gVææVÂ#à¢ÆFb6Æ74æÖSÒ&gVææVÂ×7FW#ãÆFb6Æ74æÖSÒ&gVææVÂÖ&""7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖw&FVçBÓw×Óç¶f÷&ÖDçVÒ7BçF÷FÄÆVG2ÓÂöFcãÆFb6Æ74æÖSÒ&gVææVÂÖÆ&VÂ#ízyB-y²
-yÍyy=yyÓÂöFcãÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂÖ'&÷r#î(iÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂ×7FW#ãÆFb6Æ74æÖSÒ&gVææVÂÖ&""7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖ66VçBrÆ÷6G£ãW×Óç¶f÷&ÖDçVÒ7Bç&VÆWfçDÆVG2ÓÂöFcãÆFb6Æ74æÖSÒ&gVææVÂÖÆ&VÂ#ízyÍy]y]z
-yyyyÓÂöFcãÆFb6Æ74æÖSÒ&gVææVÂ×&FR#ç¶7Bç&VÆWfçE&FRçFôfVBÒSÂöFcãÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂÖ'&÷r#î(iÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂ×7FW#ãÆFb6Æ74æÖSÒ&gVææVÂÖ&""7GÆS×·¶&6¶w&÷VæC¢wf"×'WÆRw×Óç¶f÷&ÖDçVÒ7BæÖVWFæw566VGVÆVBÓÂöFcãÆFb6Æ74æÖSÒ&gVææVÂÖÆ&VÂ#ízyÍy]y]z
-yyyyÒW7VGVÆVB
-ymyCÂöFcãÆFb6Æ74æÖSÒ&gVææVÂ×&FR#ç¶7Bç66VGVÆVE&FRçFôfVBÒSÂöFcãÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂÖ'&÷r#ë@ð½¥Øø(ñ¥Ø±ÍÍ9µôÕ¹¹°µÍÑÀøñ¥Ø±ÍÍ9µôÕ¹¹°µÈÍÑå±õíí­É½Õ¹èÙÈ ´µÉ¥¹Ð´È¤õôùí½ÉµÑ9Õ´¡Ð¹µÑ¥¹Í
-½µÁ±Ñ¥ôð½¥Øøñ¥Ø±ÍÍ9µôÕ¹¹°µ±°ú×××¦×¢×</div><div className="funnel-rate">{ct.completedRate.toFixed(1)}%</div></div>
-              <div className="funnel-arrow">â</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-4)'}}>{formatNum(ct.registrations)}</div><div className="funnel-label">××¨×©×××ª</div></div>
-              <div className="funnel-arrow">â</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-3)'}}>{formatNum(ct.contracts)}</div><div className="funnel-label">×××××</div></div>
+          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📝</div><div className="kpi-label">סה"כ שורות</div><div className="kpi-value">{formatNum(rt.totalRows)}</div></div>
+          <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>🏘️</div><div className="kpi-label">ערים ייחודיות</div><div className="kpi-value">{formatNum(rt.uniqueCities)}</div></div>
+          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">עם התנגדויות</div><div className="kpi-value">{formatNum(rt.withObjections)}</div></div>
+          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>📅</div><div className="kpi-label">עם פגישה/משימה</div><div className="kpi-value">{formatNum(rt.withMeeting)}</div></div>
+          <div className="kpi-card pink"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(236,72,153,0.1)',color:'var(--pink)'}}>📊</div><div className="kpi-label">% התנגדויות</div><div className="kpi-value">{rt.objectionRate.toFixed(1)}%</div></div>
+          <div className="kpi-card cyan"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(6,182,212,0.1)',color:'var(--cyan)'}}>📊</div><div className="kpi-label">% פגישות</div><div className="kpi-value">{rt.meetingRate.toFixed(1)}%</div></div>
+        </div>
+
+        <div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>נתונים מפורטים</div>
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead><tr>
+                <th>#</th>
+                <th>כתובת/יישוב</th>
+                <th>התנגדויות</th>
+                <th>משימה/פגישה אחרונה</th>
+              </tr></thead>
+              <tbody>
+                {allRows.map((row, i) => (
+                  <tr key={i}>
+                    <td>{i + 1}</td>
+                    <td style={{fontWeight:600}}>{row.address || '-'}</td>
+                    <td>{row.objections || '-'}</td>
+                    <td>{row.lastMeeting || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📈</div>גרפים</div>
+          <div className="chart-grid">
+            <div className="chart-card"><h4>🏘️ התפלגות לפי יישוב</h4><div className="chart-container"><canvas id="crmRepCityChart"></canvas></div></div>
+            <div className="chart-card"><h4>⚠️ התפלגות התנגדויות</h4><div className="chart-container"><canvas id="crmRepObjChart"></canvas></div></div>
+          </div>
+        </div>
+      </>
+    )
+  }, [selectedMonth, reports])
+
+  // ==================== CRM SOURCES SUB-TAB ====================
+  const renderCrmDashboard = useCallback(() => {
+    if (!selectedMonth || reports.length === 0) return null
+    destroyCharts()
+
+    const crmReports = reports.filter(r => r.month === selectedMonth && r.source === 'crm')
+    if (crmReports.length === 0) return <div className="welcome-center"><div className="icon">💭</div><h3>אין נתוני CRM לחודש זה</h3></div>
+
+    let allCrmRows = []
+    crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data) })
+    const crmData = aggregateCrmRows(allCrmRows)
+
+    // Merge Facebook campaign sources into single 'Facebook' entry
+    const _fbCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('פייסבוק') || k.toLowerCase().includes('facebook'))
+    if (_fbCrmKeys.length > 0) {
+      const _fbMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 }
+      _fbCrmKeys.forEach(k => { Object.keys(_fbMerged).forEach(f => { _fbMerged[f] += crmData.sources[k][f] || 0 }); delete crmData.sources[k] })
+      crmData.sources['Facebook'] = _fbMerged
+    }
+    // Merge Google campaign sources into single 'Google' entry
+    const _gCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('גוגל') || k.toLowerCase().includes('google'))
+    if (_gCrmKeys.length > 0) {
+      const _gMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 }
+      _gCrmKeys.forEach(k => { Object.keys(_gMerged).forEach(f => { _gMerged[f] += crmData.sources[k][f] || 0 }); delete crmData.sources[k] })
+      crmData.sources['Google'] = _gMerged
+    }
+
+    // Add platform leads to CRM totals
+    let _platformSpend = 0
+    const _fbR = reports.filter(r => r.month === selectedMonth && r.source === 'facebook')
+    const _gR = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'))
+    const _emptySource = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 }
+    if (_fbR.length > 0) {
+      let _fbRows = []; _fbR.forEach(r => { if (r.data) _fbRows = _fbRows.concat(r.data) })
+      const _fbAgg = aggregateRows(_fbRows)
+      _platformSpend += _fbAgg.totals.spend || 0
+      const _fbLeads = _fbAgg.totals.leads || 0
+      if (!crmData.sources['Facebook']) {
+        crmData.totals.totalLeads += _fbLeads
+        crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads }
+      } else {
+        crmData.totals.totalLeads -= (crmData.sources['Facebook'].totalLeads || 0)
+        crmData.totals.totalLeads += _fbLeads
+      }
+    }
+    if (_gR.length > 0) {
+      let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data) })
+      const _gAgg = aggregateRows(_gRows)
+      _platformSpend += _gAgg.totals.spend || 0
+      const _gLeads = _gAgg.totals.leads || 0
+      if (!crmData.sources['Google']) {
+        crmData.totals.totalLeads += _gLeads
+        crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads }
+      } else {
+        crmData.totals.totalLeads -= (crmData.sources['Google'].totalLeads || 0)
+        crmData.totals.totalLeads += _gLeads
+      }
+    }
+
+    let prevCrmData = null
+    if (compareEnabled) {
+      const prevMonth = getPrevMonth(selectedMonth)
+      const prevCrmReports = reports.filter(r => r.month === prevMonth && r.source === 'crm')
+      if (prevCrmReports.length > 0) {
+        let prevRows = []
+        prevCrmReports.forEach(r => { prevRows = prevRows.concat(r.data || []) })
+        prevCrmData = aggregateCrmRows(prevRows)
+      }
+    }
+
+    const ct = crmData.totals
+    const cp = prevCrmData?.totals
+
+    const crmKpi = (label, value, color, current, prev, isCost) => {
+      const ch = prev != null ? changePercent(current, prev, isCost) : null
+      const icons = { 'סה"כ לידים': 'בש', 'רלוונטיים': '✅', 'לא רלוונטיים': '❌', 'פגישות שתואמו': 'פג', 'פגישות שבוצעו': 'שט', 'פגישות שבוטלו': 'בט', 'הרשמות': 'הר', 'שווי הרשמות': '₪', 'חוזים': 'חז', 'שווי חוזים': '₪', 'אחוז המרה לפגישה שתואמה': '%', 'אחוז המרה לפגישות שבוצעו': '%', '% רלוונטיות': '%', 'עלות פגישה שבוצעה': '₪' }
+      const icon = icons[label] || '📊'
+      const kpiColors = { green: 'rgba(16,185,129,0.1)', purple: 'rgba(139,92,246,0.1)', orange: 'rgba(245,158,11,0.1)', pink: 'rgba(236,72,153,0.1)', cyan: 'rgba(6,182,212,0.1)', red: 'rgba(239,68,68,0.1)' }
+      const kpiTextColors = { green: 'var(--success)', purple: 'var(--purple)', orange: 'var(--warning)', pink: 'var(--pink)', cyan: 'var(--cyan)', red: 'var(--danger)' }
+      return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '▲' : '▼'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>
+    }
+
+    const sourceEntries = Object.entries(crmData.sources).sort((a, b) => b[1].totalLeads - a[1].totalLeads)
+    const sourceNames = sourceEntries.map(([name]) => name)
+
+    setTimeout(() => {
+      destroyCharts()
+      if (sourceNames.length > 0) {
+        createChart('crmPieChart', 'doughnut', sourceNames, [{
+          data: sourceNames.map(n => crmData.sources[n].totalLeads),
+          backgroundColor: COLORS.slice(0, sourceNames.length)
+        }])
+      }
+    }, 200)
+
+    return (
+      <>
+        <div className="kpi-grid">
+          {crmKpi('סה"כ לידים', formatNum(ct.totalLeads), '', ct.totalLeads, cp?.totalLeads)}
+          {crmKpi('רלוונטיים', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
+          {crmKpi('לא רלוונטיים', formatNum(ct.irrelevantLeads), 'red', ct.irrelevantLeads, cp?.irrelevantLeads, true)}
+          {crmKpi('% רלוונטיות', ct.relevantRate.toFixed(1) + '%', 'cyan', ct.relevantRate, cp?.relevantRate)}
+          {crmKpi('פגישות שתואמו', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled)}
+          {crmKpi('פגישות שבוצעו', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted)}
+          {crmKpi('אחוז המרה לפגישה שתואמה', ct.scheduledRate.toFixed(1) + '%', 'pink', ct.scheduledRate, cp?.scheduledRate)}
+          {crmKpi('אחוז המרה לפגישות שבוצעו', ct.completedRate.toFixed(1) + '%', '', ct.completedRate, cp?.completedRate)}
+          {crmKpi('עלות פגישה שבוצעה', ct.meetingsCompleted > 0 ? formatCurrency(_platformSpend / ct.meetingsCompleted) : '₪0', 'purple', 0, 0)}
+          {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled), 'red', ct.meetingsCancelled, cp?.meetingsCancelled, true)}
+          {crmKpi('הרשמות', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations)}
+          {crmKpi('שווי הרשמות', formatCurrency(ct.registrationValue), 'purple', ct.registrationValue, cp?.registrationValue)}
+          {crmKpi('חוזים', formatNum(ct.contracts), 'cyan', ct.contracts, cp?.contracts)}
+          {crmKpi('שווי חוזים', formatCurrency(ct.contractValue), 'orange', ct.contractValue, cp?.contractValue)}
+        </div>
+
+        {/* CRM Funnel */}
+        <div className="section">
+          <div className="section-header" style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
+            <div className="section-icon" style={{background:'var(--gradient-2)'}}>🗂️</div>
+            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(-pprimary)',margin:0}}>משפך לידים</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>מליד ועד חוזה</div></div>
+          </div>
+          <div className="card" style={{padding:'24px'}}>
+            <div className="funnel">
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(ct.totalLeads)}</div><div className="funnel-label">סה"כ לידים</div></div>
+              <div className="funnel-arrow">←</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(ct.relevantLeads)}</div><div className="funnel-label">רלוונטיים</div><div className="funnel-rate"={ct.relevantRate.toFixed(1)}%</div></div>
+              <div className="funnel-arrow">←</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(-ppurple)'}}>{formatNum(ct.meetingsScheduled)}</div><div className="funnel-label">תואמו</div><div className="funnel-rate">{ct.scheduledRate.toFixed(1)}%</div></div>
+              <div className="funnel-arrow">←</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(ct.meetingsCompleted)}</div><div className="funnel-label">בוצעו</div><div className="funnel-rate">{ct.completedRate.toFixed(1)}%</div></div>
+              <div className="funnel-arrow">←</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-4)'}}>{formatNum(ct.registrations)}</div><div className="funnel-label">הרשמות</div></div>
+              <div className="funnel-arrow">←</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-3)'}}>{formatNum(ct.contracts)}</div><div className="funnel-label">חוזים</div></div>
             </div>
             <div style={{textAlign:'center',marginTop:'10px',fontSize:'0.85em',color:'var(--text-secondary)'}}>
-              ×©××× ××¨×©×××ª: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(ct.registrationValue)}</strong> &nbsp;|&nbsp; ×©××× ×××××: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(ct.contractValue)}</strong>
+              שווי הרשמות: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(ct.registrationValue)}</strong> &nbsp;|&nbsp; שווי חוזים: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(ct.contractValue)}</strong>
             </div>
           </div>
         </div>
 
         {/* CRM Table by Source */}
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>ð</div>× ×ª×× ×× ××¤× ××§××¨ ×××¢×</div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📊</div>נתונים לפי מקור הגעה</div>
           <div className="table-wrapper">
             <table className="data-table">
               <thead><tr>
-                <th>××§××¨</th>
-                <th>×¡×"× ×××××</th>
-                <th>×¨×××× ××××</th>
-                <th>×× ×¨×××× ××××</th>
-                <th>×ª××××</th>
-                <th>% ×ª××××</th>
-                <th>×××¦×¢×</th>
-                <th>% ××××¦×¢×</th>
-                <th=yy]yyÍySÂ÷Fà¢ÇFíyMzzyíy]z£Â÷Fà¢ÇFízy]y]y
-yMzzyíy]z£Â÷Fà¢ÇFíy}y]ymyyÓÂ÷Fà¢ÇFízy]y]y
-y}y]ymyyÓÂ÷Fà¢Â÷G#ãÂ÷FVCà¢ÇF&öGà¢·6÷W&6TVçG&W2æÖ¶æÖRÂEÒÓâ°¢6öç7B66VE&FRÒBçF÷FÄÆVG2âòBæÖVWFæw566VGVÆVBòBçF÷FÄÆVG2¢çFôfVB¢sãp¢6öç7B6ö×&FRÒBçF÷FÄÆVG2âòBæÖVWFæw46ö×ÆWFVBòBçF÷FÄÆVG2¢çFôfVB¢sãp¢&WGW&â¢ÇG"¶W×¶æÖWÓà¢ÇFB7GÆS×·¶föçEvVvC£c×Óç¶æÖWÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒBçF÷FÄÆVG2ÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒBç&VÆWfçDÆVG2ÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒBæ'&VÆWfçDÆVG2ÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒBæÖVWFæw566VGVÆVBÓÂ÷FCà¢ÇFCç·66VE&FWÒSÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒBæÖVWFæw46ö×ÆWFVBÓÂ÷FCà¢ÇFCç¶6ö×&FWÒSÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒBæÖVWFæw46æ6VÆÆVBÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒBç&Vv7G&Föç2ÓÂ÷FCà¢ÇFCç¶f÷&ÖD7W'&Væ7Bç&Vv7G&FöåfÇVRÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒBæ6öçG&7G2ÓÂ÷FCà¢ÇFCç¶f÷&ÖD7W'&Væ7Bæ6öçG&7EfÇVRÓÂ÷FCà¢Â÷G#à¢¢ÒÐ¢ÇG"7GÆS×·¶föçEvVvC£sÆ&6¶w&÷VæC¢wf"ÒÖ&r×6V6öæF'w×Óà¢ÇFCízyB-y³Â÷FCà¢ÇFCç¶f÷&ÖDçVÒ7BçF÷FÄÆVG2ÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒ7Bç&VÆWfçDÆVG2ÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒ7Bæ'&VÆWfçDÆVG2ÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒ7BæÖVWFæw566VGVÆVBÓÂ÷FCà¢ÇFCç¶7Bç66VGVÆVE&FRçFôfVBÒSÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒ7BæÖVWFæw46ö×ÆWFVBÓÂ÷FCà¢ÇFCç¶7Bæ6ö×ÆWFVE&FRçFôfVBÒSÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒ7BæÖVWFæw46æ6VÆÆVBÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒ7Bç&Vv7G&Föç2ÓÂ÷FCà¢ÇFCç¶f÷&ÖD7W'&Væ77Bç&Vv7G&FöåfÇVRÓÂ÷FCà¢ÇFCç¶f÷&ÖDçVÒ7Bæ6öçG&7G2ÓÂ÷FCà¢ÇFCç¶f÷&ÖD7W'&Væ77Bæ6öçG&7EfÇVRÓÂ÷FCà¢Â÷G#à¢Â÷F&öGà¢Â÷F&ÆSà¢ÂöFcà¢ÂöFcà ¢²ò¢5$Ò6'G2¢÷Ð¢ÆFb6Æ74æÖSÒ'6V7Föâ#à¢ÆFb6Æ74æÖSÒ'6V7Föâ×FFÆR#ãÆFb6Æ74æÖSÒ'6V7FöâÖ6öâ"7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖw&FVçBÓ"w×Óï	ù8ÂöFcíy-zzMyyÓÂöFcà¢ÆFb6Æ74æÖSÒ&6'BÖw&B"7GÆS×·¶w&EFV×ÆFT6öÇVÖç3¢sg"w×Óà¢ÆFb6Æ74æÖSÒ&6'BÖ6&B#ãÆCï	úz
-yMz­zMyÍy-y]z¢
-yÍyy=yyÓÂöCãÆFb6Æ74æÖSÒ&6'BÖ6öçFæW"#ãÆ6çf2CÒ&7&ÕT6'B#ãÂö6çf3ãÂöFcãÂöFcà¢ÂöFcà¢ÂöFcà¢Âóà¢¢ÒÂ·6VÆV7FVDÖöçFÂ6ö×&TVæ&ÆVBÂ&W÷'G5Ò ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÒÔâD4$ô$BÆÂöf6V&öö²övöövÆRF'2ÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÐ¢6öç7B&VæFW$F6&ö&BÒW6T6ÆÆ&6²Óâ°¢b6VÆV7FVDÖöçFÇÂ&W÷'G2æÆVæwFÓÓÒ&WGW&âçVÆÀ¢FW7G&÷6'G2 ¢6öç7B7W'&VçE&W÷'G2Ò&W÷'G2æfÇFW""Óâ"æÖöçFÓÓÒ6VÆV7FVDÖöçF¢b7W'&VçE&W÷'G2æÆVæwFÓÓÒ&WGW&âÆFb6Æ74æÖSÒ'vVÆ6öÖRÖ6VçFW"#ãÆFb6Æ74æÖSÒ&6öâ#ï	ù:ÓÂöFcãÆ3íy
-yyò
-z
-z­y]z
-yyÒ
-yÍy}y]y=z
-ymyCÂö3ãÂöFcà ¢6öç7BF7Æ&W÷'G2ÒF6F"ÓÓÒvÆÂp¢ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÒv7&Òrbb"ç6÷W&6RÓÒv7&Õ÷&W÷'G2r¢¢F6F"ÓÓÒvf6V&öö²p¢ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒvf6V&öö²r¢¢F6F"ÓÓÒvvöövÆU÷Öp¢ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒvvöövÆU÷Ör¢¢F6F"ÓÓÒvvöövÆU÷6V&6p¢ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒvvöövÆU÷6V&6r¢¢F6F"ÓÓÒvvöövÆRp¢ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6Rbb"ç6÷W&6Rç7F'G5vFvvöövÆRr¢¢µÐ¢6öç7B5ÖÒF6F"ÓÓÒvvöövÆU÷ÖrÇÂF6F"ÓÓÒvvöövÆRrbbF7Æ&W÷'G2æÆVæwFâbbF7Æ&W÷'G2æWfW'"Óâ"ç6÷W&6RÓÓÒvvöövÆU÷Ör ¢ÆWBÆÅ&÷w2ÒµÐ¢F7Æ&W÷'G2æf÷$V6"Óâ²b"æFFÆÅ&÷w2ÒÆÅ&÷w2æ6öæ6B"æFFÒ¢6öç7BFFÒvw&VvFU&÷w2ÆÅ&÷w2 ¢òòFB5$ÒÆVG2Fò&ÆÂ"F"F÷FÇ0¢ÆWB7&ÕF÷FÄÆVG2Ò ¢bF6F"ÓÓÒvÆÂr°¢6öç7B7&Õ&W÷'G2Ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒv7&Òr¢7&Õ&W÷'G2æf÷$V6"Óâ°¢b"æFF°¢"æFFæf÷$V6&÷rÓâ²7&ÕF÷FÄÆVG2³ÒGVöb&÷rçF÷FÄÆVG2ÓÓÒvçVÖ&W"rò&÷rçF÷FÄÆVG2¢'6TfÆöB7G&ær&÷rçF÷FÄÆVG2ç&WÆ6RõµãÓåÂÕÒörÂrrÇÂÒ¢Ð¢Ò¢Ð ¢òòWG&7B5$ÒF÷FÇ2f÷"&ÆÂ"F"µF7Æ¢ÆWB7&ÕF÷FÇ2ÒçVÆÀ¢bF6F"ÓÓÒvÆÂr°¢6öç7B7&Õ&W2Ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒv7&Òr¢b7&Õ&W2æÆVæwFâ°¢ÆWBÆÄ7&Õ"ÒµÐ¢7&Õ&W2æf÷$V6"Óâ²b"æFFÆÄ7&Õ"ÒÆÄ7&Õ"æ6öæ6B"æFFÒ¢7&ÕF÷FÇ2Òvw&VvFT7&Õ&÷w2ÆÄ7&Õ"çF÷FÇ0¢Ð¢Ð ¢ÆWB&WdFFÒçVÆÀ¢b6ö×&TVæ&ÆVB°¢6öç7B&WdÖöçFÒvWE&WdÖöçF6VÆV7FVDÖöçF¢6öç7B&We&W÷'G2Ò&W÷'G2æfÇFW""Óâ"æÖöçFÓÓÒ&WdÖöçF¢6öç7BF7Æ&WbÒF6F"ÓÓÒvÆÂp¢ò&We&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÒv7&Òr¢¢F6F"ÓÓÒvf6V&öö²p¢ò&We&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒvf6V&öö²r¢¢F6F"ÓÓÒvvöövÆU÷Öp¢ò&We&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒvvöövÆU÷Ör¢¢F6F"ÓÓÒvvöövÆU÷6V&6p¢ò&We&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒvvöövÆU÷6V&6r¢¢&We&W÷'G2æfÇFW""Óâ"ç6÷W&6Rbb"ç6÷W&6Rç7F'G5vFvvöövÆRr¢bF7Æ&WbæÆVæwF²ÆWB&We&÷w2ÒµÓ²F7Æ&Wbæf÷$V6"Óâ²&We&÷w2Ò&We&÷w2æ6öæ6B"æFFÇÂµÒÒ²&WdFFÒvw&VvFU&÷w2&We&÷w2Ð¢Ð ¢6öç7BÆÄÖöçF2Ò²ââææWr6WB&W÷'G2æÖ"Óâ"æÖöçFÒç6÷'B¢6öç7BG&VæDFFÒÆÄÖöçF2æÖÒÓâ°¢ÆWBÕ&÷w2ÒµÐ¢&W÷'G2æfÇFW""Óâ"æÖöçFÓÓÒÒbb"ç6÷W&6RÓÒv7&Òrbb"ç6÷W&6RÓÒv7&Õ÷&W÷'G2ræf÷$V6"Óâ²Õ&÷w2ÒÕ&÷w2æ6öæ6B"æFFÇÂµÒÒ¢&WGW&â²ÖöçF¢ÒÂââævw&VvFU&÷w2Õ&÷w2çF÷FÇ2Ð¢Ò ¢6öç7BBÒFFçF÷FÇ0¢6öç7BÒ&WdFFòçF÷FÇ0 ¢6öç7B·6öç2Ò²}yMy]zmy
-yBs¢~(*¢rÂ}z­z}zmyys¢~(*¢rÂ}yÍyy=yyÒs¢	ùRrÂt5Âs¢	ù+rÂ}z-yÍy]z¢
-yÍyÍyy2s¢	ù+rÂ}y}zyzMy]z¢s¢	ùrÂ}z­zMy]zmyBs¢	ù:rÂ}z}yÍyz}yyÒs¢	ùkrÂt52s¢	ù+rÂt5Òs¢	ù8¢rÂt5E"s¢	ù8rÂ}yMyízyBs¢	ùHBrÂ}z­y=yzy]z¢s¢	ùHBrÂ}zMy-yzy]z¢
-zz­y]y
-yíyRs¢	ù8RrÂ}zMy-yzy]z¢
-zyy]zmz-yRs¢~)ÈRrÂ}yMzzyíy]z¢s¢	ù9ÒrÂ}y}y]ymyyÒs¢	ù8BrÐ¢6öç7B·6öÆ÷'2Ò²w&VVã¢w&v&bÃRÃ#ÃãrÂW'ÆS¢w&v&3Ã"Ã#CbÃãrÂ÷&ævS¢w&v&#CRÃSÃÃãrÂæ³¢w&v&#3bÃs"ÃS2ÃãrÂ7ã¢w&v&bÃ"Ã#"ÃãrÂ&VC¢w&v&#3ÃcÃcÃãrÐ¢6öç7B·FWD6öÆ÷'2Ò²w&VVã¢wf"Ò×7V66W72rÂW'ÆS¢wf"Ò×W'ÆRrÂ÷&ævS¢wf"Ò×v&æærrÂæ³¢wf"Ò×æ²rÂ7ã¢wf"ÒÖ7ârÂ&VC¢wf"ÒÖFævW"rÐ ¢6öç7B·ÒÆ&VÂÂfÇVRÂ6öÆ÷"Â7W'&VçBÂ&WbÂ46÷7BÓâ°¢6öç7B6Ò&WbÒçVÆÂò6ævUW&6VçB7W'&VçBÂ&WbÂ46÷7B¢çVÆÀ¢6öç7B6öâÒ·6öç5¶Æ&VÅÒÇÂ	ù8¢p¢&WGW&âÆFb6Æ74æÖS×¶·Ö6&BG¶6öÆ÷'ÖÒ¶W×¶Æ&VÇÓãÆFb6Æ74æÖSÒ&·Ö66VçB#ãÂöFcãÆFb6Æ74æÖSÒ&·Ö6öâ"7GÆS×·¶&6¶w&÷VæC¢·6öÆ÷'5¶6öÆ÷%ÒÇÂw&v&SÃ3Ã#CbÃãrÂ6öÆ÷#¢·FWD6öÆ÷'5¶6öÆ÷%ÒÇÂwf"ÒÖ66VçBw×Óç¶6öçÓÂöFcãÆFb6Æ74æÖSÒ&·ÖÆ&VÂ#ç¶Æ&VÇÓÂöFcãÆFb6Æ74æÖSÒ&·×fÇVR#ç·fÇVWÓÂöFcç¶6bbÆFb6Æ74æÖS×¶·Ö6ævRG¶6æ4vööBòwWr¢vF÷vâwÖÓãÇ7â6Æ74æÖSÒ&'&÷r#ç¶6ç7Bâò~)k"r¢~)kÂwÓÂ÷7ãâ´ÖFæ'26ç7BçFôfVBÒSÂöFcçÓÂöFcà¢Ð ¢6öç7B'VÆEF&ÆRÒFV×2Â&WdFV×2ÂÆ&VÄæÖRÂF&ÆTBÓâ°¢bFV×2ÇÂö&¦V7Bæ¶W2FV×2æÆVæwFÓÓÒ&WGW&âçVÆÀ¢6öç7B6öÇ2Ò·¶¶W¢væÖRrÆÆ&VÃ¦Æ&VÄæÖRÆvWC¢òÆâÓæçÒÇ¶¶W¢v6Æ6·2rÆÆ&VÃ¢}z}yÍyz}yyÒrÆvWC¦CÓæBæ6Æ6·2ÆvW#§G'VWÒÇ¶¶W¢v×&W76öç2rÆÆ&VÃ¢}y}zyzMy]z¢rÆvWC¦CÓæBæ×&W76öç2ÆvW#§G'VWÒÇ¶¶W¢v72rÆÆ&VÃ¢}z-yÍy]z¢
-yÍz}yÍyzrrÆvWC¦CÓæBæ6Æ6·3ãöBç7VæBöBæ6Æ6·3£ÆvW#¦fÇ6WÒÇ¶¶W¢v7G"rÆÆ&VÃ¢t5E"rÆvWC¦CÓæBæ×&W76öç3ãòBæ6Æ6·2öBæ×&W76öç2££ÆvW#§G'VWÒÇ¶¶W¢v7ÒrÆÆ&VÃ¢t5ÒrÆvWC¦CÓæBæ×&W76öç3ãòBç7VæBöBæ×&W76öç2££ÆvW#¦fÇ6WÒÇ¶¶W¢vÆVG2rÆÆ&VÃ¢}yÍyy=yyÒrÆvWC¦CÓæBæÆVG2ÆvW#§G'VWÒÇ¶¶W¢v7ÂrÆÆ&VÃ¢}z-yÍy]z¢
-yÍyÍyy2rÆvWC¦CÓæBæÆVG3ãöBç7VæBöBæÆVG3£ÆvW#¦fÇ6WÒÇ¶¶W¢w7VæBrÆÆ&VÃ¢}z­z}zmyy
-zz
-y]zmyÂrÆvWC¦CÓæBç7VæGÕÐ¢6öç7B62Ò6÷'D6öæfu·F&ÆTEÐ¢ÆWBVçG&W2Òö&¦V7BæVçG&W2FV×2¢b62²6öç7B6öÂÒ6öÇ2æfæB3Óæ2æ¶WÓÓ×62æ¶W²b6öÂ¶VçG&W2ç6÷'BÆ"Óç¶6öç7BfÖ6öÂævWB³ÒÆ³ÒÇf#Ö6öÂævWB%³ÒÆ%³Ò¶bGVöbfÓÓÒw7G&ærr&WGW&â62æF#ÓÓÒv62s÷fæÆö6ÆT6ö×&Rf"§f"æÆö6ÆT6ö×&Rf·&WGW&â62æF#ÓÓÒv62s÷f×f#§f"×f·Ò·×ÒVÇ6R²VçG&W2ç6÷'BÂ"Óâ%³Òç7VæBÒ³Òç7VæBÐ¢6öç7B6÷t6Ò6ö×&TVæ&ÆVBbb&WdFV×0¢6öç7B6Ò7W"Â&WbÂ46÷7BÓâ°¢b6÷t6ÇÂ&WbÓÒçVÆÂ&WGW&âçVÆÀ¢6öç7B7BÒ6ævUW&6VçB7W"Â&WbÂ46÷7B¢b7B&WGW&âçVÆÀ¢6öç7B5÷2Ò46÷7Bò7Bç7BÂ¢7Bç7Bâ ¢&WGW&âÇ7â6Æ74æÖS×¶6ævRÖ&FvRG¶5÷2òw÷6FfRr¢væVvFfRwÖÓç·7Bç7Bâò~)k"r¢~)kÂwÒ´ÖFæ'27Bç7BçFôfVBÒSÂ÷7ãà¢Ð¢6öç7B6÷'D6öâÒ¶WÓâ²b67ÇÇ62æ¶WÓÖ¶W&WGW&âr(xRs²&WGW&â62æF#ÓÓÒvFW62sòr)kÂs¢r)k"rÐ¢6öç7BF7GÆRÒ¶7W'6÷#¢wöçFW"rÇW6W%6VÆV7C¢væöæRrÇvFU76S¢væ÷w&wÐ¢6öç7BWG&VÖW2Ò·Ð¢6öÇ2æf÷$V62Óâ²b2æ¶WÓÓÒvæÖRrÇÂ2æ¶WÓÓÒw7VæBr&WGW&ã²6öç7BfÇ2ÒVçG&W2æÖ¶âÆEÒÓâ2ævWBBÆâæfÇFW"bÓâGVöbbÓÓÒvçVÖ&W"rbbbâ²bfÇ2æÆVæwFÂ"&WGW&ã²WG&VÖW5¶2æ¶WÒÒ²Öã¢ÖFæÖâââçfÇ2ÂÖ¢ÖFæÖââçfÇ2ÒÒ¢6öç7B6VÆÄ&rÒ¶WÂfÂÓâ²6öç7BRÒWG&VÖW5¶¶WÓ²bRÇÂfÂÃÒÇÂRæÖâÓÓÒRæÖ&WGW&â·Ó²6öç7B6öÂÒ6öÇ2æfæB3Óæ2æ¶WÓÓÖ¶W²b6öÂÇÂ6öÂævW"ÓÓÒVæFVfæVB&WGW&â·Ó²bfÂÓÓÒRæÖ&WGW&â6öÂævW"ò²6öÆ÷#¢r3SccrÆföçEvVvC£sÒ¢¶6öÆ÷#¢r6F3#c#brÆföçEvVvC£sÓ²bfÂÓÓÒRæÖâ&WGW&â6öÂævW"ò¶6öÆ÷#¢r6F3#c#brÆföçEvVvC£sÒ¢¶6öÆ÷#¢r3SccrÆföçEvVvC£sÓ²&WGW&â·ÒÐ¢&WGW&âÆFb6Æ74æÖSÒ'F&ÆR×w&W"#ãÇF&ÆR6Æ74æÖSÒ&FF×F&ÆR#ãÇFVCãÇG#ç¶6öÇ2æÖ3ÓâÇF¶W×¶2æ¶WÒ7GÆS×·F7GÆWÒöä6Æ6³×²ÓææFÆU6÷'BF&ÆTBÆ2æ¶WÓç¶2æÆ&VÇ×·6÷'D6öâ2æ¶WÓÂ÷FâÓÂ÷G#ãÂ÷FVCãÇF&öGç¶VçG&W2æÖ¶æÖRÂEÒÓâ²6öç7B7ÂÒBæÆVG2âòBç7VæBòBæÆVG2¢²6öç7B72ÒBæ6Æ6·2âòBç7VæBòBæ6Æ6·2¢²6öç7B7G"ÒBæ×&W76öç2âòBæ6Æ6·2òBæ×&W76öç2¢¢²6öç7B7ÒÒBæ×&W76öç2âòBç7VæBòBæ×&W76öç2¢¢²6öç7B7Ä6Æ72Ò7Ââbb7ÂÂòwFrÖw&VVâr¢7ÂÂ#òwFrÖ&ÇVRr¢7ÂÂSòwFr×W'ÆRr¢wFr×&VBs²&WGW&âÇG"¶W×¶æÖWÓãÇFB7GÆS×·¶föçEvVvC¢c×Óç¶æÖWÓÂ÷FCãÇFB7GÆS×¶6VÆÄ&rv6Æ6·2rÆBæ6Æ6·2Óç¶f÷&ÖDçVÒBæ6Æ6·2Ò¶6Bæ6Æ6·2Â&WdFV×3òå¶æÖUÓòæ6Æ6·2ÂfÇ6RÓÂ÷FCãÇFB7GÆS×¶6VÆÄ&rv×&W76öç2rÆBæ×&W76öç2Óç¶f÷&ÖDçVÒBæ×&W76öç2Ò¶6Bæ×&W76öç2Â&WdFV×3òå¶æÖUÓòæ×&W76öç2ÂfÇ6RÓÂ÷FCãÇFB7GÆS×¶6VÆÄ&rv72rÆ72Óç¶f÷&ÖD7W'&Væ772Ò¶672Â&WdFV×3òå¶æÖUÓòæ6Æ6·2âò&WdFV×5¶æÖUÒç7VæB÷&WdFV×5¶æÖUÒæ6Æ6·2¢çVÆÂÂG'VRÓÂ÷FCãÇFB7GÆS×¶6VÆÄ&rv7G"rÆ7G"Óç¶7G"çFôfVB"ÒSÂ÷FCãÇFB7GÆS×¶6VÆÄ&rv7ÒrÆ7ÒÓç¶f÷&ÖD7W'&Væ77ÒÓÂ÷FCãÇFB7GÆS×¶6VÆÄ&rvÆVG2rÆBæÆVG2Óç¶BæÆVG7Ò¶6BæÆVG2Â&WdFV×3òå¶æÖUÓòæÆVG2ÂfÇ6RÓÂ÷FCãÇFB7GÆS×¶6VÆÄ&rv7ÂrÆ7ÂÓãÇ7â6Æ74æÖS×¶7Â×FrG¶7Ä6Æ77ÖÓç¶f÷&ÖD7W'&Væ77ÂÓÂ÷7ããÂ÷FCãÇFCç¶f÷&ÖD7W'&Væ7Bç7VæBÒ¶6Bç7VæBÂ&WdFV×3òå¶æÖUÓòç7VæBÂG'VRÓÂ÷FCãÂ÷G#âÒÓÂ÷F&öGãÂ÷F&ÆSãÂöFcâ¢Ð ¢6WEFÖV÷WBÓâ°¢FW7G&÷6'G2¢bG&VæDFFæÆVæwFâ°¢6öç7BÆ&VÇ2ÒG&VæDFFæÖBÓâf÷&ÖDÖöçFBæÖöçF¢7&VFT6'BwG&VæDÆVG2rÂv&"rÂÆ&VÇ2Â·²Æ&VÃ¢tÆVG2rÂFF¢G&VæDFFæÖBÓâBæÆVG2Â&6¶w&÷VæD6öÆ÷#¢w&v&SÃ3Ã#CbÃãrrÂ4C¢wrÒÂ²Æ&VÃ¢t5ÂrÂFF¢G&VæDFFæÖBÓâBæ7ÂÂ&÷&FW$6öÆ÷#¢r6VcCCCBrÂGS¢vÆæRrÂ4C¢wrÂFVç6öã¢ã2ÂöçE&FW3¢RÕÒÂ²¢²÷6Föã¢w&vBrÒÂ¢²÷6Föã¢vÆVgBrÂw&C¢²G&töä6'D&V¢fÇ6RÒÒÒ¢7&VFT6'BwG&VæE7VæBrÂv&"rÂÆ&VÇ2Â·²Æ&VÃ¢t'VFvWBrÂFF¢G&VæDFFæÖBÓâBç7VæBÂ&6¶w&÷VæD6öÆ÷#¢w&v&3Ã"Ã#CbÃãrrÂ4C¢wrÒÂ²Æ&VÃ¢t×&W76öç2rÂFF¢G&VæDFFæÖBÓâBæ×&W76öç2Â&÷&FW$6öÆ÷#¢r3f#fCBrÂGS¢vÆæRrÂ4C¢wrÂFVç6öã¢ã2ÂöçE&FW3¢RÕÒÂ²¢²÷6Föã¢w&vBrÒÂ¢²÷6Föã¢vÆVgBrÂw&C¢²G&töä6'D&V¢fÇ6RÒÒÒ¢Ð¢6öç7B6×æÖW3"Òö&¦V7Bæ¶W2FFæ6×vç2¢b6×æÖW3"æÆVæwFâ°¢7&VFT6'Bv6×7VæBrÂvF÷VvçWBrÂ6×æÖW3"Â·²FF¢6×æÖW3"æÖâÓâFFæ6×vç5¶åÒç7VæBÂ&6¶w&÷VæD6öÆ÷#¢4ôÄõ%2ç6Æ6RÂ6×æÖW3"æÆVæwFÕÒ¢7&VFT6'Bv6×ÆVG2rÂv&"rÂ6×æÖW3"Â·²Æ&VÃ¢tÆVG2rÂFF¢6×æÖW3"æÖâÓâFFæ6×vç5¶åÒæÆVG2Â&6¶w&÷VæD6öÆ÷#¢w&v&bÃRÃ#ÃãrrÂ4C¢wrÒÂ²Æ&VÃ¢t5ÂrÂFF¢6×æÖW3"æÖâÓâFFæ6×vç5¶åÒæÆVG2âòFFæ6×vç5¶åÒç7VæBòFFæ6×vç5¶åÒæÆVG2¢Â&÷&FW$6öÆ÷#¢r6VcCCCBrÂGS¢vÆæRrÂ4C¢wrÂFVç6öã¢ã2ÕÒÂ²¢²÷6Föã¢w&vBrÒÂ¢²÷6Föã¢vÆVgBrÂw&C¢²G&töä6'D&V¢fÇ6RÒÒÒ¢Ð¢6öç7BvâÒö&¦V7Bæ¶W2FFævVæFW'2æfÇFW"rÓârÓÒwVæ¶æ÷vâr¢6öç7BväÆÂÒö&¦V7Bæ¶W2FFævVæFW'2¢bväÆÂæÆVæwFâ°¢6öç7BtÆ&VÇ2ÒväÆÂæÖrÓârÓÓÒvfVÖÆRrò}z
-zyyÒr¢rÓÓÒvÖÆRrò}y-yzyyÒr¢}yÍy
-yy=y]z"r¢7&VFT6'BvvVæFW%7VæD6'BrÂvF÷VvçWBrÂtÆ&VÇ2Â·²FF¢väÆÂæÖrÓâFFævVæFW'5¶uÒç7VæBÂ&6¶w&÷VæD6öÆ÷#¢²w&v&#3bÃs"ÃS2ÃãrrÂw&v&SÃ3Ã#CbÃãrrÂw&v&#CRÃSÃÃãruÒÂ&÷&FW$6öÆ÷#¢²r6ffbrÂr6ffbrÂr6ffbuÒÂ&÷&FW%vGF¢2ÕÒ¢7&VFT6'BvvVæFW$ÆVG46'BrÂvF÷VvçWBrÂtÆ&VÇ2Â·²FF¢väÆÂæÖrÓâFFævVæFW'5¶uÒæÆVG2Â&6¶w&÷VæD6öÆ÷#¢²w&v&#3bÃs"ÃS2ÃãrrÂw&v&SÃ3Ã#CbÃãrrÂw&v&#CRÃSÃÃãruÒÂ&÷&FW$6öÆ÷#¢²r6ffbrÂr6ffbrÂr6ffbuÒÂ&÷&FW%vGF¢2ÕÒ¢Ð¢6öç7BâÒö&¦V7Bæ¶W2FFævW2æfÇFW"ÓâÓÒwVæ¶æ÷vârç6÷'BÂ"Óâ'6TçBÇÂÒ'6TçB"ÇÂ¢bâæÆVæwFâ°¢7&VFT6'BvvU7VæDÆVG2rÂv&"rÂâÂ·²Æ&VÃ¢}yMy]zmy
-yBrÂFF¢âæÖÓâFFævW5¶Òç7VæBÂ&6¶w&÷VæD6öÆ÷#¢w&v&SÃ3Ã#CbÃãRrÂ&÷&FW$6öÆ÷#¢r36#&cbrÂ&÷&FW%vGF¢"Â4C¢wrÒÂ²Æ&VÃ¢}yÍyy=yyÒrÂFF¢âæÖÓâFFævW5¶ÒæÆVG2Â&6¶w&÷VæD6öÆ÷#¢w&v&bÃRÃ#ÃãRrÂ&÷&FW$6öÆ÷#¢r3#rÂ&÷&FW%vGF¢"Â4C¢wrÕÒÂ²¢²÷6Föã¢w&vBrÂFFÆS¢²F7Æ¢G'VRÂFWC¢}yMy]zmy
-yB(*¢rÒÒÂ¢²÷6Föã¢vÆVgBrÂFFÆS¢²F7Æ¢G'VRÂFWC¢}yÍyy=yyÒrÒÂw&C¢²G&töä6'D&V¢fÇ6RÒÒÒ¢6öç7BvT5ÆFFÒâæÖÓâFFævW5¶ÒæÆVG2âòFFævW5¶Òç7VæBòFFævW5¶ÒæÆVG2¢¢6öç7BvT5Æ6öÆ÷'2ÒvT5ÆFFæÖbÓâbÂòr3#r¢bÂ#òr36#&cbr¢bÂSòr3#V6cbr¢r6VcCCCBr¢6öç7BvT5Æ&rÒvT5ÆFFæÖbÓâbÂòw&v&bÃRÃ#ÃãRr¢bÂ#òw&v&SÃ3Ã#CbÃãRr¢bÂSòw&v&3Ã"Ã#CbÃãRr¢w&v&#3ÃcÃcÃãRr¢7&VFT6'BvvT5ÂrÂv&"rÂâÂ·²Æ&VÃ¢t5Â(*¢rÂFF¢vT5ÆFFÂ&6¶w&÷VæD6öÆ÷#¢vT5Æ&rÂ&÷&FW$6öÆ÷#¢vT5Æ6öÆ÷'2Â&÷&FW%vGF¢"ÕÒ¢7&VFT6'BvvU&FW2rÂv&"rÂâÂ·²Æ&VÃ¢t5E"RrÂFF¢âæÖÓâFFævW5¶Òæ×&W76öç2âòFFævW5¶Òæ6Æ6·2òFFævW5¶Òæ×&W76öç2¢¢Â&6¶w&÷VæD6öÆ÷#¢w&v&bÃ"Ã#"ÃãRrÂ&÷&FW$6öÆ÷#¢r3f#fCBrÂ&÷&FW%vGF¢"ÒÂ²Æ&VÃ¢}y
-y}y]yb
-yMyízyBRrÂFF¢âæÖÓâFFævW5¶Òæ6Æ6·2âòFFævW5¶ÒæÆVG2òFFævW5¶Òæ6Æ6·2¢¢Â&6¶w&÷VæD6öÆ÷#¢w&v&3Ã"Ã#CbÃãRrÂ&÷&FW$6öÆ÷#¢r3#V6cbrÂ&÷&FW%vGF¢"ÕÒ¢7&VFT6'BvvT5ÒrÂv&"rÂâÂ·²Æ&VÃ¢t5Ò(*¢rÂFF¢âæÖÓâFFævW5¶Òæ×&W76öç2âòFFævW5¶Òç7VæBòFFævW5¶Òæ×&W76öç2¢¢Â&6¶w&÷VæD6öÆ÷#¢w&v&#CRÃSÃÃãRrÂ&÷&FW$6öÆ÷#¢r6cSS"rÂ&÷&FW%vGF¢"ÕÒ¢Ð¢ÒÂ# ¢6öç7B6×æÖW2Òö&¦V7Bæ¶W2FFæ6×vç2¢6öç7BvVæFW$æÖW2Òö&¦V7Bæ¶W2FFævVæFW'2æfÇFW"rÓârÓÒwVæ¶æ÷vâr¢6öç7BvTæÖW2Òö&¦V7Bæ¶W2FFævW2æfÇFW"ÓâÓÒwVæ¶æ÷vâr ¢6öç7Bf%&W÷'G2Ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒvf6V&öö²r¢6öç7Bu&W÷'G2Ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6Rbb"ç6÷W&6Rç7F'G5vFvvöövÆRr¢6öç7B7&Õ&W÷'G2Ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒv7&Òr¢6öç7B7&Õ&W&W÷'G2Ò7W'&VçE&W÷'G2æfÇFW""Óâ"ç6÷W&6RÓÓÒv7&Õ÷&W÷'G2r¢6öç7B4f"Òf%&W÷'G2æÆVæwFâ ¢6öç7B5ÖÒu&W÷'G2ç6öÖR"Óâ"ç6÷W&6RÓÓÒvvöövÆU÷Ör¢6öç7B56V&6Òu&W÷'G2ç6öÖR"Óâ"ç6÷W&6RÓÓÒvvöövÆU÷6V&6r¢6öç7B4rÒu&W÷'G2æÆVæwFâ ¢6öç7B47&ÒÒ7&Õ&W÷'G2æÆVæwFâÇÂ7&Õ&W&W÷'G2æÆVæwFâ  ¢ÆWBf%F÷FÇ2ÒçVÆÂÂuF÷FÇ2ÒçVÆÀ¢b4f"²ÆWBf%&÷w2ÒµÓ²f%&W÷'G2æf÷$V6"Óâ²b"æFFf%&÷w2Òf%&÷w2æ6öæ6B"æFFÒ²f%F÷FÇ2Òvw&VvFU&÷w2f%&÷w2çF÷FÇ2Ð¢b4r²ÆWBu&÷w2ÒµÓ²u&W÷'G2æf÷$V6"Óâ²b"æFFu&÷w2Òu&÷w2æ6öæ6B"æFFÒ²uF÷FÇ2Òvw&VvFU&÷w2u&÷w2çF÷FÇ2Ð ¢6öç7B7FfUBÒF6F"ÓÓÒvf6V&öö²rbbf%F÷FÇ2òf%F÷FÇ2¢F6F"ÓÓÒvvöövÆRrbbuF÷FÇ2òuF÷FÇ2¢@¢6öç7B7FfUÒF6F"ÓÒvÆÂròçVÆÂ¢  ¢òòF÷FÂÆVG2æ6ÇVFær5$Òf÷"&ÆÂ"F"F7Æ¢6öç7BF÷FÄÆVG5vF7&ÒÒF6F"ÓÓÒvÆÂròBæÆVG2²7&ÕF÷FÄÆVG2¢7FfUBæÆVG0 ¢&WGW&â¢Ãà¢²ò¢6÷W&6RF'2¢÷Ð¢ÆFb6Æ74æÖSÒ&6ÆVçB×F'2#à¢Æ'WGFöâ6Æ74æÖS×¶6ÆVçB×F"G¶F6F"ÓÓÒvÆÂròv7FfRr¢rwÖÒöä6Æ6³×²Óâ6WDF6F"vÆÂrÓíyMy½yÃÂö'WGFöãà¢¶4f"bbÆ'WGFöâ6Æ74æÖS×¶6ÆVçB×F"G¶F6F"ÓÓÒvf6V&öö²ròv7FfRr¢rwÖÒöä6Æ6³×²Óâ6WDF6F"vf6V&öö²rÓäf6V&öö³Âö'WGFöãçÐ¢¶5ÖbbÆ'WGFöâ6Æ74æÖS×¶6ÆVçB×F"G¶F6F"ÓÓÒvvöövÆU÷Öròv7FfRr¢rwÖÒöä6Æ6³×²Óâ6WDF6F"vvöövÆU÷ÖrÓävöövÆRÖÂö'WGFöãçÐ¢¶56V&6bbÆ'WGFöâ6Æ74æÖS×¶6ÆVçB×F"G¶F6F"ÓÓÒvvöövÆU÷6V&6ròv7FfRr¢rwÖÒöä6Æ6³×²Óâ6WDF6F"vvöövÆU÷6V&6rÓävöövÆR6V&6Âö'WGFöãçÐ¢¶4rbbÆ'WGFöâ6Æ74æÖS×¶6ÆVçB×F"G¶F6F"ÓÓÒvvöövÆRròv7FfRr¢rwÖÒöä6Æ6³×²Óâ6WDF6F"vvöövÆRrÓävöövÆSÂö'WGFöãçÐ¢¶47&ÒbbÆ'WGFöâ6Æ74æÖS×¶6ÆVçB×F"G¶F6F"ÓÓÒv7&Òròv7FfRr¢rwÖÒöä6Æ6³×²Óâ6WDF6F"v7&ÒrÓä5$ÓÂö'WGFöãçÐ¢ÂöFcà ¢¶F6F"ÓÓÒv7&ÒròÃà¢ÆFb6Æ74æÖSÒ&6ÆVçB×F'2"7GÆS×·¶Ö&vä&÷GFöÓ¢W×Óà¢Æ'WGFöâ6Æ74æÖS×¶6ÆVçB×F"G¶7&Õ7V%F"ÓÓÒw6÷W&6W2ròv7FfRr¢rwÖÒöä6Æ6³×²Óâ6WD7&Õ7V%F"w6÷W&6W2rÓï	ù8"
-yíz}y]zy]z¢
-yMy-z-yCÂö'WGFöãà¢Æ'WGFöâ6Æ74æÖS×¶6ÆVçB×F"G¶7&Õ7V%F"ÓÓÒw&W÷'G2ròv7FfRr¢rwÖÒöä6Æ6³×²Óâ6WD7&Õ7V%F"w&W÷'G2rÓï	ù8¢
-yíy}y]yÍyÂ
-y=y]y}y]z£Âö'WGFöãà¢ÂöFcà¢¶7&Õ7V%F"ÓÓÒw6÷W&6W2rò&VæFW$7&ÔF6&ö&B¢&VæFW$7&Õ&W÷'DF6&ö&BÐ¢Âóâ¢Ãà¢ÆFb6Æ74æÖSÒ&·Öw&B#à¢¶·}z­z}zmyyrÂf÷&ÖD7W'&Væ77FfUBç7VæBÂrrÂ7FfUBç7VæBÂ7FfUòç7VæBÂG'VRÐ¢¶F6F"ÓÓÒvÆÂrò·}yÍyy=yyÒrÂf÷&ÖDçVÒF÷FÄÆVG5vF7&ÒÂvw&VVârÂF÷FÄÆVG5vF7&ÒÂ7FfUòæÆVG2¢·}yÍyy=yyÒrÂf÷&ÖDçVÒ7FfUBæÆVG2Âvw&VVârÂ7FfUBæÆVG2Â7FfUòæÆVG2Ð¢¶·}z-yÍy]z¢
-yÍyÍyy2rÂf÷&ÖD7W'&Væ77FfUBæ7ÂÂwW'ÆRrÂ7FfUBæ7ÂÂ7FfUòæ7ÂÂG'VRÐ¢¶F6F"ÓÓÒvÆÂrbb7&ÕF÷FÇ2ò·}zMy-yzy]z¢
-zz­y]y
-yíyRrÂf÷&ÖDçVÒ7&ÕF÷FÇ2æÖVWFæw566VGVÆVBÇÂÂv7ârÂ7&ÕF÷FÇ2æÖVWFæw566VGVÆVBÂçVÆÂ¢çVÆÇÐ¢¶F6F"ÓÓÒvÆÂrbb7&ÕF÷FÇ2ò·}zMy-yzy]z¢
-zyy]zmz-yRrÂf÷&ÖDçVÒ7&ÕF÷FÇ2æÖVWFæw46ö×ÆWFVBÇÂÂv÷&ævRrÂ7&ÕF÷FÇ2æÖVWFæw46ö×ÆWFVBÂçVÆÂ¢çVÆÇÐ¢¶F6F"ÓÓÒvÆÂrbb7&ÕF÷FÇ2ò·}yMzzyíy]z¢rÂf÷&ÖDçVÒ7&ÕF÷FÇ2ç&Vv7G&Föç2ÇÂÂvw&VVârÂ7&ÕF÷FÇ2ç&Vv7G&Föç2ÂçVÆÂ¢çVÆÇÐ¢¶F6F"ÓÓÒvÆÂrbb7&ÕF÷FÇ2ò·}y}y]ymyyÒrÂf÷&ÖDçVÒ7&ÕF÷FÇ2æ6öçG&7G2ÇÂÂwæ²rÂ7&ÕF÷FÇ2æ6öçG&7G2ÂçVÆÂ¢çVÆÇÐ¢ÂöFcà ¢²ò¢eTääTÂ¢÷Ð¢ÆFb6Æ74æÖSÒ'6V7Föâ#à¢ÆFb6Æ74æÖSÒ'6V7FöâÖVFW""7GÆS×·¶F7Æ¢vfÆWrÆÆväFV×3¢v6VçFW"rÆv¢s'rÆÖ&vä&÷GFöÓ¢s#w×Óà¢ÆFb6Æ74æÖSÒ'6V7FöâÖ6öâ"7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖw&FVçBÓ"w×Óï	ùKÓÂöFcà¢ÆFcãÆ"7GÆS×·¶föçE6¦S¢sã6VÒrÆföçEvVvC£sÆ6öÆ÷#¢wf"Ò×&Ö'rÆÖ&vã£×ÓíyízzMy¢
-zyy]y]z}yÂö#ãÆFb7GÆS×·¶föçE6¦S¢sãVVÒrÆ6öÆ÷#¢wf"Ò×FWB×6V6öæF'w×Óíyíz}yÍyzr
-y]z-y2
-y}y]ymyCÂöFcãÂöFcà¢ÂöFcà¢ÆFb6Æ74æÖSÒ&6&B"7GÆS×··FFæs¢s#Gw×Óà¢ÆFb6Æ74æÖSÒ&gVææVÂ#à¢ÆFb6Æ74æÖSÒ&gVææVÂ×7FW#ãÆFb6Æ74æÖSÒ&gVææVÂÖ&""7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖw&FVçBÓw×Óç¶f÷&ÖDçVÒ7FfUBæ6Æ6·2ÓÂöFcãÆFb6Æ74æÖSÒ&gVææVÂÖÆ&VÂ#íz}yÍyz}yyÓÂöFcãÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂÖ'&÷r#âfÆ'#³ÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂ×7FW#ãÆFb6Æ74æÖSÒ&gVææVÂÖ&""7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖ66VçBrÆ÷6G£ãW×Óç¶f÷&ÖDçVÒ7FfUBæ×&W76öç2ÓÂöFcãÆFb6Æ74æÖSÒ&gVææVÂÖÆ&VÂ#íy}zyzMy]z£ÂöFcãÂöFcà¢¶F6F"ÓÓÒvÆÂrbb7&ÕF÷FÇ2òÃãÆFb6Æ74æÖSÒ&gVææVÂÖ'&÷r#âfÆ'#³ÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂ×7FW#ãÆFb6Æ74æÖSÒ&gVææVÂÖ&""7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖ7âw×Óç¶f÷&ÖDçVÒ7&ÕF÷FÇ2æÖVWFæw566VGVÆVBÇÂÓÂöFcãÆFb6Æ74æÖSÒ&gVææVÂÖÆ&VÂ#ízMy-yzy]z¢
-yíz­y]y
-yíy]z£ÂöFcãÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂÖ'&÷r#âfÆ'#³ÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂ×7FW#ãÆFb6Æ74æÖSÒ&gVææVÂÖ&""7GÆS×·¶&6¶w&÷VæC¢wf"×'WÆRw×Óç¶f÷&ÖDçVÒ7&ÕF÷FÇ2æÖVWFæw46ö×ÆWFVBÇÂÓÂöFcãÆFb6Æ74æÖSÒ&gVææVÂÖÆ&VÂ#ízyzy]z¢
-zyy]zmz-ySÂöFcãÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂÖ'&÷r#âfÆ'#³ÂöFcà¢ÆFb6Æ74æÖSÒ&gVææVÂ×7FW#ãÆFb6Æ74æÖSÒ&gVææVÂÖ&""7GÆS×·¶&6¶w&÷VæC¢wf"ÒÖw&FVçBÓ"w×Óç¶f÷&ÖDçVÒ7&ÕF÷FÇ2ç&Vv7G&Föç2ÇÂÓÂöFcãÆFb6Æ74æÖSÒ&gVææVÂÖÆ&VÂ#íyMzzyíy]z£ÂöFcãÂöFcà¢ÆFb6Æ
+                <th>מקור</th>
+                <th>סה"כ לידים</th>
+                <th>רלוונטיים</th>
+                <th>לא רלוונטיים</th>
+                <th>תואמו</th>
+                <th>% תיאום</th>
+                <th>בוצעו</th>
+                <th>% ביצוע</th>
+                <th>בוטלו</th>
+                <th>הרשמות</th>
+                <th>שווי הרשמות</th>
+                <th>חוזים</th>
+                <th>שווי חוזים</th>
+              </tr></thead>
+              <tbody>
+                {sourceEntries.map(([name, d]) => {
+                  const schedRate = d.totalLeads > 0 ? (d.meetingsScheduled / d.totalLeads * 100).toFixed(1) : '0.0'
+                  const compRate = d.totalLeads > 0 ? (d.meetingsCompleted / d.totalLeads * 100).toFixed(1) : '0.0'
+                  return (
+                    <tr key={name}>
+                      <td style={{fontWeight:600}}>{name}</td>
+                      <td>{formatNum(d.totalLeads)}</td>
+                      <td>{formatNum(d.relevantLeads)}</td>
+                      <td>{formatNum(d.irrelevantLeads)}</td>
+                      <td>{formatNum(d.meetingsScheduled)}</td>
+                      <td>{schedRate}%</td>
+                      <td>{formatNum(d.meetingsCompleted)}</td>
+                      <td>{compRate}%</td>
+                      <td>{formatNum(d.meetingsCancelled)}</td>
+                      <td>{formatNum(d.registrations)}</td>
+                      <td>{formatCurrency(d.registrationValue)}</td>
+                      <td>{formatNum(d.contracts)}</td>
+                      <td>{formatCurrency(d.contractValue)}</td>
+                    </tr>
+                  )
+                })}
+                <tr style={{fontWeight:700,background:'var(--bg-secondary)'}}>
+                  <td>סה"כ</td>
+                  <td>{formatNum(ct.totalLeads)}</td>
+                  <td>{formatNum(ct.relevantLeads)}</td>
+                  <td>{formatNum(ct.irrelevantLeads)}</td>
+                  <td>{formatNum(ct.meetingsScheduled)}</td>
+                  <td>{ct.scheduledRate.toFixed(1)}%</td>
+                  <td>{formatNum(ct.meetingsCompleted)}</td>
+                  <td>{ct.completedRate.toFixed(1)}%</td>
+                  <td>{formatNum(ct.meetingsCancelled)}</td>
+                  <td>{formatNum(ct.registrations)}</td>
+                  <td>{formatCurrency(ct.registrationValue)}</td>
+                  <td>{formatNum(ct.contracts)}</td>
+                  <td>{formatCurrency(ct.contractValue)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* CRM Charts */}
+        <div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📈</div>גרפים</div>
+          <div className="chart-grid" style={{gridTemplateColumns: '1fr'}}>
+            <div className="chart-card"><h4>🧩 התפלגות לידים</h4><div className="chart-container"><canvas id="crmPieChart"></canvas></div></div>
+          </div>
+        </div>
+      </>
+    )
+  }, [selectedMonth, compareEnabled, reports])
+
+  // ==================== MAIN DASHBOARD (all/facebook/google tabs) ====================
+  const renderDashboard = useCallback(() => {
+    if (!selectedMonth || reports.length === 0) return null
+    destroyCharts()
+
+    const currentReports = reports.filter(r => r.month === selectedMonth)
+    if (currentReports.length === 0) return <div className="welcome-center"><div className="icon">📭</div><h3>אין נתונים לחודש זה</h3></div>
+
+    const displayReports = dashTab === 'all'
+      ? currentReports.filter(r => r.source !== 'crm' && r.source !== 'crm_reports')
+      : dashTab === 'facebook'
+      ? currentReports.filter(r => r.source === 'facebook')
+      : dashTab === 'google_pmax'
+      ? currentReports.filter(r => r.source === 'google_pmax')
+      : dashTab === 'google_search'
+      ? currentReports.filter(r => r.source === 'google_search')
+      : dashTab === 'google'
+      ? currentReports.filter(r => r.source && r.source.startsWith('google'))
+      : []
+    const isPmax = dashTab === 'google_pmax' || (dashTab === 'google' && displayReports.length > 0 && displayReports.every(r => r.source === 'google_pmax'))
+
+    let allRows = []
+    displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data) })
+    const data = aggregateRows(allRows)
+
+    // Add CRM leads to "all" tab totals
+    let crmTotalLeads = 0
+    if (dashTab === 'all') {
+      const crmReports = currentReports.filter(r => r.source === 'crm')
+      crmReports.forEach(r => {
+        if (r.data) {
+          r.data.forEach(row => { crmTotalLeads += (typeof row.totalLeads === 'number' ? row.totalLeads : parseFloat(String(row.totalLeads).replace(/[^0-9.\-]/g, '')) || 0) })
+        }
+      })
+    }
+
+    // Extract CRM totals for "all" tab KPI display
+    let crmTotals = null
+    if (dashTab === 'all') {
+      const crmReps = currentReports.filter(r => r.source === 'crm')
+      if (crmReps.length > 0) {
+        let allCrmR = []
+        crmReps.forEach(r => { if (r.data) allCrmR = allCrmR.concat(r.data) })
+        crmTotals = aggregateCrmRows(allCrmR).totals
+      }
+    }
+
+    let prevData = null
+    if (compareEnabled) {
+      const prevMonth = getPrevMonth(selectedMonth)
+      const prevReports = reports.filter(r => r.month === prevMonth)
+      const displayPrev = dashTab === 'all'
+        ? prevReports.filter(r => r.source !== 'crm')
+        : dashTab === 'facebook'
+        ? prevReports.filter(r => r.source === 'facebook')
+        : dashTab === 'google_pmax'
+        ? prevReports.filter(r => r.source === 'google_pmax')
+        : dashTab === 'google_search'
+        ? prevReports.filter(r => r.source === 'google_search')
+        : prevReports.filter(r => r.source && r.source.startsWith('google'))
+      if (displayPrev.length) { let prevRows = []; displayPrev.forEach(r => { prevRows = prevRows.concat(r.data || []) }); prevData = aggregateRows(prevRows) }
+    }
+
+    const allMonths = [...new Set(reports.map(r => r.month))].sort()
+    const trendData = allMonths.map(m => {
+      let mRows = []
+      reports.filter(r => r.month === m && r.source !== 'crm' && r.source !== 'crm_reports').forEach(r => { mRows = mRows.concat(r.data || []) })
+      return { month: m, ...aggregateRows(mRows).totals }
+    })
+
+    const t = data.totals
+    const p = prevData?.totals
+
+    const kpiIcons = { 'הוצאה: '₪', 'תקציב': '₪', 'לידים': '👥', 'CPL': '💰', 'עלות לליד': '💰', 'חשיפות': '👁', 'תפוצה': '📡', 'קליקים': '🖱', 'CPC': '💸', 'CPM': '📊', 'CTR': '📈', 'המרה': '🔄', 'תדירות': '🔄', 'פגישות שתואמו': '📅', 'פגישות שבוצעו': '✅', 'הרשמות': '📝', 'חוזים': '📄' }
+    const kpiColors = { green: 'rgba(16,185,129,0.1)', purple: 'rgba(139,92,246,0.1)', orange: 'rgba(245,158,11,0.1)', pink: 'rgba(236,72,153,0.1)', cyan: 'rgba(6,182,212,0.1)', red: 'rgba(239,68,68,0.1)' }
+    const kpiTextColors = { green: 'var(--success)', purple: 'var(--purple)', orange: 'var(--warning)', pink: 'var(--pink)', cyan: 'var(--cyan)', red: 'var(--danger)' }
+
+    const kpi = (label, value, color, current, prev, isCost) => {
+      const ch = prev != null ? changePercent(current, prev, isCost) : null
+      const icon = kpiIcons[label] || '📊'
+      return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '▲' : '▼'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>
+    }
+
+    const buildTable = (items, prevItems, labelName, tableId) => {
+      if (!items || Object.keys(items).length === 0) return null
+      const cols = [{key:'name',label:labelName,get:(_,n)=>n},{key:'clicks',label:'קליקים',get:d=>d.clicks,higher:true},{key:'impressions',label:'חשיפות',get:d=>d.impressions,higher:true},{key:'cpc',label:'עלות לקליק',get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},{key:'ctr',label:'CTR',get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},{key:'cpm',label:'CPM',get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},{key:'leads',label:'לידים',get:d=>d.leads,higher:true},{key:'cpl',label:'עלות לליד',get:d=>d.leads>0?d.spend/d.leads:0,higher:false},{key:'spend',label:'תקציב שנוצל',get:d=>d.spend}]
+      const sc = sortConfig[tableId]
+      let entries = Object.entries(items)
+      if (sc) { const col = cols.find(c=>c.key===sc.key); if(col){entries.sort((a,b)=>{const va=col.get(a[1],a[0]),vb=col.get(b[1],b[0]);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}} else { entries.sort((a, b) => b[1].spend - a[1].spend) }
+      const showCh = compareEnabled && prevItems
+      const ch = (cur, prev, isCost) => {
+        if (!showCh || prev == null) return null
+        const pct = changePercent(cur, prev, isCost)
+        if (!pct) return null
+        const isPos = isCost ? pct.pct < 0 : pct.pct > 0
+        return <span className={`change-badge ${isPos ? 'positive' : 'negative'}`}>{pct.pct > 0 ? '▲' : '▼'} {Math.abs(pct.pct).toFixed(1)}%</span>
+      }
+      const sortIcon = (key) => { if(!sc||sc.key!==key) return ' ⇅'; return sc.dir==='desc'?' ▼':' ▲' }
+      const thStyle = {cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}
+      const extremes = {}
+      cols.forEach(c => { if (c.key === 'name' || c.key === 'spend') return; const vals = entries.map(([n,d]) => c.get(d,n)).filter(v => typeof v === 'number' && v > 0); if (vals.length < 2) return; extremes[c.key] = {min: Math.min(...vals), max: Math.max(...vals)} })
+      const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {color:'#059669',fontWeight:700} : {color:'#dc2626',fontWeight:700}; if (val === e.min) return col.higher ? {color:'#dc2626',fontWeight:700} : {color:'#059669',fontWeight:700}; return {} }
+      return (<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{name}</td><td style={cellBg('clicks',d.clicks)}>{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{d.leads} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>) })}</tbody></table></div>)
+    }
+
+    setTimeout(() => {
+      destroyCharts()
+      if (trendData.length > 1) {
+        const labels = trendData.map(d => formatMonth(d.month))
+        createChart('trendLeads', 'bar', labels, [{ label: 'Leads', data: trendData.map(d => d.leads), backgroundColor: 'rgba(59,130,246,0.7)', yAxisID: 'y' }, { label: 'CPL', data: trendData.map(d => d.cpl), borderColor: '#ef4444', type: 'line', yAxisID: 'y1', tension: 0.3, pointRadius: 5 }], { y: { position: 'right' }, y1: { position: 'left', grid: { drawOnChartArea: false } } })
+        createChart('trendSpend', 'bar', labels, [{ label: 'Budget', data: trendData.map(d => d.spend), backgroundColor: 'rgba(139,92,246,0.7)', yAxisID: 'y' }, { label: 'Impressions', data: trendData.map(d => d.impressions), borderColor: '#06b6d4', type: 'line', yAxisID: 'y1', tension: 0.3, pointRadius: 5 }], { y: { position: 'right' }, y1: { position: 'left', grid: { drawOnChartArea: false } } })
+      }
+      const campNames2 = Object.keys(data.campaigns)
+      if (campNames2.length > 0) {
+        createChart('campSpend', 'doughnut', campNames2, [{ data: campNames2.map(n => data.campaigns[n].spend), backgroundColor: COLORS.slice(0, campNames2.length) }])
+        createChart('campLeads', 'bar', campNames2, [{ label: 'Leads', data: campNames2.map(n => data.campaigns[n].leads), backgroundColor: 'rgba(16,185,129,0.7)', yAxisID: 'y' }, { label: 'CPL', data: campNames2.map(n => data.campaigns[n].leads > 0 ? data.campaigns[n].spend / data.campaigns[n].leads : 0), borderColor: '#ef4444', type: 'line', yAxisID: 'y1', tension: 0.3 }], { y: { position: 'right' }, y1: { position: 'left', grid: { drawOnChartArea: false } } })
+      }
+      const gn = Object.keys(data.genders).filter(g => g !== 'unknown')
+      const gnAll = Object.keys(data.genders)
+      if (gnAll.length > 0) {
+        const gLabels = gnAll.map(g => g === 'female' ? 'נשים' : g === 'male' ? 'גברים' : 'לא ידוע')
+        createChart('genderSpendChart', 'doughnut', gLabels, [{ data: gnAll.map(g => data.genders[g].spend), backgroundColor: ['rgba(236,72,153,0.7)', 'rgba(59,130,246,0.7)', 'rgba(245,158,11,0.7)'], borderColor: ['#fff','#fff','#fff'], borderWidth: 3 }])
+        createChart('genderLeadsChart', 'doughnut', gLabels, [{ data: gnAll.map(g => data.genders[g].leads), backgroundColor: ['rgba(236,72,153,0.7)', 'rgba(59,130,246,0.7)', 'rgba(245,158,11,0.7)'], borderColor: ['#fff','#fff','#fff'], borderWidth: 3 }])
+      }
+      const an = Object.keys(data.ages).filter(a => a !== 'unknown').sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
+      if (an.length > 0) {
+        createChart('ageSpendLeads', 'bar', an, [{ label: 'הוצאה', data: an.map(a => data.ages[a].spend), backgroundColor: 'rgba(59,130,246,0.15)', borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y' }, { label: 'לידים', data: an.map(a => data.ages[a].leads), backgroundColor: 'rgba(16,185,129,0.15)', borderColor: '#10b981', borderWidth: 2, yAxisID: 'y1' }], { y: { position: 'right', title: { display: true, text: 'הוצאה (₪)' } }, y1: { position: 'left', title: { display: true, text: 'לידים' }, grid: { drawOnChartArea: false } } })
+        const ageCPLdata = an.map(a => data.ages[a].leads > 0 ? data.ages[a].spend / data.ages[a].leads : 0)
+        const ageCPLcolors = ageCPLdata.map(v => v < 80 ? '#10b981' : v < 120 ? '#3b82f6' : v < 150 ? '#8b5cf6' : '#ef4444')
+        const ageCPLbg = ageCPLdata.map(v => v < 80 ? 'rgba(16,185,129,0.15)' : v < 120 ? 'rgba(59,130,246,0.15)' : v < 150 ? 'rgba(139,92,246,0.15)' : 'rgba(239,68,68,0.15)')
+        createChart('ageCPL', 'bar', an, [{ label: 'CPL (₪)', data: ageCPLdata, backgroundColor: ageCPLbg, borderColor: ageCPLcolors, borderWidth: 2 }])
+        createChart('ageRates', 'bar', an, [{ label: 'CTR %', data: an.map(a => data.ages[a].impressions > 0 ? (data.ages[a].clicks / data.ages[a].impressions * 100) : 0), backgroundColor: 'rgba(6,182,212,0.15)', borderColor: '#06b6d4', borderWidth: 2 }, { label: 'אחוז המרה %', data: an.map(a => data.ages[a].clicks > 0 ? (data.ages[a].leads / data.ages[a].clicks * 100) : 0), backgroundColor: 'rgba(139,92,246,0.15)', borderColor: '#8b5cf6', borderWidth: 2 }])
+        createChart('ageCPM', 'bar', an, [{ label: 'CPM (₪)', data: an.map(a => data.ages[a].impressions > 0 ? (data.ages[a].spend / data.ages[a].impressions * 1000) : 0), backgroundColor: 'rgba(245,158,11,0.15)', borderColor: '#f59e0b', borderWidth: 2 }])
+      }
+    }, 200)
+
+    const campNames = Object.keys(data.campaigns)
+    const genderNames = Object.keys(data.genders).filter(g => g !== 'unknown')
+    const ageNames = Object.keys(data.ages).filter(a => a !== 'unknown')
+
+    const fbReports = currentReports.filter(r => r.source === 'facebook')
+    const gReports = currentReports.filter(r => r.source && r.source.startsWith('google'))
+    const crmReports = currentReports.filter(r => r.source === 'crm')
+    const crmRepReports = currentReports.filter(r => r.source === 'crm_reports')
+    const hasFb = fbReports.length > 0
+    const hasPmax = gReports.some(r => r.source === 'google_pmax')
+    const hasSearch = gReports.some(r => r.source === 'google_search')
+    const hasG = gReports.length > 0
+    const hasCrm = crmReports.length > 0 || crmRepReports.length > 0
+
+    let fbTotals = null, gTotals = null
+    if (hasFb) { let fbRows = []; fbReports.forEach(r => { if (r.data) fbRows = fbRows.concat(r.data) }); fbTotals = aggregateRows(fbRows).totals }
+    if (hasG) { let gRows = []; gReports.forEach(r => { if (r.data) gRows = gRows.concat(r.data) }); gTotals = aggregateRows(gRows).totals }
+
+    const activeT = dashTab === 'facebook' && fbTotals ? fbTotals : dashTab === 'google' && gTotals ? gTotals : t
+    const activeP = dashTab !== 'all' ? null : p
+
+    // Total leads including CRM for "all" tab display
+    const totalLeadsWithCrm = dashTab === 'all' ? t.leads + crmTotalLeads : activeT.leads
+
+    return (
+      <>
+        {/* Source Tabs */}
+        <div className="client-tabs">
+          <button className={`client-tab ${dashTab === 'all' ? 'active' : ''}`} onClick={() => setDashTab('all')}>הכל</button>
+          {hasFb && <button className={`client-tab ${dashTab === 'facebook' ? 'active' : ''}`} onClick={() => setDashTab('facebook')}>Facebook</button>}
+          {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}>Google PMax</button>}
+          {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
+          {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
+          {hasCrm && <button className={`client-tab ${dashTab === 'crm' ? 'active' : ''}`} onClick={() => setDashTab('crm')}>CRM</button>}
+        </div>
+
+        {dashTab === 'crm' ? (<>
+          <div className="client-tabs" style={{marginBottom: 15}}>
+            <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
+            <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>📊 מחולל דוחות</button>
+          </div>
+          {crmSubTab === 'sources' ? renderCrmDashboard() : renderCrmReportDashboard()}
+        </>) : (<>
+        <div className="kpi-grid">
+          {kpi('תקציב', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
+          {dashTab === 'all' ? kpi('לידים', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP?.leads) : kpi('לידים', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
+          {kpi('עלות לליד', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
+          {dashTab === 'all' && crmTotals ? kpi('פגישות שתואמו', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, null) : null}
+          {dashTab === 'all' && crmTotals ? kpi('פגישות שבוצעו', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, null) : null}
+          {dashTab === 'all' && crmTotals ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, null) : null}
+          {dashTab === 'all' && crmTotals ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, null) : null}
+        </div>
+
+        {/* FUNNEL */}
+        <div className="section">
+          <div className="section-header" style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
+            <div className="section-icon" style={{background:'var(--gradient-2)'}}>🔽</div>
+            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>משפך שיווקי</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>מקליק ועד חוזה</div></div>
+          </div>
+          <div className="card" style={{padding:'24px'}}>
+            <div className="funnel">
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(activeT.clicks)}</div><div className="funnel-label">קליקים</div></div>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.impressions)}</div><div className="funnel-label">חשיפות</div></div>
+              {dashTab === 'all' && crmTotals ? <><div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--cyan)'}}>{formatNum(crmTotals.meetingsScheduled || 0)}</div><div className="funnel-label">פגישות מתואמות</div></div>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(crmTotals.meetingsCompleted || 0)}</div><div className="funnel-label">פגישות שבוצעו</div></div>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(crmTotals.registrations || 0)}</div><div className="funnel-label">הרשמות</div></div>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-3)'}}>{formatNum(crmTotals.contracts || 0)}</div><div className="funnel-label">חוזים</div></div></> : <>
+              <div className="funnel-arrow">&larr;</div>
+              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(activeT.leads)}</div><div className="funnel-label">לידים</div><div className="funnel-rate">המרה: {activeT.convRate.toFixed(2)}%</div></div></>}
+            </div>
+            <div style={{textAlign:'center',marginTop:'10px',fontSize:'0.85em',color:'var(--text-secondary)'}}>
+              עלות לליד: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpl)}</strong> &nbsp;|&nbsp; עלות לקליק: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpc)}</strong> &nbsp;|&nbsp; CPM: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpm)}</strong>
+            </div>
+          </div>
+        </div>
+
+        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>מגמות חודשיות</div><div className="chart-grid"><div className="chart-card"><h4>💰 לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>📈 תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
+
+        {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>קמפיינים</div><div className="chart-grid"><div className="chart-card"><h4>📊 התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>💰 לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין', 'campaigns')}</div>)}
+
+        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות מודעות</div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות', 'adsets')}</div>
+
+        {!isPmax && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>📝</div>מודעות</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*עותק\s*$/, '').replace(/\s*-\s*עותק\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0) }); return merged })(), null, 'מודעה', 'ads')}</div>}
+
+        {/* GENDER SECTION */}
+        {!isPmax && genderNames.length > 0 && (() => {
+          const gd = data.genders
+          const genderMap = { female: { label: 'נשים', emoji: '👩' }, male: { label: 'גברים', emoji: '👨' }, unknown: { label: 'לא ידוע', emoji: '❓' } }
+          const gKeys = ['female', 'male', 'unknown'].filter(g => gd[g])
+          return (<div className="section">
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>⚧</div>פילוח מגדרי</div>
+            <div className="grid-3" style={{marginBottom:'20px',display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:'16px'}}>
+              {gKeys.map(g => { const d = gd[g]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; return (
+                <div className="card" key={g}><div className="card-body" style={{textAlign:'center'}}>
+                  <div style={{fontSize:'2em'}}>{genderMap[g]?.emoji || '👤'}</div>
+                  <div style={{fontWeight:700,fontSize:'1.1em',margin:'8px 0'}}>{genderMap[g]?.label || g}</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',textAlign:'center',fontSize:'0.85em'}}>
+                    <div>הוצאה<br/><strong>{formatCurrency(d.spend)}</strong></div>
+                    <div>לידים<br/><strong>{d.leads}</strong></div>
+                    <div>CPL<br/><strong>{formatCurrency(cpl)}</strong></div>
+                    <div>המרה<br/><strong>{conv.toFixed(2)}%</strong></div>
+                    <div>CTR<br/><strong>{ctr.toFixed(2)}%</strong></div>
+                    <div>CPM<br/><strong>{formatCurrency(cpm)}</strong></div>
+                  </div>
+                </div></div>) })}
+            </div>
+            <div className="chart-grid">
+              <div className="chart-card"><h4>💰 חלוקת הזצאה</h4><div className="chart-container"><canvas id="genderSpendChart"></canvas></div></div>
+              <div className="chart-card"><h4>👥 לידים לפי מגדר</h4><div className="chart-container"><canvas id="genderLeadsChart"></canvas></div></div>
+            </div>
+          </div>)
+        })()}
+
+        {/* AGE SECTION */}
+        {!isPmax && ageNames.length > 0 && (() => {
+          const ad = data.ages
+          const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb })
+          return (<div className="section">
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📅</div>פילוח גילאי</div>
+            <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
+              <table className="data-table"><thead><tr>
+                {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲'})()}</th>))}
+              </tr></thead><tbody>
+                {(()=>{const ageCols={age:{get:(d,n)=>n},clicks:{get:d=>d.clicks,higher:true},impressions:{get:d=>d.impressions,higher:true},cpc:{get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},ctr:{get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},cpm:{get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},leads:{get:d=>d.leads,higher:true},cpl:{get:d=>d.leads>0?d.spend/d.leads:0,higher:false},spend:{get:d=>d.spend}};const sc=sortConfig['ages'];let sorted=[...sortedAges];if(sc&&ageCols[sc.key]){sorted.sort((a,b)=>{const va=ageCols[sc.key].get(ad[a],a),vb=ageCols[sc.key].get(ad[b],b);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}const ageExtremes={};Object.keys(ageCols).forEach(k=>{if(k==='age'||k==='spend')return;const c=ageCols[k];const vals=sorted.map(a=>c.get(ad[a],a)).filter(v=>typeof v==='number'&&v>0);if(vals.length<2)return;ageExtremes[k]={min:Math.min(...vals),max:Math.max(...vals)};});const ageCellBg=(key,val)=>{const e=ageExtremes[key];if(!e||val<=0||e.min===e.max)return {};const c=ageCols[key];if(!c||c.higher===undefined)return {};if(val===e.max)return c.higher?{color:'#059669',fontWeight:700}:{color:'#dc2626',fontWeight:700};if(val===e.min)return c.higher?{color:'#dc2626',fontWeight:700}:{color:'#059669',fontWeight:700};return {};};return sorted.map(age => { const d = ad[age]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
+                  <tr key={age}><td style={{fontWeight:600}}>{age}</td><td style={ageCellBg('clicks',d.clicks)}>{formatNum(d.clicks)}</td><td style={ageCellBg('impressions',d.impressions)}>{formatNum(d.impressions)}</td><td style={ageCellBg('cpc',cpc)}>{formatCurrency(cpc)}</td><td style={ageCellBg('ctr',ctr)}>{ctr.toFixed(2)}%</td><td style={ageCellBg('cpm',cpm)}>{formatCurrency(cpm)}</td><td style={ageCellBg('leads',d.leads)}>{d.leads}</td><td style={ageCellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>)})})()}
+              </tbody></table>
+            </div></div>
+            <div className="chart-grid">
+              <div className="chart-card"><h4>💰 הוצאה ולידים</h4><div className="chart-container"><canvas id="ageSpendLeads"></canvas></div></div>
+              <div className="chart-card"><h4>📈 עלות לליד (CPL)</h4><div className="chart-container"><canvas id="ageCPL"></canvas></div></div>
+            </div>
+            <div className="chart-grid">
+              <div className="chart-card"><h4>🖱 CTR באחוז המרה</h4><div className="chart-container"><canvas id="ageRates"></canvas></div></div>
+              <div className="chart-card"><h4>📡 CPM</h4><div className="chart-container"><canvas id="ageCPM"></canvas></div></div>
+            </div>
+          </div>)
+        })()}
+
+        {/* INSIGHTS SECTION */}
+        <div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>💡</div>תובנות והמלצות</div>
+          {(() => {
+            const camps = Object.entries(data.campaigns)
+            const ads2 = isPmax ? Object.entries(data.adSets || {}) : Object.entries(data.ads)
+            const bestCamp = camps.sort((a,b) => { const ca = a[1].leads > 0 ? a[1].spend/a[1].leads : 9999; const cb = b[1].leads > 0 ? b[1].spend/b[1].leads : 9999; return ca - cb })[0]
+            const worstCamp = camps.sort((a,b) => { const ca = a[1].leads > 0 ? a[1].spend/a[1].leads : 0; const cb = b[1].leads > 0 ? b[1].spend/b[1].leads : 0; return cb - ca })[0]
+            const bestAd = ads2.sort((a,b) => { const ca = a[1].leads > 0 ? a[1].spend/a[1].leads : 9999; const cb = b[1].leads > 0 ? b[1].spend/b[1].leads : 9999; return ca - cb })[0]
+            const bestAge = isPmax ? null : (ageNames.length > 0 ? ageNames.sort((a,b) => { const da = data.ages[a]; const db = data.ages[b]; const ca = da.leads > 0 ? da.spend/da.leads : 9999; const cb = db.leads > 0 ? db.spend/db.leads : 9999; return ca - cb })[0] : null)
+            const worstAge = ageNames.length > 0 ? ageNames.sort((a,b) => { const da = data.ages[a]; const db = data.ages[b]; const ca = da.leads > 0 ? da.spend/da.leads : 0; const cb = db.leads > 0 ? db.spend/db.leads : 0; return cb - ca })[0] : null
+            return (<>
+              <div className="insight-box" style={{background:'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',border:'1px solid #bfdbfe',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
+                <h3 style={{fontSize:'1em',color:'var(--accent-dark)',marginBottom:'10px'}}>🏆 מה עובד הכי טוב</h3>
+                <ul style={{listStyle:'none',padding:0,direction:'rtl',textAlign:'right'}}>
+                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 קמפיין <strong>{bestCamp[0]}</strong> - CPL הנמוך ביותר ({formatCurrency(bestCamp[1].leads > 0 ? bestCamp[1].spend/bestCamp[1].leads : 0)}) עם {bestCamp[1].leads} לידים</li>}
+                  {bestAd && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 {isPmax ? 'קבוצת מודעות' : 'מודעה'} <strong>{bestAd[0]}</strong> - {bestAd[1].leads} לידים ב-{formatCurrency(bestAd[1].leads > 0 ? bestAd[1].spend/bestAd[1].leads : 0)} לליד</li>}
+                  {!isPmax && bestAge && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 גילאי <strong>{bestAge}</strong> - CPL הנמוך ביותר ({formatCurrency(data.ages[bestAge].leads > 0 ? data.ages[bestAge].spend/data.ages[bestAge].leads : 0)})</li>}
+                </ul>
+              </div>
+              <div className="insight-box" style={{background:'linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%)',border:'1px solid #fecaca',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
+                <h3 style={{fontSize:'1em',color:'#dc2626',marginBottom:'10px'}}>⚠️ מה צריך לשפר</h3>
+                <ul style={{listStyle:'none',padding:0,direction:'rtl',textAlign:'right'}}>
+                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 קמפיין <strong>{worstCamp[0]}</strong> - CPL גבוה ({formatCurrency(worstCamp[1].leads > 0 ? worstCamp[1].spend/worstCamp[1].leads : 0)}). שווה לתקול שינוי קריאייטיב.</li>}
+                  {worstAge && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 גילאי <strong>{worstAge}</strong> - CPL הגבוה ביותר ({formatCurrency(data.ages[worstAge].leads > 0 ? data.ages[worstAge].spend/data.ages[worstAge].leads : 0)})</li>}
+                </ul>
+              </div>
+              <div className="insight-box" style={{background:'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',border:'1px solid #86efac',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
+                <h3 style={{fontSize:'1em',color:'#059669',marginBottom:'10px'}}>🎯 המלצות לחודש הבא</h3>
+                <ul style={{listStyle:'none',padding:0,direction:'rtl',textAlign:'right'}}>
+                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 הגדלת תקציב ל-<strong>{bestCamp[0]}</strong> - ה-CPL הנמוך ביותר עם פוטנציאל להגדלה</li>}
+                  {bestAge && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 חיזוק גילאי <strong>{bestAge}</strong> - הכי אפקטיביים מבחינת עלות</li>}
+                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 בדיקה מחדש של <strong>{worstCamp[0]}</strong> - החלפת קריאייטיב או הפסקה</li>}
+                </ul>
+              </div>
+            </>)
+          })()}
+        </div>
+        </>)}
+
+        <div className="powered-by">VITAS Digital Marketing | דוח אוטומטי</div>
+      </>
+    )
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, sortConfig])
+
+  if (loading) return <div className="loading-page">טוען דוח...</div>
+
+  if (error) {
+    return (
+      <div className="welcome-center" style={{minHeight: '100vh'}}>
+        <div className="icon">🔒</div>
+        <h2>הקישור לא תקין</h2>
+        <p>אנא פנה למנהל הקמפיין שלך לקבלת קישור מעודכן</p>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* Client Header */}
+      <div className="client-header">
+        <h1>VITAS | {client?.name}</h1>
+        {projects.length > 1 && (
+          <div className="client-tabs">
+            {projects.map(proj => (
+              <button
+                key={proj.id}
+                className={`client-tab ${selectedProject?.id === proj.id ? 'active' : ''}`}
+                onClick={() => switchProject(proj)}
+              >
+                {proj.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{maxWidth: 1400, margin: '0 auto', padding: 30}}>
+        {selectedProject && (
+          <>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25}}>
+              <h2 style={{fontSize: '1.5em', fontWeight: 800}}>
+                {selectedProject.name} — {formatMonth(selectedMonth)}
+              </h2>
+              <div style={{display: 'flex', gap: 10, alignItems: 'center'}}>
+                {reports.length > 1 && (
+                  <select className="form-input" style={{width: 'auto'}} value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+                    {[...new Set(reports.map(r => r.month))].sort().reverse().map(m => (
+                      <option key={m} value={m}>{formatMonth(m)}</option>
+                    ))}
+                  </select>
+                )}
+                {reports.length > 1 && (
+                  <label style={{fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer'}}>
+                    <input type="checkbox" checked={compareEnabled} onChange={e => setCompareEnabled(e.target.checked)} />
+                    השוואה לחודש קודם
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {reports.length === 0 ? (
+              <div className="welcome-center">
+                <div className="icon">📭</div>
+                <h3>הדוח עדיין לא מוכן</h3>
+                <p>אנא צור קשר עם מנהל הקמפיין שלך</p>
+              </div>
+            ) : renderDashboard()}
+          </>
+        )}
+      </div>
+    </>
+  )
+}
