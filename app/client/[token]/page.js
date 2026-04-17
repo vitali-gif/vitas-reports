@@ -260,7 +260,7 @@ export default function ClientPage() {
     const crmKpi = (label, value, color, current, prev, isCost) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null
       const icons = { 'סה"כ לידים': 'בש', 'רלוונטיים': '✅', 'לא רלוונטיים': '❌', 'פגישות שתואמו': 'פג', 'פגישות שבוצעו': 'שט', 'פגישות שבוטלו': 'בט', 'הרשמות': 'הר', 'שווי הרשמות': '₪', 'חוזים': 'חז', 'שווי חוזים': '₪', 'אחוז המרה לפגישה שתואמה': '%', 'אחוז המרה לפגישות שבוצעו': '%', '% רלוונטיות': '%', 'עלות פגישה שבוצעה': '₪' }
-      const icon = icons[label] || '''
+      const icon = icons[label] || ''
       const kpiColors = { green: 'rgba(16,185,129,0.1)', purple: 'rgba(139,92,246,0.1)', orange: 'rgba(245,158,11,0.1)', pink: 'rgba(236,72,153,0.1)', cyan: 'rgba(6,182,212,0.1)', red: 'rgba(239,68,68,0.1)' }
       const kpiTextColors = { green: 'var(--success)', purple: 'var(--purple)', orange: 'var(--warning)', pink: 'var(--pink)', cyan: 'var(--cyan)', red: 'var(--danger)' }
       return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '▲' : '▼'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>
@@ -632,7 +632,7 @@ export default function ClientPage() {
             <div className="grid-3" style={{marginBottom:'20px',display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:'16px'}}>
               {gKeys.map(g => { const d = gd[g]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; return (
                 <div className="card" key={g}><div className="card-body" style={{textAlign:'center'}}>
-                  <div style={{fontSize:'2em'}}>{genderMap[g]?.emoji || '?''}</div>
+                  <div style={{fontSize:'2em'}}>{genderMap[g]?.emoji || '?'}</div>
                   <div style={{fontWeight:700,fontSize:'1.1em',margin:'8px 0'}}>{genderMap[g]?.label || g}</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',textAlign:'center',fontSize:'0.85em'}}>
                     <div>הוצאה<br/><strong>{formatCurrency(d.spend)}</strong></div>
