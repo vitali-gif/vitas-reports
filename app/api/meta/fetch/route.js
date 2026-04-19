@@ -106,7 +106,9 @@ async function runSync(month) {
     'id', 'name', 'effective_status', 'status',
     'creative{body,title,image_url,thumbnail_url,object_story_spec,asset_feed_spec}',
   ].join(',')
-  const adsUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/ads?fields=${adsFields}&limit=500`
+  // Filter server-side to ACTIVE ads only; Meta's ?fields=creative{...} is expensive so we need effective_status filter + small limit
+  const effectiveStatusFilter = encodeURIComponent(JSON.stringify(['ACTIVE']))
+  const adsUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/ads?fields=${adsFields}&effective_status=${effectiveStatusFilter}&limit=50`
   let adsRaw = []
   let adsFetchError = null
   try { adsRaw = await metaFetchAll(adsUrl, token) } catch (err) { adsFetchError = String(err.message || err) }
