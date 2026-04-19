@@ -522,7 +522,7 @@ export default function ClientPage() {
         createChart('genderLeadsChart', 'doughnut', gLabels, [{ data: gnAll.map(g => data.genders[g].leads), backgroundColor: ['rgba(236,72,153,0.7)', 'rgba(59,130,246,0.7)', 'rgba(245,158,11,0.7)'], borderColor: ['#fff','#fff','#fff'], borderWidth: 3 }])
       }
       const an = Object.keys(data.ages).filter(a => a !== 'unknown').sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999))
-      if (an.length > 0) {
+      if (an.length > 0 && dashTab !== 'all' && dashTab !== 'facebook') {
         createChart('ageSpendLeads', 'bar', an, [{ label: 'הוצאה', data: an.map(a => data.ages[a].spend), backgroundColor: 'rgba(59,130,246,0.15)', borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y' }, { label: 'לידים', data: an.map(a => data.ages[a].leads), backgroundColor: 'rgba(16,185,129,0.15)', borderColor: '#10b981', borderWidth: 2, yAxisID: 'y1' }], { y: { position: 'right', title: { display: true, text: 'הוצאה (₪)' } }, y1: { position: 'left', title: { display: true, text: 'לידים' }, grid: { drawOnChartArea: false } } })
         const ageCPLdata = an.map(a => data.ages[a].leads > 0 ? data.ages[a].spend / data.ages[a].leads : 0)
         const ageCPLcolors = ageCPLdata.map(v => v < 80 ? '#10b981' : v < 120 ? '#3b82f6' : v < 150 ? '#8b5cf6' : '#ef4444')
@@ -665,6 +665,7 @@ export default function ClientPage() {
                   <tr key={age}><td style={{fontWeight:600}}>{age}</td><td style={ageCellBg('clicks',d.clicks)}>{formatNum(d.clicks)}</td><td style={ageCellBg('impressions',d.impressions)}>{formatNum(d.impressions)}</td><td style={ageCellBg('cpc',cpc)}>{formatCurrency(cpc)}</td><td style={ageCellBg('ctr',ctr)}>{ctr.toFixed(2)}%</td><td style={ageCellBg('cpm',cpm)}>{formatCurrency(cpm)}</td><td style={ageCellBg('leads',d.leads)}>{d.leads}</td><td style={ageCellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>)})})()}
               </tbody></table>
             </div></div>
+            {dashTab !== 'all' && dashTab !== 'facebook' && (<>
             <div className="chart-grid">
               <div className="chart-card"><h4>💰 הוצאה ולידים</h4><div className="chart-container"><canvas id="ageSpendLeads"></canvas></div></div>
               <div className="chart-card"><h4>📈 עלות לליד (CPL)</h4><div className="chart-container"><canvas id="ageCPL"></canvas></div></div>
@@ -673,6 +674,7 @@ export default function ClientPage() {
               <div className="chart-card"><h4>🖱 CTR באחוז המרה</h4><div className="chart-container"><canvas id="ageRates"></canvas></div></div>
               <div className="chart-card"><h4>📡 CPM</h4><div className="chart-container"><canvas id="ageCPM"></canvas></div></div>
             </div>
+            </>)}
           </div>)
         })()}
 
