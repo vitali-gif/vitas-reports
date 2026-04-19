@@ -85,12 +85,72 @@ export default function ClientPage() {
     chartsRef.current = []
   }
 
+
+  const arcLabelsPlugin = {
+    id: 'arcLabels',
+    afterDatasetsDraw(chart) {
+      if (chart.config.type !== 'doughnut' && chart.config.type !== 'pie') return;
+      const { ctx } = chart;
+      const meta = chart.getDatasetMeta(0);
+      if (!meta || !meta.data) return;
+      const data = chart.data.datasets[0].data;
+      const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
+      if (total === 0) return;
+      const canvasId = chart.canvas.id || '';
+      const isSpend = /spend|Spend/i.test(canvasId);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '700 12px Heebo, sans-serif';
+      meta.data.forEach((arc, i) => {
+        const val = Number(data[i]) || 0;
+        if (val === 0) return;
+        const pct = (val / total) * 100;
+        if (pct < 4) return;
+        const pos = arc.tooltipPosition();
+        const valText = isSpend
+          ? '₪' + Math.round(val).toLocaleString('he-IL')
+          : Number.isInteger(val) ? val.toLocaleString('he-IL') : val.toFixed(1);
+        const pctText = pct.toFixed(1) + '%';
+        const w = Math.max(ctx.measureText(valText).width, ctx.measureText(pctText).width) + 12;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+        ctx.lineWidth = 1;
+        const rx = pos.x - w / 2;
+        const ry = pos.y - 17;
+        const rh = 34;
+        ctx.beginPath();
+        const r = 6;
+        ctx.moveTo(rx + r, ry);
+        ctx.lineTo(rx + w - r, ry);
+        ctx.quadraticCurveTo(rx + w, ry, rx + w, ry + r);
+        ctx.lineTo(rx + w, ry + rh - r);
+        ctx.quadraticCurveTo(rx + w, ry + rh, rx + w - r, ry + rh);
+        ctx.lineTo(rx + r, ry + rh);
+        ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - r);
+        ctx.lineTo(rx, ry + r);
+        ctx.quadraticCurveTo(rx, ry, rx + r, ry);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#1e293b';
+        ctx.fillText(valText, pos.x, pos.y - 5);
+        ctx.fillStyle = '#64748b';
+        ctx.font = '600 10px Heebo, sans-serif';
+        ctx.fillText(pctText, pos.x, pos.y + 9);
+        ctx.font = '700 12px Heebo, sans-serif';
+      });
+      ctx.restore();
+    }
+  };
+
   const createChart = (id, type, labels, datasets, scalesConfig) => {
     const canvas = document.getElementById(id)
     if (!canvas) return
     const config = {
       type,
       data: { labels, datasets },
+      plugins: [arcLabelsPlugin],
       options: {
         responsive: true,
         maintainAspectRatio: false,
