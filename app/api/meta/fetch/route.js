@@ -99,22 +99,51 @@ async function runSync(month) {
     return { status: 500, body: { error: String(err.message || err) } }
   }
 
-  // Fetch ad creative bodies
-  const adsUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/ads?fields=id,name,creative{body,object_story_spec,asset_feed_spec},effective_status&limit=500`
+  // Fetch ad creative details (body, title, images) + campaign/adset + status
+  const adsFields = [
+    'id', 'name', 'effective_status', 'status',
+    'campaign{name}', 'adset{name}',
+    'creative{body,title,image_url,thumbnail_url,object_story_spec,asset_feed_spec}',
+  ].join(',')
+  const adsUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/ads?fields=${adsFields}&limit=500`
   let adsRaw = []
   try { adsRaw = await metaFetchAll(adsUrl, token) } catch {}
-  const adBodyById = {}
-  for (const ad of adsRaw) {
-    let body = ad.creative?.body || ''
-    if (!body && ad.creative?.object_story_spec) {
-      const spec = ad.creative.object_story_spec
-      body = spec.link_data?.message || spec.video_data?.message || spec.photo_data?.message || ''
-    }
-    if (!body && ad.creative?.asset_feed_spec?.bodies?.length) {
-      body = ad.creative.asset_feed_spec.bodies.map(b => b.text).filter(Boolean).join(' / ')
-    }
-    adBodyById[ad.id] = body
+
+  // Helper: pull the best creative data (body, title, image) from nested Meta structures
+  const extractCreative = (cr = {}) => {
+    let body = cr.body || ''
+    let title = cr.title || ''
+    let imageUrl = cr.image_url || ''
+    let thumb = cr.thumbnail_url || ''
+    const spec = cr.object_story_spec || {}
+    if (!body) body = spec.link_data?.message || spec.video_data?.message || spec.photo_data?.message || ''
+    if (!title) title = spec.link_data?.name || spec.video_data?.title || ''
+    if (!imageUrl) imageUrl = spec.link_data?.picture || spec.photo_data?.url || ''
+    const feed = cr.asset_feed_spec || {}
+    if (!body && feed.bodies?.length) body = feed.bodies.map(b => b.text).filter(Boolean).join(' / ')
+    if (!title && feed.titles?.length) title = feed.titles.map(t => t.text).filter(Boolean).join(' / ')
+    if (!imageUrl && feed.images?.length) imageUrl = feed.images[0].url || feed.images[0].hash || ''
+    return { body, title, imageUrl: imageUrl || thumb, thumbnailUrl: thumb || imageUrl }
   }
+
+  const adBodyById = {}         // ad_id -> body (for breakdownRows)
+  const adDetailsById = {}      // ad_id -> full detail object
+  for (const ad of adsRaw) {
+    const c = extractCreative(ad.creative || {})
+    adBodyById[ad.id] = c.body
+    adDetailsById[ad.id] = {
+      id: ad.id,
+      name: ad.name || '',
+      campaign: ad.campaign?.name || '',
+      adSet: ad.adset?.name || '',
+      status: ad.effective_status || ad.status || '',
+      body: c.body,
+      title: c.title,
+      imageUrl: c.imageUrl,
+      thumbnailUrl: c.thumbnailUrl,
+    }
+  }
+  const activeAdsAll = Object.values(adDetailsById).filter(a => a.status === 'ACTIVE')
 
   const buildRow = (r) => ({
     campaign: r.campaign_name || '',
@@ -174,12 +203,19 @@ async function runSync(month) {
     pt.convRate = pt.clicks > 0 ? (pt.leads / pt.clicks) * 100 : 0
     pt.frequency = pt.reach > 0 ? pt.impressions / pt.reach : 0
 
+    // Filter active ads that belong to this project (campaign contains project name)
+    const projectActiveAds = activeAdsAll.filter(a =>
+      (a.campaign || '').toLowerCase().includes(needle)
+    )
+
+    const summaryWithAds = { ...pt, activeAds: projectActiveAds }
+
     const { error: upsertError } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'facebook',
       month: m,
       data: mine,
-      summary: pt,
+      summary: summaryWithAds,
       file_name: 'Meta API (live)',
       row_count: mine.length,
     }, { onConflict: 'project_id,source,month' })

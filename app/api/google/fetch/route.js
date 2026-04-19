@@ -181,6 +181,76 @@ async function runSync(month) {
 
   const totals = computeTotals(allRows)
 
+  // ===== Query active Asset Groups (Performance Max) + their assets =====
+  let assetGroupsByCampaign = {}  // map: lowerCaseCampaignName -> [ {id, name, campaign, assets:[{type,text,imageUrl}]} ]
+  try {
+    // 1. active asset groups
+    const agQuery = `
+      SELECT
+        asset_group.id,
+        asset_group.name,
+        asset_group.status,
+        campaign.name
+      FROM asset_group
+      WHERE asset_group.status = 'ENABLED'
+    `
+    const agRows = await gaqlSearch(accessToken, customerId, agQuery)
+
+    const agById = {}
+    for (const r of agRows) {
+      const id = r.assetGroup?.id
+      if (!id) continue
+      agById[id] = {
+        id,
+        name: r.assetGroup?.name || '',
+        campaign: r.campaign?.name || '',
+        status: r.assetGroup?.status || '',
+        assets: [],
+      }
+    }
+
+    // 2. assets attached to those asset groups (headlines, descriptions, images)
+    if (Object.keys(agById).length > 0) {
+      const assetQuery = `
+        SELECT
+          asset_group.id,
+          asset_group_asset.field_type,
+          asset.text_asset.text,
+          asset.image_asset.full_size.url,
+          asset.youtube_video_asset.youtube_video_id,
+          asset.name
+        FROM asset_group_asset
+        WHERE asset_group_asset.status = 'ENABLED'
+      `
+      const assetRows = await gaqlSearch(accessToken, customerId, assetQuery)
+      for (const ar of assetRows) {
+        const agId = ar.assetGroup?.id
+        if (!agId || !agById[agId]) continue
+        const type = ar.assetGroupAsset?.fieldType || 'UNKNOWN'
+        const textVal = ar.asset?.textAsset?.text || ''
+        const imgUrl = ar.asset?.imageAsset?.fullSize?.url || ''
+        const ytId = ar.asset?.youtubeVideoAsset?.youtubeVideoId || ''
+        agById[agId].assets.push({
+          type,
+          text: textVal,
+          imageUrl: imgUrl,
+          youtubeId: ytId,
+          name: ar.asset?.name || '',
+        })
+      }
+    }
+
+    // 3. bucket by lowercase campaign name for project-matching
+    for (const ag of Object.values(agById)) {
+      const key = (ag.campaign || '').toLowerCase()
+      if (!assetGroupsByCampaign[key]) assetGroupsByCampaign[key] = []
+      assetGroupsByCampaign[key].push(ag)
+    }
+  } catch (err) {
+    // non-fatal: if asset group query fails (e.g. permissions), continue without them
+    console.log('asset_group query failed:', err.message || err)
+  }
+
   // Split rows per project by campaign-name-contains match
   const { data: projects, error: projectsError } = await supabase
     .from('projects')
@@ -202,12 +272,20 @@ async function runSync(month) {
 
     const pt = computeTotals(mine)
 
+    // Gather asset groups whose campaign name contains the project name
+    const projectAssetGroups = []
+    for (const [campLower, groups] of Object.entries(assetGroupsByCampaign)) {
+      if (campLower.includes(needle)) projectAssetGroups.push(...groups)
+    }
+
+    const summaryWithAssetGroups = { ...pt, assetGroups: projectAssetGroups }
+
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'google',
       month: m,
       data: mine,
-      summary: pt,
+      summary: summaryWithAssetGroups,
       file_name: 'Google Ads API (live)',
       row_count: mine.length,
     }, { onConflict: 'project_id,source,month' })

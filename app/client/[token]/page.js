@@ -738,6 +738,104 @@ export default function ClientPage() {
           </div>)
         })()}
 
+        {/* ACTIVE ADS SECTION (Facebook) */}
+        {(dashTab === 'facebook' || dashTab === 'all') && (() => {
+          const activeAdsList = fbReports.flatMap(r => r.summary?.activeAds || [])
+          if (activeAdsList.length === 0) return null
+          return (
+            <div className="section">
+              <div className="section-title">
+                <div className="section-icon" style={{background:'var(--gradient-3, linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%))'}}>{'\ud83d\udcf1'}</div>
+                {'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05e4\u05e2\u05d9\u05dc\u05d5\u05ea \u05d1-Facebook'} ({activeAdsList.length})
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))',gap:'16px'}}>
+                {activeAdsList.map((ad, i) => (
+                  <div key={ad.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column'}}>
+                    {ad.imageUrl ? (
+                      <div style={{width:'100%',aspectRatio:'1/1',background:'#f1f5f9',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+                        <img src={ad.imageUrl} alt={ad.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e)=>{e.target.style.display='none'}} />
+                      </div>
+                    ) : (
+                      <div style={{width:'100%',aspectRatio:'1/1',background:'linear-gradient(135deg,#e0e7ff,#fce7f3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5em',color:'#64748b'}}>{'\ud83d\udcf7'}</div>
+                    )}
+                    <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'8px'}}>
+                      <div style={{fontSize:'0.75em',color:'#059669',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {'\u05e4\u05e2\u05d9\u05dc'}</div>
+                      {ad.title && <div style={{fontWeight:700,fontSize:'0.95em',color:'#0f172a',lineHeight:1.3}}>{ad.title}</div>}
+                      {ad.body && <div style={{fontSize:'0.85em',color:'#475569',lineHeight:1.5,unicodeBidi:'plaintext',maxHeight:'4.5em',overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>{ad.body}</div>}
+                      <div style={{fontSize:'0.72em',color:'#94a3b8',marginTop:'auto',paddingTop:'6px',borderTop:'1px solid #f1f5f9',unicodeBidi:'plaintext'}}>
+                        <div>{'\ud83d\udcca'} {ad.campaign || '\u2014'}</div>
+                        {ad.adSet && <div style={{marginTop:'2px'}}>{'\ud83c\udfaf'} {ad.adSet}</div>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* ASSET GROUPS SECTION (Google PMax) */}
+        {(dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'all') && (() => {
+          const groups = gReports.flatMap(r => r.summary?.assetGroups || []);
+          if (groups.length === 0) return null;
+          return (
+            <div className="section">
+              <div className="section-title">
+                <div className="section-icon" style={{background:'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)'}}>{'\ud83c\udfaf'}</div>
+                {'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd \u05e4\u05e2\u05d9\u05dc\u05d5\u05ea (PMax)'} ({groups.length})
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
+                {groups.map((ag, i) => {
+                  const headlines = (ag.assets || []).filter(a => a.type === 'HEADLINE' || a.type === 'LONG_HEADLINE');
+                  const descriptions = (ag.assets || []).filter(a => a.type === 'DESCRIPTION');
+                  const images = (ag.assets || []).filter(a => (a.type === 'MARKETING_IMAGE' || a.type === 'SQUARE_MARKETING_IMAGE' || a.type === 'PORTRAIT_MARKETING_IMAGE' || a.type === 'LOGO' || a.type === 'LANDSCAPE_LOGO') && a.imageUrl);
+                  const firstImg = images[0];
+                  return (
+                    <div key={ag.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column'}}>
+                      {firstImg ? (
+                        <div style={{width:'100%',aspectRatio:'16/9',background:'#f1f5f9',overflow:'hidden'}}>
+                          <img src={firstImg.imageUrl} alt={ag.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e)=>{e.target.style.display='none'}} />
+                        </div>
+                      ) : (
+                        <div style={{width:'100%',aspectRatio:'16/9',background:'linear-gradient(135deg,#dbeafe,#cffafe)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5em',color:'#64748b'}}>{'\ud83c\udfaf'}</div>
+                      )}
+                      <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'10px'}}>
+                        <div style={{fontSize:'0.75em',color:'#059669',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {'\u05e4\u05e2\u05d9\u05dc'}</div>
+                        <div style={{fontWeight:700,fontSize:'1em',color:'#0f172a'}}>{ag.name}</div>
+                        <div style={{fontSize:'0.72em',color:'#94a3b8',unicodeBidi:'plaintext'}}>{'\ud83d\udcca'} {ag.campaign || '\u2014'}</div>
+                        {headlines.length > 0 && (
+                          <div>
+                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05db\u05d5\u05ea\u05e8\u05d5\u05ea'} ({headlines.length})</div>
+                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'80px',overflowY:'auto'}}>
+                              {headlines.slice(0,5).map((h,j) => <div key={j} style={{fontSize:'0.82em',color:'#334155',unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{h.text}</div>)}
+                            </div>
+                          </div>
+                        )}
+                        {descriptions.length > 0 && (
+                          <div>
+                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05ea\u05d9\u05d0\u05d5\u05e8\u05d9\u05dd'} ({descriptions.length})</div>
+                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'80px',overflowY:'auto'}}>
+                              {descriptions.slice(0,3).map((d,j) => <div key={j} style={{fontSize:'0.8em',color:'#475569',lineHeight:1.4,unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{d.text}</div>)}
+                            </div>
+                          </div>
+                        )}
+                        {images.length > 1 && (
+                          <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
+                            {images.slice(1,5).map((img,j) => (
+                              <img key={j} src={img.imageUrl} alt="" style={{width:'44px',height:'44px',objectFit:'cover',borderRadius:'4px',border:'1px solid #e2e8f0'}} onError={(e)=>{e.target.style.display='none'}} />
+                            ))}
+                            {images.length > 5 && <div style={{fontSize:'0.75em',color:'#64748b',alignSelf:'center'}}>{'+'}{images.length - 5}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* INSIGHTS SECTION */}
         <div className="section">
           <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>💡</div>תובנות והמלצות</div>
