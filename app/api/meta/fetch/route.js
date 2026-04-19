@@ -99,15 +99,17 @@ async function runSync(month) {
     return { status: 500, body: { error: String(err.message || err) } }
   }
 
-  // Fetch ad creative details (body, title, images) + campaign/adset + status
+  // Fetch ad creative details (body, title, images) + status
+  // NOTE: we intentionally do NOT request campaign{name}/adset{name} edges as they can fail on some tokens;
+  // instead we use the breakdownRows below (which already contain campaign_name and adset_name keyed by ad_id).
   const adsFields = [
     'id', 'name', 'effective_status', 'status',
-    'campaign{name}', 'adset{name}',
     'creative{body,title,image_url,thumbnail_url,object_story_spec,asset_feed_spec}',
   ].join(',')
   const adsUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/ads?fields=${adsFields}&limit=500`
   let adsRaw = []
-  try { adsRaw = await metaFetchAll(adsUrl, token) } catch {}
+  let adsFetchError = null
+  try { adsRaw = await metaFetchAll(adsUrl, token) } catch (err) { adsFetchError = String(err.message || err) }
 
   // Helper: pull the best creative data (body, title, image) from nested Meta structures
   const extractCreative = (cr = {}) => {
@@ -134,13 +136,21 @@ async function runSync(month) {
     adDetailsById[ad.id] = {
       id: ad.id,
       name: ad.name || '',
-      campaign: ad.campaign?.name || '',
-      adSet: ad.adset?.name || '',
+      campaign: '',   // filled in below from breakdownRows
+      adSet: '',      // filled in below from breakdownRows
       status: ad.effective_status || ad.status || '',
       body: c.body,
       title: c.title,
       imageUrl: c.imageUrl,
       thumbnailUrl: c.thumbnailUrl,
+    }
+  }
+  // Back-fill campaign/adset names from the insights breakdownRows (keyed by ad_id)
+  for (const r of breakdownRows) {
+    const id = r.ad_id
+    if (id && adDetailsById[id]) {
+      if (!adDetailsById[id].campaign && r.campaign_name) adDetailsById[id].campaign = r.campaign_name
+      if (!adDetailsById[id].adSet && r.adset_name) adDetailsById[id].adSet = r.adset_name
     }
   }
   const activeAdsAll = Object.values(adDetailsById).filter(a => a.status === 'ACTIVE')
@@ -234,6 +244,8 @@ async function runSync(month) {
       month: m,
       totalRows: allRows.length,
       adsIndexed: adsRaw.length,
+      activeAdsCount: activeAdsAll.length,
+      adsFetchError: adsFetchError,
       totals,
       projects: results,
     },
