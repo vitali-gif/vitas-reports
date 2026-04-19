@@ -3,6 +3,10 @@
     {
       "path": "/api/meta/fetch",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/google/fetch",
+      "schedule": "0 3 * * *"
     }
   ]
 }

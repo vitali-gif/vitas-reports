@@ -10,6 +10,7 @@ export default function AdminPage() {
   const [session, setSession] = useState(null)
   const [refreshingMeta, setRefreshingMeta] = useState(false)
   const [lastMetaSync, setLastMetaSync] = useState(null)
+  const [refreshingGoogle, setRefreshingGoogle] = useState(false)
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -87,6 +88,31 @@ export default function AdminPage() {
       showToast('שגיאה: ' + (err.message || err));
     }
     setRefreshingMeta(false);
+  };
+
+  const refreshFromGoogle = async () => {
+    if (refreshingGoogle) return;
+    setRefreshingGoogle(true);
+    showToast('מושך נתונים מגוגל...');
+    try {
+      const res = await fetch('/api/google/fetch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+        },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'שגיאה בקריאה ל-Google Ads API');
+      const okProjects = (json.projects || []).filter(p => !p.skipped && !p.error).length;
+      showToast(`✓ עודכן ${okProjects} פרויקטים מגוגל`);
+      await loadClients();
+      if (selectedProject) await loadProjectReports(selectedProject.id);
+    } catch (err) {
+      showToast('שגיאה: ' + (err.message || err));
+    }
+    setRefreshingGoogle(false);
   };
 
   const loadClients = async () => {
@@ -960,7 +986,7 @@ export default function AdminPage() {
 
   return (
     <div dir="rtl" style={{direction:'rtl',textAlign:'right'}}>
-      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className={`nav-btn ${view === 'upload' ? 'active' : ''}`} onClick={() => setView('upload')}>{'\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>{'\ud83d\udccb \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4'}</button><button className="nav-btn" onClick={refreshFromMeta} disabled={refreshingMeta} title="משוך נתונים חיים מ-Facebook Ads">{refreshingMeta ? '⟳ מרענן...' : '🔄 רענן מפייסבוק'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
+      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className={`nav-btn ${view === 'upload' ? 'active' : ''}`} onClick={() => setView('upload')}>{'\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>{'\ud83d\udccb \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4'}</button><button className="nav-btn" onClick={refreshFromMeta} disabled={refreshingMeta} title="משוך נתונים חיים מ-Facebook Ads">{refreshingMeta ? '⟳ מרענן...' : '🔄 רענן מפייסבוק'}</button><button className="nav-btn" onClick={refreshFromGoogle} disabled={refreshingGoogle} title="משוך נתונים חיים מ-Google Ads">{refreshingGoogle ? '⟳ מרענן...' : '🔍 רענן מגוגל'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
 
       <div className="app-layout">
         <div className="sidebar"><div style={{padding: '0 15px', marginBottom: 20}}>
