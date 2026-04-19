@@ -1,0 +1,247 @@
+// API route: /api/meta/fetch
+//   POST — called from the admin UI. Authorized by x-client-key = NEXT_PUBLIC_SUPABASE_ANON_KEY.
+//   GET  — called by Vercel Cron hourly. Authorized by Authorization: Bearer <CRON_SECRET> (Vercel sets this automatically when CRON_SECRET env var is defined).
+// Pulls Meta Ads insights and writes one report per project per month to Supabase.
+
+import { createClient } from '@supabase/supabase-js'
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
+const META_GRAPH_VERSION = 'v21.0'
+
+// ===== helpers =====
+
+function currentMonth() {
+  const now = new Date()
+  return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
+}
+
+function num(v) {
+  if (typeof v === 'number') return v
+  if (!v) return 0
+  const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''))
+  return isNaN(n) ? 0 : n
+}
+
+// Extract leads count from Meta actions array.
+function extractLeads(actions) {
+  if (!Array.isArray(actions)) return 0
+  const leadTypes = new Set([
+    'lead',
+    'onsite_conversion.lead_grouped',
+    'leadgen.other',
+    'offsite_conversion.fb_pixel_lead',
+  ])
+  let total = 0
+  for (const a of actions) {
+    if (a && leadTypes.has(a.action_type)) total += num(a.value)
+  }
+  return total
+}
+
+async function metaFetchAll(url, token) {
+  const out = []
+  let next = url
+  let safety = 0
+  while (next && safety < 50) {
+    const sep = next.includes('?') ? '&' : '?'
+    const full = next.includes('access_token=') ? next : `${next}${sep}access_token=${encodeURIComponent(token)}`
+    const res = await fetch(full)
+    if (!res.ok) {
+      const txt = await res.text()
+      throw new Error(`Meta API ${res.status}: ${txt.slice(0, 400)}`)
+    }
+    const json = await res.json()
+    if (Array.isArray(json.data)) out.push(...json.data)
+    next = json.paging && json.paging.next ? json.paging.next : null
+    safety++
+  }
+  return out
+}
+
+// ===== main sync logic (shared by GET and POST) =====
+
+async function runSync(month) {
+  const token = process.env.META_ACCESS_TOKEN
+  const adAccountId = process.env.META_AD_ACCOUNT_ID
+  if (!token || !adAccountId) {
+    return { status: 500, body: { error: 'Missing META_ACCESS_TOKEN or META_AD_ACCOUNT_ID env vars' } }
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return { status: 500, body: { error: 'Missing Supabase credentials' } }
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
+
+  const m = month || currentMonth()
+  const [y, mm] = m.split('-').map(Number)
+  const since = `${y}-${String(mm).padStart(2, '0')}-01`
+  const lastDay = new Date(y, mm, 0).getDate()
+  const until = `${y}-${String(mm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  const timeRange = encodeURIComponent(JSON.stringify({ since, until }))
+
+  const fields = [
+    'campaign_name', 'adset_name', 'ad_name', 'ad_id',
+    'spend', 'impressions', 'reach', 'frequency',
+    'clicks', 'inline_link_clicks', 'ctr', 'cpc', 'cpm',
+    'actions',
+  ].join(',')
+
+  const breakdownUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/insights?level=ad&breakdowns=age,gender&fields=${fields}&time_range=${timeRange}&limit=500`
+
+  let breakdownRows
+  try {
+    breakdownRows = await metaFetchAll(breakdownUrl, token)
+  } catch (err) {
+    return { status: 500, body: { error: String(err.message || err) } }
+  }
+
+  // Fetch ad creative bodies
+  const adsUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/ads?fields=id,name,creative{body,object_story_spec,asset_feed_spec},effective_status&limit=500`
+  let adsRaw = []
+  try { adsRaw = await metaFetchAll(adsUrl, token) } catch {}
+  const adBodyById = {}
+  for (const ad of adsRaw) {
+    let body = ad.creative?.body || ''
+    if (!body && ad.creative?.object_story_spec) {
+      const spec = ad.creative.object_story_spec
+      body = spec.link_data?.message || spec.video_data?.message || spec.photo_data?.message || ''
+    }
+    if (!body && ad.creative?.asset_feed_spec?.bodies?.length) {
+      body = ad.creative.asset_feed_spec.bodies.map(b => b.text).filter(Boolean).join(' / ')
+    }
+    adBodyById[ad.id] = body
+  }
+
+  const buildRow = (r) => ({
+    campaign: r.campaign_name || '',
+    adSet: r.adset_name || '',
+    adName: r.ad_name || '',
+    adText: r.ad_id ? (adBodyById[r.ad_id] || '') : '',
+    gender: r.gender || '',
+    age: r.age || '',
+    spend: num(r.spend),
+    impressions: num(r.impressions),
+    reach: num(r.reach),
+    clicks: num(r.inline_link_clicks) || num(r.clicks),
+    leads: extractLeads(r.actions),
+  })
+
+  const allRows = breakdownRows.map(buildRow)
+
+  const totals = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 }
+  for (const r of allRows) {
+    totals.spend += r.spend; totals.impressions += r.impressions
+    totals.reach += r.reach; totals.clicks += r.clicks; totals.leads += r.leads
+  }
+  totals.cpl = totals.leads > 0 ? totals.spend / totals.leads : 0
+  totals.cpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0
+  totals.cpm = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0
+  totals.ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0
+  totals.convRate = totals.clicks > 0 ? (totals.leads / totals.clicks) * 100 : 0
+  totals.frequency = totals.reach > 0 ? totals.impressions / totals.reach : 0
+
+  const { data: projects, error: projectsError } = await supabase
+    .from('projects')
+    .select('id, name, client_id')
+
+  if (projectsError) {
+    return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
+  }
+
+  const results = []
+  for (const p of projects || []) {
+    const needle = (p.name || '').toLowerCase().trim()
+    if (!needle) continue
+    const mine = allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
+    if (mine.length === 0) {
+      results.push({ project: p.name, skipped: true, reason: 'no matching campaigns' })
+      continue
+    }
+
+    const pt = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 }
+    for (const r of mine) {
+      pt.spend += r.spend; pt.impressions += r.impressions
+      pt.reach += r.reach; pt.clicks += r.clicks; pt.leads += r.leads
+    }
+    pt.cpl = pt.leads > 0 ? pt.spend / pt.leads : 0
+    pt.cpc = pt.clicks > 0 ? pt.spend / pt.clicks : 0
+    pt.cpm = pt.impressions > 0 ? (pt.spend / pt.impressions) * 1000 : 0
+    pt.ctr = pt.impressions > 0 ? (pt.clicks / pt.impressions) * 100 : 0
+    pt.convRate = pt.clicks > 0 ? (pt.leads / pt.clicks) * 100 : 0
+    pt.frequency = pt.reach > 0 ? pt.impressions / pt.reach : 0
+
+    const { error: upsertError } = await supabase.from('reports').upsert({
+      project_id: p.id,
+      source: 'facebook',
+      month: m,
+      data: mine,
+      summary: pt,
+      file_name: 'Meta API (live)',
+      row_count: mine.length,
+    }, { onConflict: 'project_id,source,month' })
+
+    if (upsertError) {
+      results.push({ project: p.name, error: upsertError.message })
+    } else {
+      results.push({ project: p.name, rows: mine.length, spend: pt.spend, leads: pt.leads })
+    }
+  }
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      month: m,
+      totalRows: allRows.length,
+      adsIndexed: adsRaw.length,
+      totals,
+      projects: results,
+    },
+  }
+}
+
+// ===== handlers =====
+
+export async function POST(request) {
+  const anon = request.headers.get('x-client-key')
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  let body = {}
+  try { body = await request.json() } catch {}
+  const { status, body: responseBody } = await runSync(body.month)
+  return Response.json(responseBody, { status })
+}
+
+export async function GET(request) {
+  // Vercel Cron sends Authorization: Bearer <CRON_SECRET>
+  const auth = request.headers.get('authorization') || ''
+  const bearer = auth.replace(/^Bearer\s+/i, '')
+  const expected = process.env.CRON_SECRET
+
+  if (expected && bearer === expected) {
+    // Authorized as Vercel Cron: run the sync
+    const { status, body: responseBody } = await runSync()
+    return Response.json(responseBody, { status })
+  }
+
+  // Otherwise: health check (public, safe to expose ad account name)
+  const token = process.env.META_ACCESS_TOKEN
+  const adAccountId = process.env.META_AD_ACCOUNT_ID
+  if (!token || !adAccountId) {
+    return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
+  }
+  try {
+    const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}?fields=name,account_status,currency,timezone_name&access_token=${encodeURIComponent(token)}`
+    const res = await fetch(url)
+    const json = await res.json()
+    if (!res.ok) return Response.json({ ok: false, error: json }, { status: res.status })
+    return Response.json({ ok: true, adAccount: json })
+  } catch (err) {
+    return Response.json({ ok: false, error: String(err.message || err) }, { status: 500 })
+  }
+}
