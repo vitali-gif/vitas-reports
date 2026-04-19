@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const GOOGLE_ADS_API_VERSION = 'v18'
+const GOOGLE_ADS_API_VERSION = 'v19'
 
 // ===== helpers =====
 
