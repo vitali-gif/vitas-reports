@@ -127,10 +127,10 @@ export default function Home() {
             method="POST"
             style={{ display: 'grid', gap: 16 }}
           >
-            <input type="hidden" name="_subject" value="New lead from vitas-reports.vercel.app" />
+            <input type="hidden" name="_subject" value="New lead from reports.vitas.co.il" />
             <input type="hidden" name="_template" value="table" />
             <input type="hidden" name="_captcha" value="false" />
-            <input type="hidden" name="_next" value="https://vitas-reports.vercel.app/?submitted=1" />
+            <input type="hidden" name="_next" value="https://reports.vitas.co.il/?submitted=1" />
 
             <div>
               <label style={{ display: 'block', fontSize: '0.9em', color: '#cbd5e1', marginBottom: 6, fontWeight: 500 }}>Full name *</label>
