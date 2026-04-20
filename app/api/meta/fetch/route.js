@@ -71,7 +71,8 @@ async function metaFetchAll(url, token) {
 
 // ===== main sync logic (shared by GET and POST) =====
 
-async function runSync(month) {
+async function runSync(opts = {}) {
+  const { month, since: sinceOpt, until: untilOpt } = opts
   const token = process.env.META_ACCESS_TOKEN
   const adAccountId = process.env.META_AD_ACCOUNT_ID
   if (!token || !adAccountId) {
@@ -85,11 +86,21 @@ async function runSync(month) {
   }
   const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
 
-  const m = month || currentMonth()
-  const [y, mm] = m.split('-').map(Number)
-  const since = `${y}-${String(mm).padStart(2, '0')}-01`
-  const lastDay = new Date(y, mm, 0).getDate()
-  const until = `${y}-${String(mm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  let since, until, m
+  if (sinceOpt && untilOpt) {
+    // Custom date range mode
+    since = sinceOpt
+    until = untilOpt
+    m = `${since}_${until}`  // e.g. "2026-03-01_2026-03-15"
+  } else {
+    // Month mode (default)
+    const mArg = month || currentMonth()
+    const [y, mm] = mArg.split('-').map(Number)
+    since = `${y}-${String(mm).padStart(2, '0')}-01`
+    const lastDay = new Date(y, mm, 0).getDate()
+    until = `${y}-${String(mm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    m = mArg
+  }
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }))
 
   const fields = [
@@ -113,7 +124,7 @@ async function runSync(month) {
   // instead we use the breakdownRows below (which already contain campaign_name and adset_name keyed by ad_id).
   const adsFields = [
     'id', 'name', 'effective_status', 'status',
-    'creative{body,title,image_url,thumbnail_url,object_story_spec,asset_feed_spec,video_id}',
+    'creative{body,title,image_url,thumbnail_url,object_story_spec,asset_feed_spec,video_id,effective_object_story_id}',
   ].join(',')
   // Filter server-side to ACTIVE ads only; Meta's ?fields=creative{...} is expensive so we need effective_status filter + small limit
   const effectiveStatusFilter = encodeURIComponent(JSON.stringify(['ACTIVE']))
@@ -140,7 +151,7 @@ async function runSync(month) {
     if (!title && feed.titles?.length) title = feed.titles.map(t => t.text).filter(Boolean).join(' / ')
     if (!imageUrl && feed.images?.length) imageUrl = feed.images[0].url || ''
     if (!videoId && feed.videos?.length) videoId = feed.videos[0].video_id || ''
-    return { body, title, imageUrl: imageUrl || thumb, thumbnailUrl: thumb || imageUrl, videoId }
+    return { body, title, imageUrl: imageUrl || thumb, thumbnailUrl: thumb || imageUrl, videoId, postId: cr.effective_object_story_id || '' }
   }
 
   const adBodyById = {}         // ad_id -> body (for breakdownRows)
@@ -161,6 +172,7 @@ async function runSync(month) {
       thumbnailUrl: c.thumbnailUrl,
       videoId: c.videoId || (cr.video_id || ''),
       videoUrl: '',  // resolved later via /videos/{id}?fields=source
+      postId: c.postId || '',
       metrics: { spend: 0, impressions: 0, clicks: 0, leads: 0 },
     }
   }
@@ -204,6 +216,33 @@ async function runSync(month) {
       a.videoPermalink = videoUrlById[a.videoId].permalink || ''
       if (!a.imageUrl && videoUrlById[a.videoId].picture) a.imageUrl = videoUrlById[a.videoId].picture
       if (!a.thumbnailUrl && videoUrlById[a.videoId].picture) a.thumbnailUrl = videoUrlById[a.videoId].picture
+    }
+  }
+
+  // Resolve high-res image URLs via post's full_picture for image ads (those with postId but no video)
+  const postIdsToFetch = new Set()
+  for (const a of Object.values(adDetailsById)) {
+    if (a.status === 'ACTIVE' && a.postId && !a.videoId) postIdsToFetch.add(a.postId)
+  }
+  const fullPictureByPost = {}
+  for (const pid of postIdsToFetch) {
+    try {
+      const pu = `https://graph.facebook.com/${META_GRAPH_VERSION}/${pid}?fields=full_picture,permalink_url&access_token=${encodeURIComponent(token)}`
+      const pres = await fetch(pu)
+      if (pres.ok) {
+        const pjson = await pres.json()
+        fullPictureByPost[pid] = {
+          full: pjson.full_picture || '',
+          permalink: pjson.permalink_url || '',
+        }
+      }
+    } catch {}
+  }
+  for (const a of Object.values(adDetailsById)) {
+    if (a.postId && fullPictureByPost[a.postId]?.full) {
+      // Prefer full_picture (higher res) as primary image
+      a.imageUrl = fullPictureByPost[a.postId].full
+      a.postPermalink = fullPictureByPost[a.postId].permalink || ''
     }
   }
 
@@ -317,7 +356,11 @@ export async function POST(request) {
   }
   let body = {}
   try { body = await request.json() } catch {}
-  const { status, body: responseBody } = await runSync(body.month)
+  const { status, body: responseBody } = await runSync({
+    month: body.month,
+    since: body.since,
+    until: body.until,
+  })
   return Response.json(responseBody, { status })
 }
 

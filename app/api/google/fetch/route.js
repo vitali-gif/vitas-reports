@@ -112,7 +112,8 @@ function computeTotals(rows) {
 
 // ===== main sync =====
 
-async function runSync(month) {
+async function runSync(opts = {}) {
+  const { month, since: sinceOpt, until: untilOpt } = opts
   const required = ['GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET', 'GOOGLE_ADS_REFRESH_TOKEN', 'GOOGLE_ADS_CUSTOMER_ID']
   for (const e of required) {
     if (!process.env[e]) return { status: 500, body: { error: `Missing env var: ${e}` } }
@@ -123,11 +124,19 @@ async function runSync(month) {
   if (!supabaseUrl || !supabaseKey) return { status: 500, body: { error: 'Missing Supabase credentials' } }
   const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 
-  const m = month || currentMonth()
-  const [y, mm] = m.split('-').map(Number)
-  const since = `${y}-${String(mm).padStart(2, '0')}-01`
-  const lastDay = new Date(y, mm, 0).getDate()
-  const until = `${y}-${String(mm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  let since, until, m
+  if (sinceOpt && untilOpt) {
+    since = sinceOpt
+    until = untilOpt
+    m = `${since}_${until}`
+  } else {
+    const mArg = month || currentMonth()
+    const [y, mm] = mArg.split('-').map(Number)
+    since = `${y}-${String(mm).padStart(2, '0')}-01`
+    const lastDay = new Date(y, mm, 0).getDate()
+    until = `${y}-${String(mm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    m = mArg
+  }
 
   const customerId = process.env.GOOGLE_ADS_CUSTOMER_ID
 
@@ -318,7 +327,11 @@ export async function POST(request) {
   }
   let body = {}
   try { body = await request.json() } catch {}
-  const { status, body: responseBody } = await runSync(body.month)
+  const { status, body: responseBody } = await runSync({
+    month: body.month,
+    since: body.since,
+    until: body.until,
+  })
   return Response.json(responseBody, { status })
 }
 

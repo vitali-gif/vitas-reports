@@ -28,6 +28,8 @@ export default function AdminPage() {
   const [uploadResult, setUploadResult] = useState(null)
   const [reports, setReports] = useState([])
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [customSince, setCustomSince] = useState('')
+  const [customUntil, setCustomUntil] = useState('')
   const [compareEnabled, setCompareEnabled] = useState(false)
   const [dashTab, setDashTab] = useState('all')
   const [crmSubTab, setCrmSubTab] = useState('sources')
@@ -68,13 +70,16 @@ export default function AdminPage() {
     setRefreshingMeta(true);
     showToast('מושך נתונים מפייסבוק...');
     try {
+      const payload = (customSince && customUntil)
+        ? { since: customSince, until: customUntil }
+        : (selectedMonth ? { month: selectedMonth } : {})
       const res = await fetch('/api/meta/fetch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'שגיאה בקריאה ל-Meta API');
@@ -95,13 +100,16 @@ export default function AdminPage() {
     setRefreshingGoogle(true);
     showToast('מושך נתונים מגוגל...');
     try {
+      const payload = (customSince && customUntil)
+        ? { since: customSince, until: customUntil }
+        : (selectedMonth ? { month: selectedMonth } : {})
       const res = await fetch('/api/google/fetch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'שגיאה בקריאה ל-Google Ads API');
@@ -947,10 +955,10 @@ export default function AdminPage() {
                             controls
                             playsInline
                             preload="metadata"
-                            style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}
+                            style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background:'#000'}}
                           />
                         ) : previewImg ? (
-                          <img src={previewImg} alt={ad.name} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
+                          <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background:'#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
                         ) : (
                           <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'3em',color:'#64748b'}}>{'\ud83d\udcf7'}</div>
                         )}
@@ -1125,7 +1133,14 @@ export default function AdminPage() {
 
   return (
     <div dir="rtl" style={{direction:'rtl',textAlign:'right'}}>
-      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className={`nav-btn ${view === 'upload' ? 'active' : ''}`} onClick={() => setView('upload')}>{'\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>{'\ud83d\udccb \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4'}</button><button className="nav-btn" onClick={refreshFromMeta} disabled={refreshingMeta} title="משוך נתונים חיים מ-Facebook Ads">{refreshingMeta ? '⟳ מרענן...' : '🔄 רענן מפייסבוק'}</button><button className="nav-btn" onClick={refreshFromGoogle} disabled={refreshingGoogle} title="משוך נתונים חיים מ-Google Ads">{refreshingGoogle ? '⟳ מרענן...' : '🔍 רענן מגוגל'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
+      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className={`nav-btn ${view === 'upload' ? 'active' : ''}`} onClick={() => setView('upload')}>{'\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>{'\ud83d\udccb \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4'}</button><div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'6px 10px',background:'rgba(255,255,255,0.06)',borderRadius:'8px',marginLeft:'8px',fontSize:'0.82em'}} title="השאר ריק לשאיבה של החודש הנוכחי, או בחר טווח תאריכים ספציפי">
+<span style={{color:'#94a3b8',fontSize:'0.85em'}}>{'\u05de:'}</span>
+<input type="date" value={customSince} onChange={e => setCustomSince(e.target.value)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.15)',color:'inherit',padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em'}} />
+<span style={{color:'#94a3b8',fontSize:'0.85em'}}>{'\u05e2\u05d3:'}</span>
+<input type="date" value={customUntil} onChange={e => setCustomUntil(e.target.value)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.15)',color:'inherit',padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em'}} />
+{(customSince || customUntil) && <button onClick={() => { setCustomSince(''); setCustomUntil(''); }} style={{background:'transparent',border:'none',color:'#f87171',cursor:'pointer',fontSize:'1em',padding:'0 4px'}} title="נקה טווח">{'\u2716'}</button>}
+</div>
+<button className="nav-btn" onClick={refreshFromMeta} disabled={refreshingMeta} title="משוך נתונים חיים מ-Facebook Ads">{refreshingMeta ? '⟳ מרענן...' : '🔄 רענן מפייסבוק'}</button><button className="nav-btn" onClick={refreshFromGoogle} disabled={refreshingGoogle} title="משוך נתונים חיים מ-Google Ads">{refreshingGoogle ? '⟳ מרענן...' : '🔍 רענן מגוגל'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
 
       <div className="app-layout">
         <div className="sidebar"><div style={{padding: '0 15px', marginBottom: 20}}>

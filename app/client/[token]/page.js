@@ -769,10 +769,10 @@ export default function ClientPage() {
                             controls
                             playsInline
                             preload="metadata"
-                            style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}
+                            style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background:'#000'}}
                           />
                         ) : previewImg ? (
-                          <img src={previewImg} alt={ad.name} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
+                          <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background:'#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
                         ) : (
                           <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'3em',color:'#64748b'}}>{'\ud83d\udcf7'}</div>
                         )}
