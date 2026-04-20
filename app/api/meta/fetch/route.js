@@ -112,13 +112,6 @@ async function runSync(opts = {}) {
 
   const breakdownUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/insights?level=ad&breakdowns=age,gender&fields=${fields}&time_range=${timeRange}&limit=500`
 
-  let breakdownRows
-  try {
-    breakdownRows = await metaFetchAll(breakdownUrl, token)
-  } catch (err) {
-    return { status: 500, body: { error: String(err.message || err) } }
-  }
-
   // Fetch ad creative details (body, title, images) + status
   // NOTE: we intentionally do NOT request campaign{name}/adset{name} edges as they can fail on some tokens;
   // instead we use the breakdownRows below (which already contain campaign_name and adset_name keyed by ad_id).
@@ -129,9 +122,29 @@ async function runSync(opts = {}) {
   // Filter server-side to ACTIVE ads only; Meta's ?fields=creative{...} is expensive so we need effective_status filter + small limit
   const effectiveStatusFilter = encodeURIComponent(JSON.stringify(['ACTIVE']))
   const adsUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/ads?fields=${adsFields}&effective_status=${effectiveStatusFilter}&limit=50`
+
+  // Fire both main fetches in parallel — independent of each other
+  let breakdownRows = null
   let adsRaw = []
   let adsFetchError = null
-  try { adsRaw = await metaFetchAll(adsUrl, token) } catch (err) { adsFetchError = String(err.message || err) }
+  try {
+    const [brRes, adsRes] = await Promise.allSettled([
+      metaFetchAll(breakdownUrl, token),
+      metaFetchAll(adsUrl, token),
+    ])
+    if (brRes.status === 'fulfilled') {
+      breakdownRows = brRes.value
+    } else {
+      return { status: 500, body: { error: String(brRes.reason?.message || brRes.reason) } }
+    }
+    if (adsRes.status === 'fulfilled') {
+      adsRaw = adsRes.value
+    } else {
+      adsFetchError = String(adsRes.reason?.message || adsRes.reason)
+    }
+  } catch (err) {
+    return { status: 500, body: { error: String(err.message || err) } }
+  }
 
   // Helper: pull the best creative data (body, title, image) from nested Meta structures
   const extractCreative = (cr = {}) => {
