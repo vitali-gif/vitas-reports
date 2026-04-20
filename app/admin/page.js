@@ -8,9 +8,8 @@ import * as XLSX from 'xlsx'
 
 export default function AdminPage() {
   const [session, setSession] = useState(null)
-  const [refreshingMeta, setRefreshingMeta] = useState(false)
   const [lastMetaSync, setLastMetaSync] = useState(null)
-  const [refreshingGoogle, setRefreshingGoogle] = useState(false)
+  const [lastGoogleSync, setLastGoogleSync] = useState(null)
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,17 +19,13 @@ export default function AdminPage() {
   const [selectedClient, setSelectedClient] = useState(null)
   const [selectedProject, setSelectedProject] = useState(null)
   const [view, setView] = useState('welcome')
-  const [uploadClient, setUploadClient] = useState('')
-  const [uploadProject, setUploadProject] = useState('')
-  const [uploadSource, setUploadSource] = useState('facebook')
-  const [uploadMonth, setUploadMonth] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [uploadResult, setUploadResult] = useState(null)
   const [reports, setReports] = useState([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [customSince, setCustomSince] = useState('')
   const [customUntil, setCustomUntil] = useState('')
   const [compareEnabled, setCompareEnabled] = useState(false)
+  const [activePreset, setActivePreset] = useState('lastMonth')
+  const [refreshing, setRefreshing] = useState(false)
   const [dashTab, setDashTab] = useState('all')
   const [crmSubTab, setCrmSubTab] = useState('sources')
   const chartsRef = useRef([])
@@ -65,65 +60,99 @@ export default function AdminPage() {
 
   const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
 
-  const refreshFromMeta = async () => {
-    if (refreshingMeta) return;
-    setRefreshingMeta(true);
-    showToast('מושך נתונים מפייסבוק...');
+  // Compute since/until (or full month) from a preset key
+  const presetToPayload = (preset) => {
+    const today = new Date();
+    const toYMD = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    if (preset === 'today') { const t = toYMD(today); return { payload: { since: t, until: t }, key: t + '_' + t }; }
+    if (preset === 'yesterday') { const d = new Date(today); d.setDate(d.getDate()-1); const s = toYMD(d); return { payload: { since: s, until: s }, key: s + '_' + s }; }
+    if (preset === 'last7') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-7); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
+    if (preset === 'last30') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-30); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
+    if (preset === 'currentMonth') { const start = new Date(today.getFullYear(), today.getMonth(), 1); const s = toYMD(start), e = toYMD(today); return { payload: { since: s, until: e }, key: s + '_' + e }; }
+    if (preset === 'lastMonth') { const y = today.getMonth()===0 ? today.getFullYear()-1 : today.getFullYear(); const m = today.getMonth()===0 ? 12 : today.getMonth(); const mm = String(m).padStart(2,'0'); return { payload: { month: `${y}-${mm}` }, key: `${y}-${mm}` }; }
+    return null;
+  };
+
+  const triggerFetch = async (payload) => {
+    if (refreshing) return false;
+    setRefreshing(true);
+    showToast('\u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd...');
+    const headers = { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' };
+    let metaOk = false, googleOk = false;
     try {
-      const payload = (customSince && customUntil)
-        ? { since: customSince, until: customUntil }
-        : (selectedMonth ? { month: selectedMonth } : {})
-      const res = await fetch('/api/meta/fetch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-        },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'שגיאה בקריאה ל-Meta API');
-      const okProjects = (json.projects || []).filter(p => !p.skipped && !p.error).length;
-      setLastMetaSync(new Date());
-      showToast(`✓ עודכן ${okProjects} פרויקטים מפייסבוק`);
-      // Reload current project view if open
+      const [mr, gr] = await Promise.allSettled([
+        fetch('/api/meta/fetch', { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json()),
+        fetch('/api/google/fetch', { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json()),
+      ]);
+      metaOk = mr.status === 'fulfilled' && mr.value && mr.value.ok;
+      googleOk = gr.status === 'fulfilled' && gr.value && gr.value.ok;
+      if (metaOk) setLastMetaSync(new Date());
+      if (googleOk) setLastGoogleSync(new Date());
+      const parts = [];
+      if (metaOk) parts.push('\u2713 Facebook'); else parts.push('\u00d7 Facebook');
+      if (googleOk) parts.push('\u2713 Google'); else parts.push('\u00d7 Google');
+      showToast(parts.join('  |  '));
       await loadClients();
       if (selectedProject) await loadProjectReports(selectedProject.id);
     } catch (err) {
-      showToast('שגיאה: ' + (err.message || err));
+      showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (err.message || err));
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshingMeta(false);
+    return metaOk || googleOk;
   };
 
-  const refreshFromGoogle = async () => {
-    if (refreshingGoogle) return;
-    setRefreshingGoogle(true);
-    showToast('מושך נתונים מגוגל...');
-    try {
-      const payload = (customSince && customUntil)
-        ? { since: customSince, until: customUntil }
-        : (selectedMonth ? { month: selectedMonth } : {})
-      const res = await fetch('/api/google/fetch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-        },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'שגיאה בקריאה ל-Google Ads API');
-      const okProjects = (json.projects || []).filter(p => !p.skipped && !p.error).length;
-      showToast(`✓ עודכן ${okProjects} פרויקטים מגוגל`);
-      await loadClients();
-      if (selectedProject) await loadProjectReports(selectedProject.id);
-    } catch (err) {
-      showToast('שגיאה: ' + (err.message || err));
+  const applyPreset = async (preset) => {
+    // Existing-period option ("period:2026-03")
+    if (preset.startsWith('period:')) {
+      const m = preset.slice('period:'.length);
+      setSelectedMonth(m);
+      setActivePreset('custom'); // mark as already-loaded custom
+      return;
     }
-    setRefreshingGoogle(false);
+    setActivePreset(preset);
+    if (preset === 'custom') return; // UI shows custom date inputs — user must click הצג
+    const r = presetToPayload(preset);
+    if (!r) return;
+    const ok = await triggerFetch(r.payload);
+    if (ok) setSelectedMonth(r.key);
   };
 
-  const loadClients = async () => {
+  const applyCustomRange = async () => {
+    if (!customSince || !customUntil) return;
+    const payload = { since: customSince, until: customUntil };
+    const ok = await triggerFetch(payload);
+    if (ok) setSelectedMonth(customSince + '_' + customUntil);
+  };
+
+  const refreshAll = async () => {
+    // Re-fetch the current period
+    if (!selectedMonth) {
+      const r = presetToPayload('lastMonth');
+      if (r) await triggerFetch(r.payload);
+      return;
+    }
+    const payload = selectedMonth.includes('_')
+      ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
+      : { month: selectedMonth };
+    await triggerFetch(payload);
+  };
+
+  const onComparisonToggle = async (enabled) => {
+    setCompareEnabled(enabled);
+    if (!enabled || !selectedMonth) return;
+    const prev = getPrevMonth(selectedMonth);
+    if (!prev) return;
+    // If prev-period isn't loaded yet, fetch it
+    if (!reports.some(r => r.month === prev)) {
+      const payload = prev.includes('_')
+        ? { since: prev.split('_')[0], until: prev.split('_')[1] }
+        : { month: prev };
+      await triggerFetch(payload);
+    }
+  };
+
+const loadClients = async () => {
     const { data } = await supabase.from('clients').select('*, projects(*)').order('created_at');
     if (data) setClients(data);
   };
@@ -151,123 +180,7 @@ export default function AdminPage() {
     await loadClients(); showToast('Project "' + newProjectName + '" added');
   };
 
-  const handleResetData = async () => {
-    if (!selectedProject) return alert('\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05e7\u05d5\u05d3\u05dd');
-    if (!confirm('\u05d4\u05d0\u05dd \u05d0\u05ea\u05d4 \u05d1\u05d8\u05d5\u05d7 \u05e9\u05d1\u05d8\u05e6\u05d5\u05e0\u05da \u05dc\u05de\u05d7\u05d5\u05e7 \u05d0\u05ea \u05db\u05dc \u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e9\u05dc \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d4\u05d6\u05d4?')) return;
-    const { error } = await supabase.from('reports').delete().eq('project_id', selectedProject.id);
-    if (error) return alert('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + error.message);
-    setReports([]); alert('\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e0\u05de\u05d7\u05e7\u05d5 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4');
-  };
-
-  const handleFile = async (file) => {
-    if (!uploadClient || !uploadProject || !uploadMonth) { showToast('Please fill all fields'); return; }
-    setUploading(true); setUploadResult(null);
-    try {
-      const data = await file.arrayBuffer();
-      let json;
-      const bytes = new Uint8Array(data);
-      if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
-        const text = new TextDecoder('utf-16le').decode(data);
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-        let headerIdx = lines.findIndex(l => l.includes('\t'));
-        if (headerIdx < 0) headerIdx = 0;
-        const headers = lines[headerIdx].split('\t');
-        json = [];
-        for (let i = headerIdx + 1; i < lines.length; i++) {
-          const vals = lines[i].split('\t');
-          if (vals.length < 2) continue;
-          const row = {};
-          headers.forEach((h, j) => { row[h.trim()] = (vals[j] || '').replace(/^"|"$/g, '').trim(); });
-          json.push(row);
-        }
-      } else {
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-      }
-
-      let mapped;
-      let summary;
-      if (uploadSource === 'facebook') {
-        mapped = mapFacebookRows(json);
-        summary = aggregateRows(mapped);
-      } else if (uploadSource === 'google_pmax' || uploadSource === 'google_search') {
-        mapped = mapGoogleRows(json);
-        if (uploadSource === 'google_pmax') mapped = mapped.map(r => ({ ...r, campaign: 'PMAX' }));
-        else if (uploadSource === 'google_search') mapped = mapped.map(r => ({ ...r, campaign: 'Search' }));
-        summary = aggregateRows(mapped);
-      } else if (uploadSource === 'crm') {
-        if (json.length >= 2) {
-          const fv = Object.values(json[0]).map(v => String(v).trim());
-          if (fv.some(v => v.includes('תואמו') || v.includes('בוצעו') || (v.includes('סה') && v.includes('לידים')))) {
-            const origKeys = Object.keys(json[0]);
-            const nh = {};
-            origKeys.forEach(k => { const s = String(json[0][k] || '').trim(); nh[k] = s || k; });
-            json = json.slice(1).map(row => {
-              const obj = {};
-              origKeys.forEach(k => { obj[nh[k]] = row[k]; });
-              return obj;
-            });
-          }
-        }
-        // Decode HTML entities in CRM data
-        const decHtml = s => String(s ?? '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-        json = json.map(row => {
-          const obj = {};
-          Object.entries(row).forEach(([k, v]) => { obj[decHtml(k)] = decHtml(v); });
-          return obj;
-        });
-        mapped = mapCrmRows(json);
-        // Ignore totalLeads (column C) for rows containing Facebook/Google — platform data provides these leads separately
-        mapped = mapped.map(row => {
-          const src = String(row.source || '').toLowerCase();
-          if (src.includes('facebook') || src.includes('פייסבוק') || src.includes('google') || src.includes('גוגל')) {
-            return { ...row, totalLeads: 0 };
-          }
-          return row;
-        });
-        summary = aggregateCrmRows(mapped);
-      } else if (uploadSource === 'crm_reports') {
-        mapped = mapCrmReportRows(json);
-        summary = aggregateCrmReportRows(mapped);
-      } else {
-        mapped = json;
-        summary = {};
-      }
-
-      const { error } = await supabase.from('reports').upsert({
-        project_id: uploadProject,
-        source: uploadSource,
-        month: uploadMonth,
-        data: mapped,
-        summary: uploadSource === 'crm' ? summary.totals : summary.totals,
-        file_name: file.name,
-        row_count: mapped.length,
-      }, { onConflict: 'project_id,source,month' });
-
-      if (error) throw error;
-
-      if (uploadSource === 'crm') {
-        setUploadResult({ success: true, fileName: file.name, rowCount: mapped.length, crmTotals: summary.totals });
-      } else if (uploadSource === 'crm_reports') {
-        setUploadResult({ success: true, fileName: file.name, rowCount: mapped.length, crmReportTotals: summary.totals });
-      } else {
-        setUploadResult({ success: true, fileName: file.name, rowCount: mapped.length, totals: summary.totals });
-      }
-      showToast('Data uploaded successfully!');
-    } catch (err) {
-      setUploadResult({ success: false, error: err.message });
-      showToast('Error: ' + err.message);
-    }
-    setUploading(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault(); e.currentTarget.classList.remove('dragover');
-    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-  };
-
-  const selectProject = async (client, project) => {
+const selectProject = async (client, project) => {
     setSelectedClient(client); setSelectedProject(project); setView('dashboard'); setCompareEnabled(false);
     await loadProjectReports(project.id);
   };
@@ -1133,14 +1046,7 @@ export default function AdminPage() {
 
   return (
     <div dir="rtl" style={{direction:'rtl',textAlign:'right'}}>
-      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className={`nav-btn ${view === 'upload' ? 'active' : ''}`} onClick={() => setView('upload')}>{'\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>{'\ud83d\udccb \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4'}</button><div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'6px 10px',background:'rgba(255,255,255,0.06)',borderRadius:'8px',marginLeft:'8px',fontSize:'0.82em'}} title="השאר ריק לשאיבה של החודש הנוכחי, או בחר טווח תאריכים ספציפי">
-<span style={{color:'#94a3b8',fontSize:'0.85em'}}>{'\u05de:'}</span>
-<input type="date" value={customSince} onChange={e => setCustomSince(e.target.value)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.15)',color:'inherit',padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em'}} />
-<span style={{color:'#94a3b8',fontSize:'0.85em'}}>{'\u05e2\u05d3:'}</span>
-<input type="date" value={customUntil} onChange={e => setCustomUntil(e.target.value)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.15)',color:'inherit',padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em'}} />
-{(customSince || customUntil) && <button onClick={() => { setCustomSince(''); setCustomUntil(''); }} style={{background:'transparent',border:'none',color:'#f87171',cursor:'pointer',fontSize:'1em',padding:'0 4px'}} title="נקה טווח">{'\u2716'}</button>}
-</div>
-<button className="nav-btn" onClick={refreshFromMeta} disabled={refreshingMeta} title="משוך נתונים חיים מ-Facebook Ads">{refreshingMeta ? '⟳ מרענן...' : '🔄 רענן מפייסבוק'}</button><button className="nav-btn" onClick={refreshFromGoogle} disabled={refreshingGoogle} title="משוך נתונים חיים מ-Google Ads">{refreshingGoogle ? '⟳ מרענן...' : '🔍 רענן מגוגל'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
+      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className="nav-btn" onClick={refreshAll} disabled={refreshing} title="משוך נתונים חיים מ-Facebook + Google">{refreshing ? '\u27f3 \u05de\u05e8\u05e2\u05e0\u05df...' : '\ud83d\udd04 \u05e8\u05e2\u05e0\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
 
       <div className="app-layout">
         <div className="sidebar"><div style={{padding: '0 15px', marginBottom: 20}}>
@@ -1156,55 +1062,41 @@ export default function AdminPage() {
         <div className="main-content">
           {view === 'welcome' && (<div className="welcome-center"><div className="icon">{'\ud83d\udcca'}</div><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05de\u05d4\u05ea\u05e4\u05e8\u05d9\u05d8 \u05db\u05d3\u05d9 \u05dc\u05e6\u05e4\u05d5\u05ea \u05d1\u05d3\u05d5\u05d7, \u05d0\u05d5 \u05d4\u05e2\u05dc\u05d4 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd'}</p></div>)}
 
-          {view === 'upload' && (<>
-            <h2 style={{fontSize: '1.8em', fontWeight: 800, marginBottom: 20}}>{'\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</h2>
-            <div className="card"><div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}><h3 style={{fontWeight: 700, margin: 0}}>{'\u05d4\u05d2\u05d3\u05e8\u05d5\u05ea'}</h3><button className="btn" style={{background: '#e74c3c', color: '#fff', padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13}} onClick={handleResetData}>{'\ud83d\uddd1\ufe0f \u05d0\u05d9\u05e4\u05d5\u05e1 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button></div>
-              <div className="form-row"><div className="form-group"><label>{'\u05dc\u05e7\u05d5\u05d7'}</label><select className="form-input" value={uploadClient} onChange={e => setUploadClient(e.target.value)}><option value="">{'\u05d1\u05d7\u05e8 \u05dc\u05e7\u05d5\u05d7'}</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div className="form-group"><label>{'\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</label><select className="form-input" value={uploadProject} onChange={e => setUploadProject(e.target.value)}><option value="">{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</option>{getClientProjects(uploadClient).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></div>
-              <div className="form-row"><div className="form-group"><label>{'\u05de\u05e7\u05d5\u05e8'}</label><select className="form-input" value={uploadSource} onChange={e => setUploadSource(e.target.value)}><option value="facebook">Facebook Ads</option><option value="google_pmax">Google Ads PMax</option><option value="google_search">Google Ads Search</option><option value="crm">CRM {'\u05de\u05e7\u05d5\u05e8\u05d5\u05ea \u05d4\u05d2\u05e2\u05d4'}</option><option value="crm_reports">CRM {'\u05de\u05d7\u05d5\u05dc\u05dc \u05d3\u05d5\u05d7\u05d5\u05ea'}</option></select></div><div className="form-group"><label>{'\u05d7\u05d5\u05d3\u05e9'}</label><input className="form-input" type="month" value={uploadMonth} onChange={e => setUploadMonth(e.target.value)} /></div></div>
-            </div>
-            <div className="upload-area" onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('dragover'); }} onDragLeave={e => e.currentTarget.classList.remove('dragover')} onDrop={handleDrop} onClick={() => document.getElementById('fileInput').click()}>
-              {uploading ? (<><div className="spinner" style={{borderColor: 'rgba(59,130,246,0.3)', borderTopColor: 'var(--accent)', width: 40, height: 40}}></div><h3 style={{marginTop: 15}}>{'\u05de\u05e2\u05d1\u05d3...'}</h3></>) : (<><div className="upload-icon">{'\ud83d\udcc1'}</div><h3>{'\u05d2\u05e8\u05d5\u05e8 \u05e7\u05d5\u05d1\u05e5 \u05d0\u05e7\u05e1\u05dc \u05dc\u05db\u05d0\u05df'}</h3><p style={{color: 'var(--text-secondary)'}}>{'\u05d0\u05d5 \u05dc\u05d7\u05e5 \u05dc\u05d1\u05d7\u05d9\u05e8\u05ea \u05e7\u05d5\u05d1\u05e5'}</p></>)}
-              <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style={{display: 'none'}} onChange={e => { if (e.target.files.length) handleFile(e.target.files[0]); }} />
-            </div>
-            {uploadResult?.success && (<div className="card" style={{borderColor: 'var(--success)', borderWidth: 2}}>
-              <h3 style={{color: 'var(--success)'}}>{'\u2705 \u05d4\u05d5\u05e2\u05dc\u05d4 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4!'}</h3>
-              <p style={{color: 'var(--text-secondary)', marginBottom: 15}}>{uploadResult.fileName} â {uploadResult.rowCount} {'\u05e9\u05d5\u05e8\u05d5\u05ea'}</p>
-              {uploadResult.totals ? (
-                <div className="kpi-grid">
-                  <div className="kpi-card"><div className="kpi-label">{'\u05ea\u05e7\u05e6\u05d9\u05d1'}</div><div className="kpi-value">{formatCurrency(uploadResult.totals.spend)}</div></div>
-                  <div className="kpi-card green"><div className="kpi-label">{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</div><div className="kpi-value">{uploadResult.totals.leads}</div></div>
-                  <div className="kpi-card purple"><div className="kpi-label">CPL</div><div className="kpi-value">{formatCurrency(uploadResult.totals.cpl)}</div></div>
-                </div>
-              ) : uploadResult.crmTotals ? (
-                <div className="kpi-grid">
-                  <div className="kpi-card"><div className="kpi-label">{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</div><div className="kpi-value">{formatNum(uploadResult.crmTotals.totalLeads)}</div></div>
-                  <div className="kpi-card green"><div className="kpi-label">{'\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</div><div className="kpi-value">{formatNum(uploadResult.crmTotals.relevantLeads)}</div></div>
-                  <div className="kpi-card purple"><div className="kpi-label">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div><div className="kpi-value">{formatNum(uploadResult.crmTotals.contracts)}</div></div>
-                  <div className="kpi-card orange"><div className="kpi-label">{'\u05e9\u05d5\u05d5\u05d9 \u05d7\u05d5\u05d6\u05d9\u05dd'}</div><div className="kpi-value">{formatCurrency(uploadResult.crmTotals.contractValue)}</div></div>
-                </div>
-              ) : uploadResult.crmReportTotals ? (
-                <div className="kpi-grid">
-                  <div className="kpi-card"><div className="kpi-label">{'\u05e1\u05d4"\u05db \u05e9\u05d5\u05e8\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(uploadResult.crmReportTotals.totalRows)}</div></div>
-                  <div className="kpi-card green"><div className="kpi-label">{'\u05e2\u05e8\u05d9\u05dd \u05d9\u05d9\u05d7\u05d5\u05d3\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(uploadResult.crmReportTotals.uniqueCities)}</div></div>
-                  <div className="kpi-card purple"><div className="kpi-label">{'\u05e2\u05dd \u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(uploadResult.crmReportTotals.withObjections)}</div></div>
-                  <div className="kpi-card orange"><div className="kpi-label">{'\u05e2\u05dd \u05e4\u05d2\u05d9\u05e9\u05d4'}</div><div className="kpi-value">{formatNum(uploadResult.crmReportTotals.withMeeting)}</div></div>
-                </div>
-              ) : null}
-            </div>)}
-          </>)}
-
           {view === 'dashboard' && selectedProject && (<>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25}}>
               <h2 style={{fontSize: '1.8em', fontWeight: 800}}>{selectedClient?.name} / {selectedProject.name}</h2>
-              <div style={{display: 'flex', gap: 10, alignItems: 'center'}}>
-                <select className="form-input" style={{width: 'auto'}} value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>{[...new Set(reports.map(r => r.month))].sort().reverse().map(m => (<option key={m} value={m}>{formatMonth(m)}</option>))}</select>
-                <label style={{fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer'}}><input type="checkbox" checked={compareEnabled} onChange={e => setCompareEnabled(e.target.checked)} />{'\u05d4\u05e9\u05d5\u05d5\u05d0\u05d4 \u05dc\u05d7\u05d5\u05d3\u05e9 \u05e7\u05d5\u05d3\u05dd'}</label>
+              <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                <select className="form-input" style={{width:'auto',minWidth:'180px'}} value={activePreset} onChange={e => applyPreset(e.target.value)}>
+                  <option value="today">{'\ud83d\udcc5 \u05d4\u05d9\u05d5\u05dd'}</option>
+                  <option value="yesterday">{'\u05d0\u05ea\u05de\u05d5\u05dc'}</option>
+                  <option value="last7">{'7 \u05d9\u05de\u05d9\u05dd \u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd'}</option>
+                  <option value="last30">{'30 \u05d9\u05de\u05d9\u05dd \u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd'}</option>
+                  <option value="currentMonth">{'\u05d4\u05d7\u05d5\u05d3\u05e9 \u05d4\u05e0\u05d5\u05db\u05d7\u05d9'}</option>
+                  <option value="lastMonth">{'\u05d7\u05d5\u05d3\u05e9 \u05e9\u05e2\u05d1\u05e8'}</option>
+                  <option value="custom">{'\u05d8\u05d5\u05d5\u05d7 \u05de\u05d5\u05ea\u05d0\u05dd \u05d0\u05d9\u05e9\u05d9\u05ea...'}</option>
+                  {[...new Set(reports.map(r => r.month))].filter(m => m && !['today','yesterday','last7','last30','currentMonth','lastMonth'].includes(m)).sort().reverse().slice(0, 12).map(m => (
+                    <option key={m} value={`period:${m}`}>{formatMonth(m)}</option>
+                  ))}
+                </select>
+                {activePreset === 'custom' && (
+                  <div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'6px 10px',background:'rgba(0,0,0,0.04)',borderRadius:'8px',fontSize:'0.85em'}}>
+                    <span style={{color:'var(--text-secondary)'}}>{'\u05de:'}</span>
+                    <input type="date" value={customSince} onChange={e => setCustomSince(e.target.value)} style={{padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em',border:'1px solid #d1d5db'}} />
+                    <span style={{color:'var(--text-secondary)'}}>{'\u05e2\u05d3:'}</span>
+                    <input type="date" value={customUntil} onChange={e => setCustomUntil(e.target.value)} style={{padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em',border:'1px solid #d1d5db'}} />
+                    <button className="btn btn-sm btn-primary" style={{padding:'4px 10px',fontSize:'0.82em'}} onClick={() => applyCustomRange()} disabled={!customSince || !customUntil || refreshing}>{'\u05d4\u05e6\u05d2'}</button>
+                  </div>
+                )}
+                <label style={{fontSize:'0.9em',display:'flex',alignItems:'center',gap:6,cursor:'pointer',padding:'6px 12px',background:'rgba(59,130,246,0.08)',borderRadius:'8px',border:'1px solid rgba(59,130,246,0.2)'}} title="מציג השוואה של אותה תקופה בחודש הקודם (למשל 7 ימים אחרונים מול 7 ימים בחודש שעבר)">
+                  <input type="checkbox" checked={compareEnabled} onChange={e => onComparisonToggle(e.target.checked)} />
+                  {'\u05d4\u05e9\u05d5\u05d5\u05d0\u05d4 \u05dc\u05d0\u05d5\u05ea\u05d4 \u05ea\u05e7\u05d5\u05e4\u05d4'}
+                </label>
               </div>
             </div>
-            {reports.length === 0 ? (<div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d3\u05d9\u05d9\u05df'}</h3><button className="btn btn-primary btn-lg" onClick={() => setView('upload')} style={{marginTop: 15}}>{'\ud83d\udce4 \u05d4\u05e2\u05dc\u05d0\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button></div>) : renderDashboard()}
+            {reports.length === 0 ? (<div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d3\u05d9\u05d9\u05df'}</h3><p style={{marginTop:10,color:'var(--text-secondary)'}}>{'\u05dc\u05d7\u05e5 \u05e2\u05dc \u05db\u05e4\u05ea\u05d5\u05e8 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05dc\u05de\u05e9\u05d9\u05db\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</p></div>) : renderDashboard()}
           </>)}
 
-          {view === 'history' && (<><h2 style={{fontSize: '1.8em', fontWeight: 800, marginBottom: 20}}>{'\ud83d\udccb \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4'}</h2><HistoryView clients={clients} showToast={showToast} onRefresh={loadClients} /></>)}
+          
         </div>
       </div>
 
