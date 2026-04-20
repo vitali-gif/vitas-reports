@@ -1066,8 +1066,8 @@ export default function AdminPage() {
         <p className="subtitle">{'\u05de\u05e2\u05e8\u05db\u05ea \u05d3\u05d5\u05d7\u05d5\u05ea \u05e9\u05d9\u05d5\u05d5\u05e7 \u05d3\u05d9\u05d2\u05d9\u05d8\u05dc\u05d9'}</p>
         <div className="card">
           <form onSubmit={handleAuth}>
-            <div className="form-group"><label>{'\u05d0\u05d9\u05de\u05d9\u05d9\u05dc'}</label><input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} dir="ltr" required /></div>
-            <div className="form-group"><label>{'\u05e1\u05d9\u05e1\u05dd\u05d4'}</label><input className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} dir="ltr" required /></div>
+            <div className="form-group"><label>{'\u05d0\u05d9\u05de\u05d9\u05d9\u05dc'}</label><input id="admin-email" name="email" className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} dir="ltr" autoComplete="username" required /></div>
+            <div className="form-group"><label>{'\u05e1\u05d9\u05e1\u05dd\u05d4'}</label><input id="admin-password" name="password" className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} dir="ltr" autoComplete={isSignUp ? "new-password" : "current-password"} required /></div>
             {authError && <p style={{color: 'var(--danger)', fontSize: '0.85em', marginBottom: 10}}>{authError}</p>}
             <button className="btn btn-primary btn-lg" style={{width: '100%'}} type="submit">{isSignUp ? '\u05d4\u05e8\u05e9\u05de\u05d4' : '\u05db\u05e0\u05d9\u05e1\u05d4'}</button>
           </form>
