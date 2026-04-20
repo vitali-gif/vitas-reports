@@ -916,37 +916,78 @@ export default function AdminPage() {
           </div>);
         })()}
 
-        {/* ACTIVE ADS SECTION (Facebook) */}
+        {/* ACTIVE ADS SECTION (Facebook) — top 5 by leads, with video/image preview */}
         {(dashTab === 'facebook' || dashTab === 'all') && (() => {
           const activeAdsList = fbReports.flatMap(r => r.summary?.activeAds || []);
           if (activeAdsList.length === 0) return null;
+          // activeAds are already sorted + trimmed to top 5 by the API, but re-sort defensively
+          const topAds = [...activeAdsList]
+            .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
+            .slice(0, 5);
           return (
             <div className="section">
               <div className="section-title">
-                <div className="section-icon" style={{background:'var(--gradient-3, linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%))'}}>{'\ud83d\udcf1'}</div>
-                {'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05e4\u05e2\u05d9\u05dc\u05d5\u05ea \u05d1-Facebook'} ({activeAdsList.length})
+                <div className="section-icon" style={{background:'var(--gradient-3, linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%))'}}>{'\ud83c\udfc6'}</div>
+                {'\u05d4\u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05d4\u05db\u05d9 \u05de\u05d5\u05d1\u05d9\u05dc\u05d5\u05ea \u05d1-Facebook'} (Top {topAds.length})
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))',gap:'16px'}}>
-                {activeAdsList.map((ad, i) => (
-                  <div key={ad.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column'}}>
-                    {ad.imageUrl ? (
-                      <div style={{width:'100%',aspectRatio:'1/1',background:'#f1f5f9',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                        <img src={ad.imageUrl} alt={ad.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e)=>{e.target.style.display='none'}} />
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'20px'}}>
+                {topAds.map((ad, i) => {
+                  const metrics = ad.metrics || {};
+                  const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
+                  const hasVideo = Boolean(ad.videoUrl);
+                  const previewImg = ad.imageUrl || ad.thumbnailUrl;
+                  return (
+                    <div key={ad.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+                      {/* Media: video if available, else image */}
+                      <div style={{position:'relative',width:'100%',aspectRatio:'4/5',background:'#0f172a',overflow:'hidden'}}>
+                        {hasVideo ? (
+                          <video
+                            src={ad.videoUrl}
+                            poster={previewImg || undefined}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}
+                          />
+                        ) : previewImg ? (
+                          <img src={previewImg} alt={ad.name} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
+                        ) : (
+                          <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'3em',color:'#64748b'}}>{'\ud83d\udcf7'}</div>
+                        )}
+                        {/* Rank badge */}
+                        <div style={{position:'absolute',top:'10px',right:'10px',background:'rgba(15,23,42,0.85)',color:'#fbbf24',fontWeight:800,fontSize:'0.8em',padding:'4px 10px',borderRadius:'20px',letterSpacing:'0.04em'}}>
+                          #{i + 1}
+                        </div>
                       </div>
-                    ) : (
-                      <div style={{width:'100%',aspectRatio:'1/1',background:'linear-gradient(135deg,#e0e7ff,#fce7f3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5em',color:'#64748b'}}>{'\ud83d\udcf7'}</div>
-                    )}
-                    <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'8px'}}>
-                      <div style={{fontSize:'0.75em',color:'#059669',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {'\u05e4\u05e2\u05d9\u05dc'}</div>
-                      {ad.title && <div style={{fontWeight:700,fontSize:'0.95em',color:'#0f172a',lineHeight:1.3}}>{ad.title}</div>}
-                      {ad.body && <div style={{fontSize:'0.85em',color:'#475569',lineHeight:1.5,unicodeBidi:'plaintext',maxHeight:'4.5em',overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>{ad.body}</div>}
-                      <div style={{fontSize:'0.72em',color:'#94a3b8',marginTop:'auto',paddingTop:'6px',borderTop:'1px solid #f1f5f9',unicodeBidi:'plaintext'}}>
-                        <div>{'\ud83d\udcca'} {ad.campaign || '—'}</div>
-                        {ad.adSet && <div style={{marginTop:'2px'}}>{'\ud83c\udfaf'} {ad.adSet}</div>}
+
+                      {/* Metrics strip */}
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',borderBottom:'1px solid #e2e8f0'}}>
+                        <div style={{padding:'10px',textAlign:'center',borderRight:'1px solid #f1f5f9'}}>
+                          <div style={{fontSize:'0.65em',color:'#64748b',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</div>
+                          <div style={{fontSize:'1.2em',fontWeight:800,color:'#059669',marginTop:'2px'}}>{metrics.leads || 0}</div>
+                        </div>
+                        <div style={{padding:'10px',textAlign:'center',borderRight:'1px solid #f1f5f9'}}>
+                          <div style={{fontSize:'0.65em',color:'#64748b',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em'}}>CPL</div>
+                          <div style={{fontSize:'1.2em',fontWeight:800,color:'#0f172a',marginTop:'2px'}}>{'\u20aa'}{Math.round(cpl)}</div>
+                        </div>
+                        <div style={{padding:'10px',textAlign:'center'}}>
+                          <div style={{fontSize:'0.65em',color:'#64748b',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u05d4\u05d5\u05e6\u05d0\u05d4'}</div>
+                          <div style={{fontSize:'1.2em',fontWeight:800,color:'#0f172a',marginTop:'2px'}}>{'\u20aa'}{Math.round(metrics.spend || 0).toLocaleString('he-IL')}</div>
+                        </div>
+                      </div>
+
+                      {/* Text content */}
+                      <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'8px'}}>
+                        {ad.title && <div style={{fontWeight:700,fontSize:'0.95em',color:'#0f172a',lineHeight:1.3}}>{ad.title}</div>}
+                        {ad.body && <div style={{fontSize:'0.85em',color:'#475569',lineHeight:1.5,unicodeBidi:'plaintext',maxHeight:'5em',overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>{ad.body}</div>}
+                        <div style={{fontSize:'0.72em',color:'#94a3b8',marginTop:'auto',paddingTop:'8px',borderTop:'1px solid #f1f5f9',unicodeBidi:'plaintext'}}>
+                          <div>{'\ud83d\udcca'} {ad.campaign || '\u2014'}</div>
+                          {ad.adSet && <div style={{marginTop:'2px'}}>{'\ud83c\udfaf'} {ad.adSet}</div>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );

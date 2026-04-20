@@ -113,7 +113,7 @@ async function runSync(month) {
   // instead we use the breakdownRows below (which already contain campaign_name and adset_name keyed by ad_id).
   const adsFields = [
     'id', 'name', 'effective_status', 'status',
-    'creative{body,title,image_url,thumbnail_url,object_story_spec,asset_feed_spec}',
+    'creative{body,title,image_url,thumbnail_url,object_story_spec,asset_feed_spec,video_id}',
   ].join(',')
   // Filter server-side to ACTIVE ads only; Meta's ?fields=creative{...} is expensive so we need effective_status filter + small limit
   const effectiveStatusFilter = encodeURIComponent(JSON.stringify(['ACTIVE']))
@@ -128,21 +128,26 @@ async function runSync(month) {
     let title = cr.title || ''
     let imageUrl = cr.image_url || ''
     let thumb = cr.thumbnail_url || ''
+    let videoId = ''
     const spec = cr.object_story_spec || {}
     if (!body) body = spec.link_data?.message || spec.video_data?.message || spec.photo_data?.message || ''
     if (!title) title = spec.link_data?.name || spec.video_data?.title || ''
     if (!imageUrl) imageUrl = spec.link_data?.picture || spec.photo_data?.url || ''
+    if (spec.video_data?.video_id) videoId = spec.video_data.video_id
+    if (!videoId && spec.video_data?.image_url && !thumb) thumb = spec.video_data.image_url
     const feed = cr.asset_feed_spec || {}
     if (!body && feed.bodies?.length) body = feed.bodies.map(b => b.text).filter(Boolean).join(' / ')
     if (!title && feed.titles?.length) title = feed.titles.map(t => t.text).filter(Boolean).join(' / ')
-    if (!imageUrl && feed.images?.length) imageUrl = feed.images[0].url || feed.images[0].hash || ''
-    return { body, title, imageUrl: imageUrl || thumb, thumbnailUrl: thumb || imageUrl }
+    if (!imageUrl && feed.images?.length) imageUrl = feed.images[0].url || ''
+    if (!videoId && feed.videos?.length) videoId = feed.videos[0].video_id || ''
+    return { body, title, imageUrl: imageUrl || thumb, thumbnailUrl: thumb || imageUrl, videoId }
   }
 
   const adBodyById = {}         // ad_id -> body (for breakdownRows)
   const adDetailsById = {}      // ad_id -> full detail object
   for (const ad of adsRaw) {
-    const c = extractCreative(ad.creative || {})
+    const cr = ad.creative || {}
+    const c = extractCreative(cr)
     adBodyById[ad.id] = c.body
     adDetailsById[ad.id] = {
       id: ad.id,
@@ -154,16 +159,54 @@ async function runSync(month) {
       title: c.title,
       imageUrl: c.imageUrl,
       thumbnailUrl: c.thumbnailUrl,
+      videoId: c.videoId || (cr.video_id || ''),
+      videoUrl: '',  // resolved later via /videos/{id}?fields=source
+      metrics: { spend: 0, impressions: 0, clicks: 0, leads: 0 },
     }
   }
-  // Back-fill campaign/adset names from the insights breakdownRows (keyed by ad_id)
+  // Back-fill campaign/adset names + per-ad metrics from the insights breakdownRows
   for (const r of breakdownRows) {
     const id = r.ad_id
     if (id && adDetailsById[id]) {
       if (!adDetailsById[id].campaign && r.campaign_name) adDetailsById[id].campaign = r.campaign_name
       if (!adDetailsById[id].adSet && r.adset_name) adDetailsById[id].adSet = r.adset_name
+      const m = adDetailsById[id].metrics
+      m.spend += num(r.spend)
+      m.impressions += num(r.impressions)
+      m.clicks += num(r.inline_link_clicks)
+      m.leads += extractLeads(r.actions)
     }
   }
+
+  // Resolve video source URLs (batched by /videos/{id}?fields=source) for ads with video_id
+  const videoIdsSet = new Set()
+  for (const a of Object.values(adDetailsById)) {
+    if (a.status === 'ACTIVE' && a.videoId) videoIdsSet.add(a.videoId)
+  }
+  const videoUrlById = {}
+  for (const vid of videoIdsSet) {
+    try {
+      const vu = `https://graph.facebook.com/${META_GRAPH_VERSION}/${vid}?fields=source,permalink_url,picture&access_token=${encodeURIComponent(token)}`
+      const vres = await fetch(vu)
+      if (vres.ok) {
+        const vjson = await vres.json()
+        videoUrlById[vid] = {
+          source: vjson.source || '',
+          permalink: vjson.permalink_url || '',
+          picture: vjson.picture || '',
+        }
+      }
+    } catch {}
+  }
+  for (const a of Object.values(adDetailsById)) {
+    if (a.videoId && videoUrlById[a.videoId]) {
+      a.videoUrl = videoUrlById[a.videoId].source || ''
+      a.videoPermalink = videoUrlById[a.videoId].permalink || ''
+      if (!a.imageUrl && videoUrlById[a.videoId].picture) a.imageUrl = videoUrlById[a.videoId].picture
+      if (!a.thumbnailUrl && videoUrlById[a.videoId].picture) a.thumbnailUrl = videoUrlById[a.videoId].picture
+    }
+  }
+
   const activeAdsAll = Object.values(adDetailsById).filter(a => a.status === 'ACTIVE')
 
   const buildRow = (r) => ({
@@ -225,9 +268,11 @@ async function runSync(month) {
     pt.frequency = pt.reach > 0 ? pt.impressions / pt.reach : 0
 
     // Filter active ads that belong to this project (campaign contains project name)
-    const projectActiveAds = activeAdsAll.filter(a =>
-      (a.campaign || '').toLowerCase().includes(needle)
-    )
+    // then sort by leads desc and keep top 5
+    const projectActiveAds = activeAdsAll
+      .filter(a => (a.campaign || '').toLowerCase().includes(needle))
+      .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
+      .slice(0, 5)
 
     const summaryWithAds = { ...pt, activeAds: projectActiveAds }
 
