@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [compareEnabled, setCompareEnabled] = useState(false)
   const [activePreset, setActivePreset] = useState('lastMonth')
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshingCrm, setRefreshingCrm] = useState(false)
   const [refreshStartTime, setRefreshStartTime] = useState(null)
   const [refreshElapsed, setRefreshElapsed] = useState(0)
   const [dashTab, setDashTab] = useState('all')
@@ -129,7 +130,39 @@ export default function AdminPage() {
     if (ok) setSelectedMonth(customSince + '_' + customUntil);
   };
 
-  const refreshAll = async () => {
+  const refreshFromBmby = async () => {
+    if (refreshingCrm) return;
+    setRefreshingCrm(true);
+    showToast('\u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de-BMBY...');
+    try {
+      const payload = selectedMonth && !selectedMonth.includes('_')
+        ? { month: selectedMonth }
+        : selectedMonth
+          ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
+          : {};
+      const res = await fetch('/api/bmby/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.pending) {
+        showToast('\u26a0\ufe0f BMBY: ' + (json.message || 'credentials not configured'));
+      } else if (!res.ok) {
+        showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (json.error || 'unknown'));
+      } else {
+        const okProjects = (json.projects || []).filter(p => !p.skipped).length;
+        showToast(`\u2713 BMBY: \u05e2\u05d5\u05d3\u05db\u05e0\u05d5 ${okProjects} \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd`);
+      }
+      await loadClients();
+      if (selectedProject) await loadProjectReports(selectedProject.id);
+    } catch (err) {
+      showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (err.message || err));
+    }
+    setRefreshingCrm(false);
+  };
+
+    const refreshAll = async () => {
     // Re-fetch the current period
     if (!selectedMonth) {
       const r = presetToPayload('lastMonth');
@@ -1076,7 +1109,7 @@ const selectProject = async (client, project) => {
         );
       })()}
       <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className="nav-btn" onClick={refreshAll} disabled={refreshing} title="משוך נתונים חיים מ-Facebook + Google">{refreshing ? '\u27f3 \u05de\u05e8\u05e2\u05e0\u05df...' : '\ud83d\udd04 \u05e8\u05e2\u05e0\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
+      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className="nav-btn" onClick={refreshAll} disabled={refreshing} title="משוך נתונים חיים מ-Facebook + Google">{refreshing ? '\u27f3 \u05de\u05e8\u05e2\u05e0\u05df...' : '\ud83d\udd04 \u05e8\u05e2\u05e0\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className="nav-btn" onClick={refreshFromBmby} disabled={refreshingCrm} title="משוך נתוני CRM חיים מ-BMBY">{refreshingCrm ? '\u27f3 \u05de\u05e8\u05e2\u05e0\u05df CRM...' : '\ud83e\uddfe \u05e8\u05e2\u05e0\u05df CRM'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
 
       <div className="app-layout">
         <div className="sidebar"><div style={{padding: '0 15px', marginBottom: 20}}>
