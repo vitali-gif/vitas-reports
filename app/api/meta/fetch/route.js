@@ -25,19 +25,28 @@ function num(v) {
 }
 
 // Extract leads count from Meta actions array.
+// Meta returns BOTH an aggregate 'lead' action AND specific sub-types (onsite_conversion.lead_grouped, etc).
+// Summing them all double-counts. So we pick ONE source by priority to match what Ads Manager shows.
 function extractLeads(actions) {
   if (!Array.isArray(actions)) return 0
-  const leadTypes = new Set([
-    'lead',
-    'onsite_conversion.lead_grouped',
-    'leadgen.other',
-    'offsite_conversion.fb_pixel_lead',
-  ])
-  let total = 0
-  for (const a of actions) {
-    if (a && leadTypes.has(a.action_type)) total += num(a.value)
+  const getByType = (type) => {
+    for (const a of actions) {
+      if (a && a.action_type === type) return num(a.value)
+    }
+    return null
   }
-  return total
+  // Priority 1: onsite_conversion.lead_grouped = Meta Lead Ads / Instant Forms (what Ads Manager "Results" shows for lead-gen campaigns)
+  let v = getByType('onsite_conversion.lead_grouped')
+  if (v !== null) return v
+  // Priority 2: pixel-tracked leads on external site
+  v = getByType('offsite_conversion.fb_pixel_lead')
+  if (v !== null) return v
+  // Priority 3: leadgen.other (older lead gen)
+  v = getByType('leadgen.other')
+  if (v !== null) return v
+  // Last resort: the aggregate 'lead' field
+  v = getByType('lead')
+  return v !== null ? v : 0
 }
 
 async function metaFetchAll(url, token) {
@@ -167,7 +176,7 @@ async function runSync(month) {
     spend: num(r.spend),
     impressions: num(r.impressions),
     reach: num(r.reach),
-    clicks: num(r.inline_link_clicks) || num(r.clicks),
+    clicks: num(r.inline_link_clicks),  // link clicks only — matches Ads Manager 'Link clicks'
     leads: extractLeads(r.actions),
   })
 
