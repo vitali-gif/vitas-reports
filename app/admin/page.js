@@ -26,6 +26,8 @@ export default function AdminPage() {
   const [compareEnabled, setCompareEnabled] = useState(false)
   const [activePreset, setActivePreset] = useState('lastMonth')
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshStartTime, setRefreshStartTime] = useState(null)
+  const [refreshElapsed, setRefreshElapsed] = useState(0)
   const [dashTab, setDashTab] = useState('all')
   const [crmSubTab, setCrmSubTab] = useState('sources')
   const chartsRef = useRef([])
@@ -76,7 +78,8 @@ export default function AdminPage() {
   const triggerFetch = async (payload) => {
     if (refreshing) return false;
     setRefreshing(true);
-    showToast('\u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd...');
+    setRefreshStartTime(Date.now());
+    setRefreshElapsed(0);
     const headers = { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' };
     let metaOk = false, googleOk = false;
     try {
@@ -98,6 +101,7 @@ export default function AdminPage() {
       showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (err.message || err));
     } finally {
       setRefreshing(false);
+      setRefreshStartTime(null);
     }
     return metaOk || googleOk;
   };
@@ -184,6 +188,15 @@ const selectProject = async (client, project) => {
     setSelectedClient(client); setSelectedProject(project); setView('dashboard'); setCompareEnabled(false);
     await loadProjectReports(project.id);
   };
+
+  // Tick elapsed time every 500ms while refresh is active (for the banner timer)
+  useEffect(() => {
+    if (!refreshStartTime) return;
+    const interval = setInterval(() => {
+      setRefreshElapsed(Math.floor((Date.now() - refreshStartTime) / 1000));
+    }, 500);
+    return () => clearInterval(interval);
+  }, [refreshStartTime]);
 
   const destroyCharts = () => { chartsRef.current.forEach(c => c.destroy()); chartsRef.current = []; };
 
@@ -1040,6 +1053,29 @@ const selectProject = async (client, project) => {
 
   return (
     <div dir="rtl" style={{direction:'rtl',textAlign:'right'}}>
+      {refreshing && (() => {
+        const ESTIMATED_SECONDS = 22;
+        const progress = Math.min(100, (refreshElapsed / ESTIMATED_SECONDS) * 100);
+        const remaining = Math.max(0, ESTIMATED_SECONDS - refreshElapsed);
+        return (
+          <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'linear-gradient(135deg, rgba(59,130,246,0.95), rgba(139,92,246,0.95))',color:'white',padding:'14px 24px',boxShadow:'0 4px 20px rgba(0,0,0,0.3)',backdropFilter:'blur(10px)'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'18px',flexWrap:'wrap',maxWidth:'1200px',margin:'0 auto'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                <div style={{width:'22px',height:'22px',border:'3px solid rgba(255,255,255,0.25)',borderTopColor:'#ffffff',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}></div>
+                <div style={{fontWeight:700,fontSize:'1em'}}>{'\ud83d\udd04 \u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d9\u05d9\u05dd \u05de-Facebook \u05d5-Google...'}</div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:'14px',fontSize:'0.9em'}}>
+                <div style={{background:'rgba(255,255,255,0.2)',padding:'4px 12px',borderRadius:'20px',fontWeight:600}}>{'\u05d7\u05dc\u05e4\u05d5: '}{refreshElapsed}{'s'}</div>
+                <div style={{background:'rgba(255,255,255,0.2)',padding:'4px 12px',borderRadius:'20px'}}>{'\u2248 '}{remaining}{'s \u05e0\u05ea\u05d5\u05e2\u05e8\u05d5'}</div>
+              </div>
+            </div>
+            <div style={{marginTop:'10px',maxWidth:'600px',margin:'10px auto 0',height:'4px',background:'rgba(255,255,255,0.2)',borderRadius:'2px',overflow:'hidden'}}>
+              <div style={{width:`${progress}%`,height:'100%',background:'white',transition:'width 0.5s ease-out',boxShadow:'0 0 10px rgba(255,255,255,0.6)'}}></div>
+            </div>
+          </div>
+        );
+      })()}
+      <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className="nav-btn" onClick={refreshAll} disabled={refreshing} title="משוך נתונים חיים מ-Facebook + Google">{refreshing ? '\u27f3 \u05de\u05e8\u05e2\u05e0\u05df...' : '\ud83d\udd04 \u05e8\u05e2\u05e0\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
 
       <div className="app-layout">
