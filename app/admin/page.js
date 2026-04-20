@@ -185,12 +185,6 @@ const selectProject = async (client, project) => {
     await loadProjectReports(project.id);
   };
 
-  useEffect(() => {
-    const now = new Date();
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    setUploadMonth(prev.getFullYear() + '-' + String(prev.getMonth() + 1).padStart(2, '0'));
-  }, []);
-
   const destroyCharts = () => { chartsRef.current.forEach(c => c.destroy()); chartsRef.current = []; };
 
 
