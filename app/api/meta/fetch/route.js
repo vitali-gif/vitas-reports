@@ -196,7 +196,8 @@ async function runSync(opts = {}) {
     if (a.status === 'ACTIVE' && a.videoId) videoIdsSet.add(a.videoId)
   }
   const videoUrlById = {}
-  for (const vid of videoIdsSet) {
+  // Parallel: fire all requests at once, wait for all (Promise.all)
+  await Promise.all([...videoIdsSet].map(async (vid) => {
     try {
       const vu = `https://graph.facebook.com/${META_GRAPH_VERSION}/${vid}?fields=source,permalink_url,picture&access_token=${encodeURIComponent(token)}`
       const vres = await fetch(vu)
@@ -209,7 +210,7 @@ async function runSync(opts = {}) {
         }
       }
     } catch {}
-  }
+  }))
   for (const a of Object.values(adDetailsById)) {
     if (a.videoId && videoUrlById[a.videoId]) {
       a.videoUrl = videoUrlById[a.videoId].source || ''
@@ -225,7 +226,7 @@ async function runSync(opts = {}) {
     if (a.status === 'ACTIVE' && a.postId && !a.videoId) postIdsToFetch.add(a.postId)
   }
   const fullPictureByPost = {}
-  for (const pid of postIdsToFetch) {
+  await Promise.all([...postIdsToFetch].map(async (pid) => {
     try {
       const pu = `https://graph.facebook.com/${META_GRAPH_VERSION}/${pid}?fields=full_picture,permalink_url&access_token=${encodeURIComponent(token)}`
       const pres = await fetch(pu)
@@ -237,7 +238,7 @@ async function runSync(opts = {}) {
         }
       }
     } catch {}
-  }
+  }))
   for (const a of Object.values(adDetailsById)) {
     if (a.postId && fullPictureByPost[a.postId]?.full) {
       // Prefer full_picture (higher res) as primary image
@@ -341,6 +342,8 @@ async function runSync(opts = {}) {
       adsIndexed: adsRaw.length,
       activeAdsCount: activeAdsAll.length,
       adsFetchError: adsFetchError,
+      videosResolved: Object.keys(videoUrlById).length,
+      postsResolved: Object.keys(fullPictureByPost).length,
       totals,
       projects: results,
     },
