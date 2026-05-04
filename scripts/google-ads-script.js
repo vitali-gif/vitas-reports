@@ -1,51 +1,44 @@
 /**
  * VITAS Reports — Google Ads Script
- * 
- * Pastes into a Google Ads account at: Tools & Settings → Bulk Actions → Scripts → New Script.
- * Runs on Google's servers, pulls daily metrics, posts them to our dashboard.
+ * Pulls daily metrics from a Google Ads account and POSTs them to the dashboard.
  *
  * Setup:
- *   1. In Google Ads → Tools & Settings → Bulk Actions → Scripts → New Script
+ *   1. Tools & Settings → Bulk Actions → Scripts → New Script
  *   2. Paste this entire file
- *   3. Set INGEST_URL and SECRET below
- *   4. Click "Authorize" (Google asks permission once)
- *   5. Click "Run" once to test → Check the logs
- *   6. If it worked, set "Frequency: Daily" → schedule for ~02:00
- *
- * What it does:
- *   - Pulls campaign / ad-group / ad metrics for the previous full calendar month
- *     (configurable via PERIOD below)
- *   - Pulls asset-group data for Performance Max campaigns
- *   - POSTs everything to our dashboard endpoint
+ *   3. Update SECRET below if needed
+ *   4. Click Authorize → Preview → check Logs
+ *   5. If response is 200, set Frequency: Daily 02:00
  */
 
-// ====== CONFIGURE ME ======
 var CONFIG = {
   INGEST_URL: 'https://reports.vitas.co.il/api/google/script-ingest',
-  SECRET: 'CHANGE_ME_TO_YOUR_GOOGLE_SCRIPT_SECRET',  // must match GOOGLE_SCRIPT_SECRET in Vercel env vars
-  PERIOD: 'LAST_MONTH',                              // options: LAST_MONTH, THIS_MONTH, LAST_7_DAYS, LAST_30_DAYS
+  SECRET: 'ebc09dbcaeb232287e82514184698e2928b05a15e1b5802a',
+  PERIOD: 'LAST_MONTH',  // LAST_MONTH | THIS_MONTH | LAST_7_DAYS | LAST_30_DAYS
 };
 
-// ====== MAIN ======
 function main() {
-  var period = computePeriod(CONFIG.PERIOD);
-  Logger.log('Period: ' + period.since + ' to ' + period.until);
+  var dateRange = CONFIG.PERIOD;
+  var datesIso = computeIsoDates(dateRange);
+  Logger.log('Date range: ' + dateRange + ' (' + datesIso.since + ' to ' + datesIso.until + ')');
 
   var customerId = AdsApp.currentAccount().getCustomerId();
   Logger.log('Customer ID: ' + customerId);
 
-  var campaigns = collectCampaigns(period);
-  var assetGroups = collectAssetGroups(period);
+  var campaigns = collectCampaigns(dateRange);
+  Logger.log('Collected ' + campaigns.length + ' campaigns with spend');
+
+  var assetGroups = collectAssetGroups();
+  Logger.log('Collected ' + assetGroups.length + ' asset groups');
 
   var payload = {
     customer_id: customerId,
-    period: { since: period.since, until: period.until },
+    period: { since: datesIso.since, until: datesIso.until },
     campaigns: campaigns,
     asset_groups: assetGroups,
     timestamp: new Date().toISOString(),
   };
 
-  Logger.log('Posting ' + campaigns.length + ' campaigns + ' + assetGroups.length + ' asset groups');
+  Logger.log('Posting to ' + CONFIG.INGEST_URL);
   var resp = UrlFetchApp.fetch(CONFIG.INGEST_URL, {
     method: 'post',
     contentType: 'application/json',
@@ -53,52 +46,56 @@ function main() {
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
-  Logger.log('Response: ' + resp.getResponseCode() + ' ' + resp.getContentText().substring(0, 500));
+  Logger.log('Response: ' + resp.getResponseCode());
+  Logger.log('Body: ' + resp.getContentText().substring(0, 800));
 }
 
-// ====== PERIOD ======
-function computePeriod(name) {
+// Convert built-in range names to ISO date strings (for our endpoint, not Google's)
+function computeIsoDates(name) {
   var today = new Date();
   var fmt = function(d) {
-    var m = String(d.getMonth() + 1).padStart(2, '0');
-    var dd = String(d.getDate()).padStart(2, '0');
+    var m = String(d.getMonth() + 1);
+    if (m.length < 2) m = '0' + m;
+    var dd = String(d.getDate());
+    if (dd.length < 2) dd = '0' + dd;
     return d.getFullYear() + '-' + m + '-' + dd;
   };
   if (name === 'THIS_MONTH') {
-    var start = new Date(today.getFullYear(), today.getMonth(), 1);
-    var end = new Date(today); end.setDate(end.getDate() - 1);
-    return { since: fmt(start), until: fmt(end) };
+    var s = new Date(today.getFullYear(), today.getMonth(), 1);
+    var e = new Date(today); e.setDate(e.getDate() - 1);
+    return { since: fmt(s), until: fmt(e) };
   }
   if (name === 'LAST_7_DAYS') {
-    var end = new Date(today); end.setDate(end.getDate() - 1);
-    var start = new Date(today); start.setDate(start.getDate() - 7);
-    return { since: fmt(start), until: fmt(end) };
+    var e = new Date(today); e.setDate(e.getDate() - 1);
+    var s = new Date(today); s.setDate(s.getDate() - 7);
+    return { since: fmt(s), until: fmt(e) };
   }
   if (name === 'LAST_30_DAYS') {
-    var end = new Date(today); end.setDate(end.getDate() - 1);
-    var start = new Date(today); start.setDate(start.getDate() - 30);
-    return { since: fmt(start), until: fmt(end) };
+    var e = new Date(today); e.setDate(e.getDate() - 1);
+    var s = new Date(today); s.setDate(s.getDate() - 30);
+    return { since: fmt(s), until: fmt(e) };
   }
   // LAST_MONTH (default)
-  var start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  var end = new Date(today.getFullYear(), today.getMonth(), 0);
-  return { since: fmt(start), until: fmt(end) };
+  var s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  var e = new Date(today.getFullYear(), today.getMonth(), 0);
+  return { since: fmt(s), until: fmt(e) };
 }
 
-// ====== CAMPAIGNS / AD GROUPS / ADS ======
-function collectCampaigns(period) {
+function collectCampaigns(dateRange) {
   var rows = [];
-  var dateRange = period.since.replace(/-/g, '') + ',' + period.until.replace(/-/g, '');
+  // forDateRange accepts the built-in range name as a single string
+  var iter;
+  try {
+    iter = AdsApp.campaigns().forDateRange(dateRange).get();
+  } catch (e) {
+    Logger.log('Campaigns query failed: ' + e);
+    return rows;
+  }
 
-  // Iterate ENABLED + PAUSED campaigns (we want to see all that ran in the period)
-  var campIter = AdsApp.campaigns()
-    .forDateRange(period.since, period.until)
-    .withCondition("Cost > 0")
-    .get();
-
-  while (campIter.hasNext()) {
-    var camp = campIter.next();
-    var stats = camp.getStatsFor(period.since, period.until);
+  while (iter.hasNext()) {
+    var camp = iter.next();
+    var stats = camp.getStatsFor(dateRange);
+    if (stats.getCost() <= 0) continue;  // skip zero-cost campaigns
 
     var campObj = {
       name: camp.getName(),
@@ -112,72 +109,72 @@ function collectCampaigns(period) {
       ad_groups: [],
     };
 
-    // Ad groups under campaign
-    var agIter = camp.adGroups().forDateRange(period.since, period.until).get();
-    while (agIter.hasNext()) {
-      var ag = agIter.next();
-      var agStats = ag.getStatsFor(period.since, period.until);
-      var agObj = {
-        name: ag.getName(),
-        id: ag.getId(),
-        spend: agStats.getCost(),
-        impressions: agStats.getImpressions(),
-        clicks: agStats.getClicks(),
-        conversions: agStats.getConversions(),
-        ads: [],
-      };
-
-      // Ads under ad-group
-      var adIter = ag.ads().forDateRange(period.since, period.until).get();
-      while (adIter.hasNext()) {
-        var ad = adIter.next();
-        var adStats = ad.getStatsFor(period.since, period.until);
-        agObj.ads.push({
-          name: tryGet(function(){ return ad.getName(); }, '') || ('Ad ' + ad.getId()),
-          id: ad.getId(),
-          headline: tryGet(function(){ return ad.getHeadline(); }, ''),
-          text: tryGet(function(){ return ad.getDescription1() || ad.getDescription(); }, ''),
-          spend: adStats.getCost(),
-          impressions: adStats.getImpressions(),
-          clicks: adStats.getClicks(),
-          conversions: adStats.getConversions(),
-        });
+    try {
+      var agIter = camp.adGroups().forDateRange(dateRange).get();
+      while (agIter.hasNext()) {
+        var ag = agIter.next();
+        var agStats = ag.getStatsFor(dateRange);
+        var agObj = {
+          name: ag.getName(),
+          id: ag.getId(),
+          spend: agStats.getCost(),
+          impressions: agStats.getImpressions(),
+          clicks: agStats.getClicks(),
+          conversions: agStats.getConversions(),
+          ads: [],
+        };
+        try {
+          var adIter = ag.ads().forDateRange(dateRange).get();
+          while (adIter.hasNext()) {
+            var ad = adIter.next();
+            var adStats = ad.getStatsFor(dateRange);
+            agObj.ads.push({
+              name: tryGet(function(){ return ad.getName(); }, '') || ('Ad ' + ad.getId()),
+              id: ad.getId(),
+              headline: tryGet(function(){ return ad.getHeadline(); }, ''),
+              text: tryGet(function(){ return ad.getDescription1() || ad.getDescription(); }, ''),
+              spend: adStats.getCost(),
+              impressions: adStats.getImpressions(),
+              clicks: adStats.getClicks(),
+              conversions: adStats.getConversions(),
+            });
+          }
+        } catch (e) { Logger.log('Ads iter failed for ag=' + ag.getName() + ': ' + e); }
+        campObj.ad_groups.push(agObj);
       }
-      campObj.ad_groups.push(agObj);
-    }
+    } catch (e) { Logger.log('Ad-groups iter failed for camp=' + camp.getName() + ': ' + e); }
 
     rows.push(campObj);
   }
   return rows;
 }
 
-// ====== ASSET GROUPS (Performance Max) ======
-function collectAssetGroups(period) {
+function collectAssetGroups() {
   var groups = [];
   try {
-    // PMax campaigns expose asset groups via .assetGroups()
+    if (typeof AdsApp.performanceMaxCampaigns !== 'function') return groups;
     var iter = AdsApp.performanceMaxCampaigns().get();
     while (iter.hasNext()) {
       var camp = iter.next();
-      var agIter = camp.assetGroups().get();
-      while (agIter.hasNext()) {
-        var ag = agIter.next();
-        groups.push({
-          id: ag.getId(),
-          name: ag.getName(),
-          status: ag.isEnabled() ? 'ENABLED' : 'PAUSED',
-          campaign: camp.getName(),
-          // assets: omitted — would need a separate query, can be added later
-        });
-      }
+      try {
+        var agIter = camp.assetGroups().get();
+        while (agIter.hasNext()) {
+          var ag = agIter.next();
+          groups.push({
+            id: ag.getId(),
+            name: ag.getName(),
+            status: ag.isEnabled() ? 'ENABLED' : 'PAUSED',
+            campaign: camp.getName(),
+          });
+        }
+      } catch (e) { Logger.log('Asset groups iter failed for camp=' + camp.getName() + ': ' + e); }
     }
   } catch (e) {
-    Logger.log('asset_groups failed: ' + e);
+    Logger.log('performanceMaxCampaigns failed: ' + e);
   }
   return groups;
 }
 
-// ====== HELPERS ======
 function tryGet(fn, def) {
   try { return fn(); } catch (e) { return def; }
 }
