@@ -119,15 +119,20 @@ export default function AdminPage() {
     if (preset === 'custom') return; // UI shows custom date inputs — user must click הצג
     const r = presetToPayload(preset);
     if (!r) return;
+    // Set the target selection BEFORE triggering fetch so loadProjectReports keeps it
+    setSelectedMonth(r.key);
     const ok = await triggerFetch(r.payload);
+    // Reaffirm in case loadProjectReports raced and reset it
     if (ok) setSelectedMonth(r.key);
   };
 
   const applyCustomRange = async () => {
     if (!customSince || !customUntil) return;
     const payload = { since: customSince, until: customUntil };
+    const targetKey = customSince + '_' + customUntil;
+    setSelectedMonth(targetKey);
     const ok = await triggerFetch(payload);
-    if (ok) setSelectedMonth(customSince + '_' + customUntil);
+    if (ok) setSelectedMonth(targetKey);
   };
 
   const refreshFromBmby = async () => {
@@ -196,7 +201,17 @@ const loadClients = async () => {
 
   const loadProjectReports = async (projectId) => {
     const { data } = await supabase.from('reports').select('*').eq('project_id', projectId).order('month', { ascending: false });
-    if (data) { setReports(data); if (data.length > 0) setSelectedMonth(data[0].month); }
+    if (data) {
+      setReports(data);
+      // Preserve current selectedMonth if it still exists in the new data;
+      // otherwise (first load or it was deleted) fall back to the most recent.
+      if (data.length > 0) {
+        setSelectedMonth(prev => {
+          if (prev && data.some(r => r.month === prev)) return prev;
+          return data[0].month;
+        });
+      }
+    }
     else { setReports([]); }
   };
 
