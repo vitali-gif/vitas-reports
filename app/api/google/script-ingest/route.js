@@ -52,10 +52,28 @@ export async function POST(request) {
   const campaigns = Array.isArray(payload.campaigns) ? payload.campaigns : []
   const assetGroups = Array.isArray(payload.asset_groups) ? payload.asset_groups : []
 
-  // Determine period key (same conventions as our other endpoints)
+  // Determine period key (same conventions as our other endpoints).
+  // If the date range covers a complete calendar month, normalize to YYYY-MM
+  // so it matches data fetched via {month: 'YYYY-MM'}.
   let m
   if (payload.period?.since && payload.period?.until) {
-    m = payload.period.since + '_' + payload.period.until
+    const since = payload.period.since
+    const until = payload.period.until
+    // Check if it's a full calendar month: YYYY-MM-01 to YYYY-MM-(last day)
+    const sm = since.match(/^(\d{4})-(\d{2})-01$/)
+    if (sm) {
+      const y = parseInt(sm[1])
+      const mo = parseInt(sm[2])
+      const lastDay = new Date(y, mo, 0).getDate()
+      const expectedUntil = `${sm[1]}-${sm[2]}-${String(lastDay).padStart(2, '0')}`
+      if (until === expectedUntil) {
+        m = `${sm[1]}-${sm[2]}`  // full month → clean YYYY-MM key
+      } else {
+        m = since + '_' + until
+      }
+    } else {
+      m = since + '_' + until
+    }
   } else if (payload.month) {
     m = payload.month
   } else if (payload.period?.month) {
