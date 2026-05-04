@@ -827,15 +827,29 @@ export default function ClientPage() {
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
-                  const headlines = (ag.assets || []).filter(a => a.type === 'HEADLINE' || a.type === 'LONG_HEADLINE');
-                  const descriptions = (ag.assets || []).filter(a => a.type === 'DESCRIPTION');
-                  const images = (ag.assets || []).filter(a => (a.type === 'MARKETING_IMAGE' || a.type === 'SQUARE_MARKETING_IMAGE' || a.type === 'PORTRAIT_MARKETING_IMAGE' || a.type === 'LOGO' || a.type === 'LANDSCAPE_LOGO') && a.imageUrl);
+                  const ft = (a) => (a.field_type || a.type || '').toUpperCase();
+                  const imgUrl = (a) => a.image_url || a.imageUrl || '';
+                  const isHeadline = a => /HEADLINE/.test(ft(a));
+                  const isDescription = a => /DESCRIPTION/.test(ft(a));
+                  const isImage = a => /(IMAGE|LOGO)/.test(ft(a)) && imgUrl(a);
+                  const isVideo = a => /VIDEO/.test(ft(a)) && (a.youtube_id || a.youtubeId);
+                  const headlines = (ag.assets || []).filter(isHeadline);
+                  const descriptions = (ag.assets || []).filter(isDescription);
+                  const images = (ag.assets || []).filter(isImage);
+                  const videos = (ag.assets || []).filter(isVideo);
                   const firstImg = images[0];
+                  const metrics = {
+                    spend: ag.spend || 0,
+                    leads: ag.conversions || ag.leads || 0,
+                    impressions: ag.impressions || 0,
+                    clicks: ag.clicks || 0,
+                  };
+                  const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
                   return (
                     <div key={ag.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column'}}>
                       {firstImg ? (
-                        <div style={{width:'100%',aspectRatio:'16/9',background:'#f1f5f9',overflow:'hidden'}}>
-                          <img src={firstImg.imageUrl} alt={ag.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e)=>{e.target.style.display='none'}} />
+                        <div style={{width:'100%',aspectRatio:'16/9',background:'#0f172a',overflow:'hidden'}}>
+                          <img src={imgUrl(firstImg)} alt={ag.name} style={{width:'100%',height:'100%',objectFit:'contain'}} onError={(e)=>{e.target.style.display='none'}} />
                         </div>
                       ) : (
                         <div style={{width:'100%',aspectRatio:'16/9',background:'linear-gradient(135deg,#dbeafe,#cffafe)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5em',color:'#64748b'}}>{'\ud83c\udfaf'}</div>
@@ -860,12 +874,24 @@ export default function ClientPage() {
                             </div>
                           </div>
                         )}
+                        {(metrics.spend > 0 || metrics.leads > 0) && (
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:'4px',padding:'8px 0',borderTop:'1px solid #f1f5f9',borderBottom:'1px solid #f1f5f9',marginBottom:'4px'}}>
+                            <div style={{textAlign:'center'}}><div style={{fontSize:'0.65em',color:'#64748b'}}>{'\u05d4\u05d5\u05e6\u05d0\u05d4'}</div><div style={{fontWeight:700,fontSize:'0.95em'}}>{'\u20aa'}{Math.round(metrics.spend).toLocaleString('he-IL')}</div></div>
+                            <div style={{textAlign:'center'}}><div style={{fontSize:'0.65em',color:'#64748b'}}>{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</div><div style={{fontWeight:700,fontSize:'0.95em',color:'#059669'}}>{Math.round(metrics.leads)}</div></div>
+                            <div style={{textAlign:'center'}}><div style={{fontSize:'0.65em',color:'#64748b'}}>CPL</div><div style={{fontWeight:700,fontSize:'0.95em'}}>{'\u20aa'}{Math.round(cpl)}</div></div>
+                          </div>
+                        )}
                         {images.length > 1 && (
                           <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
                             {images.slice(1,5).map((img,j) => (
-                              <img key={j} src={img.imageUrl} alt="" style={{width:'44px',height:'44px',objectFit:'cover',borderRadius:'4px',border:'1px solid #e2e8f0'}} onError={(e)=>{e.target.style.display='none'}} />
+                              <img key={j} src={imgUrl(img)} alt="" style={{width:'44px',height:'44px',objectFit:'cover',borderRadius:'4px',border:'1px solid #e2e8f0'}} onError={(e)=>{e.target.style.display='none'}} />
                             ))}
                             {images.length > 5 && <div style={{fontSize:'0.75em',color:'#64748b',alignSelf:'center'}}>{'+'}{images.length - 5}</div>}
+                          </div>
+                        )}
+                        {videos.length > 0 && (
+                          <div style={{fontSize:'0.72em',color:'#64748b',marginTop:'4px'}}>
+                            {'\ud83c\udfac'} {videos.length} {'\u05e1\u05e8\u05d8\u05d5\u05e0\u05d9\u05dd'}
                           </div>
                         )}
                       </div>
