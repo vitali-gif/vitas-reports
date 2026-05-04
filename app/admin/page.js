@@ -1144,7 +1144,11 @@ const selectProject = async (client, project) => {
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25}}>
               <h2 style={{fontSize: '1.8em', fontWeight: 800}}>{selectedClient?.name} / {selectedProject.name}</h2>
               <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                <select className="form-input" style={{width:'auto',minWidth:'180px'}} value={activePreset} onChange={e => applyPreset(e.target.value)}>
+                <select className="form-input" style={{width:'auto',minWidth:'180px'}} value={selectedMonth || activePreset} onChange={e => applyPreset(e.target.value)}>
+                  {/* Hidden current-period option so the dropdown LABEL reflects the actual data period being shown */}
+                  {selectedMonth && (
+                    <option value={selectedMonth} style={{display:'none'}}>{formatMonth(selectedMonth)}</option>
+                  )}
                   <option value="today">{'\ud83d\udcc5 \u05d4\u05d9\u05d5\u05dd'}</option>
                   <option value="yesterday">{'\u05d0\u05ea\u05de\u05d5\u05dc'}</option>
                   <option value="last7">{'7 \u05d9\u05de\u05d9\u05dd \u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd'}</option>
@@ -1152,9 +1156,6 @@ const selectProject = async (client, project) => {
                   <option value="currentMonth">{'\u05d4\u05d7\u05d5\u05d3\u05e9 \u05d4\u05e0\u05d5\u05db\u05d7\u05d9'}</option>
                   <option value="lastMonth">{'\u05d7\u05d5\u05d3\u05e9 \u05e9\u05e2\u05d1\u05e8'}</option>
                   <option value="custom">{'\u05d8\u05d5\u05d5\u05d7 \u05de\u05d5\u05ea\u05d0\u05dd \u05d0\u05d9\u05e9\u05d9\u05ea...'}</option>
-                  {[...new Set(reports.map(r => r.month))].filter(m => m && /^\d{4}-\d{2}$/.test(m)).sort().reverse().slice(0, 12).map(m => (
-                    <option key={m} value={`period:${m}`}>{formatMonth(m)}</option>
-                  ))}
                 </select>
                 {activePreset === 'custom' && (
                   <div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'6px 10px',background:'rgba(0,0,0,0.04)',borderRadius:'8px',fontSize:'0.85em'}}>
