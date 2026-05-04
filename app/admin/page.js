@@ -1152,7 +1152,7 @@ const selectProject = async (client, project) => {
                   <option value="currentMonth">{'\u05d4\u05d7\u05d5\u05d3\u05e9 \u05d4\u05e0\u05d5\u05db\u05d7\u05d9'}</option>
                   <option value="lastMonth">{'\u05d7\u05d5\u05d3\u05e9 \u05e9\u05e2\u05d1\u05e8'}</option>
                   <option value="custom">{'\u05d8\u05d5\u05d5\u05d7 \u05de\u05d5\u05ea\u05d0\u05dd \u05d0\u05d9\u05e9\u05d9\u05ea...'}</option>
-                  {[...new Set(reports.map(r => r.month))].filter(m => m && !['today','yesterday','last7','last30','currentMonth','lastMonth'].includes(m)).sort().reverse().slice(0, 12).map(m => (
+                  {[...new Set(reports.map(r => r.month))].filter(m => m && /^\d{4}-\d{2}$/.test(m)).sort().reverse().slice(0, 12).map(m => (
                     <option key={m} value={`period:${m}`}>{formatMonth(m)}</option>
                   ))}
                 </select>
