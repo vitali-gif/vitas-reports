@@ -163,25 +163,25 @@ function collectPMaxCampaigns(dateRange) {
     catch (e) { Logger.log('Stats failed for PMax camp=' + camp.getName() + ': ' + e); continue; }
     if (stats.getCost() <= 0) continue;
 
-    // For PMax, treat each asset group as an "ad group" so the dashboard sees consistent shape
-    var assetGroupsAsAdGroups = [];
-    try {
-      var agIter = camp.assetGroups().get();
-      while (agIter.hasNext()) {
-        var ag = agIter.next();
-        var agStats = null;
-        try { agStats = ag.getStatsFor(dateRange); } catch (e) {}
-        assetGroupsAsAdGroups.push({
-          name: ag.getName(),
-          id: ag.getId(),
-          spend: agStats ? agStats.getCost() : 0,
-          impressions: agStats ? agStats.getImpressions() : 0,
-          clicks: agStats ? agStats.getClicks() : 0,
-          conversions: agStats ? agStats.getConversions() : 0,
-          ads: [],
-        });
-      }
-    } catch (e) { Logger.log('PMax asset groups iter failed: ' + e); }
+    // PMax exposes stats only at campaign level (not per asset group).
+    // Push a single synthetic ad-group with the full campaign stats so the
+    // endpoint still produces a row.
+    var syntheticAg = {
+      name: camp.getName() + ' (PMax)',
+      id: camp.getId(),
+      spend: stats.getCost(),
+      impressions: stats.getImpressions(),
+      clicks: stats.getClicks(),
+      conversions: stats.getConversions(),
+      ads: [{
+        name: camp.getName() + ' (PMax)',
+        id: camp.getId(),
+        spend: stats.getCost(),
+        impressions: stats.getImpressions(),
+        clicks: stats.getClicks(),
+        conversions: stats.getConversions(),
+      }],
+    };
 
     rows.push({
       name: camp.getName(),
@@ -192,7 +192,7 @@ function collectPMaxCampaigns(dateRange) {
       impressions: stats.getImpressions(),
       clicks: stats.getClicks(),
       conversions: stats.getConversions(),
-      ad_groups: assetGroupsAsAdGroups,
+      ad_groups: [syntheticAg],
     });
   }
   return rows;
