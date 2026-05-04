@@ -628,7 +628,7 @@ const selectProject = async (client, project) => {
       : dashTab === 'google'
       ? currentReports.filter(r => r.source && r.source.startsWith('google'))
       : [];
-    const isPmax = dashTab === 'google_pmax' || (dashTab === 'google' && displayReports.length > 0 && displayReports.every(r => r.source === 'google_pmax'));
+    const isPmax = dashTab === 'google_pmax' || dashTab === 'google';
 
     let allRows = [];
     displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
@@ -832,7 +832,55 @@ const selectProject = async (client, project) => {
 
         {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
 
+        {/* Standard ad groups table (Facebook + Search/Display) */}
+        {!isPmax && (
         <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable(data.adSets, prevData?.adSets, '\u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea', 'adsets')}</div>
+        )}
+
+        {/* PMax: detailed asset-groups table (replaces both ad-groups + ads tables) */}
+        {isPmax && (() => {
+          const allAGs = displayReports.flatMap(r => r.summary?.assetGroups || []);
+          if (allAGs.length === 0) return null;
+          const sorted = [...allAGs].sort((a,b) => (b.spend || 0) - (a.spend || 0));
+          return (
+            <div className="section">
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd \u2014 \u05e4\u05d9\u05e8\u05d5\u05d8'}</div>
+              <div className="card" style={{overflowX:'auto'}}>
+                <table className="data-table"><thead><tr>
+                  <th style={{whiteSpace:'nowrap'}}>{'\u05e7\u05d1\u05d5\u05e6\u05ea \u05e0\u05db\u05e1\u05d9\u05dd'}</th>
+                  <th style={{whiteSpace:'nowrap'}}>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05df'}</th>
+                  <th style={{whiteSpace:'nowrap'}}>{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</th>
+                  <th style={{whiteSpace:'nowrap'}}>{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</th>
+                  <th style={{whiteSpace:'nowrap'}}>CTR</th>
+                  <th style={{whiteSpace:'nowrap'}}>{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</th>
+                  <th style={{whiteSpace:'nowrap'}}>CPL</th>
+                  <th style={{whiteSpace:'nowrap'}}>{'\u05d4\u05d5\u05e6\u05d0\u05d4'}</th>
+                </tr></thead><tbody>
+                  {sorted.map((ag, i) => {
+                    const spend = ag.spend || 0;
+                    const leads = ag.conversions || ag.leads || 0;
+                    const clicks = ag.clicks || 0;
+                    const imps = ag.impressions || 0;
+                    const cpl = leads > 0 ? spend / leads : 0;
+                    const ctr = imps > 0 ? (clicks / imps * 100) : 0;
+                    return (
+                      <tr key={ag.id || i}>
+                        <td style={{fontWeight:600,unicodeBidi:'plaintext',textAlign:'right'}}>{ag.name || '—'}</td>
+                        <td style={{fontSize:'0.85em',color:'#64748b',unicodeBidi:'plaintext'}}>{ag.campaign || '—'}</td>
+                        <td>{formatNum(clicks)}</td>
+                        <td>{formatNum(imps)}</td>
+                        <td>{ctr.toFixed(2)}%</td>
+                        <td style={{fontWeight:700,color:leads>0?'#059669':'#94a3b8'}}>{Math.round(leads)}</td>
+                        <td style={{fontWeight:600}}>{leads > 0 ? formatCurrency(cpl) : '—'}</td>
+                        <td style={{fontWeight:600}}>{formatCurrency(spend)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody></table>
+              </div>
+            </div>
+          );
+        })()}
 
 {!isPmax &&         <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>}
 

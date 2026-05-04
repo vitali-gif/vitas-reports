@@ -476,7 +476,7 @@ export default function ClientPage() {
       : dashTab === 'google'
       ? currentReports.filter(r => r.source && r.source.startsWith('google'))
       : []
-    const isPmax = dashTab === 'google_pmax' || (dashTab === 'google' && displayReports.length > 0 && displayReports.every(r => r.source === 'google_pmax'))
+    const isPmax = dashTab === 'google_pmax' || dashTab === 'google'
 
     let allRows = []
     displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data) })
@@ -678,7 +678,53 @@ export default function ClientPage() {
 
         {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>קמפיינים</div><div className="chart-grid"><div className="chart-card"><h4>📊 התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>💰 לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין', 'campaigns')}</div>)}
 
+        {!isPmax && (
         <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות מודעות</div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות', 'adsets')}</div>
+        )}
+
+        {isPmax && (() => {
+          const allAGs = displayReports.flatMap(r => r.summary?.assetGroups || [])
+          if (allAGs.length === 0) return null
+          const sorted = [...allAGs].sort((a,b) => (b.spend || 0) - (a.spend || 0))
+          return (
+            <div className="section">
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות נכסים — פירוט</div>
+              <div className="card" style={{overflowX:'auto'}}>
+                <table className="data-table"><thead><tr>
+                  <th style={{whiteSpace:'nowrap'}}>קבוצת נכסים</th>
+                  <th style={{whiteSpace:'nowrap'}}>קמפיין</th>
+                  <th style={{whiteSpace:'nowrap'}}>קליקים</th>
+                  <th style={{whiteSpace:'nowrap'}}>חשיפות</th>
+                  <th style={{whiteSpace:'nowrap'}}>CTR</th>
+                  <th style={{whiteSpace:'nowrap'}}>לידים</th>
+                  <th style={{whiteSpace:'nowrap'}}>CPL</th>
+                  <th style={{whiteSpace:'nowrap'}}>הוצאה</th>
+                </tr></thead><tbody>
+                  {sorted.map((ag, i) => {
+                    const spend = ag.spend || 0
+                    const leads = ag.conversions || ag.leads || 0
+                    const clicks = ag.clicks || 0
+                    const imps = ag.impressions || 0
+                    const cpl = leads > 0 ? spend / leads : 0
+                    const ctr = imps > 0 ? (clicks / imps * 100) : 0
+                    return (
+                      <tr key={ag.id || i}>
+                        <td style={{fontWeight:600,unicodeBidi:'plaintext',textAlign:'right'}}>{ag.name || '—'}</td>
+                        <td style={{fontSize:'0.85em',color:'#64748b',unicodeBidi:'plaintext'}}>{ag.campaign || '—'}</td>
+                        <td>{formatNum(clicks)}</td>
+                        <td>{formatNum(imps)}</td>
+                        <td>{ctr.toFixed(2)}%</td>
+                        <td style={{fontWeight:700,color:leads>0?'#059669':'#94a3b8'}}>{Math.round(leads)}</td>
+                        <td style={{fontWeight:600}}>{leads > 0 ? formatCurrency(cpl) : '—'}</td>
+                        <td style={{fontWeight:600}}>{formatCurrency(spend)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody></table>
+              </div>
+            </div>
+          )
+        })()}
 
         {!isPmax && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>📝</div>מודעות</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*עותק\s*$/, '').replace(/\s*-\s*עותק\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0) }); return merged })(), null, 'מודעה', 'ads')}</div>}
 
