@@ -1,12 +1,5 @@
 /**
- * VITAS Reports — Google Ads Script (with PMax support)
- * Pulls daily metrics including Performance Max campaigns.
- *
- * Setup:
- *   1. Tools & Settings → Bulk Actions → Scripts → New Script
- *   2. Paste this entire file
- *   3. Click Authorize → Preview → check Logs (look for Response: 200)
- *   4. If 200 — set Frequency: Daily 02:00
+ * VITAS Reports — Google Ads Script (with PMax + asset-group metrics + previews)
  */
 
 var CONFIG = {
@@ -23,20 +16,18 @@ function main() {
   var customerId = AdsApp.currentAccount().getCustomerId();
   Logger.log('Customer ID: ' + customerId);
 
-  // 1) Standard campaigns (Search, Display, Video, etc — NOT PMax)
   var standardCampaigns = collectStandardCampaigns(dateRange);
   Logger.log('Standard campaigns with spend: ' + standardCampaigns.length);
 
-  // 2) Performance Max campaigns (separate API)
   var pmaxCampaigns = collectPMaxCampaigns(dateRange);
   Logger.log('PMax campaigns with spend: ' + pmaxCampaigns.length);
 
   var campaigns = standardCampaigns.concat(pmaxCampaigns);
   Logger.log('Total campaigns: ' + campaigns.length);
 
-  // 3) Asset groups (PMax — for the dashboard's Asset Groups section)
-  var assetGroups = collectAssetGroups();
-  Logger.log('Asset groups: ' + assetGroups.length);
+  // Asset groups WITH metrics + assets (via GAQL)
+  var assetGroups = collectAssetGroupsWithDetails(datesIso.since, datesIso.until);
+  Logger.log('Asset groups with details: ' + assetGroups.length);
 
   var payload = {
     customer_id: customerId,
@@ -48,8 +39,7 @@ function main() {
 
   Logger.log('Posting to ' + CONFIG.INGEST_URL);
   var resp = UrlFetchApp.fetch(CONFIG.INGEST_URL, {
-    method: 'post',
-    contentType: 'application/json',
+    method: 'post', contentType: 'application/json',
     headers: { 'x-script-secret': CONFIG.SECRET },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
@@ -65,21 +55,9 @@ function computeIsoDates(name) {
     var dd = String(d.getDate()); if (dd.length < 2) dd = '0' + dd;
     return d.getFullYear() + '-' + m + '-' + dd;
   };
-  if (name === 'THIS_MONTH') {
-    var s = new Date(today.getFullYear(), today.getMonth(), 1);
-    var e = new Date(today); e.setDate(e.getDate() - 1);
-    return { since: fmt(s), until: fmt(e) };
-  }
-  if (name === 'LAST_7_DAYS') {
-    var e = new Date(today); e.setDate(e.getDate() - 1);
-    var s = new Date(today); s.setDate(s.getDate() - 7);
-    return { since: fmt(s), until: fmt(e) };
-  }
-  if (name === 'LAST_30_DAYS') {
-    var e = new Date(today); e.setDate(e.getDate() - 1);
-    var s = new Date(today); s.setDate(s.getDate() - 30);
-    return { since: fmt(s), until: fmt(e) };
-  }
+  if (name === 'THIS_MONTH') { var s = new Date(today.getFullYear(), today.getMonth(), 1); var e = new Date(today); e.setDate(e.getDate() - 1); return { since: fmt(s), until: fmt(e) }; }
+  if (name === 'LAST_7_DAYS') { var e = new Date(today); e.setDate(e.getDate() - 1); var s = new Date(today); s.setDate(s.getDate() - 7); return { since: fmt(s), until: fmt(e) }; }
+  if (name === 'LAST_30_DAYS') { var e = new Date(today); e.setDate(e.getDate() - 1); var s = new Date(today); s.setDate(s.getDate() - 30); return { since: fmt(s), until: fmt(e) }; }
   var s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   var e = new Date(today.getFullYear(), today.getMonth(), 0);
   return { since: fmt(s), until: fmt(e) };
@@ -90,20 +68,16 @@ function collectStandardCampaigns(dateRange) {
   var iter;
   try { iter = AdsApp.campaigns().forDateRange(dateRange).get(); }
   catch (e) { Logger.log('Standard campaigns query failed: ' + e); return rows; }
-
   while (iter.hasNext()) {
     var camp = iter.next();
     var stats = camp.getStatsFor(dateRange);
     if (stats.getCost() <= 0) continue;
     rows.push({
-      name: camp.getName(),
-      id: camp.getId(),
+      name: camp.getName(), id: camp.getId(),
       type: tryGet(function(){ return camp.getAdvertisingChannelType(); }, ''),
       status: camp.isEnabled() ? 'ENABLED' : (camp.isPaused() ? 'PAUSED' : 'OTHER'),
-      spend: stats.getCost(),
-      impressions: stats.getImpressions(),
-      clicks: stats.getClicks(),
-      conversions: stats.getConversions(),
+      spend: stats.getCost(), impressions: stats.getImpressions(),
+      clicks: stats.getClicks(), conversions: stats.getConversions(),
       ad_groups: collectAdGroupsForCampaign(camp, dateRange),
     });
   }
@@ -138,88 +112,128 @@ function collectAdGroupsForCampaign(camp, dateRange) {
         ads: ads,
       });
     }
-  } catch (e) { Logger.log('Ad-groups query failed for camp=' + camp.getName() + ': ' + e); }
+  } catch (e) {}
   return ags;
 }
 
 function collectPMaxCampaigns(dateRange) {
   var rows = [];
-  if (typeof AdsApp.performanceMaxCampaigns !== 'function') {
-    Logger.log('performanceMaxCampaigns not supported in this script version');
-    return rows;
-  }
+  if (typeof AdsApp.performanceMaxCampaigns !== 'function') return rows;
   var iter;
   try { iter = AdsApp.performanceMaxCampaigns().forDateRange(dateRange).get(); }
   catch (e) {
-    // Some script versions don't support forDateRange on PMax — fallback
     try { iter = AdsApp.performanceMaxCampaigns().get(); }
     catch (e2) { Logger.log('PMax query failed: ' + e2); return rows; }
   }
-
   while (iter.hasNext()) {
     var camp = iter.next();
     var stats;
     try { stats = camp.getStatsFor(dateRange); }
     catch (e) { Logger.log('Stats failed for PMax camp=' + camp.getName() + ': ' + e); continue; }
     if (stats.getCost() <= 0) continue;
-
-    // PMax exposes stats only at campaign level (not per asset group).
-    // Push a single synthetic ad-group with the full campaign stats so the
-    // endpoint still produces a row.
     var syntheticAg = {
-      name: camp.getName() + ' (PMax)',
-      id: camp.getId(),
-      spend: stats.getCost(),
-      impressions: stats.getImpressions(),
-      clicks: stats.getClicks(),
-      conversions: stats.getConversions(),
+      name: camp.getName() + ' (PMax)', id: camp.getId(),
+      spend: stats.getCost(), impressions: stats.getImpressions(),
+      clicks: stats.getClicks(), conversions: stats.getConversions(),
       ads: [{
-        name: camp.getName() + ' (PMax)',
-        id: camp.getId(),
-        spend: stats.getCost(),
-        impressions: stats.getImpressions(),
-        clicks: stats.getClicks(),
-        conversions: stats.getConversions(),
+        name: camp.getName() + ' (PMax)', id: camp.getId(),
+        spend: stats.getCost(), impressions: stats.getImpressions(),
+        clicks: stats.getClicks(), conversions: stats.getConversions(),
       }],
     };
-
     rows.push({
-      name: camp.getName(),
-      id: camp.getId(),
+      name: camp.getName(), id: camp.getId(),
       type: 'PERFORMANCE_MAX',
       status: tryGet(function(){ return camp.isEnabled() ? 'ENABLED' : (camp.isPaused() ? 'PAUSED' : 'OTHER'); }, 'OTHER'),
-      spend: stats.getCost(),
-      impressions: stats.getImpressions(),
-      clicks: stats.getClicks(),
-      conversions: stats.getConversions(),
+      spend: stats.getCost(), impressions: stats.getImpressions(),
+      clicks: stats.getClicks(), conversions: stats.getConversions(),
       ad_groups: [syntheticAg],
     });
   }
   return rows;
 }
 
-function collectAssetGroups() {
-  var groups = [];
+// =================== Asset Groups via GAQL ===================
+// Pulls per-asset-group metrics AND attached assets (headlines, descriptions, images, videos)
+function collectAssetGroupsWithDetails(since, until) {
+  var byId = {};
+
+  // 1) Metrics per asset group
   try {
-    if (typeof AdsApp.performanceMaxCampaigns !== 'function') return groups;
-    var iter = AdsApp.performanceMaxCampaigns().get();
-    while (iter.hasNext()) {
-      var camp = iter.next();
-      try {
-        var agIter = camp.assetGroups().get();
-        while (agIter.hasNext()) {
-          var ag = agIter.next();
-          groups.push({
-            id: ag.getId(),
-            name: ag.getName(),
-            status: ag.isEnabled() ? 'ENABLED' : 'PAUSED',
-            campaign: camp.getName(),
-          });
-        }
-      } catch (e) { Logger.log('Asset groups failed for camp=' + camp.getName() + ': ' + e); }
+    var q1 = "SELECT asset_group.id, asset_group.name, asset_group.status, " +
+             "campaign.id, campaign.name, " +
+             "metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions " +
+             "FROM asset_group " +
+             "WHERE segments.date BETWEEN '" + since + "' AND '" + until + "'";
+    var rep = AdsApp.report(q1);
+    var rows = rep.rows();
+    while (rows.hasNext()) {
+      var r = rows.next();
+      var id = r['asset_group.id'];
+      if (!byId[id]) {
+        byId[id] = {
+          id: id,
+          name: r['asset_group.name'] || '',
+          status: r['asset_group.status'] || '',
+          campaign_id: r['campaign.id'] || '',
+          campaign: r['campaign.name'] || '',
+          spend: 0, impressions: 0, clicks: 0, conversions: 0,
+          assets: [],
+        };
+      }
+      // metrics may be aggregated per row already (one row per asset group due to no segmentation)
+      byId[id].spend += (parseInt(r['metrics.cost_micros'] || '0', 10)) / 1000000;
+      byId[id].impressions += parseInt(r['metrics.impressions'] || '0', 10);
+      byId[id].clicks += parseInt(r['metrics.clicks'] || '0', 10);
+      byId[id].conversions += parseFloat(r['metrics.conversions'] || '0');
     }
-  } catch (e) { Logger.log('PMax campaigns failed: ' + e); }
-  return groups;
+    Logger.log('Asset group metrics rows: ' + Object.keys(byId).length);
+  } catch (e) {
+    Logger.log('asset_group metrics query failed: ' + e);
+  }
+
+  // 2) Attached assets (text + images + videos)
+  try {
+    var q2 = "SELECT asset_group.id, asset_group_asset.field_type, " +
+             "asset.id, asset.type, asset.name, " +
+             "asset.text_asset.text, " +
+             "asset.image_asset.full_size.url, " +
+             "asset.image_asset.full_size.width_pixels, " +
+             "asset.image_asset.full_size.height_pixels, " +
+             "asset.youtube_video_asset.youtube_video_id, " +
+             "asset.youtube_video_asset.youtube_video_title " +
+             "FROM asset_group_asset " +
+             "WHERE asset_group_asset.status = 'ENABLED'";
+    var rep2 = AdsApp.report(q2);
+    var rows2 = rep2.rows();
+    var count = 0;
+    while (rows2.hasNext()) {
+      var r = rows2.next();
+      var agid = r['asset_group.id'];
+      if (!byId[agid]) continue; // skip assets for groups we don't have metrics for
+      byId[agid].assets.push({
+        asset_id: r['asset.id'] || '',
+        type: r['asset.type'] || '',
+        field_type: r['asset_group_asset.field_type'] || '',
+        name: r['asset.name'] || '',
+        text: r['asset.text_asset.text'] || '',
+        image_url: r['asset.image_asset.full_size.url'] || '',
+        image_width: r['asset.image_asset.full_size.width_pixels'] || '',
+        image_height: r['asset.image_asset.full_size.height_pixels'] || '',
+        youtube_id: r['asset.youtube_video_asset.youtube_video_id'] || '',
+        youtube_title: r['asset.youtube_video_asset.youtube_video_title'] || '',
+      });
+      count++;
+    }
+    Logger.log('Asset details rows: ' + count);
+  } catch (e) {
+    Logger.log('asset_group_asset query failed: ' + e);
+  }
+
+  // Return as array
+  var arr = [];
+  for (var k in byId) arr.push(byId[k]);
+  return arr;
 }
 
 function tryGet(fn, def) {
