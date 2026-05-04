@@ -76,9 +76,12 @@ export async function POST(request) {
   // Flatten ads to a rows list (similar to Meta schema for compatibility with the dashboard)
   const allRows = []
   for (const c of campaigns) {
-    const adGroups = Array.isArray(c.ad_groups) ? c.ad_groups : [{}]
+    // For each campaign, walk down ad_groups → ads. If a level is missing OR
+    // an empty array (e.g. PMax campaigns have ad_groups but no ads), fall back
+    // to a placeholder so the campaign-level stats still produce a row.
+    const adGroups = (Array.isArray(c.ad_groups) && c.ad_groups.length > 0) ? c.ad_groups : [{}]
     for (const ag of adGroups) {
-      const ads = Array.isArray(ag.ads) ? ag.ads : [{}]
+      const ads = (Array.isArray(ag.ads) && ag.ads.length > 0) ? ag.ads : [{}]
       for (const ad of ads) {
         const spend = num(ad.spend ?? ag.spend ?? c.spend)
         const impr  = num(ad.impressions ?? ag.impressions ?? c.impressions)
