@@ -355,6 +355,19 @@ async function runSync(opts = {}) {
     // It carries the channel info we want to bucket.
     const clientSourceText = (c) => c.media || c.source || c.Source || c.entry_channel || c.origin || ''
 
+    // Build client_id -> media map across ALL clients (not just inRange) — tasks/contracts
+    // in April may belong to clients created in earlier months. We need this map to attribute
+    // meetings and contracts to the lead's original source.
+    const clientMediaById = new Map()
+    for (const c of clients) {
+      if (c.client_id) clientMediaById.set(String(c.client_id), clientSourceText(c))
+    }
+    const sourceForLinkedRow = (row, fallbackField) => {
+      const cid = row.client_id || row.ClientID || row.lead_id
+      if (cid && clientMediaById.has(String(cid))) return clientMediaById.get(String(cid))
+      return row[fallbackField] || row.media_title || row.media || row.source || row.client_source || ''
+    }
+
     // Process clients (leads) — only those created within the window
     for (const c of clientsInRange) {
       const src = bucketSource(clientSourceText(c))
@@ -371,11 +384,12 @@ async function runSync(opts = {}) {
     }
 
     // Process tasks — BMBY task types: Task / LID / Appointment / Comment / SMS
-    // We count Appointment as "meeting scheduled"
+    // We count Appointment as "meeting scheduled". Attribute meetings to the LEAD's source
+    // (the linked client's media), not the task's own media_title.
     for (const t of tasksInRange) {
       const type = (t.type || t.Type || t.task_type || '').toString().toLowerCase()
       if (type !== 'appointment' && type !== 'meeting' && !/פגישה/.test(JSON.stringify(t))) continue
-      const src = bucketSource(t.media_title || t.media || t.source || t.client_source || '')
+      const src = bucketSource(sourceForLinkedRow(t, 'media_title'))
       const srcBucket = ensureSrc(src)
       totals.meetingsScheduled += 1
       srcBucket.meetingsScheduled += 1
@@ -387,17 +401,17 @@ async function runSync(opts = {}) {
       }
     }
 
-    // Process price offers (registrations / sales opportunities)
+    // Process price offers (registrations / sales opportunities) — attribute to lead's source
     for (const po of pricesInRange) {
-      const src = bucketSource(po.media || po.source || po.client_source || '')
+      const src = bucketSource(sourceForLinkedRow(po, 'media'))
       const srcBucket = ensureSrc(src)
       totals.registrations += 1
       srcBucket.registrations += 1
     }
 
-    // Process contracts
+    // Process contracts — attribute to lead's source via client_id
     for (const k of contractsInRange) {
-      const src = bucketSource(k.media || k.source || k.client_source || '')
+      const src = bucketSource(sourceForLinkedRow(k, 'media'))
       const srcBucket = ensureSrc(src)
       totals.contracts += 1
       srcBucket.contracts += 1
