@@ -150,6 +150,44 @@ async function callBmbyGetAllJson(service, params) {
   }
 }
 
+// Paginate BMBY GetAllJson — BMBY caps each response at 3000 rows.
+// We page by using Dynamic=0 + UniqID = previous LastUniqID until FoundRows < 3000
+// or we exceed maxPages. ToDate is used as an early-stop signal if the last row's
+// create_date is already past the requested window.
+async function callBmbyGetAllJsonPaginated(service, params, maxPages = 10) {
+  const allRows = []
+  let uniqID = params.UniqID ?? 1
+  let dynamic = params.Dynamic ?? 1
+  let lastResp = null
+  let pagesUsed = 0
+  for (let page = 0; page < maxPages; page++) {
+    const resp = await callBmbyGetAllJson(service, { ...params, UniqID: uniqID, Dynamic: dynamic })
+    lastResp = resp
+    pagesUsed++
+    if (resp.rows.length) allRows.push(...resp.rows)
+    // No next page if we got less than the BMBY page cap
+    if (!resp.foundRows || resp.foundRows < 3000) break
+    if (!resp.lastUniqID || resp.lastUniqID === uniqID) break
+    uniqID = resp.lastUniqID
+    dynamic = 0
+    // Early stop: if the last row in this page is already past ToDate, no point continuing
+    if (params.ToDate && resp.rows.length) {
+      const candidates = ['client_date', 'create_date', 'start_date', 'task_date', 'date', 'offer_date', 'contract_date', 'signed_date']
+      const lastRow = resp.rows[resp.rows.length - 1]
+      for (const key of candidates) {
+        const v = (lastRow[key] || '').toString().slice(0, 10)
+        if (v && v > params.ToDate) return { rows: allRows, foundRows: lastResp.foundRows, lastUniqID: lastResp.lastUniqID, pages: pagesUsed, earlyStop: true }
+      }
+    }
+  }
+  return {
+    rows: allRows,
+    foundRows: lastResp?.foundRows || 0,
+    lastUniqID: lastResp?.lastUniqID || 0,
+    pages: pagesUsed,
+  }
+}
+
 // ===== source detection =====
 // Map a raw BMBY source/entry-channel string to a canonical bucket used in the dashboard.
 const SOURCE_BUCKETS = [
@@ -236,11 +274,12 @@ async function runSync(opts = {}) {
     }
 
     const commonParams = { Login: login, Password: password, ProjectID: parseInt(bmbyPid), UniqID: 1, FromDate: since, ToDate: until, Dynamic: 1 }
+    // Each service runs paginated with up to 10 pages of 3000 rows. Per-service total budget 45s.
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
-      withTimeout(callBmbyGetAllJson('clients',      commonParams), 25000, 'clients'),
-      withTimeout(callBmbyGetAllJson('tasks',        commonParams), 25000, 'tasks'),
-      withTimeout(callBmbyGetAllJson('price_offers', commonParams), 25000, 'price_offers'),
-      withTimeout(callBmbyGetAllJson('contracts',    commonParams), 25000, 'contracts'),
+      withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4), 45000, 'clients'),
+      withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 6), 45000, 'tasks'),
+      withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 45000, 'price_offers'),
+      withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 45000, 'contracts'),
     ])
 
     const safeRows = (r) => (r.status === 'fulfilled' && Array.isArray(r.value?.rows)) ? r.value.rows : []
@@ -280,15 +319,22 @@ async function runSync(opts = {}) {
       return sources[key]
     }
 
-    // Helper: client_date string YYYY-MM-DD must fall within [since, until]
-    const inRange = (d) => d && d >= since && d <= until
+    // Helper: dates may come as YYYY-MM-DD or YYYY-MM-DD HH:MM:SS — strip to date portion
+    const inRange = (d) => {
+      if (!d) return false
+      const dateOnly = String(d).slice(0, 10)
+      return dateOnly >= since && dateOnly <= until
+    }
 
     // Filter clients to those CREATED within the requested date window
     // (BMBY's FromDate/ToDate filters by last-modified, not client_date)
     const clientsInRange = clients.filter(c => inRange(c.client_date || c.created_date))
-    const tasksInRange = tasks.filter(t => inRange(t.task_date || t.date || t.appointment_date || t.created_date))
-    const pricesInRange = prices.filter(po => inRange(po.offer_date || po.price_offer_date || po.date || po.created_date))
-    const contractsInRange = contracts.filter(k => inRange(k.contract_date || k.date || k.created_date || k.signed_date))
+    // Tasks: use start_date (when task is scheduled) — falls back to create_date
+    const tasksInRange = tasks.filter(t => inRange(t.start_date || t.create_date || t.task_date || t.date))
+    // Price offers: offer_date / create_date
+    const pricesInRange = prices.filter(po => inRange(po.offer_date || po.create_date || po.price_offer_date || po.date))
+    // Contracts: contract_date / signed_date / create_date
+    const contractsInRange = contracts.filter(k => inRange(k.contract_date || k.signed_date || k.create_date || k.date))
 
     // Helper: determine if a client is "relevant"
     // BMBY clients service exposes a `relevant` field: "1" = relevant, "0" = not.
@@ -324,11 +370,12 @@ async function runSync(opts = {}) {
       }
     }
 
-    // Process tasks (appointments)
+    // Process tasks — BMBY task types: Task / LID / Appointment / Comment / SMS
+    // We count Appointment as "meeting scheduled"
     for (const t of tasksInRange) {
       const type = (t.type || t.Type || t.task_type || '').toString().toLowerCase()
-      if (type !== 'appointment' && type !== 'meeting' && !/פגישה|appointment|meeting/i.test(JSON.stringify(t))) continue
-      const src = bucketSource(t.media || t.source || t.client_source || '')
+      if (type !== 'appointment' && type !== 'meeting' && !/פגישה/.test(JSON.stringify(t))) continue
+      const src = bucketSource(t.media_title || t.media || t.source || t.client_source || '')
       const srcBucket = ensureSrc(src)
       totals.meetingsScheduled += 1
       srcBucket.meetingsScheduled += 1
