@@ -377,12 +377,13 @@ async function runSync(opts = {}) {
       }
     }
 
-    // 3. Map client_id → relevant flag (from clients table, ALL clients not just inRange)
+    // 3. Map client_id → relevant flag + status (from clients table, ALL clients not just inRange)
     const clientRelevant = new Map()
+    const clientStatus = new Map()
     for (const c of clients) {
       if (!c.client_id) continue
-      // Stored as string "1"/"0" in BMBY
       clientRelevant.set(String(c.client_id), c.relevant === '1' || c.relevant === 1)
+      if (c.status) clientStatus.set(String(c.client_id), String(c.status))
     }
 
     // 4. Per-media aggregation from LIDs
@@ -404,9 +405,12 @@ async function runSync(opts = {}) {
       return sources[key]
     }
 
+    const _aprilLidStatusCounts = {}
     for (const lid of aprilLids) {
       const media = (lid.media_title || 'ללא מקור').trim() || 'ללא מקור'
       const cid = String(lid.client_id || '')
+      const cstatus = clientStatus.get(cid) || '(unknown)'
+      _aprilLidStatusCounts[cstatus] = (_aprilLidStatusCounts[cstatus] || 0) + 1
       const bucket = ensureSrc(media)
 
       // Track which clients per media (for contract attribution)
@@ -491,6 +495,11 @@ async function runSync(opts = {}) {
         attributedMedia = clientMedia.get(cid); attribSource = 'client_media'
       }
       if (!attributedMedia) { attributedMedia = 'ללא מקור'; attribSource = 'none' }
+      // Dump ALL contract fields (filtering empties) so we can find the right total
+      const _allFields = {}
+      for (const [fk, fv] of Object.entries(k)) {
+        if (fv !== '' && fv !== null && fv !== undefined) _allFields[fk] = fv
+      }
       _contractAttribDebug.push({
         client_id: cid,
         client_name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim() || undefined,
@@ -505,6 +514,7 @@ async function runSync(opts = {}) {
         contract_status: k.contract_status,
         attributedMedia,
         attribSource,
+        allFields: _allFields,
       })
       const bucket = ensureSrc(attributedMedia)
       totals.contracts += 1
@@ -585,6 +595,7 @@ async function runSync(opts = {}) {
         clientsWithAnyCancelledAppt: clientsWithAnyCancelledAppt.size,
         clientsWithAprilApptOnly: clientsWithAppt.size,
         clientsWithAprilDoneApptOnly: clientsWithDoneAppt.size,
+        aprilLidStatusCounts: _aprilLidStatusCounts,
       },
     }
   }))
