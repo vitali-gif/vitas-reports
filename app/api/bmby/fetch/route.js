@@ -476,6 +476,20 @@ async function runSync(opts = {}) {
       if (media) clientMedia.set(String(c.client_id), media)
     }
 
+    // ALL contracts dump for debug (date filtering analysis)
+    const _allContractsDump = contracts.map(k => ({
+      client_id: String(k.client_id || ''),
+      name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim(),
+      agreement_date: k.agreement_date,
+      contract_date: k.contract_date,
+      list_price: num(k.list_price),
+      p_a_inc_vat: num(k.price_agreement_inc_vat),
+      final_inc_vat: num(k.final_price_inc_vat),
+      agreement_type: k.agreement_type,
+      in_april_by_agreement: inRangeDate(k.agreement_date),
+      in_april_by_contract: inRangeDate(k.contract_date),
+    })).filter(c => c.in_april_by_agreement || c.in_april_by_contract || /04|03|05/.test(String(c.agreement_date || '').slice(5,7))).sort((a,b) => String(b.agreement_date||'').localeCompare(String(a.agreement_date||'')))
+
     // 5. Contracts: agreement_date in window. Attribute to media via client_id with fallback chain.
     const contractsInRange = contracts.filter(k => inRangeDate(k.agreement_date || k.contract_date || k.signed_date || k.create_date))
     const _contractAttribDebug = []
@@ -596,6 +610,7 @@ async function runSync(opts = {}) {
         clientsWithAprilApptOnly: clientsWithAppt.size,
         clientsWithAprilDoneApptOnly: clientsWithDoneAppt.size,
         aprilLidStatusCounts: _aprilLidStatusCounts,
+        allContractsDump: _allContractsDump,
       },
     }
   }))
