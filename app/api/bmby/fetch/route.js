@@ -340,15 +340,25 @@ async function runSync(opts = {}) {
     const clientsWithAppt = new Set()
     const clientsWithDoneAppt = new Set()
     const clientsWithCancelledAppt = new Set()
+    // Debug: collect unique task types & appointment statuses we encountered
+    const _taskTypeCounts = {}
+    const _apptStatusCounts = {}
     for (const t of tasks) {
-      const ty = (t.type || '').toString().toLowerCase()
-      if (ty !== 'appointment' && ty !== 'appointment copy') continue
+      const tyRaw = (t.type || '').toString()
+      const ty = tyRaw.toLowerCase()
+      _taskTypeCounts[tyRaw || '(empty)'] = (_taskTypeCounts[tyRaw || '(empty)'] || 0) + 1
+      // Broader appointment match — any type containing "appointment", "meeting", or Hebrew "פגישה"
+      const isAppt = /appointment|meeting|פגישה/i.test(ty)
+      if (!isAppt) continue
       if (!inRangeDate(t.start_date || t.create_date)) continue
       const cid = String(t.client_id || '')
       if (!cid) continue
       clientsWithAppt.add(cid)
-      const status = (t.status || '').toString().toLowerCase()
-      if (/done|complete|בוצע|סגור|ended/.test(status)) clientsWithDoneAppt.add(cid)
+      const statusRaw = (t.status || '').toString()
+      const status = statusRaw.toLowerCase()
+      _apptStatusCounts[statusRaw || '(empty)'] = (_apptStatusCounts[statusRaw || '(empty)'] || 0) + 1
+      // Expanded "completed" matchers — added התקיים, סגרה, נסגרה, success, finalize, registration
+      if (/done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|registr|הסתיים/.test(status)) clientsWithDoneAppt.add(cid)
       if (/cancel|בוטל/.test(status)) clientsWithCancelledAppt.add(cid)
     }
 
@@ -414,18 +424,56 @@ async function runSync(opts = {}) {
       }
     }
 
-    // 5. Contracts: agreement_date in window. Attribute to media via client_id in mediaClientIds.
+    // 5b. Historical attribution maps (across ALL fetched tasks, not just window)
+    //   - clientToAnyLidMedia: latest LID's media_title per client (any date in fetched data)
+    //   - clientMedia: client.media field from clients table (BMBY's source-of-truth attribution)
+    const clientToAnyLidMedia = new Map()
+    {
+      // Sort LIDs by start_date desc so first hit per client is the most recent
+      const allLidsByDate = tasks
+        .filter(t => (t.type || '').toString().toLowerCase() === 'lid')
+        .sort((a, b) => String(b.start_date || b.create_date || '').localeCompare(String(a.start_date || a.create_date || '')))
+      for (const lid of allLidsByDate) {
+        const cid = String(lid.client_id || '')
+        if (!cid || clientToAnyLidMedia.has(cid)) continue
+        const mt = (lid.media_title || '').trim()
+        if (mt) clientToAnyLidMedia.set(cid, mt)
+      }
+    }
+    const clientMedia = new Map()
+    for (const c of clients) {
+      if (!c.client_id) continue
+      const media = (c.media || c.media_title || '').toString().trim()
+      if (media) clientMedia.set(String(c.client_id), media)
+    }
+
+    // 5. Contracts: agreement_date in window. Attribute to media via client_id with fallback chain.
     const contractsInRange = contracts.filter(k => inRangeDate(k.agreement_date || k.contract_date || k.signed_date || k.create_date))
+    const _contractAttribDebug = []
     for (const k of contractsInRange) {
       const cid = String(k.client_id || '')
-      // list_price = agreed sale price (matches BMBY report's "סכום העסקאות")
       const val = num(k.list_price || k.price_agreement || k.final_price || k.price_agreement_inc_vat)
-      // Find which media this client appears under (in the window's LIDs)
+      // Fallback chain: window LIDs → any historical LID → client.media → "ללא מקור"
       let attributedMedia = null
+      let attribSource = null
       for (const [media, ids] of mediaClientIds.entries()) {
-        if (ids.has(cid)) { attributedMedia = media; break }
+        if (ids.has(cid)) { attributedMedia = media; attribSource = 'window_lid'; break }
       }
-      if (!attributedMedia) attributedMedia = 'ללא מקור'
+      if (!attributedMedia && clientToAnyLidMedia.has(cid)) {
+        attributedMedia = clientToAnyLidMedia.get(cid); attribSource = 'historical_lid'
+      }
+      if (!attributedMedia && clientMedia.has(cid)) {
+        attributedMedia = clientMedia.get(cid); attribSource = 'client_media'
+      }
+      if (!attributedMedia) { attributedMedia = 'ללא מקור'; attribSource = 'none' }
+      _contractAttribDebug.push({
+        client_id: cid,
+        client_name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim() || undefined,
+        agreement_date: k.agreement_date,
+        list_price: val,
+        attributedMedia,
+        attribSource,
+      })
       const bucket = ensureSrc(attributedMedia)
       totals.contracts += 1
       bucket.contracts += 1
@@ -493,6 +541,13 @@ async function runSync(opts = {}) {
       sources,
       errors: errors.length ? errors : undefined,
       debug: Object.keys(debug).length ? debug : undefined,
+      diag: {
+        taskTypeCounts: _taskTypeCounts,
+        apptStatusCounts: _apptStatusCounts,
+        contractAttrib: _contractAttribDebug,
+        historicalLidMediaSize: clientToAnyLidMedia.size,
+        clientMediaSize: clientMedia.size,
+      },
     }
   }))
 
