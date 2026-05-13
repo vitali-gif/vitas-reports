@@ -406,12 +406,27 @@ async function runSync(opts = {}) {
       srcBucket.contractValue += val
     }
 
-    // Upsert to Supabase — store only the in-range rows (full historical data would blow row size)
+    // Build xlsx-shape rows (one row per source) so the dashboard's aggregateCrmRows works as-is
+    const xlsxRows = Object.entries(sources).map(([sourceName, s]) => ({
+      source: sourceName,
+      totalLeads: s.totalLeads,
+      relevantLeads: s.relevantLeads,
+      irrelevantLeads: s.nonRelevantLeads,
+      meetingsScheduled: s.meetingsScheduled,
+      meetingsCompleted: s.meetingsCompleted,
+      meetingsCancelled: 0,
+      registrations: s.registrations,
+      registrationValue: 0,
+      contracts: s.contracts,
+      contractValue: s.contractValue,
+    }))
+
+    // Upsert to Supabase — `data` stays xlsx-shape so the existing dashboard aggregator works
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
       month: m,
-      data: { clients: clientsInRange, tasks: tasksInRange, prices: pricesInRange, contracts: contractsInRange },
+      data: xlsxRows,
       summary: { ...totals, sources },
       file_name: 'BMBY API (live)',
       row_count: clientsInRange.length + tasksInRange.length + pricesInRange.length + contractsInRange.length,
