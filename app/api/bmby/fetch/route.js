@@ -220,12 +220,16 @@ async function runSync(opts = {}) {
 
     const commonParams = { Login: login, Password: password, ProjectID: parseInt(bmbyPid), FromDate: since, ToDate: until, Dynamic: 1 }
 
-    // Fetch all 4 services in parallel for this project
+    // Fetch all 4 services in parallel for this project, with per-call timeout
+    const withTimeout = (promise, ms, label) => Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timed out after ' + ms + 'ms')), ms))
+    ])
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
-      callBmbyGetAllJson('clients',      commonParams),
-      callBmbyGetAllJson('tasks',        commonParams),
-      callBmbyGetAllJson('price_offers', commonParams),
-      callBmbyGetAllJson('contracts',    commonParams),
+      withTimeout(callBmbyGetAllJson('clients',      commonParams), 10000, 'clients'),
+      withTimeout(callBmbyGetAllJson('tasks',        commonParams), 10000, 'tasks'),
+      withTimeout(callBmbyGetAllJson('price_offers', commonParams), 10000, 'price_offers'),
+      withTimeout(callBmbyGetAllJson('contracts',    commonParams), 10000, 'contracts'),
     ])
 
     const clients   = clientsR.status   === 'fulfilled' ? clientsR.value.rows   : []
@@ -353,12 +357,19 @@ export async function POST(request) {
   }
   let body = {}
   try { body = await request.json() } catch {}
-  const { status, body: responseBody } = await runSync({
-    month: body.month,
-    since: body.since,
-    until: body.until,
-  })
-  return Response.json(responseBody, { status })
+  try {
+    const { status, body: responseBody } = await runSync({
+      month: body.month,
+      since: body.since,
+      until: body.until,
+    })
+    return Response.json(responseBody, { status })
+  } catch (err) {
+    return Response.json({
+      error: 'runSync threw: ' + (err.message || String(err)),
+      stack: (err.stack || '').split('\n').slice(0, 5).join('\n'),
+    }, { status: 500 })
+  }
 }
 
 export async function GET(request) {
