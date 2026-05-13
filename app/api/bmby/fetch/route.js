@@ -232,16 +232,27 @@ async function runSync(opts = {}) {
       withTimeout(callBmbyGetAllJson('contracts',    commonParams), 10000, 'contracts'),
     ])
 
-    const clients   = clientsR.status   === 'fulfilled' ? clientsR.value.rows   : []
-    const tasks     = tasksR.status     === 'fulfilled' ? tasksR.value.rows     : []
-    const prices    = pricesR.status    === 'fulfilled' ? pricesR.value.rows    : []
-    const contracts = contractsR.status === 'fulfilled' ? contractsR.value.rows : []
+    const safeRows = (r) => (r.status === 'fulfilled' && Array.isArray(r.value?.rows)) ? r.value.rows : []
+    const clients   = safeRows(clientsR)
+    const tasks     = safeRows(tasksR)
+    const prices    = safeRows(pricesR)
+    const contracts = safeRows(contractsR)
 
     const errors = []
-    if (clientsR.status === 'rejected')   errors.push('clients: '   + clientsR.reason?.message)
-    if (tasksR.status === 'rejected')     errors.push('tasks: '     + tasksR.reason?.message)
-    if (pricesR.status === 'rejected')    errors.push('prices: '    + pricesR.reason?.message)
-    if (contractsR.status === 'rejected') errors.push('contracts: ' + contractsR.reason?.message)
+    const debug = {}
+    const captureDebug = (label, res) => {
+      if (res.status === 'rejected') {
+        errors.push(label + ': ' + (res.reason?.message || String(res.reason)))
+      } else if (res.value && !Array.isArray(res.value.rows)) {
+        debug[label] = { rawPreview: res.value.rawPreview?.slice(0, 500), foundRows: res.value.foundRows, lastUniqID: res.value.lastUniqID, valueKeys: Object.keys(res.value || {}) }
+      } else if (res.value && Array.isArray(res.value.rows) && res.value.rows.length > 0) {
+        debug[label] = { count: res.value.rows.length, firstRowKeys: Object.keys(res.value.rows[0] || {}).slice(0, 10) }
+      }
+    }
+    captureDebug('clients', clientsR)
+    captureDebug('tasks', tasksR)
+    captureDebug('price_offers', pricesR)
+    captureDebug('contracts', contractsR)
 
     // Aggregate per-source metrics
     const totals = { totalLeads: 0, relevantLeads: 0, nonRelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, contractValue: 0 }
@@ -342,6 +353,7 @@ async function runSync(opts = {}) {
       totals,
       sources,
       errors: errors.length ? errors : undefined,
+      debug: Object.keys(debug).length ? debug : undefined,
     })
   }
 
