@@ -210,22 +210,20 @@ async function runSync(opts = {}) {
     .select('id, name')
   if (projectsError) return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
 
-  const results = []
+  // Helper shared by all projects
+  const withTimeout = (promise, ms, label) => Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timed out after ' + ms + 'ms')), ms))
+  ])
 
-  for (const p of projects || []) {
+  // Process ALL projects in parallel — so total runtime ≈ slowest single call, not sum
+  const projectResults = await Promise.all((projects || []).map(async (p) => {
     const bmbyPid = projectMap[p.name]
     if (!bmbyPid) {
-      results.push({ project: p.name, skipped: true, reason: 'no BMBY project_id mapping' })
-      continue
+      return { project: p.name, skipped: true, reason: 'no BMBY project_id mapping' }
     }
 
     const commonParams = { Login: login, Password: password, ProjectID: parseInt(bmbyPid), UniqID: 1, FromDate: since, ToDate: until, Dynamic: 1 }
-
-    // Fetch all 4 services in parallel for this project, with per-call timeout
-    const withTimeout = (promise, ms, label) => Promise.race([
-      promise,
-      new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timed out after ' + ms + 'ms')), ms))
-    ])
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
       withTimeout(callBmbyGetAllJson('clients',      commonParams), 25000, 'clients'),
       withTimeout(callBmbyGetAllJson('tasks',        commonParams), 25000, 'tasks'),
@@ -348,7 +346,7 @@ async function runSync(opts = {}) {
 
     if (upsertErr) errors.push('upsert: ' + upsertErr.message)
 
-    results.push({
+    return {
       project: p.name,
       bmbyProjectId: bmbyPid,
       counts: {
@@ -361,10 +359,10 @@ async function runSync(opts = {}) {
       sources,
       errors: errors.length ? errors : undefined,
       debug: Object.keys(debug).length ? debug : undefined,
-    })
-  }
+    }
+  }))
 
-  return { status: 200, body: { ok: true, month: m, projects: results } }
+  return { status: 200, body: { ok: true, month: m, projects: projectResults } }
 }
 
 // ===== handlers =====
