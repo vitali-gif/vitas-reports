@@ -421,11 +421,12 @@ async function runSync(opts = {}) {
       }
 
       // Meetings — final logic (matches BMBY's "דוח יחסי המרה" within ~96%):
-      //   "תואמו" = April-LID clients with EITHER an in-window appointment OR a done appt anywhere
-      //   "בוצעו" = April-LID clients with a done appointment anywhere (any date)
-      //   "בוטלו" = April-LID clients with an in-window cancellation
-      const scheduledHit = clientsWithAppt.has(cid) || clientsWithAnyDoneAppt.has(cid)
+      //   "תואמו" / "בוצעו" both use any-time done appointment per April-LID client.
+      //   BMBY only exposes 'completed' / 'canceled' statuses — no "scheduled-only" state to
+      //   tell apart, so we treat any non-cancelled appointment as both scheduled & completed.
+      //   "בוטלו" = April-LID clients with an in-window cancellation.
       const completedHit = clientsWithAnyDoneAppt.has(cid)
+      const scheduledHit = completedHit
       const cancelledHit = clientsWithCancelledAppt.has(cid)
       if (scheduledHit) { totals.meetingsScheduled += 1; bucket.meetingsScheduled += 1 }
       if (completedHit) { totals.meetingsCompleted += 1; bucket.meetingsCompleted += 1 }
