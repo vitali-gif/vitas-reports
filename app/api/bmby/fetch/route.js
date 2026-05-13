@@ -227,10 +227,10 @@ async function runSync(opts = {}) {
       new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timed out after ' + ms + 'ms')), ms))
     ])
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
-      withTimeout(callBmbyGetAllJson('clients',      commonParams), 10000, 'clients'),
-      withTimeout(callBmbyGetAllJson('tasks',        commonParams), 10000, 'tasks'),
-      withTimeout(callBmbyGetAllJson('price_offers', commonParams), 10000, 'price_offers'),
-      withTimeout(callBmbyGetAllJson('contracts',    commonParams), 10000, 'contracts'),
+      withTimeout(callBmbyGetAllJson('clients',      commonParams), 25000, 'clients'),
+      withTimeout(callBmbyGetAllJson('tasks',        commonParams), 25000, 'tasks'),
+      withTimeout(callBmbyGetAllJson('price_offers', commonParams), 25000, 'price_offers'),
+      withTimeout(callBmbyGetAllJson('contracts',    commonParams), 25000, 'contracts'),
     ])
 
     const safeRows = (r) => (r.status === 'fulfilled' && Array.isArray(r.value?.rows)) ? r.value.rows : []
