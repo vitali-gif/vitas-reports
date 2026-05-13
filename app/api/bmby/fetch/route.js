@@ -348,29 +348,21 @@ async function runSync(opts = {}) {
     const clientsWithAnyCancelledAppt = new Set()
     // For each client, track earliest LID start_date (in window) — used by strategy C
     const clientFirstAprilLidDate = new Map()
-    // Debug: collect unique task types & appointment statuses we encountered
-    const _taskTypeCounts = {}
-    const _apptStatusCounts = {}
-    const _apptsInWindowByMonth = {}
     for (const t of tasks) {
       const tyRaw = (t.type || '').toString()
       const ty = tyRaw.toLowerCase()
-      _taskTypeCounts[tyRaw || '(empty)'] = (_taskTypeCounts[tyRaw || '(empty)'] || 0) + 1
       const isAppt = /appointment|meeting|פגישה/i.test(ty)
       if (!isAppt) continue
       const cid = String(t.client_id || '')
       if (!cid) continue
       const statusRaw = (t.status || '').toString()
       const status = statusRaw.toLowerCase()
-      _apptStatusCounts[statusRaw || '(empty)'] = (_apptStatusCounts[statusRaw || '(empty)'] || 0) + 1
       // Always count toward "any appointment" set
       clientsWithAnyAppt.add(cid)
       if (/done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)) clientsWithAnyDoneAppt.add(cid)
       if (/cancel|בוטל/.test(status)) clientsWithAnyCancelledAppt.add(cid)
       // Window-only sets
       if (inRangeDate(t.start_date || t.create_date)) {
-        const dateMonth = String(t.start_date || t.create_date || '').slice(0, 7)
-        _apptsInWindowByMonth[dateMonth] = (_apptsInWindowByMonth[dateMonth] || 0) + 1
         clientsWithAppt.add(cid)
         if (/done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)) clientsWithDoneAppt.add(cid)
         if (/cancel|בוטל/.test(status)) clientsWithCancelledAppt.add(cid)
@@ -390,8 +382,6 @@ async function runSync(opts = {}) {
     const totals = {
       totalLeads: 0, relevantLeads: 0, nonRelevantLeads: 0, irrelevantLeads: 0,
       meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0,
-      // Strategy B: any-time appointment counts per LID
-      meetingsScheduledAny: 0, meetingsCompletedAny: 0, meetingsCancelledAny: 0,
       registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0,
     }
     const sources = {}
@@ -430,23 +420,16 @@ async function runSync(opts = {}) {
         bucket.nonRelevantLeads += 1
       }
 
-      // Meetings (counted per LID — if same client has 2 LIDs and 1 appointment, both LIDs count)
-      if (clientsWithAppt.has(cid)) {
-        totals.meetingsScheduled += 1
-        bucket.meetingsScheduled += 1
-      }
-      if (clientsWithDoneAppt.has(cid)) {
-        totals.meetingsCompleted += 1
-        bucket.meetingsCompleted += 1
-      }
-      if (clientsWithCancelledAppt.has(cid)) {
-        totals.meetingsCancelled += 1
-        bucket.meetingsCancelled += 1
-      }
-      // Strategy B (any-time)
-      if (clientsWithAnyAppt.has(cid)) totals.meetingsScheduledAny += 1
-      if (clientsWithAnyDoneAppt.has(cid)) totals.meetingsCompletedAny += 1
-      if (clientsWithAnyCancelledAppt.has(cid)) totals.meetingsCancelledAny += 1
+      // Meetings — final logic (matches BMBY's "דוח יחסי המרה" within ~96%):
+      //   "תואמו" = April-LID clients with EITHER an in-window appointment OR a done appt anywhere
+      //   "בוצעו" = April-LID clients with a done appointment anywhere (any date)
+      //   "בוטלו" = April-LID clients with an in-window cancellation
+      const scheduledHit = clientsWithAppt.has(cid) || clientsWithAnyDoneAppt.has(cid)
+      const completedHit = clientsWithAnyDoneAppt.has(cid)
+      const cancelledHit = clientsWithCancelledAppt.has(cid)
+      if (scheduledHit) { totals.meetingsScheduled += 1; bucket.meetingsScheduled += 1 }
+      if (completedHit) { totals.meetingsCompleted += 1; bucket.meetingsCompleted += 1 }
+      if (cancelledHit) { totals.meetingsCancelled += 1; bucket.meetingsCancelled += 1 }
     }
 
     // After bucketing LIDs we can compute "any appointment ever" counts for comparison
@@ -476,26 +459,13 @@ async function runSync(opts = {}) {
       if (media) clientMedia.set(String(c.client_id), media)
     }
 
-    // ALL contracts dump for debug (date filtering analysis)
-    const _allContractsDump = contracts.map(k => ({
-      client_id: String(k.client_id || ''),
-      name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim(),
-      agreement_date: k.agreement_date,
-      contract_date: k.contract_date,
-      list_price: num(k.list_price),
-      p_a_inc_vat: num(k.price_agreement_inc_vat),
-      final_inc_vat: num(k.final_price_inc_vat),
-      agreement_type: k.agreement_type,
-      in_april_by_agreement: inRangeDate(k.agreement_date),
-      in_april_by_contract: inRangeDate(k.contract_date),
-    })).filter(c => c.in_april_by_agreement || c.in_april_by_contract || /04|03|05/.test(String(c.agreement_date || '').slice(5,7))).sort((a,b) => String(b.agreement_date||'').localeCompare(String(a.agreement_date||'')))
-
     // 5. Contracts: agreement_date in window. Attribute to media via client_id with fallback chain.
     const contractsInRange = contracts.filter(k => inRangeDate(k.agreement_date || k.contract_date || k.signed_date || k.create_date))
     const _contractAttribDebug = []
     for (const k of contractsInRange) {
       const cid = String(k.client_id || '')
-      const val = num(k.list_price || k.price_agreement || k.final_price || k.price_agreement_inc_vat)
+      // BMBY's "סכום העסקאות" matches price_agreement_inc_vat (with VAT) — gives ~95% of report total
+      const val = num(k.price_agreement_inc_vat || k.final_price_inc_vat || k.list_price || k.price_agreement || k.final_price)
       // Fallback chain: window LIDs → any historical LID → client.media → "ללא מקור"
       let attributedMedia = null
       let attribSource = null
@@ -509,26 +479,15 @@ async function runSync(opts = {}) {
         attributedMedia = clientMedia.get(cid); attribSource = 'client_media'
       }
       if (!attributedMedia) { attributedMedia = 'ללא מקור'; attribSource = 'none' }
-      // Dump ALL contract fields (filtering empties) so we can find the right total
-      const _allFields = {}
-      for (const [fk, fv] of Object.entries(k)) {
-        if (fv !== '' && fv !== null && fv !== undefined) _allFields[fk] = fv
-      }
       _contractAttribDebug.push({
         client_id: cid,
         client_name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim() || undefined,
         agreement_date: k.agreement_date,
-        contract_date: k.contract_date,
         used_val: val,
         list_price: num(k.list_price),
-        price_agreement: num(k.price_agreement),
         price_agreement_inc_vat: num(k.price_agreement_inc_vat),
-        final_price: num(k.final_price),
-        final_price_inc_vat: num(k.final_price_inc_vat),
-        contract_status: k.contract_status,
-        attributedMedia,
         attribSource,
-        allFields: _allFields,
+        attributedMedia,
       })
       const bucket = ensureSrc(attributedMedia)
       totals.contracts += 1
@@ -598,19 +557,25 @@ async function runSync(opts = {}) {
       errors: errors.length ? errors : undefined,
       debug: Object.keys(debug).length ? debug : undefined,
       diag: {
-        taskTypeCounts: _taskTypeCounts,
-        apptStatusCounts: _apptStatusCounts,
-        apptsInWindowByMonth: _apptsInWindowByMonth,
-        contractAttrib: _contractAttribDebug,
-        historicalLidMediaSize: clientToAnyLidMedia.size,
-        clientMediaSize: clientMedia.size,
-        clientsWithAnyAppt: clientsWithAnyAppt.size,
-        clientsWithAnyDoneAppt: clientsWithAnyDoneAppt.size,
-        clientsWithAnyCancelledAppt: clientsWithAnyCancelledAppt.size,
-        clientsWithAprilApptOnly: clientsWithAppt.size,
-        clientsWithAprilDoneApptOnly: clientsWithDoneAppt.size,
+        // Compact diag for ops — keep contract attribution chain + funnel status counts
+        contractAttrib: _contractAttribDebug.map(c => ({
+          client_id: c.client_id,
+          client_name: c.client_name,
+          agreement_date: c.agreement_date,
+          used_val: c.used_val,
+          list_price: c.list_price,
+          attribSource: c.attribSource,
+          attributedMedia: c.attributedMedia,
+        })),
         aprilLidStatusCounts: _aprilLidStatusCounts,
-        allContractsDump: _allContractsDump,
+        apptCounts: {
+          inWindow: clientsWithAppt.size,
+          inWindowDone: clientsWithDoneAppt.size,
+          inWindowCancelled: clientsWithCancelledAppt.size,
+          anyTime: clientsWithAnyAppt.size,
+          anyTimeDone: clientsWithAnyDoneAppt.size,
+          anyTimeCancelled: clientsWithAnyCancelledAppt.size,
+        },
       },
     }
   }))
