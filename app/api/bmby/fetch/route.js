@@ -333,8 +333,10 @@ async function runSync(opts = {}) {
     const tasksInRange = tasks.filter(t => inRange(t.start_date || t.create_date || t.task_date || t.date))
     // Price offers: offer_date / create_date
     const pricesInRange = prices.filter(po => inRange(po.offer_date || po.create_date || po.price_offer_date || po.date))
-    // Contracts: contract_date / signed_date / create_date
-    const contractsInRange = contracts.filter(k => inRange(k.contract_date || k.signed_date || k.create_date || k.date))
+    // Contracts: agreement_date (when deal was actually signed) — contract_date is when
+    // the paperwork was logged (often later in a different month). BMBY's conversion report
+    // uses agreement_date.
+    const contractsInRange = contracts.filter(k => inRange(k.agreement_date || k.contract_date || k.signed_date || k.create_date || k.date))
 
     // Helper: determine if a client is "relevant"
     // BMBY clients service exposes a `relevant` field: "1" = relevant, "0" = not.
@@ -415,7 +417,9 @@ async function runSync(opts = {}) {
       const srcBucket = ensureSrc(src)
       totals.contracts += 1
       srcBucket.contracts += 1
-      const val = num(k.price_agreement_inc_vat || k.price_agreement || k.final_price_inc_vat || k.final_price)
+      // list_price is the agreed sale price as listed in the report.
+      // price_agreement_inc_vat is the total contract value (with VAT + extras) — overcounts.
+      const val = num(k.list_price || k.price_agreement || k.final_price || k.price_agreement_inc_vat || k.final_price_inc_vat)
       totals.contractValue += val
       srcBucket.contractValue += val
     }
