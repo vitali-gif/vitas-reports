@@ -99,42 +99,54 @@ async function callBmbyGetAllJson(service, params) {
     throw new Error(`BMBY ${service} HTTP ${res.status}: ${text.slice(0, 300)}`)
   }
 
-  // Extract the <Data>...</Data> content — BMBY's GetAllJson returns a JSON string inside <Data>
-  const dataMatch = text.match(/<Data[^>]*>([\s\S]*?)<\/Data>/)
-  const foundMatch = text.match(/<FoundRows[^>]*>(\d+)<\/FoundRows>/)
-  const lastUniqMatch = text.match(/<LastUniqID[^>]*>(\d+)<\/LastUniqID>/)
-  const errMatch = text.match(/<Error[^>]*>([\s\S]*?)<\/Error>/)
-  if (errMatch && errMatch[1].trim()) {
-    throw new Error(`BMBY ${service} error: ${errMatch[1].trim().slice(0, 200)}`)
+  // BMBY format: SOAP envelope wraps <GetAllJsonReturn> which contains a JSON STRING
+  // (HTML-entity-encoded). That JSON parses to { FoundRows, LastUniqID, Data, Error }.
+  // `Data` is XML-as-string with <clients>/<tasks>/... root and <row>...</row> children.
+  // Each <row> field is wrapped in CDATA.
+  const retMatch = text.match(/<GetAllJsonReturn[^>]*>([\s\S]*?)<\/GetAllJsonReturn>/)
+  if (!retMatch) {
+    const faultMatch = text.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/)
+    if (faultMatch) throw new Error(`BMBY ${service} fault: ${faultMatch[1].slice(0, 200)}`)
+    return { rows: [], foundRows: 0, lastUniqID: 0, rawSnippet: text.slice(0, 500) }
   }
-  if (!dataMatch) {
-    // Sometimes the data is returned directly without wrapping — try to find a JSON array/object
-    const jsonMatch = text.match(/\[\s*\{[\s\S]*?\}\s*\]|\{[\s\S]*?\}/)
-    if (jsonMatch) {
-      try { return { rows: JSON.parse(jsonMatch[0]), foundRows: 0, lastUniqID: 0 } } catch {}
-    }
-    return { rows: [], foundRows: 0, lastUniqID: 0, rawPreview: text.slice(0, 500) }
+  const jsonStr = retMatch[1]
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+  let parsed
+  try {
+    parsed = JSON.parse(jsonStr)
+  } catch (e) {
+    return { rows: [], foundRows: 0, lastUniqID: 0, parseError: e.message, rawSnippet: jsonStr.slice(0, 400) }
+  }
+  if (parsed.Error && String(parsed.Error).trim()) {
+    throw new Error(`BMBY ${service} error: ${String(parsed.Error).slice(0, 200)}`)
   }
 
-  let rows = []
-  const rawData = dataMatch[1].trim()
-  // The inner content may be XML-escaped — decode it first
-  const decoded = rawData
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-  try {
-    const parsed = JSON.parse(decoded)
-    if (Array.isArray(parsed)) rows = parsed
-    else if (parsed && typeof parsed === 'object') rows = parsed.rows || [parsed]
-  } catch {
-    // If it's XML instead of JSON, we'd need an XML parser — skip for now
+  // Parse the XML-as-string in `Data` into row objects
+  const rows = []
+  const dataXml = parsed.Data || ''
+  if (dataXml) {
+    const rowRegex = /<row>([\s\S]*?)<\/row>/g
+    let m
+    while ((m = rowRegex.exec(dataXml)) !== null) {
+      const rowXml = m[1]
+      const obj = {}
+      const fieldRegex = /<(\w+)>([\s\S]*?)<\/\1>/g
+      let fm
+      while ((fm = fieldRegex.exec(rowXml)) !== null) {
+        let val = fm[2]
+        const cdataMatch = val.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/)
+        if (cdataMatch) val = cdataMatch[1]
+        obj[fm[1]] = val
+      }
+      rows.push(obj)
+    }
   }
 
   return {
     rows,
-    foundRows: foundMatch ? parseInt(foundMatch[1]) : 0,
-    lastUniqID: lastUniqMatch ? parseInt(lastUniqMatch[1]) : 0,
-    rawSnippet: text.slice(0, 600),
+    foundRows: parsed.FoundRows || 0,
+    lastUniqID: parsed.LastUniqID || 0,
   }
 }
 
@@ -268,21 +280,38 @@ async function runSync(opts = {}) {
       return sources[key]
     }
 
+    // Helper: client_date string YYYY-MM-DD must fall within [since, until]
+    const inRange = (d) => d && d >= since && d <= until
+
+    // Filter clients to those CREATED within the requested date window
+    // (BMBY's FromDate/ToDate filters by last-modified, not client_date)
+    const clientsInRange = clients.filter(c => inRange(c.client_date || c.created_date))
+    const tasksInRange = tasks.filter(t => inRange(t.task_date || t.date || t.appointment_date || t.created_date))
+    const pricesInRange = prices.filter(po => inRange(po.offer_date || po.price_offer_date || po.date || po.created_date))
+    const contractsInRange = contracts.filter(k => inRange(k.contract_date || k.date || k.created_date || k.signed_date))
+
     // Helper: determine if a client is "relevant"
+    // BMBY clients service exposes a `relevant` field: "1" = relevant, "0" = not.
     const isRelevant = (c) => {
+      if (c.relevant === '1' || c.relevant === 1) return true
+      if (c.relevant === '0' || c.relevant === 0) return false
+      // Optional override via env var (status whitelist)
       const status = (c.status ?? c.Status ?? '').toString()
       if (relevantStatuses) return relevantStatuses.has(status)
-      // Fallback heuristic: look for Hebrew/English keywords
+      // Fallback heuristic for older / non-standard data
       const all = JSON.stringify(c).toLowerCase()
       if (/לא ?רלוונ|not ?relevant|cold|קר/.test(all)) return false
       if (/רלוונ|relevant|hot|warm|חם|פושר/.test(all)) return true
-      // Default: treat as relevant (conservative)
       return true
     }
 
-    // Process clients (leads)
-    for (const c of clients) {
-      const src = bucketSource(c.source || c.Source || c.entry_channel || c.origin || '')
+    // BMBY's `media` field looks like: "hi park | מסחר - חנויות למכירה | פייסבוק"
+    // It carries the channel info we want to bucket.
+    const clientSourceText = (c) => c.media || c.source || c.Source || c.entry_channel || c.origin || ''
+
+    // Process clients (leads) — only those created within the window
+    for (const c of clientsInRange) {
+      const src = bucketSource(clientSourceText(c))
       const srcBucket = ensureSrc(src)
       totals.totalLeads += 1
       srcBucket.totalLeads += 1
@@ -296,13 +325,10 @@ async function runSync(opts = {}) {
     }
 
     // Process tasks (appointments)
-    // Appointment = meeting scheduled. If task has a "completed" flag / past-date + flag — completed.
-    // The BMBY API doc mentions Type=Appointment. We'll consider a meeting "completed" if task.status === 'completed' or similar.
-    for (const t of tasks) {
-      const type = (t.type || t.Type || '').toString().toLowerCase()
-      if (type !== 'appointment' && type !== 'meeting' && !/פגישה/.test(JSON.stringify(t))) continue
-      // figure out source from the linked client if present
-      const src = bucketSource(t.source || t.client_source || '')
+    for (const t of tasksInRange) {
+      const type = (t.type || t.Type || t.task_type || '').toString().toLowerCase()
+      if (type !== 'appointment' && type !== 'meeting' && !/פגישה|appointment|meeting/i.test(JSON.stringify(t))) continue
+      const src = bucketSource(t.media || t.source || t.client_source || '')
       const srcBucket = ensureSrc(src)
       totals.meetingsScheduled += 1
       srcBucket.meetingsScheduled += 1
@@ -315,16 +341,16 @@ async function runSync(opts = {}) {
     }
 
     // Process price offers (registrations / sales opportunities)
-    for (const po of prices) {
-      const src = bucketSource(po.source || po.client_source || '')
+    for (const po of pricesInRange) {
+      const src = bucketSource(po.media || po.source || po.client_source || '')
       const srcBucket = ensureSrc(src)
       totals.registrations += 1
       srcBucket.registrations += 1
     }
 
     // Process contracts
-    for (const k of contracts) {
-      const src = bucketSource(k.source || k.client_source || '')
+    for (const k of contractsInRange) {
+      const src = bucketSource(k.media || k.source || k.client_source || '')
       const srcBucket = ensureSrc(src)
       totals.contracts += 1
       srcBucket.contracts += 1
@@ -333,15 +359,15 @@ async function runSync(opts = {}) {
       srcBucket.contractValue += val
     }
 
-    // Upsert to Supabase
+    // Upsert to Supabase — store only the in-range rows (full historical data would blow row size)
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
       month: m,
-      data: { clients, tasks, prices, contracts },
+      data: { clients: clientsInRange, tasks: tasksInRange, prices: pricesInRange, contracts: contractsInRange },
       summary: { ...totals, sources },
       file_name: 'BMBY API (live)',
-      row_count: clients.length + tasks.length + prices.length + contracts.length,
+      row_count: clientsInRange.length + tasksInRange.length + pricesInRange.length + contractsInRange.length,
     }, { onConflict: 'project_id,source,month' })
 
     if (upsertErr) errors.push('upsert: ' + upsertErr.message)
@@ -350,6 +376,12 @@ async function runSync(opts = {}) {
       project: p.name,
       bmbyProjectId: bmbyPid,
       counts: {
+        clients: clientsInRange.length,
+        tasks: tasksInRange.length,
+        prices: pricesInRange.length,
+        contracts: contractsInRange.length,
+      },
+      totalRaw: {
         clients: clients.length,
         tasks: tasks.length,
         prices: prices.length,
