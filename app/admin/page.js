@@ -617,7 +617,10 @@ const selectProject = async (client, project) => {
     destroyCharts();
 
     const currentReports = reports.filter(r => r.month === selectedMonth);
-    if (currentReports.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>No data for this month</h3></div>;
+    // If there are NO reports at all for this project, show the welcome screen.
+    // If there are reports but not for this period, fall through — tabs will still show
+    // (based on `reports`, not `currentReports`) and per-tab content will handle empty.
+    if (reports.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>No data for this month</h3></div>;
 
     const displayReports = dashTab === 'all'
       ? currentReports.filter(r => r.source !== 'crm' && r.source !== 'crm_reports')
@@ -748,11 +751,18 @@ const selectProject = async (client, project) => {
     const gReports = currentReports.filter(r => r.source && r.source.startsWith('google'));
     const crmReports = currentReports.filter(r => r.source === 'crm');
     const crmRepReports = currentReports.filter(r => r.source === 'crm_reports');
-    const hasFb = fbReports.length > 0;
-    const hasPmax = gReports.some(r => r.source === 'google_pmax');
-    const hasSearch = gReports.some(r => r.source === 'google_search');
-    const hasG = gReports.length > 0;
-    const hasCrm = crmReports.length > 0 || crmRepReports.length > 0;
+    // Tab visibility — show if the project has ANY data of this source (any month).
+    // Data presence inside the tab is handled by an empty-state below.
+    const anyFb = reports.some(r => r.source === 'facebook');
+    const anyG = reports.some(r => r.source && r.source.startsWith('google'));
+    const anyPmax = reports.some(r => r.source === 'google_pmax');
+    const anySearch = reports.some(r => r.source === 'google_search');
+    const anyCrm = reports.some(r => r.source === 'crm' || r.source === 'crm_reports');
+    const hasFb = anyFb;
+    const hasPmax = anyPmax;
+    const hasSearch = anySearch;
+    const hasG = anyG;
+    const hasCrm = anyCrm;
 
     let fbTotals = null, gTotals = null;
     if (hasFb) { let fbRows = []; fbReports.forEach(r => { if (r.data) fbRows = fbRows.concat(r.data); }); fbTotals = aggregateRows(fbRows).totals; }
@@ -782,7 +792,13 @@ const selectProject = async (client, project) => {
             <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>{'\ud83d\udcca \u05de\u05d7\u05d5\u05dc\u05dc \u05d3\u05d5\u05d7\u05d5\u05ea'}</button>
           </div>
           {crmSubTab === 'sources' ? renderCrmDashboard() : renderCrmReportDashboard()}
-        </>) : (<>
+        </>) : (displayReports.length === 0 && dashTab !== 'all') ? (
+          <div className="welcome-center" style={{padding:'60px 20px',textAlign:'center'}}>
+            <div className="icon" style={{fontSize:'4em',marginBottom:'10px'}}>{'\ud83d\udced'}</div>
+            <h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05d8\u05d5\u05d5\u05d7 \u05d4\u05ea\u05d0\u05e8\u05d9\u05db\u05d9\u05dd \u05e9\u05e0\u05d1\u05d7\u05e8'}</h3>
+            <p style={{color:'#64748b',marginTop:'8px'}}>{'\u05d1\u05d7\u05e8 \u05d8\u05d5\u05d5\u05d7 \u05d0\u05d7\u05e8 \u05d0\u05d5 \u05d4\u05e8\u05e5 \u05e1\u05e0\u05db\u05e8\u05d5\u05df'}</p>
+          </div>
+        ) : (<>
         <div className="kpi-grid">
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP?.leads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
