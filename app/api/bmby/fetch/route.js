@@ -336,30 +336,45 @@ async function runSync(opts = {}) {
       return ty === 'lid' && inRangeDate(t.start_date || t.create_date)
     })
 
-    // 2. Appointments in window — per client_id, did they have an appointment / completed?
+    // 2. Appointments — multiple counting strategies to find the one matching BMBY's report
+    // Strategy A (current): client has appointment in window
+    // Strategy B: client has ANY appointment (regardless of date)
+    // Strategy C: client has appointment with start_date >= their first LID's start_date
     const clientsWithAppt = new Set()
     const clientsWithDoneAppt = new Set()
     const clientsWithCancelledAppt = new Set()
+    const clientsWithAnyAppt = new Set()
+    const clientsWithAnyDoneAppt = new Set()
+    const clientsWithAnyCancelledAppt = new Set()
+    // For each client, track earliest LID start_date (in window) — used by strategy C
+    const clientFirstAprilLidDate = new Map()
     // Debug: collect unique task types & appointment statuses we encountered
     const _taskTypeCounts = {}
     const _apptStatusCounts = {}
+    const _apptsInWindowByMonth = {}
     for (const t of tasks) {
       const tyRaw = (t.type || '').toString()
       const ty = tyRaw.toLowerCase()
       _taskTypeCounts[tyRaw || '(empty)'] = (_taskTypeCounts[tyRaw || '(empty)'] || 0) + 1
-      // Broader appointment match — any type containing "appointment", "meeting", or Hebrew "פגישה"
       const isAppt = /appointment|meeting|פגישה/i.test(ty)
       if (!isAppt) continue
-      if (!inRangeDate(t.start_date || t.create_date)) continue
       const cid = String(t.client_id || '')
       if (!cid) continue
-      clientsWithAppt.add(cid)
       const statusRaw = (t.status || '').toString()
       const status = statusRaw.toLowerCase()
       _apptStatusCounts[statusRaw || '(empty)'] = (_apptStatusCounts[statusRaw || '(empty)'] || 0) + 1
-      // Expanded "completed" matchers — added התקיים, סגרה, נסגרה, success, finalize, registration
-      if (/done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|registr|הסתיים/.test(status)) clientsWithDoneAppt.add(cid)
-      if (/cancel|בוטל/.test(status)) clientsWithCancelledAppt.add(cid)
+      // Always count toward "any appointment" set
+      clientsWithAnyAppt.add(cid)
+      if (/done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)) clientsWithAnyDoneAppt.add(cid)
+      if (/cancel|בוטל/.test(status)) clientsWithAnyCancelledAppt.add(cid)
+      // Window-only sets
+      if (inRangeDate(t.start_date || t.create_date)) {
+        const dateMonth = String(t.start_date || t.create_date || '').slice(0, 7)
+        _apptsInWindowByMonth[dateMonth] = (_apptsInWindowByMonth[dateMonth] || 0) + 1
+        clientsWithAppt.add(cid)
+        if (/done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)) clientsWithDoneAppt.add(cid)
+        if (/cancel|בוטל/.test(status)) clientsWithCancelledAppt.add(cid)
+      }
     }
 
     // 3. Map client_id → relevant flag (from clients table, ALL clients not just inRange)
@@ -374,6 +389,8 @@ async function runSync(opts = {}) {
     const totals = {
       totalLeads: 0, relevantLeads: 0, nonRelevantLeads: 0, irrelevantLeads: 0,
       meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0,
+      // Strategy B: any-time appointment counts per LID
+      meetingsScheduledAny: 0, meetingsCompletedAny: 0, meetingsCancelledAny: 0,
       registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0,
     }
     const sources = {}
@@ -422,7 +439,15 @@ async function runSync(opts = {}) {
         totals.meetingsCancelled += 1
         bucket.meetingsCancelled += 1
       }
+      // Strategy B (any-time)
+      if (clientsWithAnyAppt.has(cid)) totals.meetingsScheduledAny += 1
+      if (clientsWithAnyDoneAppt.has(cid)) totals.meetingsCompletedAny += 1
+      if (clientsWithAnyCancelledAppt.has(cid)) totals.meetingsCancelledAny += 1
     }
+
+    // After bucketing LIDs we can compute "any appointment ever" counts for comparison
+    // (Strategy B: at most one of each per April-LID-client, regardless of appointment date)
+    // Computed inline below in the LID loop.
 
     // 5b. Historical attribution maps (across ALL fetched tasks, not just window)
     //   - clientToAnyLidMedia: latest LID's media_title per client (any date in fetched data)
@@ -470,7 +495,14 @@ async function runSync(opts = {}) {
         client_id: cid,
         client_name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim() || undefined,
         agreement_date: k.agreement_date,
-        list_price: val,
+        contract_date: k.contract_date,
+        used_val: val,
+        list_price: num(k.list_price),
+        price_agreement: num(k.price_agreement),
+        price_agreement_inc_vat: num(k.price_agreement_inc_vat),
+        final_price: num(k.final_price),
+        final_price_inc_vat: num(k.final_price_inc_vat),
+        contract_status: k.contract_status,
         attributedMedia,
         attribSource,
       })
@@ -544,9 +576,15 @@ async function runSync(opts = {}) {
       diag: {
         taskTypeCounts: _taskTypeCounts,
         apptStatusCounts: _apptStatusCounts,
+        apptsInWindowByMonth: _apptsInWindowByMonth,
         contractAttrib: _contractAttribDebug,
         historicalLidMediaSize: clientToAnyLidMedia.size,
         clientMediaSize: clientMedia.size,
+        clientsWithAnyAppt: clientsWithAnyAppt.size,
+        clientsWithAnyDoneAppt: clientsWithAnyDoneAppt.size,
+        clientsWithAnyCancelledAppt: clientsWithAnyCancelledAppt.size,
+        clientsWithAprilApptOnly: clientsWithAppt.size,
+        clientsWithAprilDoneApptOnly: clientsWithDoneAppt.size,
       },
     }
   }))
