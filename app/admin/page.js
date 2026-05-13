@@ -1236,7 +1236,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, sortConfig]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, sortConfig, expandedCampaigns, expandedAdSets]);
 
   if (loading) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
