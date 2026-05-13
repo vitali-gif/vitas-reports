@@ -277,7 +277,7 @@ async function runSync(opts = {}) {
     // Each service runs paginated with up to 10 pages of 3000 rows. Per-service total budget 45s.
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
       withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4), 45000, 'clients'),
-      withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 6), 45000, 'tasks'),
+      withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 10), 45000, 'tasks'),
       withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 45000, 'price_offers'),
       withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 45000, 'contracts'),
     ])
@@ -310,118 +310,141 @@ async function runSync(opts = {}) {
     captureDebug('price_offers', pricesR)
     captureDebug('contracts', contractsR)
 
-    // Aggregate per-source metrics
-    const totals = { totalLeads: 0, relevantLeads: 0, nonRelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, contractValue: 0 }
-    const sources = {}
-
-    const ensureSrc = (key) => {
-      if (!sources[key]) sources[key] = { totalLeads: 0, relevantLeads: 0, nonRelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, contractValue: 0 }
-      return sources[key]
-    }
+    // ===== Reverse-engineered "דוח יחסי המרה" counting logic =====
+    // BMBY's conversion-rate report bucketing:
+    //   "סה"כ לידים" per media = number of LID tasks in window with task.media_title == media
+    //   "תואמו" per media       = number of LIDs in window whose client_id has an Appointment in window
+    //   "בוצעו" per media       = number of LIDs in window whose client_id has a completed Appointment in window
+    //   "עסקאות" per media      = number of contracts whose agreement_date is in window AND
+    //                              whose client_id appears in any LID with that media (in window)
+    //   "סכום העסקאות"          = sum of list_price for those contracts
+    //   "רלוונטיים/לא"          = relevant flag on the underlying client (most-recent value)
+    //
+    // April LIDs are the universe of "leads" for the period. Per the report each LID is one row,
+    // and the media_title carried on the LID task is the bucketing key — not the client's media.
 
     // Helper: dates may come as YYYY-MM-DD or YYYY-MM-DD HH:MM:SS — strip to date portion
-    const inRange = (d) => {
+    const inRangeDate = (d) => {
       if (!d) return false
       const dateOnly = String(d).slice(0, 10)
       return dateOnly >= since && dateOnly <= until
     }
 
-    // Filter clients to those CREATED within the requested date window
-    // (BMBY's FromDate/ToDate filters by last-modified, not client_date)
-    const clientsInRange = clients.filter(c => inRange(c.client_date || c.created_date))
-    // Tasks: use start_date (when task is scheduled) — falls back to create_date
-    const tasksInRange = tasks.filter(t => inRange(t.start_date || t.create_date || t.task_date || t.date))
-    // Price offers: offer_date / create_date
-    const pricesInRange = prices.filter(po => inRange(po.offer_date || po.create_date || po.price_offer_date || po.date))
-    // Contracts: agreement_date (when deal was actually signed) — contract_date is when
-    // the paperwork was logged (often later in a different month). BMBY's conversion report
-    // uses agreement_date.
-    const contractsInRange = contracts.filter(k => inRange(k.agreement_date || k.contract_date || k.signed_date || k.create_date || k.date))
+    // 1. LID tasks in window — each row counts as one lead under its own media_title
+    const aprilLids = tasks.filter(t => {
+      const ty = (t.type || '').toString().toLowerCase()
+      return ty === 'lid' && inRangeDate(t.start_date || t.create_date)
+    })
 
-    // Helper: determine if a client is "relevant"
-    // BMBY clients service exposes a `relevant` field: "1" = relevant, "0" = not.
-    const isRelevant = (c) => {
-      if (c.relevant === '1' || c.relevant === 1) return true
-      if (c.relevant === '0' || c.relevant === 0) return false
-      // Optional override via env var (status whitelist)
-      const status = (c.status ?? c.Status ?? '').toString()
-      if (relevantStatuses) return relevantStatuses.has(status)
-      // Fallback heuristic for older / non-standard data
-      const all = JSON.stringify(c).toLowerCase()
-      if (/לא ?רלוונ|not ?relevant|cold|קר/.test(all)) return false
-      if (/רלוונ|relevant|hot|warm|חם|פושר/.test(all)) return true
-      return true
+    // 2. Appointments in window — per client_id, did they have an appointment / completed?
+    const clientsWithAppt = new Set()
+    const clientsWithDoneAppt = new Set()
+    const clientsWithCancelledAppt = new Set()
+    for (const t of tasks) {
+      const ty = (t.type || '').toString().toLowerCase()
+      if (ty !== 'appointment' && ty !== 'appointment copy') continue
+      if (!inRangeDate(t.start_date || t.create_date)) continue
+      const cid = String(t.client_id || '')
+      if (!cid) continue
+      clientsWithAppt.add(cid)
+      const status = (t.status || '').toString().toLowerCase()
+      if (/done|complete|בוצע|סגור|ended/.test(status)) clientsWithDoneAppt.add(cid)
+      if (/cancel|בוטל/.test(status)) clientsWithCancelledAppt.add(cid)
     }
 
-    // BMBY's `media` field looks like: "hi park | מסחר - חנויות למכירה | פייסבוק"
-    // It carries the channel info we want to bucket.
-    const clientSourceText = (c) => c.media || c.source || c.Source || c.entry_channel || c.origin || ''
-
-    // Build client_id -> media map across ALL clients (not just inRange) — tasks/contracts
-    // in April may belong to clients created in earlier months. We need this map to attribute
-    // meetings and contracts to the lead's original source.
-    const clientMediaById = new Map()
+    // 3. Map client_id → relevant flag (from clients table, ALL clients not just inRange)
+    const clientRelevant = new Map()
     for (const c of clients) {
-      if (c.client_id) clientMediaById.set(String(c.client_id), clientSourceText(c))
-    }
-    const sourceForLinkedRow = (row, fallbackField) => {
-      const cid = row.client_id || row.ClientID || row.lead_id
-      if (cid && clientMediaById.has(String(cid))) return clientMediaById.get(String(cid))
-      return row[fallbackField] || row.media_title || row.media || row.source || row.client_source || ''
+      if (!c.client_id) continue
+      // Stored as string "1"/"0" in BMBY
+      clientRelevant.set(String(c.client_id), c.relevant === '1' || c.relevant === 1)
     }
 
-    // Process clients (leads) — only those created within the window
-    for (const c of clientsInRange) {
-      const src = bucketSource(clientSourceText(c))
-      const srcBucket = ensureSrc(src)
+    // 4. Per-media aggregation from LIDs
+    const totals = {
+      totalLeads: 0, relevantLeads: 0, nonRelevantLeads: 0, irrelevantLeads: 0,
+      meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0,
+      registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0,
+    }
+    const sources = {}
+    const mediaClientIds = new Map() // media → Set<client_id> in window (for contracts attribution)
+    const ensureSrc = (key) => {
+      if (!sources[key]) sources[key] = {
+        totalLeads: 0, relevantLeads: 0, nonRelevantLeads: 0,
+        meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0,
+        registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0,
+      }
+      return sources[key]
+    }
+
+    for (const lid of aprilLids) {
+      const media = (lid.media_title || 'ללא מקור').trim() || 'ללא מקור'
+      const cid = String(lid.client_id || '')
+      const bucket = ensureSrc(media)
+
+      // Track which clients per media (for contract attribution)
+      if (!mediaClientIds.has(media)) mediaClientIds.set(media, new Set())
+      if (cid) mediaClientIds.get(media).add(cid)
+
+      // Total leads
       totals.totalLeads += 1
-      srcBucket.totalLeads += 1
-      if (isRelevant(c)) {
+      bucket.totalLeads += 1
+
+      // Relevant
+      if (clientRelevant.get(cid)) {
         totals.relevantLeads += 1
-        srcBucket.relevantLeads += 1
+        bucket.relevantLeads += 1
       } else {
         totals.nonRelevantLeads += 1
-        srcBucket.nonRelevantLeads += 1
+        bucket.nonRelevantLeads += 1
       }
-    }
 
-    // Process tasks — BMBY task types: Task / LID / Appointment / Comment / SMS
-    // We count Appointment as "meeting scheduled". Attribute meetings to the LEAD's source
-    // (the linked client's media), not the task's own media_title.
-    for (const t of tasksInRange) {
-      const type = (t.type || t.Type || t.task_type || '').toString().toLowerCase()
-      if (type !== 'appointment' && type !== 'meeting' && !/פגישה/.test(JSON.stringify(t))) continue
-      const src = bucketSource(sourceForLinkedRow(t, 'media_title'))
-      const srcBucket = ensureSrc(src)
-      totals.meetingsScheduled += 1
-      srcBucket.meetingsScheduled += 1
-      const status = (t.status || t.Status || '').toString().toLowerCase()
-      const completed = /done|complete|בוצע|סגור|ended/.test(status)
-      if (completed) {
+      // Meetings (counted per LID — if same client has 2 LIDs and 1 appointment, both LIDs count)
+      if (clientsWithAppt.has(cid)) {
+        totals.meetingsScheduled += 1
+        bucket.meetingsScheduled += 1
+      }
+      if (clientsWithDoneAppt.has(cid)) {
         totals.meetingsCompleted += 1
-        srcBucket.meetingsCompleted += 1
+        bucket.meetingsCompleted += 1
+      }
+      if (clientsWithCancelledAppt.has(cid)) {
+        totals.meetingsCancelled += 1
+        bucket.meetingsCancelled += 1
       }
     }
 
-    // Process price offers (registrations / sales opportunities) — attribute to lead's source
-    for (const po of pricesInRange) {
-      const src = bucketSource(sourceForLinkedRow(po, 'media'))
-      const srcBucket = ensureSrc(src)
-      totals.registrations += 1
-      srcBucket.registrations += 1
+    // 5. Contracts: agreement_date in window. Attribute to media via client_id in mediaClientIds.
+    const contractsInRange = contracts.filter(k => inRangeDate(k.agreement_date || k.contract_date || k.signed_date || k.create_date))
+    for (const k of contractsInRange) {
+      const cid = String(k.client_id || '')
+      // list_price = agreed sale price (matches BMBY report's "סכום העסקאות")
+      const val = num(k.list_price || k.price_agreement || k.final_price || k.price_agreement_inc_vat)
+      // Find which media this client appears under (in the window's LIDs)
+      let attributedMedia = null
+      for (const [media, ids] of mediaClientIds.entries()) {
+        if (ids.has(cid)) { attributedMedia = media; break }
+      }
+      if (!attributedMedia) attributedMedia = 'ללא מקור'
+      const bucket = ensureSrc(attributedMedia)
+      totals.contracts += 1
+      bucket.contracts += 1
+      totals.contractValue += val
+      bucket.contractValue += val
     }
 
-    // Process contracts — attribute to lead's source via client_id
-    for (const k of contractsInRange) {
-      const src = bucketSource(sourceForLinkedRow(k, 'media'))
-      const srcBucket = ensureSrc(src)
-      totals.contracts += 1
-      srcBucket.contracts += 1
-      // list_price is the agreed sale price as listed in the report.
-      // price_agreement_inc_vat is the total contract value (with VAT + extras) — overcounts.
-      const val = num(k.list_price || k.price_agreement || k.final_price || k.price_agreement_inc_vat || k.final_price_inc_vat)
-      totals.contractValue += val
-      srcBucket.contractValue += val
+    // 6. Price offers (currently unused for ש.ברוך — kept for future)
+    const pricesInRange = prices.filter(po => inRangeDate(po.offer_date || po.create_date))
+    for (const po of pricesInRange) {
+      const cid = String(po.client_id || '')
+      let attributedMedia = null
+      for (const [media, ids] of mediaClientIds.entries()) {
+        if (ids.has(cid)) { attributedMedia = media; break }
+      }
+      if (!attributedMedia) continue
+      const bucket = ensureSrc(attributedMedia)
+      totals.registrations += 1
+      bucket.registrations += 1
     }
 
     // Build xlsx-shape rows (one row per source) so the dashboard's aggregateCrmRows works as-is
