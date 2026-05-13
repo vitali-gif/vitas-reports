@@ -470,7 +470,7 @@ async function runSync(opts = {}) {
       data: xlsxRows,
       summary: { ...totals, sources },
       file_name: 'BMBY API (live)',
-      row_count: clientsInRange.length + tasksInRange.length + pricesInRange.length + contractsInRange.length,
+      row_count: aprilLids.length + contractsInRange.length + pricesInRange.length,
     }, { onConflict: 'project_id,source,month' })
 
     if (upsertErr) errors.push('upsert: ' + upsertErr.message)
@@ -479,10 +479,9 @@ async function runSync(opts = {}) {
       project: p.name,
       bmbyProjectId: bmbyPid,
       counts: {
-        clients: clientsInRange.length,
-        tasks: tasksInRange.length,
-        prices: pricesInRange.length,
+        leads: aprilLids.length,
         contracts: contractsInRange.length,
+        prices: pricesInRange.length,
       },
       totalRaw: {
         clients: clients.length,
