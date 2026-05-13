@@ -134,6 +134,7 @@ async function callBmbyGetAllJson(service, params) {
     rows,
     foundRows: foundMatch ? parseInt(foundMatch[1]) : 0,
     lastUniqID: lastUniqMatch ? parseInt(lastUniqMatch[1]) : 0,
+    rawSnippet: text.slice(0, 600),
   }
 }
 
@@ -218,7 +219,7 @@ async function runSync(opts = {}) {
       continue
     }
 
-    const commonParams = { Login: login, Password: password, ProjectID: parseInt(bmbyPid), FromDate: since, ToDate: until, Dynamic: 1 }
+    const commonParams = { Login: login, Password: password, ProjectID: parseInt(bmbyPid), UniqID: 1, FromDate: since, ToDate: until, Dynamic: 1 }
 
     // Fetch all 4 services in parallel for this project, with per-call timeout
     const withTimeout = (promise, ms, label) => Promise.race([
@@ -245,8 +246,14 @@ async function runSync(opts = {}) {
         errors.push(label + ': ' + (res.reason?.message || String(res.reason)))
       } else if (res.value && !Array.isArray(res.value.rows)) {
         debug[label] = { rawPreview: res.value.rawPreview?.slice(0, 500), foundRows: res.value.foundRows, lastUniqID: res.value.lastUniqID, valueKeys: Object.keys(res.value || {}) }
-      } else if (res.value && Array.isArray(res.value.rows) && res.value.rows.length > 0) {
-        debug[label] = { count: res.value.rows.length, firstRowKeys: Object.keys(res.value.rows[0] || {}).slice(0, 10) }
+      } else if (res.value && Array.isArray(res.value.rows)) {
+        debug[label] = {
+          count: res.value.rows.length,
+          foundRows: res.value.foundRows,
+          lastUniqID: res.value.lastUniqID,
+          firstRowKeys: res.value.rows.length > 0 ? Object.keys(res.value.rows[0] || {}).slice(0, 10) : undefined,
+          rawSnippet: res.value.rows.length === 0 ? res.value.rawSnippet : undefined,
+        }
       }
     }
     captureDebug('clients', clientsR)
