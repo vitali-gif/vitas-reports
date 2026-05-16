@@ -353,6 +353,41 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
+  // Optional debug: ?probeCustomers=1 lists all customers with their account names + campaign counts
+  if (request?.url && request.url.includes('probeCustomers=1')) {
+    try {
+      const token = await getAccessToken()
+      const headers = { Authorization: `Bearer ${token}`, 'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN }
+      if (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) headers['login-customer-id'] = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID
+      const customers = ['2464593851','4852056421','3001397737','5213006256','7978284635']
+      const results = []
+      for (const cid of customers) {
+        try {
+          const body = { query: 'SELECT customer.descriptive_name, customer.id, customer.currency_code FROM customer LIMIT 1' }
+          const r = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${cid}/googleAds:search`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          const txt = await r.text()
+          let info = null
+          try { info = JSON.parse(txt) } catch {}
+          const c = info?.results?.[0]?.customer
+          // Also count campaigns
+          let campCount = null, campNames = []
+          try {
+            const r2 = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${cid}/googleAds:search`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ query: "SELECT campaign.name FROM campaign WHERE campaign.status != 'REMOVED' LIMIT 50" }) })
+            const j = await r2.json()
+            campCount = (j.results || []).length
+            campNames = (j.results || []).map(x => x.campaign?.name).filter(Boolean).slice(0, 30)
+          } catch (e) { campCount = 'err: ' + e.message }
+          results.push({ cid, status: r.status, name: c?.descriptiveName, currency: c?.currencyCode, campCount, campNames })
+        } catch (e) {
+          results.push({ cid, error: String(e.message || e) })
+        }
+      }
+      return Response.json({ results })
+    } catch (e) {
+      return Response.json({ error: String(e.message || e) }, { status: 500 })
+    }
+  }
+
   // Optional debug: ?listCustomers=1 returns the list of accessible customer IDs
   if (request?.url && request.url.includes('listCustomers=1')) {
     try {
