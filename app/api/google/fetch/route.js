@@ -65,7 +65,7 @@ async function gaqlSearch(accessToken, customerId, query) {
   let nextPageToken = null
   let safety = 0
   while (safety < 20) {
-    const body = { query, pageSize: 10000 }
+    const body = { query }
     if (nextPageToken) body.pageToken = nextPageToken
     const res = await fetch(
       `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${customerId}/googleAds:search`,
