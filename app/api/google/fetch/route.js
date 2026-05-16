@@ -355,6 +355,13 @@ async function runSync(opts = {}) {
     }
   }
 
+  // DEBUG: per-campaign aggregation so we can see what's in allRows
+  const _campAgg = {}
+  for (const r of allRows) {
+    const k = r.campaign || '(empty)'
+    if (!_campAgg[k]) _campAgg[k] = { spend:0, impressions:0, clicks:0, leads:0, count:0 }
+    _campAgg[k].spend += r.spend; _campAgg[k].impressions += r.impressions; _campAgg[k].clicks += r.clicks; _campAgg[k].leads += r.leads; _campAgg[k].count++
+  }
   return {
     status: 200,
     body: {
@@ -363,6 +370,7 @@ async function runSync(opts = {}) {
       totalRows: allRows.length,
       totals,
       projects: results,
+      _campaigns: _campAgg,
     },
   }
 }
