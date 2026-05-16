@@ -348,12 +348,17 @@ export async function GET(request) {
   // Health check: verify we can get an access token
   try {
     const token = await getAccessToken()
+    const diag = globalThis.__GAdsOAuthDiag || {}
     return Response.json({
       ok: true,
       customerId: process.env.GOOGLE_ADS_CUSTOMER_ID,
       loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || null,
       hasDeveloperToken: !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+      developerTokenLen: (process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '').length,
       accessTokenPreview: token ? token.slice(0, 20) + '...' : null,
+      oauthScope: diag.scope,
+      oauthExpiresIn: diag.expires_in,
+      apiVersion: GOOGLE_ADS_API_VERSION,
     })
   } catch (err) {
     return Response.json({ ok: false, error: String(err.message || err) }, { status: 500 })
