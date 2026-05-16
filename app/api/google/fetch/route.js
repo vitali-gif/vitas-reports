@@ -41,6 +41,14 @@ async function getAccessToken() {
     throw new Error(`OAuth token refresh failed ${res.status}: ${txt.slice(0, 300)}`)
   }
   const json = await res.json()
+  // Diagnostic: capture the scopes granted by the refresh token
+  globalThis.__GAdsOAuthDiag = {
+    hasAccessToken: Boolean(json.access_token),
+    tokenLen: (json.access_token || '').length,
+    scope: json.scope || '(not returned)',
+    expires_in: json.expires_in,
+    token_type: json.token_type,
+  }
   return json.access_token
 }
 
@@ -65,7 +73,7 @@ async function gaqlSearch(accessToken, customerId, query) {
     )
     if (!res.ok) {
       const txt = await res.text()
-      throw new Error(`Google Ads API ${res.status}: ${txt.slice(0, 500)}`)
+      throw new Error(`Google Ads API ${res.status}: ${txt.slice(0, 2000)}`)
     }
     const json = await res.json()
     if (Array.isArray(json.results)) allRows.push(...json.results)
