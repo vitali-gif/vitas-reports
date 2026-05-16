@@ -41,14 +41,6 @@ async function getAccessToken() {
     throw new Error(`OAuth token refresh failed ${res.status}: ${txt.slice(0, 300)}`)
   }
   const json = await res.json()
-  // Diagnostic: capture the scopes granted by the refresh token
-  globalThis.__GAdsOAuthDiag = {
-    hasAccessToken: Boolean(json.access_token),
-    tokenLen: (json.access_token || '').length,
-    scope: json.scope || '(not returned)',
-    expires_in: json.expires_in,
-    token_type: json.token_type,
-  }
   return json.access_token
 }
 
@@ -319,12 +311,10 @@ async function runSync(opts = {}) {
   }
 
   const results = []
-  const _projDebug = []
   for (const p of projects || []) {
     const needle = (p.name || '').toLowerCase().trim()
     if (!needle) continue
     const mine = allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
-    _projDebug.push({ project: p.name, needle, matchCount: mine.length, matched: mine.map(r => ({ campaign: r.campaign, spend: r.spend, leads: r.leads })) })
     if (mine.length === 0) {
       results.push({ project: p.name, skipped: true, reason: 'no matching campaigns' })
       continue
@@ -357,13 +347,6 @@ async function runSync(opts = {}) {
     }
   }
 
-  // DEBUG: per-campaign aggregation so we can see what's in allRows
-  const _campAgg = {}
-  for (const r of allRows) {
-    const k = r.campaign || '(empty)'
-    if (!_campAgg[k]) _campAgg[k] = { spend:0, impressions:0, clicks:0, leads:0, count:0 }
-    _campAgg[k].spend += r.spend; _campAgg[k].impressions += r.impressions; _campAgg[k].clicks += r.clicks; _campAgg[k].leads += r.leads; _campAgg[k].count++
-  }
   return {
     status: 200,
     body: {
@@ -372,8 +355,6 @@ async function runSync(opts = {}) {
       totalRows: allRows.length,
       totals,
       projects: results,
-      _campaigns: _campAgg,
-      _projDebug,
     },
   }
 }
@@ -405,67 +386,15 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
-  // Optional debug: ?probeCustomers=1 lists all customers with their account names + campaign counts
-  if (request?.url && request.url.includes('probeCustomers=1')) {
-    try {
-      const token = await getAccessToken()
-      const headers = { Authorization: `Bearer ${token}`, 'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN }
-      if (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) headers['login-customer-id'] = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID
-      const customers = ['2464593851','4852056421','3001397737','5213006256','7978284635']
-      const results = []
-      for (const cid of customers) {
-        try {
-          const body = { query: 'SELECT customer.descriptive_name, customer.id, customer.currency_code FROM customer LIMIT 1' }
-          const r = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${cid}/googleAds:search`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-          const txt = await r.text()
-          let info = null
-          try { info = JSON.parse(txt) } catch {}
-          const c = info?.results?.[0]?.customer
-          // Also count campaigns
-          let campCount = null, campNames = []
-          try {
-            const r2 = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${cid}/googleAds:search`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ query: "SELECT campaign.name FROM campaign WHERE campaign.status != 'REMOVED' LIMIT 50" }) })
-            const j = await r2.json()
-            campCount = (j.results || []).length
-            campNames = (j.results || []).map(x => x.campaign?.name).filter(Boolean).slice(0, 30)
-          } catch (e) { campCount = 'err: ' + e.message }
-          results.push({ cid, status: r.status, name: c?.descriptiveName, currency: c?.currencyCode, campCount, campNames })
-        } catch (e) {
-          results.push({ cid, error: String(e.message || e) })
-        }
-      }
-      return Response.json({ results })
-    } catch (e) {
-      return Response.json({ error: String(e.message || e) }, { status: 500 })
-    }
-  }
-
-  // Optional debug: ?listCustomers=1 returns the list of accessible customer IDs
-  if (request?.url && request.url.includes('listCustomers=1')) {
-    try {
-      const token = await getAccessToken()
-      const headers = { Authorization: `Bearer ${token}`, 'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN }
-      const r = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`, { headers })
-      const txt = await r.text()
-      return Response.json({ status: r.status, body: txt.slice(0, 3000) })
-    } catch (e) {
-      return Response.json({ error: String(e.message || e) }, { status: 500 })
-    }
-  }
-
   // Health check: verify we can get an access token
   try {
     const token = await getAccessToken()
-    const diag = globalThis.__GAdsOAuthDiag || {}
     return Response.json({
       ok: true,
       customerId: process.env.GOOGLE_ADS_CUSTOMER_ID,
       loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || null,
       hasDeveloperToken: !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
-      developerTokenLen: (process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '').length,
       accessTokenPreview: token ? token.slice(0, 20) + '...' : null,
-      oauthScope: diag.scope,
-      oauthExpiresIn: diag.expires_in,
       apiVersion: GOOGLE_ADS_API_VERSION,
     })
   } catch (err) {
