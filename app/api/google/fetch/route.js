@@ -319,10 +319,12 @@ async function runSync(opts = {}) {
   }
 
   const results = []
+  const _projDebug = []
   for (const p of projects || []) {
     const needle = (p.name || '').toLowerCase().trim()
     if (!needle) continue
     const mine = allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
+    _projDebug.push({ project: p.name, needle, matchCount: mine.length, matched: mine.map(r => ({ campaign: r.campaign, spend: r.spend, leads: r.leads })) })
     if (mine.length === 0) {
       results.push({ project: p.name, skipped: true, reason: 'no matching campaigns' })
       continue
@@ -371,6 +373,7 @@ async function runSync(opts = {}) {
       totals,
       projects: results,
       _campaigns: _campAgg,
+      _projDebug,
     },
   }
 }
