@@ -353,6 +353,19 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
+  // Optional debug: ?listCustomers=1 returns the list of accessible customer IDs
+  if (request?.url && request.url.includes('listCustomers=1')) {
+    try {
+      const token = await getAccessToken()
+      const headers = { Authorization: `Bearer ${token}`, 'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN }
+      const r = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`, { headers })
+      const txt = await r.text()
+      return Response.json({ status: r.status, body: txt.slice(0, 3000) })
+    } catch (e) {
+      return Response.json({ error: String(e.message || e) }, { status: 500 })
+    }
+  }
+
   // Health check: verify we can get an access token
   try {
     const token = await getAccessToken()
