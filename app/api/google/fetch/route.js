@@ -181,7 +181,7 @@ async function runSync(opts = {}) {
     return { status: 500, body: { error: err.message } }
   }
 
-  // Transform to our common row schema (same as Facebook rows)
+  // Transform ad_group_ad rows (Search/Display ad-level metrics)
   const allRows = rawRows.map(r => ({
     campaign: r.campaign?.name || '',
     adSet: r.adGroup?.name || '',
@@ -195,6 +195,47 @@ async function runSync(opts = {}) {
     clicks: num(r.metrics?.clicks),
     leads: num(r.metrics?.conversions),
   }))
+
+  // ALSO query campaign-level metrics — this catches Performance Max campaigns which
+  // don't have ad_group_ad rows. We add campaign-level totals for any campaign that
+  // didn't appear in ad_group_ad results.
+  try {
+    const campQuery = `
+      SELECT
+        campaign.name,
+        campaign.advertising_channel_type,
+        metrics.cost_micros,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.conversions
+      FROM campaign
+      WHERE segments.date BETWEEN '${since}' AND '${until}'
+        AND campaign.status != 'REMOVED'
+    `
+    const campRows = await gaqlSearch(accessToken, customerId, campQuery)
+    const seenCampaigns = new Set(allRows.map(r => r.campaign).filter(Boolean))
+    for (const r of campRows) {
+      const cn = r.campaign?.name || ''
+      if (!cn || seenCampaigns.has(cn)) continue  // already have ad-level data for this campaign
+      // PMax / Smart / other "campaign-only" types — emit a single row per campaign
+      const channelType = r.campaign?.advertisingChannelType || ''
+      allRows.push({
+        campaign: cn,
+        adSet: channelType || '(campaign-level)',
+        adName: cn,
+        adText: '',
+        gender: '',
+        age: '',
+        spend: num(r.metrics?.costMicros) / 1_000_000,
+        impressions: num(r.metrics?.impressions),
+        reach: 0,
+        clicks: num(r.metrics?.clicks),
+        leads: num(r.metrics?.conversions),
+      })
+    }
+  } catch (err) {
+    console.log('campaign-level query failed:', err.message || err)
+  }
 
   const totals = computeTotals(allRows)
 
