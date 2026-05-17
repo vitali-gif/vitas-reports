@@ -386,57 +386,6 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
-  // TEMP: ?probeAll=1 returns all accessible accounts + their basics
-  if (request?.url && request.url.includes('probeAll=1')) {
-    try {
-      const token = await getAccessToken()
-      const baseHeaders = { Authorization: `Bearer ${token}`, 'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN }
-      // 1) list accessible customer IDs
-      const listResp = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`, { headers: baseHeaders })
-      const listJson = await listResp.json()
-      const ids = (listJson.resourceNames || []).map(r => r.replace('customers/', ''))
-      // 2) for each, query its descriptive name + manager flag + active campaign count
-      const results = []
-      for (const cid of ids) {
-        const headers = { ...baseHeaders, 'Content-Type': 'application/json' }
-        // Try without login-customer-id first
-        let resp, json, used = 'direct'
-        try {
-          resp = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${cid}/googleAds:search`, { method: 'POST', headers, body: JSON.stringify({ query: 'SELECT customer.descriptive_name, customer.manager, customer.currency_code, customer.test_account FROM customer LIMIT 1' }) })
-          json = await resp.json()
-          if (resp.status !== 200) {
-            // Retry with MCC as login-customer-id
-            used = 'via_mcc'
-            const headers2 = { ...headers, 'login-customer-id': process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID }
-            resp = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${cid}/googleAds:search`, { method: 'POST', headers: headers2, body: JSON.stringify({ query: 'SELECT customer.descriptive_name, customer.manager, customer.currency_code, customer.test_account FROM customer LIMIT 1' }) })
-            json = await resp.json()
-          }
-        } catch (e) {
-          results.push({ cid, error: String(e.message || e) })
-          continue
-        }
-        const c = json?.results?.[0]?.customer
-        if (resp.status !== 200) {
-          results.push({ cid, status: resp.status, error: (json?.error?.message || '').slice(0, 200) })
-          continue
-        }
-        // Get campaigns count
-        let campCount = 0, campNames = []
-        try {
-          const headers3 = { ...headers, 'login-customer-id': process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID }
-          const cr = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${cid}/googleAds:search`, { method: 'POST', headers: c?.manager ? headers : headers3, body: JSON.stringify({ query: "SELECT campaign.name, campaign.status FROM campaign WHERE campaign.status != 'REMOVED' LIMIT 100" }) })
-          const cj = await cr.json()
-          campCount = (cj.results || []).length
-          campNames = (cj.results || []).map(x => `${x.campaign?.status === 'ENABLED' ? '✅' : '⏸️'} ${x.campaign?.name}`).filter(Boolean)
-        } catch {}
-        results.push({ cid, used, name: c?.descriptiveName, manager: c?.manager === true, test: c?.testAccount === true, currency: c?.currencyCode, activeCampaigns: campCount, campaignNames: campNames })
-      }
-      return Response.json({ totalAccessible: ids.length, results })
-    } catch (e) {
-      return Response.json({ error: String(e.message || e) }, { status: 500 })
-    }
-  }
-
   // Health check: verify we can get an access token
   try {
     const token = await getAccessToken()
