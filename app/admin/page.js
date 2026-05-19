@@ -422,7 +422,7 @@ const selectProject = async (client, project) => {
       for (const o of objs) objCounts[o] = (objCounts[o] || 0) + 1;
     }
 
-    const objEntries = Object.entries(objCounts).sort((a, b) => b[1] - a[1]);
+    const objEntries = Object.entries(objCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
     const total = objEntries.reduce((s, [, c]) => s + c, 0);
 
     if (objEntries.length === 0) {
