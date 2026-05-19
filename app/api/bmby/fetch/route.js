@@ -363,13 +363,23 @@ async function runSync(opts = {}) {
       }
     }
 
-    // 3. Map client_id → relevant flag + status (from clients table, ALL clients not just inRange)
+    // 3. Map client_id → relevant flag + status + city/address/objection (from clients table)
     const clientRelevant = new Map()
     const clientStatus = new Map()
+    const clientCity = new Map()       // for "התפלגות לפי יישוב"
+    const clientAddress = new Map()
+    const clientObjection = new Map()  // for "התנגדויות"
     for (const c of clients) {
       if (!c.client_id) continue
-      clientRelevant.set(String(c.client_id), c.relevant === '1' || c.relevant === 1)
-      if (c.status) clientStatus.set(String(c.client_id), String(c.status))
+      const cid = String(c.client_id)
+      clientRelevant.set(cid, c.relevant === '1' || c.relevant === 1)
+      if (c.status) clientStatus.set(cid, String(c.status))
+      const city = (c.city || '').toString().trim()
+      const addr = (c.address || '').toString().trim()
+      if (city) clientCity.set(cid, city)
+      if (addr) clientAddress.set(cid, addr)
+      const obj = (c.objection || '').toString().trim()
+      if (obj) clientObjection.set(cid, obj)
     }
 
     // 4. Per-media aggregation from LIDs
@@ -560,6 +570,25 @@ async function runSync(opts = {}) {
       contractValue: s.contractValue,
     }))
 
+    // Build per-LID rows for the "מחולל דוחות" sub-tab (city/objection/last-meeting view).
+    // Shape: { address, objections, lastMeeting } — same shape `mapCrmReportRows` produces from xlsx.
+    const crmReportRows = []
+    for (const lid of aprilLids) {
+      const cid = String(lid.client_id || '')
+      if (!cid) continue
+      const city = clientCity.get(cid) || ''
+      const address = clientAddress.get(cid) || ''
+      const objection = clientObjection.get(cid) || ''
+      // last appointment date for this client (any status), within fetched tasks
+      const apptDates = (clientApptList.get(cid) || []).map(a => a.date).filter(Boolean).sort()
+      const lastMeeting = apptDates.length ? apptDates[apptDates.length - 1] : ''
+      crmReportRows.push({
+        address: city || address || '',
+        objections: objection,
+        lastMeeting,
+      })
+    }
+
     // Upsert to Supabase — `data` stays xlsx-shape so the existing dashboard aggregator works
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
@@ -572,6 +601,25 @@ async function runSync(opts = {}) {
     }, { onConflict: 'project_id,source,month' })
 
     if (upsertErr) errors.push('upsert: ' + upsertErr.message)
+
+    // Second upsert: `crm_reports` source populates the "מחולל דוחות" sub-tab
+    // (city distribution chart + objections chart + last-meeting feed).
+    const { error: upsertErr2 } = await supabase.from('reports').upsert({
+      project_id: p.id,
+      source: 'crm_reports',
+      month: m,
+      data: crmReportRows,
+      summary: {
+        totalRows: crmReportRows.length,
+        withCity: crmReportRows.filter(r => r.address).length,
+        withObjections: crmReportRows.filter(r => r.objections).length,
+        withMeeting: crmReportRows.filter(r => r.lastMeeting).length,
+      },
+      file_name: 'BMBY API (live)',
+      row_count: crmReportRows.length,
+    }, { onConflict: 'project_id,source,month' })
+
+    if (upsertErr2) errors.push('upsert crm_reports: ' + upsertErr2.message)
 
     return {
       project: p.name,
