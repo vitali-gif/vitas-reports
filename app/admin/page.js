@@ -417,7 +417,27 @@ const selectProject = async (client, project) => {
     destroyCharts();
 
     const crmReports = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
-    if (crmReports.length === 0) return <div className="welcome-center"><div className="icon">ð­</div><h3>\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 CRM \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d6\u05d4</h3></div>;
+    const crmRepCount = reports.filter(r => r.month === selectedMonth && r.source === 'crm_reports').length;
+    if (crmReports.length === 0) {
+      const isCustomRange = selectedMonth && selectedMonth.includes('_');
+      return (
+        <div className="welcome-center" style={{padding:'40px 20px',textAlign:'center'}}>
+          <div className="icon" style={{fontSize:'3em',marginBottom:'10px'}}>{refreshingCrm ? '⏳' : '💭'}</div>
+          {refreshingCrm ? (
+            <>
+              <h3>{'מושך נתוני CRM מ- BMBY...'}</h3>
+              <p style={{color:'#64748b',marginTop:'8px'}}>{'זה לוקח כ-25 שניות לטווח התאריכים הזה'}</p>
+            </>
+          ) : (
+            <>
+              <h3>{'אין נתוני CRM לתקופה זו'}</h3>
+              <p style={{color:'#64748b',marginTop:'8px'}}>{isCustomRange ? 'טווח מותאם אישי דורש משיכת נתונים חדשה' : 'לחץ על הכפתור כדי למשוך נתונים'}</p>
+              <button className="btn btn-primary" style={{marginTop:'16px'}} onClick={refreshFromBmby}>{'🔄 משוך נתונים מ-BMBY'}</button>
+            </>
+          )}
+        </div>
+      );
+    }
 
     let allCrmRows = [];
     crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
