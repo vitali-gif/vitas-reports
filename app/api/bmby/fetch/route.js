@@ -460,6 +460,32 @@ async function runSync(opts = {}) {
       if (media) clientMedia.set(String(c.client_id), media)
     }
 
+    // Debug: also dump all recent contracts (any date field in May or April 2026)
+    const _allRecentContracts = contracts.filter(k => {
+      const dates = [k.agreement_date, k.contract_date, k.signed_date, k.create_date]
+      return dates.some(d => d && /2026-(04|05)/.test(d.toString()))
+    }).map(k => {
+      const af = {}
+      for (const [fk, fv] of Object.entries(k)) {
+        if (fv !== '' && fv !== null && fv !== undefined) af[fk] = fv
+      }
+      return {
+        client_id: k.client_id,
+        name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim(),
+        agreement_date: k.agreement_date,
+        contract_date: k.contract_date,
+        signed_date: k.signed_date,
+        create_date: k.create_date,
+        list_price: num(k.list_price),
+        agreement_type: k.agreement_type,
+        in_window_by_agreement: inRangeDate(k.agreement_date),
+        in_window_by_contract: inRangeDate(k.contract_date),
+        in_window_by_signed: inRangeDate(k.signed_date),
+        in_window_by_create: inRangeDate(k.create_date),
+        allFields: af,
+      }
+    })
+
     // 5. Contracts: agreement_date in window. Attribute to media via client_id with fallback chain.
     const contractsInRange = contracts.filter(k => inRangeDate(k.agreement_date || k.contract_date || k.signed_date || k.create_date))
     const _contractAttribDebug = []
@@ -480,6 +506,10 @@ async function runSync(opts = {}) {
         attributedMedia = clientMedia.get(cid); attribSource = 'client_media'
       }
       if (!attributedMedia) { attributedMedia = 'ללא מקור'; attribSource = 'none' }
+      const _allFields = {}
+      for (const [fk, fv] of Object.entries(k)) {
+        if (fv !== '' && fv !== null && fv !== undefined) _allFields[fk] = fv
+      }
       _contractAttribDebug.push({
         client_id: cid,
         client_name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim() || undefined,
@@ -489,6 +519,7 @@ async function runSync(opts = {}) {
         price_agreement_inc_vat: num(k.price_agreement_inc_vat),
         attribSource,
         attributedMedia,
+        allFields: _allFields,
       })
       const bucket = ensureSrc(attributedMedia)
       totals.contracts += 1
@@ -569,6 +600,7 @@ async function runSync(opts = {}) {
           attributedMedia: c.attributedMedia,
         })),
         aprilLidStatusCounts: _aprilLidStatusCounts,
+        allRecentContracts: _allRecentContracts,
         apptCounts: {
           inWindow: clientsWithAppt.size,
           inWindowDone: clientsWithDoneAppt.size,
