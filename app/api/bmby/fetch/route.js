@@ -589,37 +589,19 @@ async function runSync(opts = {}) {
       })
     }
 
-    // Upsert to Supabase — `data` stays xlsx-shape so the existing dashboard aggregator works
+    // Single upsert: store source-level rows in `data`, and per-LID city/objection
+    // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
       month: m,
       data: xlsxRows,
-      summary: { ...totals, sources },
+      summary: { ...totals, sources, crmRepRows: crmReportRows },
       file_name: 'BMBY API (live)',
       row_count: aprilLids.length + contractsInRange.length + pricesInRange.length,
     }, { onConflict: 'project_id,source,month' })
 
     if (upsertErr) errors.push('upsert: ' + upsertErr.message)
-
-    // Second upsert: `crm_reports` source populates the "מחולל דוחות" sub-tab
-    // (city distribution chart + objections chart + last-meeting feed).
-    const { error: upsertErr2 } = await supabase.from('reports').upsert({
-      project_id: p.id,
-      source: 'crm_reports',
-      month: m,
-      data: crmReportRows,
-      summary: {
-        totalRows: crmReportRows.length,
-        withCity: crmReportRows.filter(r => r.address).length,
-        withObjections: crmReportRows.filter(r => r.objections).length,
-        withMeeting: crmReportRows.filter(r => r.lastMeeting).length,
-      },
-      file_name: 'BMBY API (live)',
-      row_count: crmReportRows.length,
-    }, { onConflict: 'project_id,source,month' })
-
-    if (upsertErr2) errors.push('upsert crm_reports: ' + upsertErr2.message)
 
     return {
       project: p.name,

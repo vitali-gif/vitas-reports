@@ -169,11 +169,13 @@ export default function ClientPage() {
     if (!selectedMonth || reports.length === 0) return null
     destroyCharts()
 
-    const crmRepReports = reports.filter(r => r.month === selectedMonth && r.source === 'crm_reports')
-    if (crmRepReports.length === 0) return <div className="welcome-center"><div className="icon">💭</div><h3>אין נתוני CRM דוחות לחודש זה</h3></div>
-
+    // Source data: prefer crmRepRows stored in 'crm' rows' summary (BMBY API), fallback to legacy 'crm_reports' xlsx rows
+    const crmRows = reports.filter(r => r.month === selectedMonth && r.source === 'crm')
+    const legacyRepRows = reports.filter(r => r.month === selectedMonth && r.source === 'crm_reports')
     let allRows = []
-    crmRepReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data) })
+    crmRows.forEach(r => { if (r.summary && Array.isArray(r.summary.crmRepRows)) allRows = allRows.concat(r.summary.crmRepRows) })
+    legacyRepRows.forEach(r => { if (r.data) allRows = allRows.concat(r.data) })
+    if (allRows.length === 0) return <div className="welcome-center"><div className="icon">💭</div><h3>אין נתוני CRM דוחות לחודש זה</h3></div>
     const repData = aggregateCrmReportRows(allRows)
     const rt = repData.totals
 
@@ -600,7 +602,9 @@ export default function ClientPage() {
     const fbReports = currentReports.filter(r => r.source === 'facebook')
     const gReports = currentReports.filter(r => r.source && r.source.startsWith('google'))
     const crmReports = currentReports.filter(r => r.source === 'crm')
-    const crmRepReports = currentReports.filter(r => r.source === 'crm_reports')
+    const crmRepReports = currentReports.filter(r =>
+      r.source === 'crm_reports' || (r.source === 'crm' && r.summary && Array.isArray(r.summary.crmRepRows) && r.summary.crmRepRows.length > 0)
+    )
     const hasFb = fbReports.length > 0
     const hasPmax = gReports.some(r => r.source === 'google_pmax')
     const hasSearch = gReports.some(r => r.source === 'google_search')
