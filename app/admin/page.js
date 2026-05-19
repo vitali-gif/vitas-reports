@@ -248,16 +248,25 @@ const selectProject = async (client, project) => {
     return () => clearInterval(interval);
   }, [refreshStartTime]);
 
-  // Auto-fetch BMBY when user picks a custom date range that has no cached data.
-  // Skips monthly presets (handled by daily cron) — only date-range keys like "2026-05-18_2026-05-18".
+  // Auto-fetch any missing data sources when user picks a period.
+  // Replaces the old manual refresh buttons — if Meta/Google/BMBY data is missing
+  // for the selected period, fetch it automatically (with debounce).
   useEffect(() => {
     if (!selectedMonth || !selectedProject) return;
-    if (refreshingCrm) return;
-    if (!selectedMonth.includes('_')) return; // only custom ranges
-    const hasCrmForPeriod = reports.some(r => r.month === selectedMonth && r.source === 'crm');
-    if (hasCrmForPeriod) return;
-    // Trigger after a short delay so we don't fire during quick toggling
-    const tm = setTimeout(() => { refreshFromBmby(); }, 800);
+    if (refreshing || refreshingCrm) return;
+    const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
+    const hasGoogle = reports.some(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
+    const hasCrm = reports.some(r => r.month === selectedMonth && r.source === 'crm');
+    if (hasMeta && hasGoogle && hasCrm) return; // fully cached
+    const tm = setTimeout(() => {
+      if (!hasMeta || !hasGoogle) {
+        const payload = selectedMonth.includes('_')
+          ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
+          : { month: selectedMonth };
+        triggerFetch(payload);
+      }
+      if (!hasCrm) refreshFromBmby();
+    }, 800);
     return () => clearTimeout(tm);
   }, [selectedMonth, selectedProject?.id, reports.length]);
 
@@ -1322,7 +1331,7 @@ const selectProject = async (client, project) => {
         );
       })()}
       <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav"><button className="nav-btn" onClick={refreshAll} disabled={refreshing} title="משוך נתונים חיים מ-Facebook + Google">{refreshing ? '\u27f3 \u05de\u05e8\u05e2\u05e0\u05df...' : '\ud83d\udd04 \u05e8\u05e2\u05e0\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</button><button className="nav-btn" onClick={refreshFromBmby} disabled={refreshingCrm} title="משוך נתוני CRM חיים מ-BMBY">{refreshingCrm ? '\u27f3 \u05de\u05e8\u05e2\u05e0\u05df CRM...' : '\ud83e\uddfe \u05e8\u05e2\u05e0\u05df CRM'}</button><button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
+      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav">{(refreshing || refreshingCrm) && <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'rgba(59,130,246,0.12)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:14}}><span style={{display:'inline-block',width:14,height:14,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}></span>{refreshingCrm ? 'מושך CRM...' : 'מושך נתונים...'}</div>}<button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
 
       <div className="app-layout">
         <div className="sidebar"><div style={{padding: '0 15px', marginBottom: 20}}>
