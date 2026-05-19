@@ -336,18 +336,12 @@ async function runSync(opts = {}) {
       return ty === 'lid' && inRangeDate(t.start_date || t.create_date)
     })
 
-    // 2. Appointments — multiple counting strategies to find the one matching BMBY's report
-    // Strategy A (current): client has appointment in window
-    // Strategy B: client has ANY appointment (regardless of date)
-    // Strategy C: client has appointment with start_date >= their first LID's start_date
-    const clientsWithAppt = new Set()
-    const clientsWithDoneAppt = new Set()
-    const clientsWithCancelledAppt = new Set()
-    const clientsWithAnyAppt = new Set()
-    const clientsWithAnyDoneAppt = new Set()
-    const clientsWithAnyCancelledAppt = new Set()
-    // For each client, track earliest LID start_date (in window) — used by strategy C
-    const clientFirstAprilLidDate = new Map()
+    // 2. Appointments — build per-client list of events so we can filter
+    //    by appt date relative to the LID's start_date (post-LID logic).
+    const clientApptList = new Map()  // cid → [{ date, completed, cancelled }]
+    const clientsWithAppt = new Set()           // window-based (any status)
+    const clientsWithDoneAppt = new Set()       // window + done
+    const clientsWithCancelledAppt = new Set()  // window + cancelled
     for (const t of tasks) {
       const tyRaw = (t.type || '').toString()
       const ty = tyRaw.toLowerCase()
@@ -355,17 +349,17 @@ async function runSync(opts = {}) {
       if (!isAppt) continue
       const cid = String(t.client_id || '')
       if (!cid) continue
-      const statusRaw = (t.status || '').toString()
-      const status = statusRaw.toLowerCase()
-      // Always count toward "any appointment" set
-      clientsWithAnyAppt.add(cid)
-      if (/done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)) clientsWithAnyDoneAppt.add(cid)
-      if (/cancel|בוטל/.test(status)) clientsWithAnyCancelledAppt.add(cid)
-      // Window-only sets
+      const status = (t.status || '').toString().toLowerCase()
+      const apptDate = (t.start_date || t.create_date || '').toString().slice(0, 10)
+      const isDone = /done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)
+      const isCanc = /cancel|בוטל/.test(status)
+      if (!clientApptList.has(cid)) clientApptList.set(cid, [])
+      clientApptList.get(cid).push({ date: apptDate, completed: isDone, cancelled: isCanc })
+      // Window-only sets (for compatibility with diag)
       if (inRangeDate(t.start_date || t.create_date)) {
         clientsWithAppt.add(cid)
-        if (/done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)) clientsWithDoneAppt.add(cid)
-        if (/cancel|בוטל/.test(status)) clientsWithCancelledAppt.add(cid)
+        if (isDone) clientsWithDoneAppt.add(cid)
+        if (isCanc) clientsWithCancelledAppt.add(cid)
       }
     }
 
@@ -420,13 +414,16 @@ async function runSync(opts = {}) {
         bucket.nonRelevantLeads += 1
       }
 
-      // Meetings — final logic (matches BMBY's "דוח יחסי המרה" within ~96%):
-      //   "תואמו" / "בוצעו" both use any-time done appointment per April-LID client.
-      //   BMBY only exposes 'completed' / 'canceled' statuses — no "scheduled-only" state to
-      //   tell apart, so we treat any non-cancelled appointment as both scheduled & completed.
-      //   "בוטלו" = April-LID clients with an in-window cancellation.
-      const completedHit = clientsWithAnyDoneAppt.has(cid)
-      const scheduledHit = completedHit
+      // Meetings — post-LID logic: only count appointments that occurred AFTER (or same date as)
+      // the LID. This excludes historical appointments of returning customers.
+      //   "תואמו" = LIDs whose client has any appointment with start_date >= LID's start_date
+      //   "בוצעו" = LIDs whose client has a completed appointment with start_date >= LID's start_date
+      //   "בוטלו" = LIDs whose client has a cancelled appointment in the window
+      const lidDate = (lid.start_date || lid.create_date || '').toString().slice(0, 10)
+      const apptList = clientApptList.get(cid) || []
+      const postLidAppts = apptList.filter(a => !a.date || a.date >= lidDate)
+      const scheduledHit = postLidAppts.length > 0 && postLidAppts.some(a => !a.cancelled)
+      const completedHit = postLidAppts.some(a => a.completed)
       const cancelledHit = clientsWithCancelledAppt.has(cid)
       if (scheduledHit) { totals.meetingsScheduled += 1; bucket.meetingsScheduled += 1 }
       if (completedHit) { totals.meetingsCompleted += 1; bucket.meetingsCompleted += 1 }
@@ -486,8 +483,14 @@ async function runSync(opts = {}) {
       }
     })
 
-    // 5. Contracts: agreement_date in window. Attribute to media via client_id with fallback chain.
-    const contractsInRange = contracts.filter(k => inRangeDate(k.agreement_date || k.contract_date || k.signed_date || k.create_date))
+    // 5. Contracts: include if EITHER agreement_date OR contract_date is in window.
+    // BMBY's report categorizes contracts as:
+    //   הסכמים נסגרו = filtered by agreement_date (preliminary bookings)
+    //   חוזים נחתמו  = filtered by contract_date (final paperwork)
+    // We combine both into a single "contracts" count.
+    const contractsInRange = contracts.filter(k =>
+      inRangeDate(k.agreement_date) || inRangeDate(k.contract_date) || inRangeDate(k.signed_date)
+    )
     const _contractAttribDebug = []
     for (const k of contractsInRange) {
       const cid = String(k.client_id || '')
