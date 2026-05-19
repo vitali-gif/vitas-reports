@@ -608,9 +608,7 @@ async function runSync(opts = {}) {
           inWindow: clientsWithAppt.size,
           inWindowDone: clientsWithDoneAppt.size,
           inWindowCancelled: clientsWithCancelledAppt.size,
-          anyTime: clientsWithAnyAppt.size,
-          anyTimeDone: clientsWithAnyDoneAppt.size,
-          anyTimeCancelled: clientsWithAnyCancelledAppt.size,
+          totalClientsWithAppts: clientApptList.size,
         },
       },
     }
