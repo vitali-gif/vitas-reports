@@ -342,74 +342,56 @@ const selectProject = async (client, project) => {
     legacyRepRows.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
     if (allRows.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udcad'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 CRM \u05d3\u05d5\u05d7\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d6\u05d4'}</h3></div>;
     const repData = aggregateCrmReportRows(allRows);
-    const rt = repData.totals;
 
-    const cityEntries = Object.entries(repData.cities).sort((a, b) => b[1] - a[1]);
-    const objEntries = Object.entries(repData.objectionTypes).sort((a, b) => b[1] - a[1]);
+    // Top 10 cities only — clean, focused view
+    const cityEntries = Object.entries(repData.cities)
+      .filter(([n]) => n && n !== 'לא צוין')
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
     const cityNames = cityEntries.map(([n]) => n);
-    const objNames = objEntries.map(([n]) => n);
+    const cityCounts = cityEntries.map(([, c]) => c);
 
     setTimeout(() => {
       destroyCharts();
       if (cityNames.length > 0) {
         createChart('crmRepCityChart', 'bar', cityNames, [{
-          label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: cityNames.map(n => repData.cities[n]),
-          backgroundColor: COLORS.slice(0, cityNames.length)
-        }], { y: { beginAtZero: true, position: 'right' } });
-      }
-      if (objNames.length > 0) {
-        createChart('crmRepObjChart', 'doughnut', objNames, [{
-          data: objNames.map(n => repData.objectionTypes[n]),
-          backgroundColor: COLORS.slice(0, objNames.length)
-        }]);
+          label: 'לידים', data: cityCounts,
+          backgroundColor: COLORS.slice(0, cityNames.length),
+          borderRadius: 6,
+        }], {
+          y: { beginAtZero: true, position: 'right' },
+          indexAxis: 'y',
+        });
       }
     }, 200);
 
+    if (cityEntries.length === 0) {
+      return <div className="welcome-center"><div className="icon">🏘️</div><h3>אין נתוני יישובים לתקופה זו</h3></div>;
+    }
+
     return (
-      <>
-        <div className="kpi-grid">
-          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>{'\ud83d\udcdd'}</div><div className="kpi-label">{'\u05e1\u05d4"\u05db \u05e9\u05d5\u05d8\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(rt.totalRows)}</div></div>
-          <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>{'\ud83c\udfd8\ufe0f'}</div><div className="kpi-label">{'\u05e2\u05e8\u05d9\u05dd \u05d9\u05d9\u05d7\u05d5\u05d3\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(rt.uniqueCities)}</div></div>
-          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>{'\u26a0\ufe0f'}</div><div className="kpi-label">{'\u05e2\u05dd \u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{formatNum(rt.withObjections)}</div></div>
-          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>{'\ud83d\udcc5'}</div><div className="kpi-label">{'\u05e2\u05dd \u05e4\u05d2\u05d9\u05e9\u05d4/\u05de\u05e9\u05d9\u05de\u05d4'}</div><div className="kpi-value">{formatNum(rt.withMeeting)}</div></div>
-          <div className="kpi-card pink"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(236,72,153,0.1)',color:'var(--pink)'}}>{'\ud83d\udcca'}</div><div className="kpi-label">{'% \u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</div><div className="kpi-value">{rt.objectionRate.toFixed(1)}%</div></div>
-          <div className="kpi-card cyan"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(6,182,212,0.1)',color:'var(--cyan)'}}>{'\ud83d\udcca'}</div><div className="kpi-label">{'% \u05e4\u05d2\u05d9\u05e9\u05d5\u05ea'}</div><div className="kpi-value">{rt.meetingRate.toFixed(1)}%</div></div>
+      <div className="section">
+        <div className="section-title">
+          <div className="section-icon" style={{background:'var(--gradient-1)'}}>🏘️</div>
+          Top 10 יישובים
         </div>
-
-        {/* Data Table */}
-        <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de\u05e4\u05d5\u05e8\u05d8\u05d9\u05dd'}</div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead><tr>
-                <th>#</th>
-                <th>{'\u05db\u05ea\u05d5\u05d1\u05ea/\u05d9\u05d9\u05e9\u05d5\u05d1'}</th>
-                <th>{'\u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</th>
-                <th>{'\u05de\u05e9\u05d9\u05dd\u05d4/\u05e4\u05d2\u05d9\u05e9\u05d4 \u05d0\u05d7\u05e8\u05d5\u05e0\u05d4'}</th>
-              </tr></thead>
-              <tbody>
-                {allRows.map((row, i) => (
-                  <tr key={i}>
-                    <td>{i + 1}</td>
-                    <td style={{fontWeight:600}}>{row.address || '-'}</td>
-                    <td>{row.objections || '-'}</td>
-                    <td>{row.lastMeeting || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
+          <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmRepCityChart"></canvas></div></div>
+          <div className="chart-card" style={{padding: '20px'}}>
+            <ol style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '15px'}}>
+              {cityEntries.map(([name, count], i) => (
+                <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',borderBottom: i < cityEntries.length-1 ? '1px solid #eee' : 'none'}}>
+                  <span style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                    <span style={{display:'inline-block',width:24,height:24,borderRadius:'50%',background:COLORS[i] || 'var(--accent)',color:'#fff',fontSize:12,fontWeight:700,textAlign:'center',lineHeight:'24px'}}>{i + 1}</span>
+                    <span style={{fontWeight: 600}}>{name}</span>
+                  </span>
+                  <span style={{color: 'var(--accent)', fontWeight: 700}}>{count}</span>
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
-
-        {/* Charts */}
-        <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udcc8'}</div>{'\u05d2\u05e8\u05e4\u05d9\u05dd'}</div>
-          <div className="chart-grid">
-            <div className="chart-card"><h4>{'\ud83c\udfd8\ufe0f \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05dc\u05e4\u05d9 \u05d9\u05d9\u05e9\u05d5\u05d1'}</h4><div className="chart-container"><canvas id="crmRepCityChart"></canvas></div></div>
-            <div className="chart-card"><h4>{'\u26a0\ufe0f \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05d4\u05ea\u05e0\u05d2\u05d3\u05d5\u05d9\u05d5\u05ea'}</h4><div className="chart-container"><canvas id="crmRepObjChart"></canvas></div></div>
-          </div>
-        </div>
-      </>
+      </div>
     );
   }, [selectedMonth, reports]);
 

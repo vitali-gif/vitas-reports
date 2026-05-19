@@ -177,72 +177,56 @@ export default function ClientPage() {
     legacyRepRows.forEach(r => { if (r.data) allRows = allRows.concat(r.data) })
     if (allRows.length === 0) return <div className="welcome-center"><div className="icon">💭</div><h3>אין נתוני CRM דוחות לחודש זה</h3></div>
     const repData = aggregateCrmReportRows(allRows)
-    const rt = repData.totals
 
-    const cityEntries = Object.entries(repData.cities).sort((a, b) => b[1] - a[1])
-    const objEntries = Object.entries(repData.objectionTypes).sort((a, b) => b[1] - a[1])
+    // Top 10 cities only — clean, focused view
+    const cityEntries = Object.entries(repData.cities)
+      .filter(([n]) => n && n !== 'לא צוין')
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
     const cityNames = cityEntries.map(([n]) => n)
-    const objNames = objEntries.map(([n]) => n)
+    const cityCounts = cityEntries.map(([, c]) => c)
 
     setTimeout(() => {
       destroyCharts()
       if (cityNames.length > 0) {
         createChart('crmRepCityChart', 'bar', cityNames, [{
-          label: 'לידים', data: cityNames.map(n => repData.cities[n]),
-          backgroundColor: COLORS.slice(0, cityNames.length)
-        }], { y: { beginAtZero: true, position: 'right' } })
-      }
-      if (objNames.length > 0) {
-        createChart('crmRepObjChart', 'doughnut', objNames, [{
-          data: objNames.map(n => repData.objectionTypes[n]),
-          backgroundColor: COLORS.slice(0, objNames.length)
-        }])
+          label: 'לידים', data: cityCounts,
+          backgroundColor: COLORS.slice(0, cityNames.length),
+          borderRadius: 6,
+        }], {
+          y: { beginAtZero: true, position: 'right' },
+          indexAxis: 'y',
+        })
       }
     }, 200)
 
+    if (cityEntries.length === 0) {
+      return <div className="welcome-center"><div className="icon">🏘️</div><h3>אין נתוני יישובים לתקופה זו</h3></div>
+    }
+
     return (
-      <>
-        <div className="kpi-grid">
-          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📝</div><div className="kpi-label">סה"כ שורות</div><div className="kpi-value">{formatNum(rt.totalRows)}</div></div>
-          <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>🏘️</div><div className="kpi-label">ערים ייחודיות</div><div className="kpi-value">{formatNum(rt.uniqueCities)}</div></div>
-          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">עם התנגדויות</div><div className="kpi-value">{formatNum(rt.withObjections)}</div></div>
-          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>📅</div><div className="kpi-label">עם פגישה/משימה</div><div className="kpi-value">{formatNum(rt.withMeeting)}</div></div>
-          <div className="kpi-card pink"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(236,72,153,0.1)',color:'var(--pink)'}}>📊</div><div className="kpi-label">% התנגדויות</div><div className="kpi-value">{rt.objectionRate.toFixed(1)}%</div></div>
-          <div className="kpi-card cyan"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(6,182,212,0.1)',color:'var(--cyan)'}}>📊</div><div className="kpi-label">% פגישות</div><div className="kpi-value">{rt.meetingRate.toFixed(1)}%</div></div>
+      <div className="section">
+        <div className="section-title">
+          <div className="section-icon" style={{background:'var(--gradient-1)'}}>🏘️</div>
+          Top 10 יישובים
         </div>
-
-        <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>נתונים מפורטים</div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead><tr>
-                <th>#</th>
-                <th>כתובת/יישוב</th>
-                <th>התנגדויות</th>
-                <th>משימה/פגישה אחרונה</th>
-              </tr></thead>
-              <tbody>
-                {allRows.map((row, i) => (
-                  <tr key={i}>
-                    <td>{i + 1}</td>
-                    <td style={{fontWeight:600}}>{row.address || '-'}</td>
-                    <td>{row.objections || '-'}</td>
-                    <td>{row.lastMeeting || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
+          <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmRepCityChart"></canvas></div></div>
+          <div className="chart-card" style={{padding: '20px'}}>
+            <ol style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '15px'}}>
+              {cityEntries.map(([name, count], i) => (
+                <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',borderBottom: i < cityEntries.length-1 ? '1px solid #eee' : 'none'}}>
+                  <span style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                    <span style={{display:'inline-block',width:24,height:24,borderRadius:'50%',background:COLORS[i] || 'var(--accent)',color:'#fff',fontSize:12,fontWeight:700,textAlign:'center',lineHeight:'24px'}}>{i + 1}</span>
+                    <span style={{fontWeight: 600}}>{name}</span>
+                  </span>
+                  <span style={{color: 'var(--accent)', fontWeight: 700}}>{count}</span>
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
-
-        <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📈</div>גרפים</div>
-          <div className="chart-grid">
-            <div className="chart-card"><h4>🏘️ התפלגות לפי יישוב</h4><div className="chart-container"><canvas id="crmRepCityChart"></canvas></div></div>
-            <div className="chart-card"><h4>⚠️ התפלגות התנגדויות</h4><div className="chart-container"><canvas id="crmRepObjChart"></canvas></div></div>
-          </div>
-        </div>
-      </>
+      </div>
     )
   }, [selectedMonth, reports])
 
