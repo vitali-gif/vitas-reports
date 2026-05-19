@@ -16,6 +16,7 @@
 //                                 If not set, falls back to: lead with status in {"relevant","hot","warm","חם","פושר","רלוונטי"}
 
 import { createClient } from '@supabase/supabase-js'
+import { normalizeCity } from '../../../../lib/city-normalize.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -374,10 +375,12 @@ async function runSync(opts = {}) {
       const cid = String(c.client_id)
       clientRelevant.set(cid, c.relevant === '1' || c.relevant === 1)
       if (c.status) clientStatus.set(cid, String(c.status))
-      const city = (c.city || '').toString().trim()
-      const addr = (c.address || '').toString().trim()
-      if (city) clientCity.set(cid, city)
-      if (addr) clientAddress.set(cid, addr)
+      const rawCity = (c.city || '').toString().trim()
+      const rawAddr = (c.address || '').toString().trim()
+      const normCity = normalizeCity(rawCity)
+      const normAddr = normalizeCity(rawAddr)
+      if (normCity) clientCity.set(cid, normCity)
+      if (normAddr) clientAddress.set(cid, normAddr)
       const obj = (c.objection || '').toString().trim()
       if (obj) clientObjection.set(cid, obj)
     }
