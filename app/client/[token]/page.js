@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency, formatNum, formatMonth, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS } from '../../../lib/helpers'
+import { normalizeObjections } from '../../../lib/objection-normalize.js'
 import Chart from 'chart.js/auto'
 
 export default function ClientPage() {
@@ -223,6 +224,71 @@ export default function ClientPage() {
                   <span style={{color: 'var(--accent)', fontWeight: 700}}>{count}</span>
                 </li>
               ))}
+            </ol>
+          </div>
+        </div>
+      </div>
+    )
+  }, [selectedMonth, reports])
+
+  // ==================== CRM OBJECTIONS SUB-TAB ====================
+  const renderCrmObjectionsDashboard = useCallback(() => {
+    if (!selectedMonth || reports.length === 0) return null
+    destroyCharts()
+
+    const crmRows = reports.filter(r => r.month === selectedMonth && r.source === 'crm')
+    let allRows = []
+    crmRows.forEach(r => { if (r.summary && Array.isArray(r.summary.crmRepRows)) allRows = allRows.concat(r.summary.crmRepRows) })
+
+    // Split + normalize objections per row, count each canonical label
+    const objCounts = {}
+    let rowsWithObjection = 0
+    for (const row of allRows) {
+      const objs = normalizeObjections(row.objections || '')
+      if (objs.length > 0) rowsWithObjection++
+      for (const o of objs) objCounts[o] = (objCounts[o] || 0) + 1
+    }
+
+    const objEntries = Object.entries(objCounts).sort((a, b) => b[1] - a[1])
+    const total = objEntries.reduce((s, [, c]) => s + c, 0)
+
+    if (objEntries.length === 0) {
+      return <div className="welcome-center"><div className="icon">🚫</div><h3>אין נתוני התנגדויות לתקופה זו</h3></div>
+    }
+
+    const topNames = objEntries.map(([n]) => n)
+    const topCounts = objEntries.map(([, c]) => c)
+
+    setTimeout(() => {
+      destroyCharts()
+      createChart('crmObjChart', 'doughnut', topNames, [{
+        data: topCounts,
+        backgroundColor: COLORS.slice(0, topNames.length),
+      }])
+    }, 200)
+
+    return (
+      <div className="section">
+        <div className="section-title">
+          <div className="section-icon" style={{background:'var(--gradient-2)'}}>🚫</div>
+          התנגדויות לידים ({rowsWithObjection} מתוך {allRows.length})
+        </div>
+        <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
+          <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmObjChart"></canvas></div></div>
+          <div className="chart-card" style={{padding: '20px'}}>
+            <ol style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '14px'}}>
+              {objEntries.map(([name, count], i) => {
+                const pct = total > 0 ? (count / total * 100) : 0
+                return (
+                  <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',borderBottom: i < objEntries.length-1 ? '1px solid #eee' : 'none'}}>
+                    <span style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                      <span style={{display:'inline-block',width:12,height:12,borderRadius:'3px',background:COLORS[i] || 'var(--accent)'}}></span>
+                      <span style={{fontWeight: 600}}>{name}</span>
+                    </span>
+                    <span style={{color: 'var(--accent)', fontWeight: 700}}>{count} <span style={{color:'#888',fontWeight:400,fontSize:12}}>({pct.toFixed(0)}%)</span></span>
+                  </li>
+                )
+              })}
             </ol>
           </div>
         </div>
@@ -620,9 +686,10 @@ export default function ClientPage() {
         {dashTab === 'crm' ? (<>
           <div className="client-tabs" style={{marginBottom: 15}}>
             <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
-            <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>📊 מחולל דוחות</button>
+            <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
+            <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
           </div>
-          {crmSubTab === 'sources' ? renderCrmDashboard() : renderCrmReportDashboard()}
+          {crmSubTab === 'sources' ? renderCrmDashboard() : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : renderCrmReportDashboard()}
         </>) : (<>
         <div className="kpi-grid">
           {kpi('תקציב', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
@@ -980,7 +1047,7 @@ export default function ClientPage() {
         <div className="powered-by">VITAS Digital Marketing | דוח אוטומטי</div>
       </>
     )
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, sortConfig])
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, sortConfig])
 
   if (loading) return <div className="loading-page">טוען דוח...</div>
 
