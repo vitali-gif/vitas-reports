@@ -82,6 +82,8 @@ export default function AdminPage() {
   const triggerFetch = async (payload) => {
     if (refreshing) return false;
     setRefreshing(true);
+    // Limit fetch to current project only — much faster than fetching all 3
+    if (selectedProject && !payload.projectId) payload = { ...payload, projectId: selectedProject.id };
     setRefreshStartTime(Date.now());
     setRefreshElapsed(0);
     const headers = { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' };
@@ -143,11 +145,12 @@ export default function AdminPage() {
     setRefreshingCrm(true);
     showToast('\u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de-BMBY...');
     try {
-      const payload = selectedMonth && !selectedMonth.includes('_')
+      let payload = selectedMonth && !selectedMonth.includes('_')
         ? { month: selectedMonth }
         : selectedMonth
           ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
           : {};
+      if (selectedProject) payload = { ...payload, projectId: selectedProject.id };
       const res = await fetch('/api/bmby/fetch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },

@@ -310,8 +310,12 @@ async function runSync(opts = {}) {
     return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
   }
 
+  const projectsList = opts.projectId
+    ? (projects || []).filter(p => p.id === opts.projectId)
+    : (projects || [])
+
   const results = []
-  for (const p of projects || []) {
+  for (const p of projectsList) {
     const needle = (p.name || '').toLowerCase().trim()
     if (!needle) continue
     const mine = allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
@@ -372,6 +376,7 @@ export async function POST(request) {
     month: body.month,
     since: body.since,
     until: body.until,
+    projectId: body.projectId,
   })
   return Response.json(responseBody, { status })
 }

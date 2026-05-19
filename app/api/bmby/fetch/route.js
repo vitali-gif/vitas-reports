@@ -261,6 +261,11 @@ async function runSync(opts = {}) {
     .select('id, name')
   if (projectsError) return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
 
+  // Filter to a single project if requested (faster load — caller is viewing only this one)
+  const projectsList = opts.projectId
+    ? (projects || []).filter(p => p.id === opts.projectId)
+    : (projects || [])
+
   // Helper shared by all projects
   const withTimeout = (promise, ms, label) => Promise.race([
     promise,
@@ -268,7 +273,7 @@ async function runSync(opts = {}) {
   ])
 
   // Process ALL projects in parallel — so total runtime ≈ slowest single call, not sum
-  const projectResults = await Promise.all((projects || []).map(async (p) => {
+  const projectResults = await Promise.all(projectsList.map(async (p) => {
     const bmbyPid = projectMap[p.name]
     if (!bmbyPid) {
       return { project: p.name, skipped: true, reason: 'no BMBY project_id mapping' }
@@ -773,6 +778,7 @@ export async function POST(request) {
       month: body.month,
       since: body.since,
       until: body.until,
+      projectId: body.projectId,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
