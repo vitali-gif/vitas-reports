@@ -649,12 +649,18 @@ async function runSync(opts = {}) {
       const businessMin = businessMinutesBetween(lidMs, firstMs)
       const userId = String(first.user_id || first.create_user_id || '')
       const userName = userIdToName.get(userId) || ('משתמש ' + userId) || 'לא ידוע'
+      // Did this lead result in a scheduled (non-cancelled) appointment post-LID?
+      const lidDateOnly = (lid.start_date || lid.create_date || '').toString().slice(0, 10)
+      const apptList = clientApptList.get(cid) || []
+      const postLidAppts = apptList.filter(a => !a.date || a.date >= lidDateOnly)
+      const scheduledHit = postLidAppts.length > 0 && postLidAppts.some(a => !a.cancelled)
       responseTimes.push({
         source,
         responseMinutes: deltaMin,
         businessMinutes: businessMin,
         firstType: first.type,
         firstUser: userName,
+        scheduledMeeting: scheduledHit,
         noResponse: false,
       })
     }
@@ -663,16 +669,35 @@ async function runSync(opts = {}) {
     const responded = responseTimes.filter(r => !r.noResponse)
     const noResponseCount = responseTimes.length - responded.length
 
+    // Bucketize WITH meeting-conversion tracking — output per-bucket { total, withMeeting }
+    const bucketOf = (mn) => {
+      if (mn <= 15) return '0-15m'
+      if (mn <= 60) return '15m-1h'
+      if (mn <= 240) return '1h-4h'
+      if (mn <= 1440) return '4h-1d'
+      if (mn <= 4320) return '1d-3d'
+      return '3d+'
+    }
+    const bucketsRich = (valKey) => {
+      const out = {
+        '0-15m':  { total: 0, withMeeting: 0 },
+        '15m-1h': { total: 0, withMeeting: 0 },
+        '1h-4h':  { total: 0, withMeeting: 0 },
+        '4h-1d':  { total: 0, withMeeting: 0 },
+        '1d-3d':  { total: 0, withMeeting: 0 },
+        '3d+':    { total: 0, withMeeting: 0 },
+      }
+      for (const r of responded) {
+        const b = bucketOf(r[valKey])
+        out[b].total++
+        if (r.scheduledMeeting) out[b].withMeeting++
+      }
+      return out
+    }
+    // Backwards-compat: keep old `buckets` (numeric counts) for older dashboard versions
     const buckets = (mins) => {
       const out = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
-      for (const mn of mins) {
-        if (mn <= 15) out['0-15m']++
-        else if (mn <= 60) out['15m-1h']++
-        else if (mn <= 240) out['1h-4h']++
-        else if (mn <= 1440) out['4h-1d']++
-        else if (mn <= 4320) out['1d-3d']++
-        else out['3d+']++
-      }
+      for (const mn of mins) out[bucketOf(mn)]++
       return out
     }
 
@@ -705,6 +730,7 @@ async function runSync(opts = {}) {
         medianMinutes: median,
         p90Minutes: p90,
         buckets: buckets(mins),
+        bucketsWithMeeting: bucketsRich(valKey),
         bySource: aggregateBy('source'),
         byUser: aggregateBy('firstUser'),
       }

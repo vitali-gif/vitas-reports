@@ -242,6 +242,8 @@ export default function ClientPage() {
     const allMins = []
     const bucketsTotal = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
     const bucketsBusiness = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
+    const bucketMeetingTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
+    const bucketMeetingWith = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
     const byUserMerged = {}
     const bySourceMerged = {}
     for (const r of crmRows) {
@@ -253,6 +255,12 @@ export default function ClientPage() {
       for (const [k, v] of Object.entries(rt.buckets || {})) bucketsTotal[k === '4h-24h' ? '4h-1d' : k] = (bucketsTotal[k === '4h-24h' ? '4h-1d' : k] || 0) + v
       const bBuckets = (rt.business && rt.business.buckets) || {}
       for (const [k, v] of Object.entries(bBuckets)) bucketsBusiness[k === '4h-24h' ? '4h-1d' : k] = (bucketsBusiness[k === '4h-24h' ? '4h-1d' : k] || 0) + v
+      const bRichBuckets = (rt.business && rt.business.bucketsWithMeeting) || {}
+      for (const [k, v] of Object.entries(bRichBuckets)) {
+        const key = k === '4h-24h' ? '4h-1d' : k
+        bucketMeetingTotals[key] = (bucketMeetingTotals[key] || 0) + (v.total || 0)
+        bucketMeetingWith[key] = (bucketMeetingWith[key] || 0) + (v.withMeeting || 0)
+      }
       const bUser = (rt.business && rt.business.byUser) || {}
       const bSource = (rt.business && rt.business.bySource) || {}
       for (const [k, v] of Object.entries(rt.byUser || {})) {
@@ -283,9 +291,17 @@ export default function ClientPage() {
     setTimeout(() => {
       destroyCharts()
       const bucketBusinessValues = bucketLabels.map(k => bucketsBusiness[k] || 0)
+      const conversionRates = bucketLabels.map(k => {
+        const tot = bucketMeetingTotals[k] || 0
+        return tot > 0 ? Math.round((bucketMeetingWith[k] || 0) / tot * 100) : 0
+      })
       createChart('responseBucketsChart', 'bar', bucketHumanLabels, [
-        { label: 'מספר לידים', data: bucketBusinessValues, backgroundColor: ['#10b981','#22c55e','#84cc16','#f59e0b','#f97316','#ef4444'], borderRadius: 6 },
-      ], { y: { beginAtZero: true, position: 'right' } })
+        { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: ['#10b981','#22c55e','#84cc16','#f59e0b','#f97316','#ef4444'], borderRadius: 6, yAxisID: 'y' },
+        { label: '% המרה לפגישה', type: 'line', data: conversionRates, borderColor: '#3b82f6', backgroundColor: '#3b82f6', pointRadius: 5, pointBackgroundColor: '#3b82f6', fill: false, tension: 0.3, yAxisID: 'y1' },
+      ], {
+        y: { beginAtZero: true, position: 'right', title: { display: true, text: 'מספר לידים' } },
+        y1: { beginAtZero: true, position: 'left', max: 100, title: { display: true, text: '% המרה' }, grid: { drawOnChartArea: false } },
+      })
     }, 200)
 
     // Format minutes into human label (e.g. "12h 30m" or "2d 4h")
