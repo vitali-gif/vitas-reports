@@ -417,8 +417,6 @@ const selectProject = async (client, project) => {
     let totalLids = 0, respondedCount = 0, noResponseCount = 0;
     const bucketsTotal = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 };
     const bucketsBusiness = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
-    const bucketMeetingTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
-    const bucketMeetingWith = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 };
     const bucketMeetingTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 };
     const bucketMeetingWith = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 };
     const byUserMerged = {};
@@ -461,9 +459,6 @@ const selectProject = async (client, project) => {
     const overallAvgMin = respondedCount > 0
       ? Math.round(Object.values(byUserMerged).reduce((s, v) => s + v.sumMinutes, 0) / respondedCount)
       : 0
-    const overallBusinessMin = respondedCount > 0
-      ? Math.round(Object.values(byUserMerged).reduce((s, v) => s + (v.sumBusinessMinutes || 0), 0) / respondedCount)
-      : 0;
     const overallBusinessMin = respondedCount > 0
       ? Math.round(Object.values(byUserMerged).reduce((s, v) => s + (v.sumBusinessMinutes || 0), 0) / respondedCount)
       : 0;
