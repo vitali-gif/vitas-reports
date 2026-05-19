@@ -629,10 +629,13 @@ async function runSync(opts = {}) {
       const lidMs = parseTs(lid.create_date || lid.start_date)
       if (isNaN(lidMs)) continue
 
-      // Find first non-LID task by same client created at or after the LID
+      // Find first REAL HUMAN followup — skip BMBY's auto "Update Info Lead" system comments
+      // (those are generated automatically when a lead form is filled, always Δ=0s under the lead owner's name).
       const followups = (tasksByClient.get(cid) || [])
         .filter(t => {
           if ((t.type || '').toString().toLowerCase() === 'lid') return false
+          const subj = (t.subject || '').toString().trim().toLowerCase()
+          if (subj === 'update info lead') return false // BMBY auto-comment
           const tMs = parseTs(t.create_date || t.start_date)
           return !isNaN(tMs) && tMs >= lidMs
         })
