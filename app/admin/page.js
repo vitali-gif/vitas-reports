@@ -405,7 +405,134 @@ const selectProject = async (client, project) => {
     );
   }, [selectedMonth, reports]);
 
-  // ==================== CRM OBJECTIONS SUB-TAB ====================
+  // ==================== CRM RESPONSE TIME SUB-TAB ====================
+  const renderCrmResponseDashboard = useCallback(() => {
+    if (!selectedMonth || reports.length === 0) return null;
+    destroyCharts();
+
+    const crmRows = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
+    let totalLids = 0, respondedCount = 0, noResponseCount = 0;
+    const bucketsTotal = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-24h': 0, '1d-3d': 0, '3d+': 0 };
+    const byUserMerged = {};
+    const bySourceMerged = {};
+    for (const r of crmRows) {
+      const rt = r.summary && r.summary.responseTimeStats;
+      if (!rt) continue;
+      totalLids += rt.totalLids || 0;
+      respondedCount += rt.respondedCount || 0;
+      noResponseCount += rt.noResponseCount || 0;
+      for (const [k, v] of Object.entries(rt.buckets || {})) bucketsTotal[k] += v;
+      for (const [k, v] of Object.entries(rt.byUser || {})) {
+        if (!byUserMerged[k]) byUserMerged[k] = { count: 0, sumMinutes: 0 };
+        byUserMerged[k].count += v.count;
+        byUserMerged[k].sumMinutes += v.avgMinutes * v.count;
+      }
+      for (const [k, v] of Object.entries(rt.bySource || {})) {
+        if (!bySourceMerged[k]) bySourceMerged[k] = { count: 0, sumMinutes: 0 };
+        bySourceMerged[k].count += v.count;
+        bySourceMerged[k].sumMinutes += v.avgMinutes * v.count;
+      }
+    }
+
+    if (totalLids === 0) {
+      return <div className="welcome-center"><div className="icon">⏱️</div><h3>אין נתוני זמני תגובה לתקופה זו</h3></div>;
+    }
+
+    const overallAvgMin = respondedCount > 0
+      ? Math.round(Object.values(byUserMerged).reduce((s, v) => s + v.sumMinutes, 0) / respondedCount)
+      : 0;
+
+    const bucketLabels = ['0-15m', '15m-1h', '1h-4h', '4h-24h', '1d-3d', '3d+'];
+    const bucketHumanLabels = ['פחות מ-15 דק׳', '15 דק׳-שעה', '1-4 שעות', '4-24 שעות', '1-3 ימים', 'יותר מ-3 ימים'];
+    const bucketValues = bucketLabels.map(k => bucketsTotal[k] || 0);
+
+    setTimeout(() => {
+      destroyCharts();
+      createChart('responseBucketsChart', 'bar', bucketHumanLabels, [{
+        label: 'מספר לידים',
+        data: bucketValues,
+        backgroundColor: ['#10b981','#22c55e','#84cc16','#f59e0b','#f97316','#ef4444'],
+        borderRadius: 6,
+      }], { y: { beginAtZero: true, position: 'right' } });
+    }, 200);
+
+    const fmt = (mn) => {
+      if (mn == null) return '-';
+      if (mn < 1) return 'מיידי';
+      if (mn < 60) return mn + ' דק׳';
+      if (mn < 1440) return Math.floor(mn / 60) + ' ש׳ ' + (mn % 60) + ' דק׳';
+      const d = Math.floor(mn / 1440);
+      const h = Math.floor((mn % 1440) / 60);
+      return d + ' ימים' + (h ? ' ' + h + ' ש׳' : '');
+    };
+
+    const userList = Object.entries(byUserMerged)
+      .filter(([, v]) => v.count > 0)
+      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const sourceList = Object.entries(bySourceMerged)
+      .filter(([, v]) => v.count >= 3)
+      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count) }))
+      .sort((a, b) => b.avg - a.avg)
+      .slice(0, 10);
+
+    return (
+      <>
+        <div className="kpi-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))'}}>
+          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📊</div><div className="kpi-label">סה"כ לידים</div><div className="kpi-value">{totalLids}</div></div>
+          <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>✓</div><div className="kpi-label">קיבלו מענה</div><div className="kpi-value">{respondedCount}</div></div>
+          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label">זמן מענה ממוצע</div><div className="kpi-value">{fmt(overallAvgMin)}</div></div>
+          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה</div><div className="kpi-value">{noResponseCount}</div></div>
+        </div>
+
+        <div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה</div>
+          <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
+        </div>
+
+        <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
+          <div className="section">
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות</div>
+            <div className="chart-card" style={{padding:'10px'}}>
+              <table className="data-table">
+                <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן ממוצע</th></tr></thead>
+                <tbody>
+                  {userList.map(u => (
+                    <tr key={u.name}>
+                      <td style={{fontWeight:600}}>{u.name}</td>
+                      <td>{u.count}</td>
+                      <td>{fmt(u.avg)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="section">
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📡</div>הכי איטיים — לפי מקור</div>
+            <div className="chart-card" style={{padding:'10px'}}>
+              <table className="data-table">
+                <thead><tr><th>מקור</th><th>לידים</th><th>זמן ממוצע</th></tr></thead>
+                <tbody>
+                  {sourceList.map(s => (
+                    <tr key={s.name}>
+                      <td style={{fontWeight:600,fontSize:13}}>{s.name}</td>
+                      <td>{s.count}</td>
+                      <td>{fmt(s.avg)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }, [selectedMonth, reports]);
+
+    // ==================== CRM OBJECTIONS SUB-TAB ====================
   const renderCrmObjectionsDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
     destroyCharts();
@@ -883,8 +1010,9 @@ const selectProject = async (client, project) => {
             <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
             <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
             <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
+            <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
           </div>
-          {crmSubTab === 'sources' ? renderCrmDashboard() : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : renderCrmReportDashboard()}
+          {crmSubTab === 'sources' ? renderCrmDashboard() : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : renderCrmReportDashboard()}
         </>) : (displayReports.length === 0 && dashTab !== 'all') ? (
           <div className="welcome-center" style={{padding:'60px 20px',textAlign:'center'}}>
             <div className="icon" style={{fontSize:'4em',marginBottom:'10px'}}>{'\ud83d\udced'}</div>
@@ -1345,7 +1473,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, sortConfig, expandedCampaigns, expandedAdSets]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets]);
 
   if (loading) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
