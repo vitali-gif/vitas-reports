@@ -209,7 +209,7 @@ export default function ClientPage() {
       <div className="section">
         <div className="section-title">
           <div className="section-icon" style={{background:'var(--gradient-1)'}}>🏘️</div>
-          Top 10 יישובים
+          <span title="10 הערים שמהן הגיעו הכי הרבה לידים. בסיס לבחירת אזורי גיאו-טרגטינג בקמפיינים">Top 10 יישובים ⓘ</span>
         </div>
         <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmRepCityChart"></canvas></div></div>
@@ -352,7 +352,7 @@ export default function ClientPage() {
 
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות</div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div><span title="ממוצע הזמן שלוקח לכל איש מכירות לחזור ללידים חדשים (בשעות עסקים). מספרים קטנים = תגובה מהירה">זמן מענה לפי איש מכירות ⓘ</span></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -369,7 +369,7 @@ export default function ClientPage() {
             </div>
           </div>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)' || 'var(--gradient-2)'}}>📡</div>הכי איטיים — לפי מקור</div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)' || 'var(--gradient-2)'}}>📡</div><span title="המקורות מסודרים מהאיטי ביותר למהיר ביותר. עוזר לזהות איזה מקור לידים מקבל טיפול לקוי">הכי איטיים — לפי מקור ⓘ</span></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>מקור</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -430,7 +430,7 @@ export default function ClientPage() {
       <div className="section">
         <div className="section-title">
           <div className="section-icon" style={{background:'var(--gradient-2)'}}>🚫</div>
-          התנגדויות לידים ({rowsWithObjection} מתוך {allRows.length})
+          <span title="10 הסיבות הנפוצות ביותר שלידים לא ממשיכים בתהליך. עוזר לזהות חסמי מכירה ולהתאים את המסר">התנגדויות לידים ⓘ</span> ({rowsWithObjection} מתוך {allRows.length})
         </div>
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmObjChart"></canvas></div></div>
@@ -597,7 +597,7 @@ export default function ClientPage() {
 
         {/* CRM Table by Source */}
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📊</div>נתונים לפי מקור הגעה</div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📊</div><span title="פירוט לידים, רלוונטיים, פגישות וחוזים לפי מקור (פייסבוק/גוגל/יד2). הבסיס לחישוב ROI פר מקור">נתונים לפי מקור הגעה ⓘ</span></div>
           <div className="table-wrapper">
             <table className="data-table">
               <thead><tr>
@@ -659,7 +659,7 @@ export default function ClientPage() {
 
         {/* CRM Charts */}
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📈</div>גרפים</div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📈</div><span title="הצגה ויזואלית של ההמרות, האיכות, וההתפלגות לפי מקור">גרפים ⓘ</span></div>
           <div className="chart-grid" style={{gridTemplateColumns: '1fr'}}>
             <div className="chart-card"><h4>🧩 התפלגות לידים</h4><div className="chart-container"><canvas id="crmPieChart"></canvas></div></div>
           </div>
@@ -892,12 +892,12 @@ export default function ClientPage() {
           </div>
         </div>
 
-        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>מגמות חודשיות</div><div className="chart-grid"><div className="chart-card"><h4>💰 לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>📈 תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
+        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div><span title="השוואת חודש מול חודש קודם — תקציב, חשיפות, לידים, CPL. עוזר לזהות מגמות לאורך זמן">מגמות חודשיות ⓘ</span></div><div className="chart-grid"><div className="chart-card"><h4>💰 לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>📈 תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
 
-        {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>קמפיינים</div><div className="chart-grid"><div className="chart-card"><h4>📊 התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>💰 לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין', 'campaigns')}</div>)}
+        {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div><span title="סיכום ביצועים פר קמפיין. CPL (עלות לליד) הוא ה-KPI המרכזי">קמפיינים ⓘ</span></div><div className="chart-grid"><div className="chart-card"><h4>📊 התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>💰 לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין', 'campaigns')}</div>)}
 
         {!isPmax && (
-        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות מודעות</div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות', 'adsets')}</div>
+        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div><span title="ביצועי Ad Sets — איזה קהל יעד הכי טוב">קבוצות מודעות ⓘ</span></div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות', 'adsets')}</div>
         )}
 
         {isPmax && (() => {
@@ -906,7 +906,7 @@ export default function ClientPage() {
           const sorted = [...allAGs].sort((a,b) => (b.spend || 0) - (a.spend || 0))
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות נכסים — פירוט</div>
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div><span title="Performance Max Asset Groups — התוכן והביצוע בכל קבוצה">קבוצות נכסים — פירוט ⓘ</span></div>
               <div className="card" style={{overflowX:'auto'}}>
                 <table className="data-table"><thead><tr>
                   <th style={{whiteSpace:'nowrap'}}>קבוצת נכסים</th>
@@ -944,7 +944,7 @@ export default function ClientPage() {
           )
         })()}
 
-        {!isPmax && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>📝</div>מודעות</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*עותק\s*$/, '').replace(/\s*-\s*עותק\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0) }); return merged })(), null, 'מודעה', 'ads')}</div>}
+        {!isPmax && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>📝</div><span title="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)">מודעות ⓘ</span></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*עותק\s*$/, '').replace(/\s*-\s*עותק\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0) }); return merged })(), null, 'מודעה', 'ads')}</div>}
 
         {/* GENDER SECTION */}
         {!isPmax && genderNames.length > 0 && (() => {
@@ -952,7 +952,7 @@ export default function ClientPage() {
           const genderMap = { female: { label: 'נשים', emoji: '♀' }, male: { label: 'גברים', emoji: '♂' }, unknown: { label: 'לא ידוע', emoji: '?' } }
           const gKeys = ['female', 'male', 'unknown'].filter(g => gd[g])
           return (<div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>⚧</div>פילוח מגדרי</div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>⚧</div><span title="התפלגות הצופים/מקליקים/לידים לפי מגדר">פילוח מגדרי ⓘ</span></div>
             <div className="grid-3" style={{marginBottom:'20px',display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:'16px'}}>
               {gKeys.map(g => { const d = gd[g]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; return (
                 <div className="card" key={g}><div className="card-body" style={{textAlign:'center'}}>
@@ -980,7 +980,7 @@ export default function ClientPage() {
           const ad = data.ages
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb })
           return (<div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📅</div>פילוח גילאי</div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📅</div><span title="התפלגות הצופים/מקליקים/לידים לפי קבוצת גיל">פילוח גילאי ⓘ</span></div>
             <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲'})()}</th>))}
@@ -1169,7 +1169,7 @@ export default function ClientPage() {
 
         {/* INSIGHTS SECTION */}
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>💡</div>תובנות והמלצות</div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>💡</div><span title="תובנות אוטומטיות על הביצועים — מה עובד טוב ומה כדאי לעדכן">תובנות והמלצות ⓘ</span></div>
           {(() => {
             const camps = Object.entries(data.campaigns)
             const ads2 = isPmax ? Object.entries(data.adSets || {}) : Object.entries(data.ads)

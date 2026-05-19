@@ -386,7 +386,7 @@ const selectProject = async (client, project) => {
       <div className="section">
         <div className="section-title">
           <div className="section-icon" style={{background:'var(--gradient-1)'}}>🏘️</div>
-          Top 10 יישובים
+          <span title="10 הערים שמהן הגיעו הכי הרבה לידים. בסיס לבחירת אזורי גיאו-טרגטינג בקמפיינים">Top 10 יישובים ⓘ</span>
         </div>
         <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmRepCityChart"></canvas></div></div>
@@ -521,7 +521,7 @@ const selectProject = async (client, project) => {
 
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות</div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div><span title="ממוצע הזמן שלוקח לכל איש מכירות לחזור ללידים חדשים (בשעות עסקים). מספרים קטנים = תגובה מהירה">זמן מענה לפי איש מכירות ⓘ</span></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -538,7 +538,7 @@ const selectProject = async (client, project) => {
             </div>
           </div>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📡</div>הכי איטיים — לפי מקור</div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📡</div><span title="המקורות מסודרים מהאיטי ביותר למהיר ביותר. עוזר לזהות איזה מקור לידים מקבל טיפול לקוי">הכי איטיים — לפי מקור ⓘ</span></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>מקור</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -598,7 +598,7 @@ const selectProject = async (client, project) => {
       <div className="section">
         <div className="section-title">
           <div className="section-icon" style={{background:'var(--gradient-2)'}}>🚫</div>
-          {`התנגדויות לידים (${rowsWithObjection} מתוך ${allRows.length})`}
+          {`<span title="10 הסיבות הנפוצות ביותר שלידים לא ממשיכים בתהליך. עוזר לזהות חסמי מכירה ולהתאים את המסר">התנגדויות לידים ⓘ</span> (${rowsWithObjection} מתוך ${allRows.length})`}
         </div>
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmObjChart"></canvas></div></div>
@@ -785,7 +785,7 @@ const selectProject = async (client, project) => {
 
         {/* CRM Table by Source */}
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcca'}</div>{'\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05e4\u05d9 \u05de\u05e7\u05d5\u05e8 \u05d4\u05d2\u05e2\u05d4'}</div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcca'}</div><span title="פירוט לידים, רלוונטיים, פגישות וחוזים לפי מקור (פייסבוק/גוגל/יד2). הבסיס לחישוב ROI פר מקור">{'\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05e4\u05d9 \u05de\u05e7\u05d5\u05e8 \u05d4\u05d2\u05e2\u05d4'} ⓘ</span></div>
           <div className="table-wrapper">
             <table className="data-table">
               <thead><tr>
@@ -847,7 +847,7 @@ const selectProject = async (client, project) => {
 
         {/* CRM Charts */}
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udcc8'}</div>{'\u05d2\u05e8\u05e4\u05d9\u05dd'}</div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udcc8'}</div><span title="הצגה ויזואלית של ההמרות, האיכות, וההתפלגות לפי מקור">{'\u05d2\u05e8\u05e4\u05d9\u05dd'} ⓘ</span></div>
           <div className="chart-grid" style={{gridTemplateColumns: '1fr'}}>
             <div className="chart-card"><h4>{'\ud83e\udde9 \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05dc\u05d9\u05d3\u05d9\u05dd'}</h4><div className="chart-container"><canvas id="crmPieChart"></canvas></div></div>
           </div>
@@ -1086,7 +1086,7 @@ const selectProject = async (client, project) => {
         </div>
 
         {/* Non-FB tabs: keep existing campaigns charts + flat table */}
-        {!isFb && campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd'}</div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
+        {!isFb && campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div><span title="סיכום ביצועים פר קמפיין. CPL (עלות לליד) הוא ה-KPI המרכזי">{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd'} ⓘ</span></div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
 
         {/* FB tab: nested expandable table — Campaign → Ad Set → Ad */}
         {isFb && campNames.length > 0 && (() => {
@@ -1154,7 +1154,7 @@ const selectProject = async (client, project) => {
           };
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd, \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05d5\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div><span title="טבלה מאוחדת עם כל הרמות של החשבון הפרסומי">{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd, \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05d5\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'} ⓘ</span></div>
               <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:'12px',textAlign:'right'}}>{'\ud83d\udca1 \u05dc\u05d7\u05e5 \u05e2\u05dc \u05e7\u05de\u05e4\u05d9\u05d9\u05df \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea, \u05d5\u05e2\u05dc \u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>
               <div className="table-wrapper">
                 <table className="data-table">
@@ -1188,7 +1188,7 @@ const selectProject = async (client, project) => {
 
         {/* Standard ad groups table (Facebook + Search/Display) */}
         {!isPmax && !isFb && (
-        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable(data.adSets, prevData?.adSets, '\u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea', 'adsets')}</div>
+        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div><span title="ביצועי Ad Sets — איזה קהל יעד הכי טוב">{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'} ⓘ</span></div>{buildTable(data.adSets, prevData?.adSets, '\u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea', 'adsets')}</div>
         )}
 
         {/* PMax: detailed asset-groups table (replaces both ad-groups + ads tables) */}
@@ -1198,7 +1198,7 @@ const selectProject = async (client, project) => {
           const sorted = [...allAGs].sort((a,b) => (b.spend || 0) - (a.spend || 0));
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd \u2014 \u05e4\u05d9\u05e8\u05d5\u05d8'}</div>
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div><span title="Performance Max Asset Groups — התוכן והביצוע בכל קבוצה">{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd \u2014 \u05e4\u05d9\u05e8\u05d5\u05d8'} ⓘ</span></div>
               <div className="card" style={{overflowX:'auto'}}>
                 <table className="data-table"><thead><tr>
                   <th style={{whiteSpace:'nowrap'}}>{'\u05e7\u05d1\u05d5\u05e6\u05ea \u05e0\u05db\u05e1\u05d9\u05dd'}</th>
@@ -1236,7 +1236,7 @@ const selectProject = async (client, project) => {
           );
         })()}
 
-{!isPmax && !isFb &&         <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>}
+{!isPmax && !isFb &&         <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div><span title="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)">{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'} ⓘ</span></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>}
 
         {/* GENDER SECTION — table format (like age) */}
         {!isPmax && genderNames.length > 0 && (() => {
@@ -1244,7 +1244,7 @@ const selectProject = async (client, project) => {
           const genderLabel = (g) => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : g === 'unknown' ? '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2' : g;
           const orderedKeys = ['female', 'male', 'unknown'].filter(g => gd[g]);
           return (<div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\u26a7'}</div>{'\u05e4\u05d9\u05dc\u05d5\u05d7 \u05de\u05d2\u05d3\u05e8\u05d9'}</div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\u26a7'}</div><span title="התפלגות הצופים/מקליקים/לידים לפי מגדר">{'\u05e4\u05d9\u05dc\u05d5\u05d7 \u05de\u05d2\u05d3\u05e8\u05d9'} ⓘ</span></div>
             <div className="card"><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'gender',label:'\u05de\u05d2\u05d3\u05e8'},{key:'clicks',label:'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'},{key:'impressions',label:'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'},{key:'cpc',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'\u05dc\u05d9\u05d3\u05d9\u05dd'},{key:'cpl',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'},{key:'spend',label:'\u05ea\u05e7\u05e6\u05d9\u05d1 \u05e9\u05e0\u05d5\u05e6\u05dc'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('genders',c.key)}>{c.label}{(()=>{const s=sortConfig['genders'];if(!s||s.key!==c.key)return ' \u21c5';return s.dir==='desc'?' \u25bc':' \u25b2';})()}</th>))}
@@ -1270,7 +1270,7 @@ const selectProject = async (client, project) => {
           const ad = data.ages;
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb; });
           return (<div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc5'}</div>{'\u05e4\u05d9\u05dc\u05d5\u05d7 \u05d2\u05d9\u05dc\u05d0\u05d9'}</div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc5'}</div><span title="התפלגות הצופים/מקליקים/לידים לפי קבוצת גיל">{'\u05e4\u05d9\u05dc\u05d5\u05d7 \u05d2\u05d9\u05dc\u05d0\u05d9'} ⓘ</span></div>
             <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
@@ -1461,7 +1461,7 @@ const selectProject = async (client, project) => {
 
         {/* INSIGHTS SECTION */}
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udca1'}</div>{'\u05ea\u05d5\u05d1\u05e0\u05d5\u05ea \u05d5\u05d4\u05de\u05dc\u05e6\u05d5\u05ea'}</div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udca1'}</div><span title="תובנות אוטומטיות על הביצועים — מה עובד טוב ומה כדאי לעדכן">{'\u05ea\u05d5\u05d1\u05e0\u05d5\u05ea \u05d5\u05d4\u05de\u05dc\u05e6\u05d5\u05ea'} ⓘ</span></div>
           {(() => {
             const camps = Object.entries(data.campaigns);
          const ads2 = isPmax ? Object.entries(data.adSets || {}) : Object.entries(data.ads);
