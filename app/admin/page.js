@@ -248,6 +248,19 @@ const selectProject = async (client, project) => {
     return () => clearInterval(interval);
   }, [refreshStartTime]);
 
+  // Auto-fetch BMBY when user picks a custom date range that has no cached data.
+  // Skips monthly presets (handled by daily cron) — only date-range keys like "2026-05-18_2026-05-18".
+  useEffect(() => {
+    if (!selectedMonth || !selectedProject) return;
+    if (refreshingCrm) return;
+    if (!selectedMonth.includes('_')) return; // only custom ranges
+    const hasCrmForPeriod = reports.some(r => r.month === selectedMonth && r.source === 'crm');
+    if (hasCrmForPeriod) return;
+    // Trigger after a short delay so we don't fire during quick toggling
+    const tm = setTimeout(() => { refreshFromBmby(); }, 800);
+    return () => clearTimeout(tm);
+  }, [selectedMonth, selectedProject?.id, reports.length]);
+
   const destroyCharts = () => { chartsRef.current.forEach(c => c.destroy()); chartsRef.current = []; };
 
 
