@@ -240,7 +240,8 @@ export default function ClientPage() {
     // Merge stats across all crm rows for this period (one per project)
     let totalLids = 0, respondedCount = 0, noResponseCount = 0
     const allMins = []
-    const bucketsTotal = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-24h': 0, '1d-3d': 0, '3d+': 0 }
+    const bucketsTotal = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
+    const bucketsBusiness = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
     const byUserMerged = {}
     const bySourceMerged = {}
     for (const r of crmRows) {
@@ -249,16 +250,22 @@ export default function ClientPage() {
       totalLids += rt.totalLids || 0
       respondedCount += rt.respondedCount || 0
       noResponseCount += rt.noResponseCount || 0
-      for (const [k, v] of Object.entries(rt.buckets || {})) bucketsTotal[k] += v
+      for (const [k, v] of Object.entries(rt.buckets || {})) bucketsTotal[k === '4h-24h' ? '4h-1d' : k] = (bucketsTotal[k === '4h-24h' ? '4h-1d' : k] || 0) + v
+      const bBuckets = (rt.business && rt.business.buckets) || {}
+      for (const [k, v] of Object.entries(bBuckets)) bucketsBusiness[k === '4h-24h' ? '4h-1d' : k] = (bucketsBusiness[k === '4h-24h' ? '4h-1d' : k] || 0) + v
+      const bUser = (rt.business && rt.business.byUser) || {}
+      const bSource = (rt.business && rt.business.bySource) || {}
       for (const [k, v] of Object.entries(rt.byUser || {})) {
-        if (!byUserMerged[k]) byUserMerged[k] = { count: 0, sumMinutes: 0, mins: [] }
+        if (!byUserMerged[k]) byUserMerged[k] = { count: 0, sumMinutes: 0, sumBusinessMinutes: 0 }
         byUserMerged[k].count += v.count
         byUserMerged[k].sumMinutes += v.avgMinutes * v.count
+        if (bUser[k]) byUserMerged[k].sumBusinessMinutes += bUser[k].avgMinutes * bUser[k].count
       }
       for (const [k, v] of Object.entries(rt.bySource || {})) {
-        if (!bySourceMerged[k]) bySourceMerged[k] = { count: 0, sumMinutes: 0 }
+        if (!bySourceMerged[k]) bySourceMerged[k] = { count: 0, sumMinutes: 0, sumBusinessMinutes: 0 }
         bySourceMerged[k].count += v.count
         bySourceMerged[k].sumMinutes += v.avgMinutes * v.count
+        if (bSource[k]) bySourceMerged[k].sumBusinessMinutes += bSource[k].avgMinutes * bSource[k].count
       }
     }
 
@@ -269,18 +276,16 @@ export default function ClientPage() {
     const avgFromBuckets = respondedCount > 0
       ? Math.round(Object.entries(byUserMerged).reduce((s, [, v]) => s + v.sumMinutes, 0) / respondedCount)
       : 0
-    const bucketLabels = ['0-15m', '15m-1h', '1h-4h', '4h-24h', '1d-3d', '3d+']
+    const bucketLabels = ['0-15m', '15m-1h', '1h-4h', '4h-1d', '1d-3d', '3d+']
     const bucketHumanLabels = ['פחות מ-15 דק׳', '15 דק׳-שעה', '1-4 שעות', '4-24 שעות', '1-3 ימים', 'יותר מ-3 ימים']
     const bucketValues = bucketLabels.map(k => bucketsTotal[k] || 0)
 
     setTimeout(() => {
       destroyCharts()
-      createChart('responseBucketsChart', 'bar', bucketHumanLabels, [{
-        label: 'מספר לידים',
-        data: bucketValues,
-        backgroundColor: ['#10b981','#22c55e','#84cc16','#f59e0b','#f97316','#ef4444'],
-        borderRadius: 6,
-      }], { y: { beginAtZero: true, position: 'right' } })
+      const bucketBusinessValues = bucketLabels.map(k => bucketsBusiness[k] || 0)
+      createChart('responseBucketsChart', 'bar', bucketHumanLabels, [
+        { label: 'מספר לידים', data: bucketBusinessValues, backgroundColor: ['#10b981','#22c55e','#84cc16','#f59e0b','#f97316','#ef4444'], borderRadius: 6 },
+      ], { y: { beginAtZero: true, position: 'right' } })
     }, 200)
 
     // Format minutes into human label (e.g. "12h 30m" or "2d 4h")
@@ -298,18 +303,21 @@ export default function ClientPage() {
     const overallAvgMin = respondedCount > 0
       ? Math.round(Object.values(byUserMerged).reduce((s, v) => s + v.sumMinutes, 0) / respondedCount)
       : 0
+    const overallBusinessMin = respondedCount > 0
+      ? Math.round(Object.values(byUserMerged).reduce((s, v) => s + (v.sumBusinessMinutes || 0), 0) / respondedCount)
+      : 0
 
     // User list, sorted by count desc
     const userList = Object.entries(byUserMerged)
       .filter(([, v]) => v.count > 0)
-      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count) }))
+      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count) }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
 
     const sourceList = Object.entries(bySourceMerged)
       .filter(([, v]) => v.count >= 3)
-      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count) }))
-      .sort((a, b) => b.avg - a.avg)  // slowest first
+      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count) }))
+      .sort((a, b) => b.bizAvg - a.bizAvg)
       .slice(0, 10)
 
     return (
@@ -317,12 +325,12 @@ export default function ClientPage() {
         <div className="kpi-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))'}}>
           <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📊</div><div className="kpi-label">סה"כ לידים</div><div className="kpi-value">{totalLids}</div></div>
           <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>✓</div><div className="kpi-label">קיבלו מענה</div><div className="kpi-value">{respondedCount}</div></div>
-          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label">זמן מענה ממוצע</div><div className="kpi-value">{fmt(overallAvgMin)}</div></div>
+          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label" title="ימים א-ה 09:00-19:00 | שישי עד 13:00 | שבת + חגים לא נספרים">זמן מענה ⓘ</div><div className="kpi-value">{fmt(overallBusinessMin)}</div></div>
           <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה</div><div className="kpi-value">{noResponseCount}</div></div>
         </div>
 
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה</div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div><span title="שעות עסקים בלבד: א-ה 09:00-19:00, שישי עד 13:00, שבת וחגים לא נספרים">התפלגות זמני תגובה ⓘ</span></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
         </div>
 
@@ -331,13 +339,13 @@ export default function ClientPage() {
             <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות</div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
-                <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן ממוצע</th></tr></thead>
+                <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
                 <tbody>
                   {userList.map(u => (
                     <tr key={u.name}>
                       <td style={{fontWeight:600}}>{u.name}</td>
                       <td>{u.count}</td>
-                      <td>{fmt(u.avg)}</td>
+                      <td style={{fontWeight:600,color:'var(--accent)'}}>{fmt(u.bizAvg)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -348,13 +356,13 @@ export default function ClientPage() {
             <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)' || 'var(--gradient-2)'}}>📡</div>הכי איטיים — לפי מקור</div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
-                <thead><tr><th>מקור</th><th>לידים</th><th>זמן ממוצע</th></tr></thead>
+                <thead><tr><th>מקור</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
                 <tbody>
                   {sourceList.map(s => (
                     <tr key={s.name}>
                       <td style={{fontWeight:600,fontSize:13}}>{s.name}</td>
                       <td>{s.count}</td>
-                      <td>{fmt(s.avg)}</td>
+                      <td style={{fontWeight:600,color:'var(--accent)'}}>{fmt(s.bizAvg)}</td>
                     </tr>
                   ))}
                 </tbody>

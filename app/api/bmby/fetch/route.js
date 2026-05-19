@@ -17,6 +17,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { normalizeCity } from '../../../../lib/city-normalize.js'
+import { businessMinutesBetween } from '../../../../lib/business-hours.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -645,11 +646,13 @@ async function runSync(opts = {}) {
       const first = followups[0]
       const firstMs = parseTs(first.create_date || first.start_date)
       const deltaMin = Math.max(0, Math.round((firstMs - lidMs) / 60000))
+      const businessMin = businessMinutesBetween(lidMs, firstMs)
       const userId = String(first.user_id || first.create_user_id || '')
       const userName = userIdToName.get(userId) || ('משתמש ' + userId) || 'לא ידוע'
       responseTimes.push({
         source,
         responseMinutes: deltaMin,
+        businessMinutes: businessMin,
         firstType: first.type,
         firstUser: userName,
         noResponse: false,
@@ -659,51 +662,62 @@ async function runSync(opts = {}) {
     // Aggregations
     const responded = responseTimes.filter(r => !r.noResponse)
     const noResponseCount = responseTimes.length - responded.length
-    const mins = responded.map(r => r.responseMinutes).sort((a, b) => a - b)
-    const sum = mins.reduce((a, b) => a + b, 0)
-    const avgMin = mins.length ? Math.round(sum / mins.length) : 0
-    const median = mins.length ? mins[Math.floor(mins.length / 2)] : 0
-    const p90 = mins.length ? mins[Math.floor(mins.length * 0.9)] : 0
 
-    const buckets = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-24h': 0, '1d-3d': 0, '3d+': 0 }
-    for (const mn of mins) {
-      if (mn <= 15) buckets['0-15m']++
-      else if (mn <= 60) buckets['15m-1h']++
-      else if (mn <= 240) buckets['1h-4h']++
-      else if (mn <= 1440) buckets['4h-24h']++
-      else if (mn <= 4320) buckets['1d-3d']++
-      else buckets['3d+']++
+    const buckets = (mins) => {
+      const out = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
+      for (const mn of mins) {
+        if (mn <= 15) out['0-15m']++
+        else if (mn <= 60) out['15m-1h']++
+        else if (mn <= 240) out['1h-4h']++
+        else if (mn <= 1440) out['4h-1d']++
+        else if (mn <= 4320) out['1d-3d']++
+        else out['3d+']++
+      }
+      return out
     }
 
-    const aggregateBy = (key) => {
-      const groups = {}
-      for (const r of responded) {
-        const k = r[key] || 'לא ידוע'
-        if (!groups[k]) groups[k] = []
-        groups[k].push(r.responseMinutes)
-      }
-      const result = {}
-      for (const [k, arr] of Object.entries(groups)) {
-        const s = [...arr].sort((a, b) => a - b)
-        result[k] = {
-          count: arr.length,
-          avgMinutes: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length),
-          medianMinutes: s[Math.floor(s.length / 2)],
+    const aggStats = (valKey) => {
+      const mins = responded.map(r => r[valKey]).sort((a, b) => a - b)
+      const sum = mins.reduce((a, b) => a + b, 0)
+      const avgMin = mins.length ? Math.round(sum / mins.length) : 0
+      const median = mins.length ? mins[Math.floor(mins.length / 2)] : 0
+      const p90 = mins.length ? mins[Math.floor(mins.length * 0.9)] : 0
+      const aggregateBy = (key) => {
+        const groups = {}
+        for (const r of responded) {
+          const k = r[key] || 'לא ידוע'
+          if (!groups[k]) groups[k] = []
+          groups[k].push(r[valKey])
         }
+        const result = {}
+        for (const [k, arr] of Object.entries(groups)) {
+          const s = [...arr].sort((a, b) => a - b)
+          result[k] = {
+            count: arr.length,
+            avgMinutes: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length),
+            medianMinutes: s[Math.floor(s.length / 2)],
+          }
+        }
+        return result
       }
-      return result
+      return {
+        avgMinutes: avgMin,
+        medianMinutes: median,
+        p90Minutes: p90,
+        buckets: buckets(mins),
+        bySource: aggregateBy('source'),
+        byUser: aggregateBy('firstUser'),
+      }
     }
 
     const responseTimeStats = {
       totalLids: responseTimes.length,
       respondedCount: responded.length,
       noResponseCount,
-      avgMinutes: avgMin,
-      medianMinutes: median,
-      p90Minutes: p90,
-      buckets,
-      bySource: aggregateBy('source'),
-      byUser: aggregateBy('firstUser'),
+      // Continuous (wall-clock) stats
+      ...aggStats('responseMinutes'),
+      // Business-hours stats (Sun-Thu 09-19, Fri 09-13, Sat+holidays off)
+      business: aggStats('businessMinutes'),
     }
 
     // Single upsert: store source-level rows in `data`, and per-LID city/objection
