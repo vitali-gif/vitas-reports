@@ -777,12 +777,15 @@ async function runSync(opts = {}) {
 
     // Single upsert: store source-level rows in `data`, and per-LID city/objection
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
+    // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
+    // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
+    const CRM_SCHEMA_VERSION = 2  // v2: meetingsCancelled per-source (fixed 2026-05-20)
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
       month: m,
       data: xlsxRows,
-      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats },
+      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, schemaVersion: CRM_SCHEMA_VERSION },
       file_name: 'BMBY API (live)',
       row_count: aprilLids.length + contractsInRange.length + pricesInRange.length,
     }, { onConflict: 'project_id,source,month' })
