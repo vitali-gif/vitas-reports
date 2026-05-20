@@ -747,6 +747,34 @@ async function runSync(opts = {}) {
       business: aggStats('businessMinutes'),
     }
 
+    // === Day-of-week distribution: which days bring the most leads and conversions? ===
+    // 0=Sunday ... 6=Saturday. Hebrew week starts Sunday.
+    const dayOfWeekStats = {
+      0: { name: 'ראשון',  leads: 0, scheduled: 0 },
+      1: { name: 'שני',    leads: 0, scheduled: 0 },
+      2: { name: 'שלישי',  leads: 0, scheduled: 0 },
+      3: { name: 'רביעי',  leads: 0, scheduled: 0 },
+      4: { name: 'חמישי',  leads: 0, scheduled: 0 },
+      5: { name: 'שישי',   leads: 0, scheduled: 0 },
+      6: { name: 'שבת',    leads: 0, scheduled: 0 },
+    }
+    // Use the LID's create_date to determine its day of week
+    for (const lid of aprilLids) {
+      const cid = String(lid.client_id || '')
+      if (!cid) continue
+      const lidDateStr = (lid.create_date || lid.start_date || '').toString().replace(' ', 'T')
+      const d = new Date(lidDateStr)
+      if (isNaN(d.getTime())) continue
+      const dow = d.getDay()
+      dayOfWeekStats[dow].leads++
+      // Did this client get any scheduled (non-cancelled) appointment post-LID?
+      const lidDateOnly = (lid.start_date || lid.create_date || '').toString().slice(0, 10)
+      const apptList = clientApptList.get(cid) || []
+      const postLidAppts = apptList.filter(a => !a.date || a.date >= lidDateOnly)
+      const scheduledHit = postLidAppts.length > 0 && postLidAppts.some(a => !a.cancelled)
+      if (scheduledHit) dayOfWeekStats[dow].scheduled++
+    }
+
     // Single upsert: store source-level rows in `data`, and per-LID city/objection
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     const { error: upsertErr } = await supabase.from('reports').upsert({
@@ -754,7 +782,7 @@ async function runSync(opts = {}) {
       source: 'crm',
       month: m,
       data: xlsxRows,
-      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats },
+      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats },
       file_name: 'BMBY API (live)',
       row_count: aprilLids.length + contractsInRange.length + pricesInRange.length,
     }, { onConflict: 'project_id,source,month' })

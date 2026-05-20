@@ -297,6 +297,7 @@ export default function ClientPage() {
     const bucketMeetingTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 }
     const bucketMeetingWith = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 }
     const byUserMerged = {}
+    const dowMerged = {}
     const bySourceMerged = {}
     for (const r of crmRows) {
       const rt = r.summary && r.summary.responseTimeStats
@@ -312,6 +313,15 @@ export default function ClientPage() {
         const key = (k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k
         bucketMeetingTotals[key] = (bucketMeetingTotals[key] || 0) + (v.total || 0)
         bucketMeetingWith[key] = (bucketMeetingWith[key] || 0) + (v.withMeeting || 0)
+      }
+      // Day of week merge (sum across projects for the selected month)
+      const dow = r.summary && r.summary.dayOfWeekStats
+      if (dow) {
+        for (const k of Object.keys(dow)) {
+          if (!dowMerged[k]) dowMerged[k] = { name: dow[k].name, leads: 0, scheduled: 0 }
+          dowMerged[k].leads += dow[k].leads || 0
+          dowMerged[k].scheduled += dow[k].scheduled || 0
+        }
       }
       const bUser = (rt.business && rt.business.byUser) || {}
       const bSource = (rt.business && rt.business.bySource) || {}
@@ -357,6 +367,30 @@ export default function ClientPage() {
     }, 200)
 
     // Format minutes into human label (e.g. "12h 30m" or "2d 4h")
+    // Day-of-week chart data prep
+    const dowOrder = ['0','1','2','3','4','5','6']
+    const dowHasData = dowOrder.some(k => dowMerged[k] && dowMerged[k].leads > 0)
+    if (dowHasData) {
+      setTimeout(() => {
+        const labels = dowOrder.map(k => (dowMerged[k] && dowMerged[k].name) || k)
+        const leadsData = dowOrder.map(k => (dowMerged[k] && dowMerged[k].leads) || 0)
+        const schedData = dowOrder.map(k => (dowMerged[k] && dowMerged[k].scheduled) || 0)
+        const conv = dowOrder.map(k => {
+          const ld = (dowMerged[k] && dowMerged[k].leads) || 0
+          const sc = (dowMerged[k] && dowMerged[k].scheduled) || 0
+          return ld > 0 ? Math.round(sc / ld * 100) : 0
+        })
+        createChart('dowChart', 'bar', labels, [
+          { label: 'לידים', type: 'bar', data: leadsData, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y' },
+          { label: 'פגישות תואמו', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y' },
+          { label: '% המרה', type: 'line', data: conv, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, fill: false, tension: 0.3, yAxisID: 'y1' },
+        ], {
+          y: { beginAtZero: true, position: 'right', title: { display: true, text: 'כמות' } },
+          y1: { beginAtZero: true, position: 'left', max: 100, title: { display: true, text: '% המרה' }, grid: { drawOnChartArea: false } },
+        })
+      }, 300)
+    }
+
     const fmt = (mn) => {
       if (mn == null) return '-'
       if (mn < 1) return 'מיידי'
@@ -401,6 +435,13 @@ export default function ClientPage() {
           <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="התפלגות זמני התגובה הראשונים של אנשי המכירות לכל ליד שנכנס.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
         </div>
+
+        {dowHasData && (
+          <div className="section">
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)' || 'var(--gradient-2)'}}>📅</div>פילוח לפי יום בשבוע <InfoTip text="כמה לידים נכנסו, וכמה פגישות תואמו, בכל יום בשבוע. הקו הצהוב = % המרה לפגישה.\n\nשימושי לזיהוי באיזה יום בא הקהל הכי חם, ולתזמון של קמפיינים." /></div>
+            <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
+          </div>
+        )}
 
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="section">
