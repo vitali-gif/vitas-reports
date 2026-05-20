@@ -133,9 +133,10 @@ export default function AdminPage() {
     return null;
   };
 
-  // Internal: actually call Meta + Google APIs. Called by triggerFetch
-  // either blocking (no cache) or in background (open period with cache).
-  const performLiveFetch = async (payload, isBackground) => {
+  // Internal: call Meta + Google + BMBY in PARALLEL (whichever are needed).
+  // Saves 10s on first-time fetches vs the previous sequential meta+google-then-bmby flow.
+  const performLiveFetch = async (payload, isBackground, needed) => {
+    const { fb = true, gg = true, crm = true } = needed || {};
     if (!isBackground) {
       setRefreshing(true);
       setRefreshStartTime(Date.now());
@@ -143,22 +144,35 @@ export default function AdminPage() {
     }
     if (selectedProject && !payload.projectId) payload = { ...payload, projectId: selectedProject.id };
     const headers = { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' };
-    let metaOk = false, googleOk = false;
+    const callList = [];
+    if (fb)  callList.push({ key: 'fb',  url: '/api/meta/fetch' });
+    if (gg)  callList.push({ key: 'gg',  url: '/api/google/fetch' });
+    if (crm) callList.push({ key: 'crm', url: '/api/bmby/fetch' });
+    if (callList.length === 0) {
+      if (!isBackground) setRefreshing(false);
+      return true;
+    }
+    let metaOk = false, googleOk = false, crmOk = false;
     try {
-      const [mr, gr] = await Promise.allSettled([
-        fetch('/api/meta/fetch', { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json()),
-        fetch('/api/google/fetch', { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json()),
-      ]);
-      metaOk = mr.status === 'fulfilled' && mr.value && mr.value.ok;
-      googleOk = gr.status === 'fulfilled' && gr.value && gr.value.ok;
+      const results = await Promise.allSettled(
+        callList.map(c => fetch(c.url, { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json()))
+      );
+      callList.forEach((c, i) => {
+        const r = results[i];
+        const ok = r.status === 'fulfilled' && r.value && r.value.ok;
+        if (c.key === 'fb')  metaOk = ok;
+        if (c.key === 'gg')  googleOk = ok;
+        if (c.key === 'crm') crmOk = ok;
+      });
       if (metaOk) setLastMetaSync(new Date());
       if (googleOk) setLastGoogleSync(new Date());
       if (!isBackground) {
         const parts = [];
-        if (metaOk) parts.push('\u2713 Facebook'); else parts.push('\u00d7 Facebook');
-        if (googleOk) parts.push('\u2713 Google'); else parts.push('\u00d7 Google');
+        if (fb)  parts.push((metaOk ? '\u2713' : '\u00d7') + ' Facebook');
+        if (gg)  parts.push((googleOk ? '\u2713' : '\u00d7') + ' Google');
+        if (crm) parts.push((crmOk ? '\u2713' : '\u00d7') + ' CRM');
         showToast(parts.join('  |  '));
-      } else if (metaOk || googleOk) {
+      } else if (metaOk || googleOk || crmOk) {
         showToast('\u2713 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d5\u05d3\u05db\u05e0\u05d5 \u05d1\u05e8\u05e7\u05e2');  // "נתונים עודכנו ברקע"
       }
       await loadClients();
@@ -171,7 +185,7 @@ export default function AdminPage() {
         setRefreshStartTime(null);
       }
     }
-    return metaOk || googleOk;
+    return metaOk || googleOk || crmOk;
   };
 
   const triggerFetch = async (payload) => {
@@ -183,7 +197,10 @@ export default function AdminPage() {
     // What do we already have cached in 'reports' for this period?
     const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
     const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google'));
-    const hasCache = haveFb && haveGoog;
+    const CRM_SCHEMA_VERSION = 2;  // keep in sync with route.js + useEffect below
+    const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
+    const haveCrm = !!crmRow && (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION;
+    const haveAll = haveFb && haveGoog && haveCrm;
 
     // Is this an "open" period (today still updating) or a closed/finalized one?
     const today = new Date().toISOString().slice(0, 10);
@@ -193,20 +210,20 @@ export default function AdminPage() {
     else if (payload.until) isOpen = payload.until >= today;
 
     // Closed period with full cache: instant render, never re-fetch (data is final).
-    if (hasCache && !isOpen) {
+    if (haveAll && !isOpen) {
       showToast('\u2713 \u05de\u05d8\u05de\u05d5\u05df \u2014 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e1\u05d5\u05e4\u05d9\u05d9\u05dd');  // "מטמון - נתונים סופיים"
       return true;
     }
 
-    // Open period with cache: render existing data immediately, refresh in background.
-    if (hasCache && isOpen) {
+    // Open period with full cache: render now, refresh all 3 in background.
+    if (haveAll && isOpen) {
       showToast('\u2713 \u05de\u05d5\u05e6\u05d2 \u05de\u05de\u05d8\u05de\u05d5\u05df, \u05de\u05ea\u05e2\u05d3\u05db\u05df \u05d1\u05e8\u05e7\u05e2...');  // "מוצג ממטמון, מתעדכן ברקע"
-      performLiveFetch(payload, true);  // fire-and-forget
+      performLiveFetch(payload, true, { fb: true, gg: true, crm: true });
       return true;
     }
 
-    // No cache: blocking live fetch (with skeleton + progress bar).
-    return await performLiveFetch(payload, false);
+    // Partial or missing cache: blocking fetch, but only fetch the sources we lack.
+    return await performLiveFetch(payload, false, { fb: !haveFb, gg: !haveGoog, crm: !haveCrm });
   };
 
   const applyPreset = async (preset) => {
@@ -363,13 +380,12 @@ const selectProject = async (client, project) => {
     const hasCrm = !!crmRow && cachedCrmVersion >= CRM_SCHEMA_VERSION;
     if (hasMeta && hasGoogle && hasCrm) return; // fully cached
     const tm = setTimeout(() => {
-      if (!hasMeta || !hasGoogle) {
-        const payload = selectedMonth.includes('_')
-          ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
-          : { month: selectedMonth };
-        triggerFetch(payload);
-      }
-      if (!hasCrm) refreshFromBmby();
+      // Unified: triggerFetch handles whichever sources are missing, in PARALLEL.
+      // This replaces the previous sequential meta+google → then-bmby flow.
+      const payload = selectedMonth.includes('_')
+        ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
+        : { month: selectedMonth };
+      triggerFetch(payload);
     }, 800);
     return () => clearTimeout(tm);
   }, [selectedMonth, selectedProject?.id, reports.length]);
