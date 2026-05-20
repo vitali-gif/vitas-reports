@@ -805,14 +805,22 @@ export default function ClientPage() {
       })
     }
 
-    // Extract CRM totals for "all" tab KPI display
+    // Extract CRM totals for KPI display.
+    // 'all' tab → unfiltered CRM totals.
+    // FB/Google tabs → CRM rows filtered to platform-matching sources.
     let crmTotals = null
-    if (dashTab === 'all') {
+    {
       const crmReps = currentReports.filter(r => r.source === 'crm')
       if (crmReps.length > 0) {
         let allCrmR = []
         crmReps.forEach(r => { if (r.data) allCrmR = allCrmR.concat(r.data) })
-        crmTotals = aggregateCrmRows(allCrmR).totals
+        let filteredR = allCrmR
+        if (dashTab === 'facebook') {
+          filteredR = allCrmR.filter(r => /פייסבוק|facebook/i.test(r.source || ''))
+        } else if (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') {
+          filteredR = allCrmR.filter(r => /גוגל|google|pmax|search/i.test(r.source || ''))
+        }
+        if (filteredR.length > 0) crmTotals = aggregateCrmRows(filteredR).totals
       }
     }
 
@@ -959,10 +967,12 @@ export default function ClientPage() {
           {kpi('תקציב', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('לידים', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP?.leads) : kpi('לידים', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
           {kpi('עלות לליד', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
-          {dashTab === 'all' && crmTotals ? kpi('פגישות שתואמו', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, null) : null}
-          {dashTab === 'all' && crmTotals ? kpi('פגישות שבוצעו', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, null) : null}
-          {dashTab === 'all' && crmTotals ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, null) : null}
-          {dashTab === 'all' && crmTotals ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, null) : null}
+          {crmTotals ? kpi('פגישות שתואמו', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, null) : null}
+          {crmTotals ? kpi('פגישות שבוצעו', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, null) : null}
+          {crmTotals ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, null) : null}
+          {crmTotals ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, null) : null}
+          {crmTotals && dashTab !== 'all' && crmTotals.meetingsCompleted > 0 ? kpi('עלות לפגישה שבוצעה', formatCurrency(activeT.spend / crmTotals.meetingsCompleted), 'purple', activeT.spend / crmTotals.meetingsCompleted, null, true) : null}
+          {crmTotals && dashTab !== 'all' && crmTotals.contracts > 0 ? kpi('עלות לחוזה', formatCurrency(activeT.spend / crmTotals.contracts), 'red', activeT.spend / crmTotals.contracts, null, true) : null}
         </div>
 
         {/* FUNNEL */}
@@ -976,7 +986,7 @@ export default function ClientPage() {
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(activeT.clicks)}</div><div className="funnel-label">קליקים</div></div>
               <div className="funnel-arrow">&larr;</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.impressions)}</div><div className="funnel-label">חשיפות</div></div>
-              {dashTab === 'all' && crmTotals ? <><div className="funnel-arrow">&larr;</div>
+              {crmTotals ? <><div className="funnel-arrow">&larr;</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--cyan)'}}>{formatNum(crmTotals.meetingsScheduled || 0)}</div><div className="funnel-label">פגישות מתואמות</div></div>
               <div className="funnel-arrow">&larr;</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(crmTotals.meetingsCompleted || 0)}</div><div className="funnel-label">פגישות שבוצעו</div></div>

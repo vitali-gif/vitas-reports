@@ -996,14 +996,22 @@ const selectProject = async (client, project) => {
       });
     }
 
-    // Extract CRM totals for "all" tab KPI display
+    // Extract CRM totals for KPI display.
+    // 'all' tab → unfiltered CRM totals.
+    // FB/Google tabs → CRM rows filtered to platform-matching sources.
     let crmTotals = null;
-    if (dashTab === 'all') {
+    {
       const crmReps = currentReports.filter(r => r.source === 'crm');
       if (crmReps.length > 0) {
         let allCrmR = [];
         crmReps.forEach(r => { if (r.data) allCrmR = allCrmR.concat(r.data); });
-        crmTotals = aggregateCrmRows(allCrmR).totals;
+        let filteredR = allCrmR;
+        if (dashTab === 'facebook') {
+          filteredR = allCrmR.filter(r => /פייסבוק|facebook/i.test(r.source || ''));
+        } else if (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') {
+          filteredR = allCrmR.filter(r => /גוגל|google|pmax|search/i.test(r.source || ''));
+        }
+        if (filteredR.length > 0) crmTotals = aggregateCrmRows(filteredR).totals;
       }
     }
 
@@ -1152,10 +1160,12 @@ const selectProject = async (client, project) => {
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP?.leads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
-          {dashTab === 'all' && crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, null) : null}
-          {dashTab === 'all' && crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, null) : null}
-          {dashTab === 'all' && crmTotals ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, null) : null}
-          {dashTab === 'all' && crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, null) : null}
+          {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, null) : null}
+          {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, null) : null}
+          {crmTotals ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, null) : null}
+          {crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, null) : null}
+          {crmTotals && dashTab !== 'all' && crmTotals.meetingsCompleted > 0 ? kpi('עלות לפגישה שבוצעה', formatCurrency(activeT.spend / crmTotals.meetingsCompleted), 'purple', activeT.spend / crmTotals.meetingsCompleted, null, true) : null}
+          {crmTotals && dashTab !== 'all' && crmTotals.contracts > 0 ? kpi('עלות לחוזה', formatCurrency(activeT.spend / crmTotals.contracts), 'red', activeT.spend / crmTotals.contracts, null, true) : null}
         </div>
 
         {/* FUNNEL */}
@@ -1169,7 +1179,7 @@ const selectProject = async (client, project) => {
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(activeT.clicks)}</div><div className="funnel-label">{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</div></div>
               <div className="funnel-arrow">&larr;</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.impressions)}</div><div className="funnel-label">{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</div></div>
-              {dashTab === 'all' && crmTotals ? <><div className="funnel-arrow">&larr;</div>
+              {crmTotals ? <><div className="funnel-arrow">&larr;</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--cyan)'}}>{formatNum(crmTotals.meetingsScheduled || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05de\u05ea\u05d5\u05d0\u05de\u05d5\u05ea'}</div></div>
               <div className="funnel-arrow">&larr;</div>
               <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(crmTotals.meetingsCompleted || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5'}</div></div>
