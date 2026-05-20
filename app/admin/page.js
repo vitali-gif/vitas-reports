@@ -693,38 +693,6 @@ const selectProject = async (client, project) => {
           <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div><div className="kpi-value">{noResponseCount}</div></div>
         </div>
 
-        {(() => {
-          const recs = buildRecommendations({ bucketTotals: bucketsBusiness, bucketWith: bucketMeetingWith, dowMerged, totalLids });
-          if (!recs.length) return null;
-          return (
-            <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>💡</div>המלצות חכמות לחודש הבא <InfoTip text="המלצות שמופקות מתוך הנתונים שלך - דפוסים שזיהינו שווה לנסות לפעול עליהם. הטקסט מתייחס למספרים האמיתיים מהחודש הנוכחי, וכולל תחזית כמותית למה שעלול לקרות אם הצעד יבוצע." /></div>
-              {recs.map((rec, i) => (
-                <div key={i} className={`rec-card ${rec.type === 'response_time' ? '' : rec.type === 'day_of_week' ? 'green' : ''}`}>
-                  <div className="rec-title"><span className="rec-icon">{rec.icon}</span>{rec.title}</div>
-                  <div className="rec-body">{rec.body.map((p, j) => <p key={j}>{p}</p>)}</div>
-                  {rec.suggestion && <div className="rec-suggestion">{rec.suggestion}</div>}
-                  {rec.prediction && (
-                    <div className="rec-prediction">
-                      <span className="pred-value">{rec.prediction.value}</span>
-                      <div>
-                        <div className="pred-label">{rec.prediction.label}</div>
-                        <div className="pred-detail">{rec.prediction.detail}</div>
-                      </div>
-                    </div>
-                  )}
-                  {rec.measure && rec.measure.length > 0 && (
-                    <div className="rec-measure">
-                      <div className="rec-measure-title">איך נדע אם זה עבד החודש הבא?</div>
-                      <ul>{rec.measure.map((m, k) => <li key={k}>{m}</li>)}</ul>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          );
-        })()}
-
         <div className="section">
           <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="התפלגות זמני התגובה הראשונים של אנשי המכירות לכל ליד שנכנס.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
@@ -1290,9 +1258,76 @@ const selectProject = async (client, project) => {
           {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}>Google PMax</button>}
             {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
             {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
+            {hasCrm && <button className={`client-tab ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
         </div>
 
-        {dashTab === 'crm' ? (<>
+        {dashTab === 'recommendations' ? (() => {
+          // Build merged stats from current period's CRM rows + run recommendation engine
+          const crmRowsRec = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
+          let _totalLids = 0;
+          const _bucketTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
+          const _bucketWith  = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
+          const _dowMerged = {};
+          for (const r of crmRowsRec) {
+            const rt = r.summary && r.summary.responseTimeStats; if (!rt) continue;
+            _totalLids += rt.totalLids || 0;
+            const biz = (rt.business && rt.business.bucketsWithMeeting) || {};
+            const bizB = (rt.business && rt.business.buckets) || {};
+            for (const [k,v] of Object.entries(bizB)) {
+              const key = (k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k;
+              _bucketTotals[key] = (_bucketTotals[key] || 0) + v;
+            }
+            for (const [k, v] of Object.entries(biz)) {
+              const key = (k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k;
+              _bucketWith[key] = (_bucketWith[key] || 0) + (v.withMeeting || 0);
+            }
+            const dow = r.summary && r.summary.dayOfWeekStats;
+            if (dow) for (const k of Object.keys(dow)) {
+              if (!_dowMerged[k]) _dowMerged[k] = { name: dow[k].name, leads: 0, scheduled: 0 };
+              _dowMerged[k].leads += dow[k].leads || 0;
+              _dowMerged[k].scheduled += dow[k].scheduled || 0;
+            }
+          }
+          const recs = buildRecommendations({ bucketTotals: _bucketTotals, bucketWith: _bucketWith, dowMerged: _dowMerged, totalLids: _totalLids });
+          return (
+            <div className="section">
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>💡</div>המלצות חכמות לחודש הבא <InfoTip text="המלצות אישיות שנוצרות מתוך הנתונים של הפרויקט - דפוסים שזיהינו ושווה לנסות לפעול עליהם. הטקסט מתייחס למספרים אמיתיים מהתקופה הנבחרת, וכולל תחזית כמותית של מה לצפות אם תיישם את ההמלצה. אם אין המלצות - אין דפוס מובהק מספיק בנתונים, וזה דבר טוב (אין נורות אדומות)." /></div>
+              {recs.length === 0 ? (
+                <div className="welcome-center" style={{padding:'40px 20px',textAlign:'center'}}>
+                  <div className="icon" style={{fontSize:'3.5em',marginBottom:'10px'}}>✨</div>
+                  <h3>אין כרגע המלצות מובהקות</h3>
+                  <p style={{color:'var(--text-secondary)',marginTop:'8px',maxWidth:'520px',margin:'8px auto'}}>הנתונים לתקופה הנבחרת לא מציגים דפוס חזק מספיק כדי להוציא המלצה אחראית. ייתכן שהדפוסים יתבהרו בחודש הבא כשייאסף יותר מידע, או שהפרויקט פשוט מתפקד מאוזן. נסה לבחור חודש אחר או טווח רחב יותר.</p>
+                </div>
+              ) : (
+                <>
+                  <p style={{color:'var(--text-secondary)',fontSize:'0.9em',marginBottom:'18px'}}>מצאנו {recs.length === 1 ? 'דפוס מובהק' : `${recs.length} דפוסים מובהקים`} בנתוני הפרויקט שלך. כל המלצה כוללת את הנתון הנוכחי, תחזית כמותית, ואיך תוכל לדעת בחודש הבא אם הצעד עבד.</p>
+                  {recs.map((rec, i) => (
+                    <div key={i} className={`rec-card ${rec.type === 'response_time' ? '' : rec.type === 'day_of_week' ? 'green' : ''}`}>
+                      <div className="rec-title"><span className="rec-icon">{rec.icon}</span>{rec.title}</div>
+                      <div className="rec-body">{rec.body.map((p, j) => <p key={j}>{p}</p>)}</div>
+                      {rec.suggestion && <div className="rec-suggestion">{rec.suggestion}</div>}
+                      {rec.prediction && (
+                        <div className="rec-prediction">
+                          <span className="pred-value">{rec.prediction.value}</span>
+                          <div>
+                            <div className="pred-label">{rec.prediction.label}</div>
+                            <div className="pred-detail">{rec.prediction.detail}</div>
+                          </div>
+                        </div>
+                      )}
+                      {rec.measure && rec.measure.length > 0 && (
+                        <div className="rec-measure">
+                          <div className="rec-measure-title">איך נדע אם זה עבד החודש הבא?</div>
+                          <ul>{rec.measure.map((m, k) => <li key={k}>{m}</li>)}</ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          );
+        })() : dashTab === 'crm' ? (<>
           <div className="client-tabs" style={{marginBottom: 15}}>
             <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
             <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
