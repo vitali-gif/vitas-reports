@@ -691,7 +691,7 @@ const selectProject = async (client, project) => {
       <div className="section">
         <div className="section-title">
           <div className="section-icon" style={{background:'var(--gradient-2)'}}>🚫</div>
-          {`התנגדויות לידים <InfoTip text="10 הסיבות הנפוצות ביותר שלידים לא ממשיכים בתהליך. עוזר לזהות חסמי מכירה ולהתאים את המסר" /> (${rowsWithObjection} מתוך ${allRows.length})`}
+          התנגדויות לידים <InfoTip text="10 הסיבות הנפוצות ביותר שלידים לא ממשיכים בתהליך. עוזר לזהות חסמי מכירה ולהתאים את המסר" /> ({rowsWithObjection} מתוך {allRows.length})
         </div>
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmObjChart"></canvas></div></div>

@@ -572,7 +572,7 @@ async function runSync(opts = {}) {
       irrelevantLeads: s.nonRelevantLeads,
       meetingsScheduled: s.meetingsScheduled,
       meetingsCompleted: s.meetingsCompleted,
-      meetingsCancelled: 0,
+      meetingsCancelled: s.meetingsCancelled,
       registrations: s.registrations,
       registrationValue: 0,
       contracts: s.contracts,
