@@ -133,13 +133,15 @@ export default function AdminPage() {
     return null;
   };
 
-  const triggerFetch = async (payload) => {
-    if (refreshing) return false;
-    setRefreshing(true);
-    // Limit fetch to current project only - much faster than fetching all 3
+  // Internal: actually call Meta + Google APIs. Called by triggerFetch
+  // either blocking (no cache) or in background (open period with cache).
+  const performLiveFetch = async (payload, isBackground) => {
+    if (!isBackground) {
+      setRefreshing(true);
+      setRefreshStartTime(Date.now());
+      setRefreshElapsed(0);
+    }
     if (selectedProject && !payload.projectId) payload = { ...payload, projectId: selectedProject.id };
-    setRefreshStartTime(Date.now());
-    setRefreshElapsed(0);
     const headers = { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' };
     let metaOk = false, googleOk = false;
     try {
@@ -151,19 +153,60 @@ export default function AdminPage() {
       googleOk = gr.status === 'fulfilled' && gr.value && gr.value.ok;
       if (metaOk) setLastMetaSync(new Date());
       if (googleOk) setLastGoogleSync(new Date());
-      const parts = [];
-      if (metaOk) parts.push('\u2713 Facebook'); else parts.push('\u00d7 Facebook');
-      if (googleOk) parts.push('\u2713 Google'); else parts.push('\u00d7 Google');
-      showToast(parts.join('  |  '));
+      if (!isBackground) {
+        const parts = [];
+        if (metaOk) parts.push('\u2713 Facebook'); else parts.push('\u00d7 Facebook');
+        if (googleOk) parts.push('\u2713 Google'); else parts.push('\u00d7 Google');
+        showToast(parts.join('  |  '));
+      } else if (metaOk || googleOk) {
+        showToast('\u2713 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d5\u05d3\u05db\u05e0\u05d5 \u05d1\u05e8\u05e7\u05e2');  // "נתונים עודכנו ברקע"
+      }
       await loadClients();
       if (selectedProject) await loadProjectReports(selectedProject.id);
     } catch (err) {
-      showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (err.message || err));
+      if (!isBackground) showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (err.message || err));
     } finally {
-      setRefreshing(false);
-      setRefreshStartTime(null);
+      if (!isBackground) {
+        setRefreshing(false);
+        setRefreshStartTime(null);
+      }
     }
     return metaOk || googleOk;
+  };
+
+  const triggerFetch = async (payload) => {
+    if (refreshing) return false;
+
+    // Compute the cache key the same way presetToPayload + applyCustomRange do
+    const targetKey = payload.month || (payload.since + '_' + payload.until);
+
+    // What do we already have cached in 'reports' for this period?
+    const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
+    const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google'));
+    const hasCache = haveFb && haveGoog;
+
+    // Is this an "open" period (today still updating) or a closed/finalized one?
+    const today = new Date().toISOString().slice(0, 10);
+    const currentYM = today.slice(0, 7);
+    let isOpen = true;  // default to assume open if we can't tell
+    if (payload.month) isOpen = payload.month >= currentYM;
+    else if (payload.until) isOpen = payload.until >= today;
+
+    // Closed period with full cache: instant render, never re-fetch (data is final).
+    if (hasCache && !isOpen) {
+      showToast('\u2713 \u05de\u05d8\u05de\u05d5\u05df \u2014 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e1\u05d5\u05e4\u05d9\u05d9\u05dd');  // "מטמון - נתונים סופיים"
+      return true;
+    }
+
+    // Open period with cache: render existing data immediately, refresh in background.
+    if (hasCache && isOpen) {
+      showToast('\u2713 \u05de\u05d5\u05e6\u05d2 \u05de\u05de\u05d8\u05de\u05d5\u05df, \u05de\u05ea\u05e2\u05d3\u05db\u05df \u05d1\u05e8\u05e7\u05e2...');  // "מוצג ממטמון, מתעדכן ברקע"
+      performLiveFetch(payload, true);  // fire-and-forget
+      return true;
+    }
+
+    // No cache: blocking live fetch (with skeleton + progress bar).
+    return await performLiveFetch(payload, false);
   };
 
   const applyPreset = async (preset) => {
