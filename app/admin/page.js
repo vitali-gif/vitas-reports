@@ -23,7 +23,7 @@ function InfoTip({ text }) {
   return (
     <span className="info-tip-wrapper" style={{ position: 'relative', display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }}>
       <span
-        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open) }}
         style={{
           cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           width: 18, height: 18, borderRadius: '50%',
