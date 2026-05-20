@@ -409,6 +409,7 @@ async function runSync(opts = {}) {
     }
 
     const _aprilLidStatusCounts = {}
+    const _lidHitTrace = []
     for (const lid of aprilLids) {
       const media = (lid.media_title || 'ללא מקור').trim() || 'ללא מקור'
       const cid = String(lid.client_id || '')
@@ -447,6 +448,21 @@ async function runSync(opts = {}) {
       if (scheduledHit) { totals.meetingsScheduled += 1; bucket.meetingsScheduled += 1 }
       if (completedHit) { totals.meetingsCompleted += 1; bucket.meetingsCompleted += 1 }
       if (cancelledHit) { totals.meetingsCancelled += 1; bucket.meetingsCancelled += 1 }
+
+      // DIAG (#11) - record per-LID hit trace for off-by-one investigation
+      _lidHitTrace.push({
+        cid,
+        lid_date: lidDate,
+        media,
+        status: cstatus,
+        appts: apptList.map(a => ({ d: a.date, done: a.completed, canc: a.cancelled })),
+        postLidApptDates: postLidAppts.map(a => a.date),
+        scheduledHit, completedHit, cancelledHit,
+        // alt-counters under variant logic for comparison
+        scheduledHit_inWindow: postLidAppts.some(a => a.date && !a.cancelled && inRangeDate(a.date)),
+        completedHit_inWindow: postLidAppts.some(a => a.date && a.completed && inRangeDate(a.date)),
+        scheduledHit_strictDate: postLidAppts.filter(a => a.date).length > 0 && postLidAppts.filter(a => a.date).some(a => !a.cancelled),
+      })
     }
 
     // After bucketing LIDs we can compute "any appointment ever" counts for comparison
@@ -828,6 +844,14 @@ async function runSync(opts = {}) {
           inWindowDone: clientsWithDoneAppt.size,
           inWindowCancelled: clientsWithCancelledAppt.size,
           totalClientsWithAppts: clientApptList.size,
+        },
+        lidHitTrace: _lidHitTrace,
+        lidHitTotals: {
+          current_scheduled: _lidHitTrace.filter(x => x.scheduledHit).length,
+          current_completed: _lidHitTrace.filter(x => x.completedHit).length,
+          variant_scheduled_inWindow: _lidHitTrace.filter(x => x.scheduledHit_inWindow).length,
+          variant_completed_inWindow: _lidHitTrace.filter(x => x.completedHit_inWindow).length,
+          variant_scheduled_strictDate: _lidHitTrace.filter(x => x.scheduledHit_strictDate).length,
         },
       },
     }
