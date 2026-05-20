@@ -1081,7 +1081,7 @@ const selectProject = async (client, project) => {
     const kpi = (label, value, color, current, prev, isCost) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null;
       const icon = kpiIcons[label] || '\ud83d\udcca';
-      return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}{tip ? <InfoTip text={tip} /> : null}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '\u25b2' : '\u25bc'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>;
+      return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '\u25b2' : '\u25bc'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>;
     };
 
     const buildTable = (items, prevItems, labelName, tableId) => {
