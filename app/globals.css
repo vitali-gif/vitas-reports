@@ -727,3 +727,82 @@ a { color: var(--accent); text-decoration: none; }
 .skel-kpi-icon { width: 40px; height: 40px; border-radius: 10px; margin-bottom: 10px; }
 .skel-kpi-label { height: 14px; width: 70%; margin-bottom: 10px; }
 .skel-kpi-value { height: 28px; width: 50%; }
+
+/* RECOMMENDATIONS PANEL — natural-Hebrew advice cards */
+.rec-card {
+  background: var(--card);
+  border-right: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 18px 22px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.rec-card.green { border-right-color: var(--success); }
+.rec-card.orange { border-right-color: var(--warning); }
+.rec-card .rec-title {
+  font-size: 1.05em;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rec-card .rec-title .rec-icon { font-size: 1.3em; }
+.rec-card .rec-body p {
+  margin: 6px 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  font-size: 0.93em;
+}
+.rec-suggestion {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: rgba(59,130,246,0.08);
+  border-radius: 6px;
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.93em;
+}
+.rec-suggestion::before { content: "✨ שווה לנסות: "; font-weight: 700; }
+.rec-prediction {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 14px;
+  background: rgba(16,185,129,0.10);
+  border-radius: 8px;
+  border: 1px dashed var(--success);
+}
+.rec-prediction .pred-value {
+  font-size: 1.6em;
+  font-weight: 800;
+  color: var(--success);
+}
+.rec-prediction .pred-label {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+.rec-prediction .pred-detail {
+  font-size: 0.78em;
+  color: var(--text-light);
+}
+.rec-measure {
+  margin-top: 12px;
+  font-size: 0.86em;
+  color: var(--text-secondary);
+}
+.rec-measure-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+.rec-measure ul {
+  margin: 0;
+  padding-right: 20px;
+}
+.rec-measure li {
+  margin: 2px 0;
+}

@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { formatCurrency, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
+import { buildRecommendations } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
 
@@ -665,6 +666,38 @@ const selectProject = async (client, project) => {
           <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div><div className="kpi-value">{fmt(overallBusinessMin)}</div></div>
           <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div><div className="kpi-value">{noResponseCount}</div></div>
         </div>
+
+        {(() => {
+          const recs = buildRecommendations({ bucketTotals: bucketsBusiness, bucketWith: bucketMeetingWith, dowMerged, totalLids });
+          if (!recs.length) return null;
+          return (
+            <div className="section">
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>💡</div>המלצות חכמות לחודש הבא <InfoTip text="המלצות שמופקות מתוך הנתונים שלך - דפוסים שזיהינו שווה לנסות לפעול עליהם. הטקסט מתייחס למספרים האמיתיים מהחודש הנוכחי, וכולל תחזית כמותית למה שעלול לקרות אם הצעד יבוצע." /></div>
+              {recs.map((rec, i) => (
+                <div key={i} className={`rec-card ${rec.type === 'response_time' ? '' : rec.type === 'day_of_week' ? 'green' : ''}`}>
+                  <div className="rec-title"><span className="rec-icon">{rec.icon}</span>{rec.title}</div>
+                  <div className="rec-body">{rec.body.map((p, j) => <p key={j}>{p}</p>)}</div>
+                  {rec.suggestion && <div className="rec-suggestion">{rec.suggestion}</div>}
+                  {rec.prediction && (
+                    <div className="rec-prediction">
+                      <span className="pred-value">{rec.prediction.value}</span>
+                      <div>
+                        <div className="pred-label">{rec.prediction.label}</div>
+                        <div className="pred-detail">{rec.prediction.detail}</div>
+                      </div>
+                    </div>
+                  )}
+                  {rec.measure && rec.measure.length > 0 && (
+                    <div className="rec-measure">
+                      <div className="rec-measure-title">איך נדע אם זה עבד החודש הבא?</div>
+                      <ul>{rec.measure.map((m, k) => <li key={k}>{m}</li>)}</ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         <div className="section">
           <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="התפלגות זמני התגובה הראשונים של אנשי המכירות לכל ליד שנכנס.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
