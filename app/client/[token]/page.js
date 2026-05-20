@@ -1468,6 +1468,7 @@ export default function ClientPage() {
                   <label style={{fontSize: '0.85em', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer'}}>
                     <input type="checkbox" checked={compareEnabled} onChange={e => setCompareEnabled(e.target.checked)} />
                     השוואה לחודש קודם
+                    {selectedMonth && (<InfoTip text={`משווה מול אותה תקופה בחודש הקודם:\n\nהתקופה הנסקרת: ${formatMonth(selectedMonth)}\nתקופת השוואה: ${formatMonth(getPrevMonth(selectedMonth))}\n\nהלוגיקה: המערכת מזיזה את כל הטווח בדיוק חודש אחד אחורה - גם לקטעים קצרים כמו 7 ימים אחרונים (לא משווה לשבוע שעבר אלא לאותם הימים בחודש הקודם).`} />)}
                   </label>
                 )}
               </div>

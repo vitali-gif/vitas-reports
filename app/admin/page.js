@@ -1758,9 +1758,10 @@ const selectProject = async (client, project) => {
                     <button className="btn btn-sm btn-primary" style={{padding:'4px 10px',fontSize:'0.82em'}} onClick={() => applyCustomRange()} disabled={!customSince || !customUntil || refreshing}>{'\u05d4\u05e6\u05d2'}</button>
                   </div>
                 )}
-                <label style={{fontSize:'0.9em',display:'flex',alignItems:'center',gap:6,cursor:'pointer',padding:'6px 12px',background:'rgba(59,130,246,0.08)',borderRadius:'8px',border:'1px solid rgba(59,130,246,0.2)'}} title="מציג השוואה של אותה תקופה בחודש הקודם (למשל 7 ימים אחרונים מול 7 ימים בחודש שעבר)">
+                <label style={{fontSize:'0.9em',display:'flex',alignItems:'center',gap:6,cursor:'pointer',padding:'6px 12px',background:'rgba(59,130,246,0.08)',borderRadius:'8px',border:'1px solid rgba(59,130,246,0.2)'}}>
                   <input type="checkbox" checked={compareEnabled} onChange={e => onComparisonToggle(e.target.checked)} />
                   {'\u05d4\u05e9\u05d5\u05d5\u05d0\u05d4 \u05dc\u05d0\u05d5\u05ea\u05d4 \u05ea\u05e7\u05d5\u05e4\u05d4'}
+                  {selectedMonth && (<InfoTip text={`\u05de\u05e9\u05d5\u05d5\u05d4 \u05de\u05d5\u05dc \u05d0\u05d5\u05ea\u05d4 \u05ea\u05e7\u05d5\u05e4\u05d4 \u05d1\u05d7\u05d5\u05d3\u05e9 \u05d4\u05e7\u05d5\u05d3\u05dd:\n\n\u05d4\u05ea\u05e7\u05d5\u05e4\u05d4 \u05d4\u05e0\u05e1\u05e7\u05e8\u05ea: ${formatMonth(selectedMonth)}\n\u05ea\u05e7\u05d5\u05e4\u05ea \u05d4\u05e9\u05d5\u05d5\u05d0\u05d4: ${formatMonth(getPrevMonth(selectedMonth))}\n\n\u05d4\u05dc\u05d5\u05d2\u05d9\u05e7\u05d4: \u05d4\u05de\u05e2\u05e8\u05db\u05ea \u05de\u05d6\u05d9\u05d6\u05d4 \u05d0\u05ea \u05db\u05dc \u05d4\u05d8\u05d5\u05d5\u05d7 \u05d1\u05d3\u05d9\u05d5\u05e7 \u05d7\u05d5\u05d3\u05e9 \u05d0\u05d7\u05d3 \u05d0\u05d7\u05d5\u05e8\u05d4 - \u05d2\u05dd \u05dc\u05e7\u05d8\u05e2\u05d9\u05dd \u05e7\u05e6\u05e8\u05d9\u05dd \u05db\u05de\u05d5 7 \u05d9\u05de\u05d9\u05dd \u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd (\u05dc\u05d0 \u05de\u05e9\u05d5\u05d5\u05d4 \u05dc\u05e9\u05d1\u05d5\u05e2 \u05e9\u05e2\u05d1\u05e8 \u05d0\u05dc\u05d0 \u05dc\u05d0\u05d5\u05ea\u05dd \u05d4\u05d9\u05de\u05d9\u05dd \u05d1\u05d7\u05d5\u05d3\u05e9 \u05d4\u05e7\u05d5\u05d3\u05dd).`} />)}
                 </label>
               </div>
             </div>
