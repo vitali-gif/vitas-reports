@@ -1,17 +1,17 @@
 // API route: /api/bmby/fetch
-//   POST — from the admin UI (auth via x-client-key header = anon key)
-//   GET  — from Vercel Cron (auth via Authorization: Bearer <CRON_SECRET>)
+//   POST - from the admin UI (auth via x-client-key header = anon key)
+//   GET  - from Vercel Cron (auth via Authorization: Bearer <CRON_SECRET>)
 //
 // Pulls data from BMBY CRM SOAP services (Clients / Tasks / Price Offers / Contracts)
 // for each project listed in BMBY_PROJECT_IDS env var, aggregates per-source metrics,
 // and writes one `reports` row per project per month with source='crm'.
 //
 // Env vars required:
-//   BMBY_LOGIN                  — API username (from BMBY support, not the web-UI login)
-//   BMBY_PASSWORD               — API password
-//   BMBY_PROJECT_IDS            — JSON mapping of our project name -> BMBY project_id, e.g.
+//   BMBY_LOGIN                  - API username (from BMBY support, not the web-UI login)
+//   BMBY_PASSWORD               - API password
+//   BMBY_PROJECT_IDS            - JSON mapping of our project name -> BMBY project_id, e.g.
 //                                 {"HI PARK":"1234","ONCE":"1235","REHAVIA":"1236"}
-//   BMBY_RELEVANT_STATUSES      — (optional) JSON array of `status` values meaning "relevant", e.g. ["1","2","3"]
+//   BMBY_RELEVANT_STATUSES      - (optional) JSON array of `status` values meaning "relevant", e.g. ["1","2","3"]
 //                                 Anything not in this list is counted as "non-relevant".
 //                                 If not set, falls back to: lead with status in {"relevant","hot","warm","חם","פושר","רלוונטי"}
 
@@ -152,7 +152,7 @@ async function callBmbyGetAllJson(service, params) {
   }
 }
 
-// Paginate BMBY GetAllJson — BMBY caps each response at 3000 rows.
+// Paginate BMBY GetAllJson - BMBY caps each response at 3000 rows.
 // We page by using Dynamic=0 + UniqID = previous LastUniqID until FoundRows < 3000
 // or we exceed maxPages. ToDate is used as an early-stop signal if the last row's
 // create_date is already past the requested window.
@@ -220,7 +220,7 @@ async function runSync(opts = {}) {
 
   if (!login || !password || !projectIdsRaw) {
     return {
-      status: 200,  // not a real error — just pending credentials
+      status: 200,  // not a real error - just pending credentials
       body: {
         ok: false,
         pending: true,
@@ -262,7 +262,7 @@ async function runSync(opts = {}) {
     .select('id, name')
   if (projectsError) return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
 
-  // Filter to a single project if requested (faster load — caller is viewing only this one)
+  // Filter to a single project if requested (faster load - caller is viewing only this one)
   const projectsList = opts.projectId
     ? (projects || []).filter(p => p.id === opts.projectId)
     : (projects || [])
@@ -273,7 +273,7 @@ async function runSync(opts = {}) {
     new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timed out after ' + ms + 'ms')), ms))
   ])
 
-  // Process ALL projects in parallel — so total runtime ≈ slowest single call, not sum
+  // Process ALL projects in parallel - so total runtime ≈ slowest single call, not sum
   const projectResults = await Promise.all(projectsList.map(async (p) => {
     const bmbyPid = projectMap[p.name]
     if (!bmbyPid) {
@@ -328,22 +328,22 @@ async function runSync(opts = {}) {
     //   "רלוונטיים/לא"          = relevant flag on the underlying client (most-recent value)
     //
     // April LIDs are the universe of "leads" for the period. Per the report each LID is one row,
-    // and the media_title carried on the LID task is the bucketing key — not the client's media.
+    // and the media_title carried on the LID task is the bucketing key - not the client's media.
 
-    // Helper: dates may come as YYYY-MM-DD or YYYY-MM-DD HH:MM:SS — strip to date portion
+    // Helper: dates may come as YYYY-MM-DD or YYYY-MM-DD HH:MM:SS - strip to date portion
     const inRangeDate = (d) => {
       if (!d) return false
       const dateOnly = String(d).slice(0, 10)
       return dateOnly >= since && dateOnly <= until
     }
 
-    // 1. LID tasks in window — each row counts as one lead under its own media_title
+    // 1. LID tasks in window - each row counts as one lead under its own media_title
     const aprilLids = tasks.filter(t => {
       const ty = (t.type || '').toString().toLowerCase()
       return ty === 'lid' && inRangeDate(t.start_date || t.create_date)
     })
 
-    // 2. Appointments — build per-client list of events so we can filter
+    // 2. Appointments - build per-client list of events so we can filter
     //    by appt date relative to the LID's start_date (post-LID logic).
     const clientApptList = new Map()  // cid → [{ date, completed, cancelled }]
     const clientsWithAppt = new Set()           // window-based (any status)
@@ -433,7 +433,7 @@ async function runSync(opts = {}) {
         bucket.nonRelevantLeads += 1
       }
 
-      // Meetings — post-LID logic: only count appointments that occurred AFTER (or same date as)
+      // Meetings - post-LID logic: only count appointments that occurred AFTER (or same date as)
       // the LID. This excludes historical appointments of returning customers.
       //   "תואמו" = LIDs whose client has any appointment with start_date >= LID's start_date
       //   "בוצעו" = LIDs whose client has a completed appointment with start_date >= LID's start_date
@@ -513,7 +513,7 @@ async function runSync(opts = {}) {
     const _contractAttribDebug = []
     for (const k of contractsInRange) {
       const cid = String(k.client_id || '')
-      // BMBY's "סכום העסקאות" matches price_agreement_inc_vat (with VAT) — gives ~95% of report total
+      // BMBY's "סכום העסקאות" matches price_agreement_inc_vat (with VAT) - gives ~95% of report total
       const val = num(k.price_agreement_inc_vat || k.final_price_inc_vat || k.list_price || k.price_agreement || k.final_price)
       // Fallback chain: window LIDs → any historical LID → client.media → "ללא מקור"
       let attributedMedia = null
@@ -550,7 +550,7 @@ async function runSync(opts = {}) {
       bucket.contractValue += val
     }
 
-    // 6. Price offers (currently unused for ש.ברוך — kept for future)
+    // 6. Price offers (currently unused for ש.ברוך - kept for future)
     const pricesInRange = prices.filter(po => inRangeDate(po.offer_date || po.create_date))
     for (const po of pricesInRange) {
       const cid = String(po.client_id || '')
@@ -580,7 +580,7 @@ async function runSync(opts = {}) {
     }))
 
     // Build per-LID rows for the "מחולל דוחות" sub-tab (city/objection/last-meeting view).
-    // Shape: { address, objections, lastMeeting } — same shape `mapCrmReportRows` produces from xlsx.
+    // Shape: { address, objections, lastMeeting } - same shape `mapCrmReportRows` produces from xlsx.
     const crmReportRows = []
     for (const lid of aprilLids) {
       const cid = String(lid.client_id || '')
@@ -629,7 +629,7 @@ async function runSync(opts = {}) {
       const lidMs = parseTs(lid.create_date || lid.start_date)
       if (isNaN(lidMs)) continue
 
-      // Find first REAL HUMAN followup — skip BMBY's auto "Update Info Lead" system comments
+      // Find first REAL HUMAN followup - skip BMBY's auto "Update Info Lead" system comments
       // (those are generated automatically when a lead form is filled, always Δ=0s under the lead owner's name).
       const followups = (tasksByClient.get(cid) || [])
         .filter(t => {
@@ -672,7 +672,7 @@ async function runSync(opts = {}) {
     const responded = responseTimes.filter(r => !r.noResponse)
     const noResponseCount = responseTimes.length - responded.length
 
-    // Bucketize WITH meeting-conversion tracking — output per-bucket { total, withMeeting }
+    // Bucketize WITH meeting-conversion tracking - output per-bucket { total, withMeeting }
     // Split 4-24h into 4-8h (same workday) + 8-24h (next workday) for more granularity
     const bucketOf = (mn) => {
       if (mn <= 15) return '0-15m'
@@ -811,7 +811,7 @@ async function runSync(opts = {}) {
       errors: errors.length ? errors : undefined,
       debug: Object.keys(debug).length ? debug : undefined,
       diag: {
-        // Compact diag for ops — keep contract attribution chain + funnel status counts
+        // Compact diag for ops - keep contract attribution chain + funnel status counts
         contractAttrib: _contractAttribDebug.map(c => ({
           client_id: c.client_id,
           client_name: c.client_name,

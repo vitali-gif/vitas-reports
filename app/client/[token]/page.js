@@ -7,7 +7,7 @@ import { normalizeObjections } from '../../../lib/objection-normalize.js'
 import Chart from 'chart.js/auto'
 
 
-// Reusable info tooltip — click ⓘ to open a styled popover with the explanation.
+// Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
 function InfoTip({ text }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
@@ -232,7 +232,7 @@ export default function ClientPage() {
     if (allRows.length === 0) return <div className="welcome-center"><div className="icon">💭</div><h3>אין נתוני CRM דוחות לחודש זה</h3></div>
     const repData = aggregateCrmReportRows(allRows)
 
-    // Top 10 cities only — clean, focused view
+    // Top 10 cities only - clean, focused view
     const cityEntries = Object.entries(repData.cities)
       .filter(([n]) => n && n !== 'לא צוין')
       .sort((a, b) => b[1] - a[1])
@@ -361,7 +361,7 @@ export default function ClientPage() {
       })
       createChart('responseBucketsChart', 'bar', bucketHumanLabels, [
         { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y', order: 2 },
-        { label: 'מתוכם — המירו לפגישה', type: 'bar', data: bucketMeetingValues, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
+        { label: 'מתוכם - המירו לפגישה', type: 'bar', data: bucketMeetingValues, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
         { label: '% המרה לפגישה', type: 'line', data: conversionRates, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, pointBackgroundColor: '#f59e0b', fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
       ], {
         y: { beginAtZero: true, position: 'right', title: { display: true, text: 'מספר לידים' } },
@@ -385,7 +385,7 @@ export default function ClientPage() {
         })
         createChart('dowChart', 'bar', labels, [
           { label: 'לידים', type: 'bar', data: leadsData, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y', order: 2 },
-          { label: 'מתוכם — המירו לפגישה', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
+          { label: 'מתוכם - המירו לפגישה', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
           { label: '% המרה לפגישה', type: 'line', data: conv, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
         ], {
           y: { beginAtZero: true, position: 'right', title: { display: true, text: 'כמות' } },
@@ -428,27 +428,27 @@ export default function ClientPage() {
     return (
       <>
         <div className="kpi-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))'}}>
-          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📊</div><div className="kpi-label">סה"כ לידים <InfoTip text="כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת — ספירה אחרי ניכוי כפילויות." /></div><div className="kpi-value">{totalLids}</div></div>
+          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📊</div><div className="kpi-label">סה"כ לידים <InfoTip text="כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות." /></div><div className="kpi-value">{totalLids}</div></div>
           <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>✓</div><div className="kpi-label">קיבלו מענה <InfoTip text="לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות." /></div><div className="kpi-value">{respondedCount}</div></div>
-          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div><div className="kpi-value">{fmt(overallBusinessMin)}</div></div>
-          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם — או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div><div className="kpi-value">{noResponseCount}</div></div>
+          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div><div className="kpi-value">{fmt(overallBusinessMin)}</div></div>
+          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div><div className="kpi-value">{noResponseCount}</div></div>
         </div>
 
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="התפלגות זמני התגובה הראשונים של אנשי המכירות לכל ליד שנכנס.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="התפלגות זמני התגובה הראשונים של אנשי המכירות לכל ליד שנכנס.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
         </div>
 
         {dowHasData && (
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)' || 'var(--gradient-2)'}}>📅</div>פילוח לפי יום בשבוע <InfoTip text="כמה לידים נכנסו בכל יום בשבוע, ומתוכם כמה בסופו של דבר המירו לפגישה.\n\nחשוב: המדידה היא לפי יום כניסת הליד, לא לפי יום קביעת הפגישה. דוגמה — ליד שהגיע בשבת ואחר כך נקבעה לו פגישה ביום שני, נספר תחת 'שבת'.\n\nשימושי לזיהוי באיזה יום מגיע הקהל הכי איכותי, ולתזמון של תקציבי קמפיינים." /></div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)' || 'var(--gradient-2)'}}>📅</div>פילוח לפי יום בשבוע <InfoTip text="כמה לידים נכנסו בכל יום בשבוע, ומתוכם כמה בסופו של דבר המירו לפגישה.\n\nחשוב: המדידה היא לפי יום כניסת הליד, לא לפי יום קביעת הפגישה. דוגמה - ליד שהגיע בשבת ואחר כך נקבעה לו פגישה ביום שני, נספר תחת 'שבת'.\n\nשימושי לזיהוי באיזה יום מגיע הקהל הכי איכותי, ולתזמון של תקציבי קמפיינים." /></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
           </div>
         )}
 
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות <InfoTip text="ממוצע הזמן שלוקח לכל איש מכירות לחזור ללידים החדשים שלו. מספרים קטנים = תגובה מהירה.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות <InfoTip text="ממוצע הזמן שלוקח לכל איש מכירות לחזור ללידים החדשים שלו. מספרים קטנים = תגובה מהירה.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -465,7 +465,7 @@ export default function ClientPage() {
             </div>
           </div>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)' || 'var(--gradient-2)'}}>📡</div>הכי איטיים — לפי מקור <InfoTip text="המקורות מסודרים מהאיטי ביותר למהיר ביותר. עוזר לזהות איזה מקור מקבל טיפול לקוי.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)' || 'var(--gradient-2)'}}>📡</div>הכי איטיים - לפי מקור <InfoTip text="המקורות מסודרים מהאיטי ביותר למהיר ביותר. עוזר לזהות איזה מקור מקבל טיפול לקוי.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>מקור</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -563,14 +563,14 @@ export default function ClientPage() {
     crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data) })
     const crmData = aggregateCrmRows(allCrmRows)
 
-    // Merge Facebook campaign sources into single 'Facebook' entry — children kept for drill-down
+    // Merge Facebook campaign sources into single 'Facebook' entry - children kept for drill-down
     const _fbCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('פייסבוק') || k.toLowerCase().includes('facebook'))
     if (_fbCrmKeys.length > 0) {
       const _fbMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [] }
       _fbCrmKeys.forEach(k => { Object.keys(_fbMerged).forEach(f => { if (f === 'children') return; _fbMerged[f] += crmData.sources[k][f] || 0 }); _fbMerged.children.push({ name: k, ...crmData.sources[k] }); delete crmData.sources[k] })
       crmData.sources['Facebook'] = _fbMerged
     }
-    // Merge Google campaign sources into single 'Google' entry — children kept for drill-down
+    // Merge Google campaign sources into single 'Google' entry - children kept for drill-down
     const _gCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('גוגל') || k.toLowerCase().includes('google'))
     if (_gCrmKeys.length > 0) {
       const _gMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [] }
@@ -1032,12 +1032,12 @@ export default function ClientPage() {
           </div>
         </div>
 
-        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>מגמות חודשיות <InfoTip text="השוואת חודש מול חודש קודם — תקציב, חשיפות, לידים, CPL. עוזר לזהות מגמות לאורך זמן" /></div><div className="chart-grid"><div className="chart-card"><h4>💰 לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>📈 תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
+        {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>מגמות חודשיות <InfoTip text="השוואת חודש מול חודש קודם - תקציב, חשיפות, לידים, CPL. עוזר לזהות מגמות לאורך זמן" /></div><div className="chart-grid"><div className="chart-card"><h4>💰 לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>📈 תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
 
         {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>קמפיינים <InfoTip text="סיכום ביצועים פר קמפיין. CPL (עלות לליד) הוא ה-KPI המרכזי" /></div><div className="chart-grid"><div className="chart-card"><h4>📊 התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>💰 לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין', 'campaigns')}</div>)}
 
         {!isPmax && (
-        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות מודעות <InfoTip text="ביצועי Ad Sets — איזה קהל יעד הכי טוב" /></div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות', 'adsets')}</div>
+        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות מודעות <InfoTip text="ביצועי Ad Sets - איזה קהל יעד הכי טוב" /></div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות', 'adsets')}</div>
         )}
 
         {isPmax && (() => {
@@ -1046,7 +1046,7 @@ export default function ClientPage() {
           const sorted = [...allAGs].sort((a,b) => (b.spend || 0) - (a.spend || 0))
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות נכסים — פירוט <InfoTip text="Performance Max Asset Groups — התוכן והביצוע בכל קבוצה" /></div>
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות נכסים - פירוט <InfoTip text="Performance Max Asset Groups - התוכן והביצוע בכל קבוצה" /></div>
               <div className="card" style={{overflowX:'auto'}}>
                 <table className="data-table"><thead><tr>
                   <th style={{whiteSpace:'nowrap'}}>קבוצת נכסים</th>
@@ -1067,13 +1067,13 @@ export default function ClientPage() {
                     const ctr = imps > 0 ? (clicks / imps * 100) : 0
                     return (
                       <tr key={ag.id || i}>
-                        <td style={{fontWeight:600,unicodeBidi:'plaintext',textAlign:'right'}}>{ag.name || '—'}</td>
-                        <td style={{fontSize:'0.85em',color:'#64748b',unicodeBidi:'plaintext'}}>{ag.campaign || '—'}</td>
+                        <td style={{fontWeight:600,unicodeBidi:'plaintext',textAlign:'right'}}>{ag.name || '-'}</td>
+                        <td style={{fontSize:'0.85em',color:'#64748b',unicodeBidi:'plaintext'}}>{ag.campaign || '-'}</td>
                         <td>{formatNum(clicks)}</td>
                         <td>{formatNum(imps)}</td>
                         <td>{ctr.toFixed(2)}%</td>
                         <td style={{fontWeight:700,color:leads>0?'#059669':'#94a3b8'}}>{Math.round(leads)}</td>
-                        <td style={{fontWeight:600}}>{leads > 0 ? formatCurrency(cpl) : '—'}</td>
+                        <td style={{fontWeight:600}}>{leads > 0 ? formatCurrency(cpl) : '-'}</td>
                         <td style={{fontWeight:600}}>{formatCurrency(spend)}</td>
                       </tr>
                     )
@@ -1143,7 +1143,7 @@ export default function ClientPage() {
         })()}
         </div>)}
 
-        {/* ACTIVE ADS SECTION (Facebook) — top 5 by leads, with video/image preview */}
+        {/* ACTIVE ADS SECTION (Facebook) - top 5 by leads, with video/image preview */}
         {(dashTab === 'facebook' || dashTab === 'all') && (() => {
           const activeAdsList = fbReports.flatMap(r => r.summary?.activeAds || []);
           if (activeAdsList.length === 0) return null;
@@ -1352,7 +1352,7 @@ export default function ClientPage() {
           <>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25}}>
               <h2 style={{fontSize: '1.5em', fontWeight: 800}}>
-                {selectedProject.name} — {formatMonth(selectedMonth)}
+                {selectedProject.name} - {formatMonth(selectedMonth)}
               </h2>
               <div style={{display: 'flex', gap: 10, alignItems: 'center'}}>
                 {reports.length > 1 && (

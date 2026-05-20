@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'VITAS Campaign Manager — Digital Marketing Reports',
+  title: 'VITAS Campaign Manager - Digital Marketing Reports',
   description: 'Unified marketing performance dashboard by VITAS. Consolidates Meta Ads and Google Ads data into a single reporting platform.',
 }
 
@@ -58,7 +58,7 @@ export default function Home() {
           Unified Digital Marketing Reporting for Agencies and Advertisers
         </h1>
         <p style={{ fontSize: '1.15em', color: '#94a3b8', lineHeight: 1.7, margin: '0 0 26px', maxWidth: 820 }}>
-          VITAS Campaign Manager is a proprietary reporting dashboard built by VITAS Digital Marketing. It consolidates campaign performance data from multiple advertising platforms — including Meta Ads (Facebook / Instagram) and Google Ads — into a single, unified interface that agencies and advertisers use to track spend, leads, cost-per-lead, and ad creative performance across all their clients and projects in real time.
+          VITAS Campaign Manager is a proprietary reporting dashboard built by VITAS Digital Marketing. It consolidates campaign performance data from multiple advertising platforms - including Meta Ads (Facebook / Instagram) and Google Ads - into a single, unified interface that agencies and advertisers use to track spend, leads, cost-per-lead, and ad creative performance across all their clients and projects in real time.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ background: 'rgba(59,130,246,0.15)', color: '#93c5fd', padding: '6px 14px', borderRadius: 20, fontSize: '0.85em', fontWeight: 600 }}>Meta Marketing API</span>
@@ -82,7 +82,7 @@ export default function Home() {
             <div style={{ background: '#0b1220', padding: 24, borderRadius: 12, borderLeft: '4px solid #10b981' }}>
               <div style={{ fontSize: '1.05em', fontWeight: 700, marginBottom: 8 }}>Per-project dashboards</div>
               <div style={{ color: '#94a3b8', fontSize: '0.95em', lineHeight: 1.6 }}>
-                Agency-style project breakdown — each client can have multiple active projects, each with its own monthly report, campaign tables, ad creative library, and demographic breakdowns.
+                Agency-style project breakdown - each client can have multiple active projects, each with its own monthly report, campaign tables, ad creative library, and demographic breakdowns.
               </div>
             </div>
             <div style={{ background: '#0b1220', padding: 24, borderRadius: 12, borderLeft: '4px solid #8b5cf6' }}>
@@ -106,10 +106,10 @@ export default function Home() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <h2 style={{ fontSize: '1.9em', fontWeight: 800, marginTop: 0, marginBottom: 20 }}>How we use the Google Ads API</h2>
           <p style={{ color: '#94a3b8', lineHeight: 1.75, fontSize: '1em', maxWidth: 900 }}>
-            VITAS Campaign Manager uses the Google Ads API in <strong style={{ color: '#e2e8f0' }}>read-only mode</strong> to retrieve campaign, ad group, ad, and performance metrics for the Google Ads accounts that our MCC manages. Retrieved data is transformed into a common schema — identical to the schema used for Meta Ads data — and stored in a Supabase Postgres database. Users of the platform view the data through the web dashboard; the API itself is never exposed directly to end users or clients.
+            VITAS Campaign Manager uses the Google Ads API in <strong style={{ color: '#e2e8f0' }}>read-only mode</strong> to retrieve campaign, ad group, ad, and performance metrics for the Google Ads accounts that our MCC manages. Retrieved data is transformed into a common schema - identical to the schema used for Meta Ads data - and stored in a Supabase Postgres database. Users of the platform view the data through the web dashboard; the API itself is never exposed directly to end users or clients.
           </p>
           <p style={{ color: '#94a3b8', lineHeight: 1.75, fontSize: '1em', maxWidth: 900, marginTop: 16 }}>
-            The API is called either on demand by a logged-in agency employee (via a &quot;Refresh from Google Ads&quot; button) or automatically once per day via a scheduled Vercel Cron job. We do not create, modify, pause, or delete campaigns through the API — all campaign management is done by our team directly in the Google Ads UI. Refresh tokens are stored as encrypted environment variables in Vercel and are never written to source code or logs.
+            The API is called either on demand by a logged-in agency employee (via a &quot;Refresh from Google Ads&quot; button) or automatically once per day via a scheduled Vercel Cron job. We do not create, modify, pause, or delete campaigns through the API - all campaign management is done by our team directly in the Google Ads UI. Refresh tokens are stored as encrypted environment variables in Vercel and are never written to source code or logs.
           </p>
         </div>
       </section>

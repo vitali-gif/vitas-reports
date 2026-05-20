@@ -8,7 +8,7 @@ import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
 
 
-// Reusable info tooltip — click ⓘ to open a styled popover with the explanation.
+// Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
 function InfoTip({ text }) {
   const [open, setOpen] = useState(false)
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function AdminPage() {
   const triggerFetch = async (payload) => {
     if (refreshing) return false;
     setRefreshing(true);
-    // Limit fetch to current project only — much faster than fetching all 3
+    // Limit fetch to current project only - much faster than fetching all 3
     if (selectedProject && !payload.projectId) payload = { ...payload, projectId: selectedProject.id };
     setRefreshStartTime(Date.now());
     setRefreshElapsed(0);
@@ -174,7 +174,7 @@ export default function AdminPage() {
       return;
     }
     setActivePreset(preset);
-    if (preset === 'custom') return; // UI shows custom date inputs — user must click הצג
+    if (preset === 'custom') return; // UI shows custom date inputs - user must click הצג
     const r = presetToPayload(preset);
     if (!r) return;
     // Set the target selection BEFORE triggering fetch so loadProjectReports keeps it
@@ -306,7 +306,7 @@ const selectProject = async (client, project) => {
   }, [refreshStartTime]);
 
   // Auto-fetch any missing data sources when user picks a period.
-  // Replaces the old manual refresh buttons — if Meta/Google/BMBY data is missing
+  // Replaces the old manual refresh buttons - if Meta/Google/BMBY data is missing
   // for the selected period, fetch it automatically (with debounce).
   useEffect(() => {
     if (!selectedMonth || !selectedProject) return;
@@ -412,7 +412,7 @@ const selectProject = async (client, project) => {
     if (allRows.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udcad'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 CRM \u05d3\u05d5\u05d7\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d6\u05d4'}</h3></div>;
     const repData = aggregateCrmReportRows(allRows);
 
-    // Top 10 cities only — clean, focused view
+    // Top 10 cities only - clean, focused view
     const cityEntries = Object.entries(repData.cities)
       .filter(([n]) => n && n !== 'לא צוין')
       .sort((a, b) => b[1] - a[1])
@@ -543,7 +543,7 @@ const selectProject = async (client, project) => {
       });
       createChart('responseBucketsChart', 'bar', bucketHumanLabels, [
         { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y', order: 2 },
-        { label: 'מתוכם — המירו לפגישה', type: 'bar', data: bucketMeetingValues, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
+        { label: 'מתוכם - המירו לפגישה', type: 'bar', data: bucketMeetingValues, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
         { label: '% המרה לפגישה', type: 'line', data: conversionRates, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, pointBackgroundColor: '#f59e0b', fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
       ], {
         y: { beginAtZero: true, position: 'right', title: { display: true, text: 'מספר לידים' } },
@@ -566,7 +566,7 @@ const selectProject = async (client, project) => {
         });
         createChart('dowChart', 'bar', labels, [
           { label: 'לידים', type: 'bar', data: leadsData, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y', order: 2 },
-          { label: 'מתוכם — המירו לפגישה', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
+          { label: 'מתוכם - המירו לפגישה', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
           { label: '% המרה לפגישה', type: 'line', data: conv, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
         ], {
           y: { beginAtZero: true, position: 'right', title: { display: true, text: 'כמות' } },
@@ -600,27 +600,27 @@ const selectProject = async (client, project) => {
     return (
       <>
         <div className="kpi-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))'}}>
-          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📊</div><div className="kpi-label">סה"כ לידים <InfoTip text="כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת — ספירה אחרי ניכוי כפילויות." /></div><div className="kpi-value">{totalLids}</div></div>
+          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📊</div><div className="kpi-label">סה"כ לידים <InfoTip text="כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות." /></div><div className="kpi-value">{totalLids}</div></div>
           <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>✓</div><div className="kpi-label">קיבלו מענה <InfoTip text="לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות." /></div><div className="kpi-value">{respondedCount}</div></div>
-          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div><div className="kpi-value">{fmt(overallBusinessMin)}</div></div>
-          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם — או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div><div className="kpi-value">{noResponseCount}</div></div>
+          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div><div className="kpi-value">{fmt(overallBusinessMin)}</div></div>
+          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div><div className="kpi-value">{noResponseCount}</div></div>
         </div>
 
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="התפלגות זמני התגובה הראשונים של אנשי המכירות לכל ליד שנכנס.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="התפלגות זמני התגובה הראשונים של אנשי המכירות לכל ליד שנכנס.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
         </div>
 
         {dowHasData && (
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📅</div>פילוח לפי יום בשבוע <InfoTip text="כמה לידים נכנסו בכל יום בשבוע, ומתוכם כמה בסופו של דבר המירו לפגישה.\n\nחשוב: המדידה היא לפי יום כניסת הליד, לא לפי יום קביעת הפגישה. דוגמה — ליד שהגיע בשבת ואחר כך נקבעה לו פגישה ביום שני, נספר תחת 'שבת'.\n\nשימושי לזיהוי באיזה יום מגיע הקהל הכי איכותי, ולתזמון של תקציבי קמפיינים." /></div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📅</div>פילוח לפי יום בשבוע <InfoTip text="כמה לידים נכנסו בכל יום בשבוע, ומתוכם כמה בסופו של דבר המירו לפגישה.\n\nחשוב: המדידה היא לפי יום כניסת הליד, לא לפי יום קביעת הפגישה. דוגמה - ליד שהגיע בשבת ואחר כך נקבעה לו פגישה ביום שני, נספר תחת 'שבת'.\n\nשימושי לזיהוי באיזה יום מגיע הקהל הכי איכותי, ולתזמון של תקציבי קמפיינים." /></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
           </div>
         )}
 
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות <InfoTip text="ממוצע הזמן שלוקח לכל איש מכירות לחזור ללידים החדשים שלו. מספרים קטנים = תגובה מהירה.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות <InfoTip text="ממוצע הזמן שלוקח לכל איש מכירות לחזור ללידים החדשים שלו. מספרים קטנים = תגובה מהירה.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -637,7 +637,7 @@ const selectProject = async (client, project) => {
             </div>
           </div>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📡</div>הכי איטיים — לפי מקור <InfoTip text="המקורות מסודרים מהאיטי ביותר למהיר ביותר. עוזר לזהות איזה מקור מקבל טיפול לקוי.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📡</div>הכי איטיים - לפי מקור <InfoTip text="המקורות מסודרים מהאיטי ביותר למהיר ביותר. עוזר לזהות איזה מקור מקבל טיפול לקוי.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>מקור</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -753,14 +753,14 @@ const selectProject = async (client, project) => {
     crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
     const crmData = aggregateCrmRows(allCrmRows);
 
-    // Merge Facebook campaign sources into single 'Facebook' entry — children kept for drill-down
+    // Merge Facebook campaign sources into single 'Facebook' entry - children kept for drill-down
     const _fbCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('פייסבוק') || k.toLowerCase().includes('facebook'));
     if (_fbCrmKeys.length > 0) {
       const _fbMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [] };
       _fbCrmKeys.forEach(k => { Object.keys(_fbMerged).forEach(f => { if (f === 'children') return; _fbMerged[f] += crmData.sources[k][f] || 0; }); _fbMerged.children.push({ name: k, ...crmData.sources[k] }); delete crmData.sources[k]; });
       crmData.sources['Facebook'] = _fbMerged;
     }
-    // Merge Google campaign sources into single 'Google' entry — children kept for drill-down
+    // Merge Google campaign sources into single 'Google' entry - children kept for drill-down
     const _gCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('גוגל') || k.toLowerCase().includes('google'));
     if (_gCrmKeys.length > 0) {
       const _gMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [] };
@@ -989,7 +989,7 @@ const selectProject = async (client, project) => {
 
     const currentReports = reports.filter(r => r.month === selectedMonth);
     // If there are NO reports at all for this project, show the welcome screen.
-    // If there are reports but not for this period, fall through — tabs will still show
+    // If there are reports but not for this period, fall through - tabs will still show
     // (based on `reports`, not `currentReports`) and per-tab content will handle empty.
     if (reports.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>No data for this month</h3></div>;
 
@@ -1138,7 +1138,7 @@ const selectProject = async (client, project) => {
     const crmRepReports = currentReports.filter(r =>
       r.source === 'crm_reports' || (r.source === 'crm' && r.summary && Array.isArray(r.summary.crmRepRows) && r.summary.crmRepRows.length > 0)
     );
-    // Tab visibility — show if the project has ANY data of this source (any month).
+    // Tab visibility - show if the project has ANY data of this source (any month).
     // Data presence inside the tab is handled by an empty-state below.
     const anyFb = reports.some(r => r.source === 'facebook');
     const anyG = reports.some(r => r.source && r.source.startsWith('google'));
@@ -1231,7 +1231,7 @@ const selectProject = async (client, project) => {
         {/* Non-FB tabs: keep existing campaigns charts + flat table */}
         {isPmax && campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd'} <InfoTip text="סיכום ביצועים פר קמפיין. CPL (עלות לליד) הוא ה-KPI המרכזי" /></div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
 
-        {/* Nested expandable table — Campaign → Ad Set → Ad — for FB, All, Google Search */}
+        {/* Nested expandable table - Campaign → Ad Set → Ad - for FB, All, Google Search */}
         {(isFb || dashTab === 'all' || dashTab === 'google_search') && campNames.length > 0 && (() => {
           // Build hierarchy from raw rows
           const tree = {};
@@ -1330,7 +1330,7 @@ const selectProject = async (client, project) => {
         })()}
 
         {/* Standard ad groups table (Facebook + Search/Display) */}
-        {/* Ad-sets table removed for All/Google Search — nested campaigns table covers it */}
+        {/* Ad-sets table removed for All/Google Search - nested campaigns table covers it */}
 
         {/* PMax: detailed asset-groups table (replaces both ad-groups + ads tables) */}
         {isPmax && (() => {
@@ -1339,7 +1339,7 @@ const selectProject = async (client, project) => {
           const sorted = [...allAGs].sort((a,b) => (b.spend || 0) - (a.spend || 0));
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd \u2014 \u05e4\u05d9\u05e8\u05d5\u05d8'} <InfoTip text="Performance Max Asset Groups — התוכן והביצוע בכל קבוצה" /></div>
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd \u2014 \u05e4\u05d9\u05e8\u05d5\u05d8'} <InfoTip text="Performance Max Asset Groups - התוכן והביצוע בכל קבוצה" /></div>
               <div className="card" style={{overflowX:'auto'}}>
                 <table className="data-table"><thead><tr>
                   <th style={{whiteSpace:'nowrap'}}>{'\u05e7\u05d1\u05d5\u05e6\u05ea \u05e0\u05db\u05e1\u05d9\u05dd'}</th>
@@ -1360,13 +1360,13 @@ const selectProject = async (client, project) => {
                     const ctr = imps > 0 ? (clicks / imps * 100) : 0;
                     return (
                       <tr key={ag.id || i}>
-                        <td style={{fontWeight:600,unicodeBidi:'plaintext',textAlign:'right'}}>{ag.name || '—'}</td>
-                        <td style={{fontSize:'0.85em',color:'#64748b',unicodeBidi:'plaintext'}}>{ag.campaign || '—'}</td>
+                        <td style={{fontWeight:600,unicodeBidi:'plaintext',textAlign:'right'}}>{ag.name || '-'}</td>
+                        <td style={{fontSize:'0.85em',color:'#64748b',unicodeBidi:'plaintext'}}>{ag.campaign || '-'}</td>
                         <td>{formatNum(clicks)}</td>
                         <td>{formatNum(imps)}</td>
                         <td>{ctr.toFixed(2)}%</td>
                         <td style={{fontWeight:700,color:leads>0?'#059669':'#94a3b8'}}>{Math.round(leads)}</td>
-                        <td style={{fontWeight:600}}>{leads > 0 ? formatCurrency(cpl) : '—'}</td>
+                        <td style={{fontWeight:600}}>{leads > 0 ? formatCurrency(cpl) : '-'}</td>
                         <td style={{fontWeight:600}}>{formatCurrency(spend)}</td>
                       </tr>
                     );
@@ -1434,7 +1434,7 @@ const selectProject = async (client, project) => {
         })()}
         </div>)}
 
-        {/* ACTIVE ADS SECTION (Facebook) — top 5 by leads, with video/image preview */}
+        {/* ACTIVE ADS SECTION (Facebook) - top 5 by leads, with video/image preview */}
         {(dashTab === 'facebook' || dashTab === 'all') && (() => {
           const activeAdsList = fbReports.flatMap(r => r.summary?.activeAds || []);
           if (activeAdsList.length === 0) return null;
