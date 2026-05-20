@@ -358,8 +358,8 @@ export default function ClientPage() {
         return tot > 0 ? Math.round((bucketMeetingWith[k] || 0) / tot * 100) : 0
       })
       createChart('responseBucketsChart', 'bar', bucketHumanLabels, [
-        { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: ['#10b981','#22c55e','#84cc16','#eab308','#f59e0b','#f97316','#ef4444'], borderRadius: 6, yAxisID: 'y' },
-        { label: '% המרה לפגישה', type: 'line', data: conversionRates, borderColor: '#3b82f6', backgroundColor: '#3b82f6', pointRadius: 5, pointBackgroundColor: '#3b82f6', fill: false, tension: 0.3, yAxisID: 'y1' },
+        { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: ['#10b981','#22c55e','#84cc16','#eab308','#f59e0b','#f97316','#ef4444'], borderRadius: 6, yAxisID: 'y', order: 2 },
+        { label: '% המרה לפגישה', type: 'line', data: conversionRates, borderColor: '#3b82f6', backgroundColor: '#3b82f6', pointRadius: 5, pointBackgroundColor: '#3b82f6', fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
       ], {
         y: { beginAtZero: true, position: 'right', title: { display: true, text: 'מספר לידים' } },
         y1: { beginAtZero: true, position: 'left', max: 100, title: { display: true, text: '% המרה' }, grid: { drawOnChartArea: false } },
@@ -381,9 +381,9 @@ export default function ClientPage() {
           return ld > 0 ? Math.round(sc / ld * 100) : 0
         })
         createChart('dowChart', 'bar', labels, [
-          { label: 'לידים', type: 'bar', data: leadsData, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y' },
-          { label: 'מתוכם — המירו לפגישה', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y' },
-          { label: '% המרה לפגישה', type: 'line', data: conv, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, fill: false, tension: 0.3, yAxisID: 'y1' },
+          { label: 'לידים', type: 'bar', data: leadsData, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y', order: 2 },
+          { label: 'מתוכם — המירו לפגישה', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
+          { label: '% המרה לפגישה', type: 'line', data: conv, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
         ], {
           y: { beginAtZero: true, position: 'right', title: { display: true, text: 'כמות' } },
           y1: { beginAtZero: true, position: 'left', max: 100, title: { display: true, text: '% המרה' }, grid: { drawOnChartArea: false } },
@@ -425,10 +425,10 @@ export default function ClientPage() {
     return (
       <>
         <div className="kpi-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))'}}>
-          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📊</div><div className="kpi-label">סה"כ לידים</div><div className="kpi-value">{totalLids}</div></div>
-          <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>✓</div><div className="kpi-label">קיבלו מענה</div><div className="kpi-value">{respondedCount}</div></div>
-          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label" title="ימים א-ה 09:00-19:00 | שישי עד 13:00 | שבת + חגים לא נספרים">זמן מענה ⓘ</div><div className="kpi-value">{fmt(overallBusinessMin)}</div></div>
-          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה</div><div className="kpi-value">{noResponseCount}</div></div>
+          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📊</div><div className="kpi-label">סה"כ לידים <InfoTip text="כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת — ספירה אחרי ניכוי כפילויות." /></div><div className="kpi-value">{totalLids}</div></div>
+          <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>✓</div><div className="kpi-label">קיבלו מענה <InfoTip text="לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות." /></div><div className="kpi-value">{respondedCount}</div></div>
+          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div><div className="kpi-value">{fmt(overallBusinessMin)}</div></div>
+          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם — או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div><div className="kpi-value">{noResponseCount}</div></div>
         </div>
 
         <div className="section">
@@ -934,19 +934,19 @@ export default function ClientPage() {
         {/* Source Tabs */}
         <div className="client-tabs">
           <button className={`client-tab ${dashTab === 'all' ? 'active' : ''}`} onClick={() => setDashTab('all')}>הכל</button>
+          {hasCrm && <button className={`client-tab ${dashTab === 'crm' ? 'active' : ''}`} onClick={() => setDashTab('crm')}>CRM</button>}
           {hasFb && <button className={`client-tab ${dashTab === 'facebook' ? 'active' : ''}`} onClick={() => setDashTab('facebook')}>Facebook</button>}
           {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}>Google PMax</button>}
           {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
           {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
-          {hasCrm && <button className={`client-tab ${dashTab === 'crm' ? 'active' : ''}`} onClick={() => setDashTab('crm')}>CRM</button>}
         </div>
 
         {dashTab === 'crm' ? (<>
           <div className="client-tabs" style={{marginBottom: 15}}>
             <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
-            <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
-            <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
             <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
+            <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
+            <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
           </div>
           {crmSubTab === 'sources' ? renderCrmDashboard()
             : crmSubTab === 'objections' ? renderCrmObjectionsDashboard()
@@ -1266,44 +1266,6 @@ export default function ClientPage() {
           );
         })()}
 
-        {/* INSIGHTS SECTION */}
-        <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>💡</div>תובנות והמלצות <InfoTip text="תובנות אוטומטיות על הביצועים — מה עובד טוב ומה כדאי לעדכן" /></div>
-          {(() => {
-            const camps = Object.entries(data.campaigns)
-            const ads2 = isPmax ? Object.entries(data.adSets || {}) : Object.entries(data.ads)
-            const bestCamp = camps.sort((a,b) => { const ca = a[1].leads > 0 ? a[1].spend/a[1].leads : 9999; const cb = b[1].leads > 0 ? b[1].spend/b[1].leads : 9999; return ca - cb })[0]
-            const worstCamp = camps.sort((a,b) => { const ca = a[1].leads > 0 ? a[1].spend/a[1].leads : 0; const cb = b[1].leads > 0 ? b[1].spend/b[1].leads : 0; return cb - ca })[0]
-            const bestAd = ads2.sort((a,b) => { const ca = a[1].leads > 0 ? a[1].spend/a[1].leads : 9999; const cb = b[1].leads > 0 ? b[1].spend/b[1].leads : 9999; return ca - cb })[0]
-            const bestAge = isPmax ? null : (ageNames.length > 0 ? ageNames.sort((a,b) => { const da = data.ages[a]; const db = data.ages[b]; const ca = da.leads > 0 ? da.spend/da.leads : 9999; const cb = db.leads > 0 ? db.spend/db.leads : 9999; return ca - cb })[0] : null)
-            const worstAge = ageNames.length > 0 ? ageNames.sort((a,b) => { const da = data.ages[a]; const db = data.ages[b]; const ca = da.leads > 0 ? da.spend/da.leads : 0; const cb = db.leads > 0 ? db.spend/db.leads : 0; return cb - ca })[0] : null
-            return (<>
-              <div className="insight-box" style={{background:'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',border:'1px solid #bfdbfe',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
-                <h3 style={{fontSize:'1em',color:'var(--accent-dark)',marginBottom:'10px'}}>🏆 מה עובד הכי טוב</h3>
-                <ul style={{listStyle:'none',padding:0,direction:'rtl',textAlign:'right'}}>
-                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 קמפיין <strong>{bestCamp[0]}</strong> - CPL הנמוך ביותר ({formatCurrency(bestCamp[1].leads > 0 ? bestCamp[1].spend/bestCamp[1].leads : 0)}) עם {bestCamp[1].leads} לידים</li>}
-                  {bestAd && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 {isPmax ? 'קבוצת מודעות' : 'מודעה'} <strong>{bestAd[0]}</strong> - {bestAd[1].leads} לידים ב-{formatCurrency(bestAd[1].leads > 0 ? bestAd[1].spend/bestAd[1].leads : 0)} לליד</li>}
-                  {!isPmax && bestAge && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 גילאי <strong>{bestAge}</strong> - CPL הנמוך ביותר ({formatCurrency(data.ages[bestAge].leads > 0 ? data.ages[bestAge].spend/data.ages[bestAge].leads : 0)})</li>}
-                </ul>
-              </div>
-              <div className="insight-box" style={{background:'linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%)',border:'1px solid #fecaca',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
-                <h3 style={{fontSize:'1em',color:'#dc2626',marginBottom:'10px'}}>⚠️ מה צריך לשפר</h3>
-                <ul style={{listStyle:'none',padding:0,direction:'rtl',textAlign:'right'}}>
-                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 קמפיין <strong>{worstCamp[0]}</strong> - CPL גבוה ({formatCurrency(worstCamp[1].leads > 0 ? worstCamp[1].spend/worstCamp[1].leads : 0)}). שווה לתקול שינוי קריאייטיב.</li>}
-                  {worstAge && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 גילאי <strong>{worstAge}</strong> - CPL הגבוה ביותר ({formatCurrency(data.ages[worstAge].leads > 0 ? data.ages[worstAge].spend/data.ages[worstAge].leads : 0)})</li>}
-                </ul>
-              </div>
-              <div className="insight-box" style={{background:'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',border:'1px solid #86efac',borderRadius:'var(--radius)',padding:'20px 24px',marginBottom:'20px'}}>
-                <h3 style={{fontSize:'1em',color:'#059669',marginBottom:'10px'}}>🎯 המלצות לחודש הבא</h3>
-                <ul style={{listStyle:'none',padding:0,direction:'rtl',textAlign:'right'}}>
-                  {bestCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 הגדלת תקציב ל-<strong>{bestCamp[0]}</strong> - ה-CPL הנמוך ביותר עם פוטנציאל להגדלה</li>}
-                  {bestAge && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 חיזוק גילאי <strong>{bestAge}</strong> - הכי אפקטיביים מבחינת עלות</li>}
-                  {worstCamp && <li style={{padding:'6px 0',fontSize:'0.9em',unicodeBidi:'plaintext'}}>💡 בדיקה מחדש של <strong>{worstCamp[0]}</strong> - החלפת קריאייטיב או הפסקה</li>}
-                </ul>
-              </div>
-            </>)
-          })()}
-        </div>
         </>)}
 
         <div className="powered-by">VITAS Digital Marketing | דוח אוטומטי</div>
