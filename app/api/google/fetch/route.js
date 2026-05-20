@@ -161,6 +161,7 @@ async function runSync(opts = {}) {
       metrics.cost_micros,
       metrics.impressions,
       metrics.clicks,
+      metrics.invalid_clicks,
       metrics.conversions
     FROM ad_group_ad
     WHERE segments.date BETWEEN '${since}' AND '${until}'
@@ -184,7 +185,7 @@ async function runSync(opts = {}) {
     spend: num(r.metrics?.costMicros) / 1_000_000,
     impressions: num(r.metrics?.impressions),
     reach: 0,
-    clicks: num(r.metrics?.clicks),
+    clicks: Math.max(0, num(r.metrics?.clicks) - num(r.metrics?.invalidClicks)),
     leads: num(r.metrics?.conversions),
   }))
 
@@ -199,6 +200,7 @@ async function runSync(opts = {}) {
         metrics.cost_micros,
         metrics.impressions,
         metrics.clicks,
+        metrics.invalid_clicks,
         metrics.conversions
       FROM campaign
       WHERE segments.date BETWEEN '${since}' AND '${until}'
@@ -221,7 +223,7 @@ async function runSync(opts = {}) {
         spend: num(r.metrics?.costMicros) / 1_000_000,
         impressions: num(r.metrics?.impressions),
         reach: 0,
-        clicks: num(r.metrics?.clicks),
+        clicks: Math.max(0, num(r.metrics?.clicks) - num(r.metrics?.invalidClicks)),
         leads: num(r.metrics?.conversions),
       })
     }

@@ -110,7 +110,7 @@ async function runSync(opts = {}) {
     'actions',
   ].join(',')
 
-  const breakdownUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/insights?level=ad&breakdowns=age,gender&fields=${fields}&time_range=${timeRange}&limit=500`
+  const breakdownUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/insights?level=ad&breakdowns=age,gender&fields=${fields}&time_range=${timeRange}&use_unified_attribution_setting=true&limit=500`
 
   // Fetch ad creative details (body, title, images) + status
   // NOTE: we intentionally do NOT request campaign{name}/adset{name} edges as they can fail on some tokens;
