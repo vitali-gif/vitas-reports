@@ -751,7 +751,13 @@ export default function ClientPage() {
       const crmReports = currentReports.filter(r => r.source === 'crm')
       crmReports.forEach(r => {
         if (r.data) {
-          r.data.forEach(row => { crmTotalLeads += (typeof row.totalLeads === 'number' ? row.totalLeads : parseFloat(String(row.totalLeads).replace(/[^0-9.\-]/g, '')) || 0) })
+          r.data.forEach(row => {
+            // Skip rows whose source already counted via Meta/Google API (avoid double-counting in 'All' tab)
+            const src = String(row.source || '').toLowerCase()
+            if (/פייסבוק|facebook|fb\b|מטא/.test(src)) return
+            if (/גוגל|google|pmax|search|adwords/.test(src)) return
+            crmTotalLeads += (typeof row.totalLeads === 'number' ? row.totalLeads : parseFloat(String(row.totalLeads).replace(/[^0-9.\-]/g, '')) || 0)
+          })
         }
       })
     }
