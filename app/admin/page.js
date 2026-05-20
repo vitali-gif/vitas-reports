@@ -532,13 +532,15 @@ const selectProject = async (client, project) => {
     setTimeout(() => {
       destroyCharts();
       const bucketBusinessValues = bucketLabels.map(k => bucketsBusiness[k] || 0);
+      const bucketMeetingValues = bucketLabels.map(k => bucketMeetingWith[k] || 0);
       const conversionRates = bucketLabels.map(k => {
         const tot = bucketMeetingTotals[k] || 0;
         return tot > 0 ? Math.round((bucketMeetingWith[k] || 0) / tot * 100) : 0;
       });
       createChart('responseBucketsChart', 'bar', bucketHumanLabels, [
-        { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: ['#10b981','#22c55e','#84cc16','#eab308','#f59e0b','#f97316','#ef4444'], borderRadius: 6, yAxisID: 'y', order: 2 },
-        { label: '% המרה לפגישה', type: 'line', data: conversionRates, borderColor: '#3b82f6', backgroundColor: '#3b82f6', pointRadius: 5, pointBackgroundColor: '#3b82f6', fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
+        { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y', order: 2 },
+        { label: 'מתוכם — המירו לפגישה', type: 'bar', data: bucketMeetingValues, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
+        { label: '% המרה לפגישה', type: 'line', data: conversionRates, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, pointBackgroundColor: '#f59e0b', fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
       ], {
         y: { beginAtZero: true, position: 'right', title: { display: true, text: 'מספר לידים' } },
         y1: { beginAtZero: true, position: 'left', max: 100, title: { display: true, text: '% המרה' }, grid: { drawOnChartArea: false } },
