@@ -560,7 +560,7 @@ const selectProject = async (client, project) => {
         });
         createChart('dowChart', 'bar', labels, [
           { label: 'לידים', type: 'bar', data: leadsData, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y' },
-          { label: 'פגישות תואמו', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y' },
+          { label: 'מתוכם — המירו לפגישה', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y' },
           { label: '% המרה', type: 'line', data: conv, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, fill: false, tension: 0.3, yAxisID: 'y1' },
         ], {
           y: { beginAtZero: true, position: 'right', title: { display: true, text: 'כמות' } },
@@ -607,7 +607,7 @@ const selectProject = async (client, project) => {
 
         {dowHasData && (
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📅</div>פילוח לפי יום בשבוע <InfoTip text="כמה לידים נכנסו, וכמה פגישות תואמו, בכל יום בשבוע. הקו הצהוב = % המרה לפגישה.\n\nשימושי לזיהוי באיזה יום בא הקהל הכי חם, ולתזמון של קמפיינים." /></div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📅</div>פילוח לפי יום בשבוע <InfoTip text="כמה לידים נכנסו בכל יום בשבוע, ומתוכם כמה בסופו של דבר המירו לפגישה (גם אם הפגישה נקבעה בימים אחרים).\n\nהמדידה היא לפי יום כניסת הליד, לא לפי יום קביעת הפגישה. שימושי לזיהוי באיזה יום בא הקהל הכי איכותי." /></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
           </div>
         )}
