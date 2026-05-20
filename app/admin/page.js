@@ -40,6 +40,7 @@ function InfoTip({ text }) {
           padding: '14px 16px', borderRadius: 10,
           fontSize: 13, fontWeight: 400, lineHeight: 1.6,
           width: 280, maxWidth: '90vw',
+          whiteSpace: 'pre-line',
           boxShadow: '0 12px 32px rgba(15,23,42,0.25)',
           zIndex: 1000, textAlign: 'right', direction: 'rtl',
         }}>
@@ -48,7 +49,9 @@ function InfoTip({ text }) {
             width: 12, height: 12, background: '#1e293b',
             transform: 'rotate(45deg)',
           }}></div>
-          {text}
+          {text.split('\\n').map((line, i, arr) => (
+            <span key={i}>{line}{i < arr.length - 1 && <br/>}</span>
+          ))}
         </div>
       )}
     </span>
@@ -564,13 +567,13 @@ const selectProject = async (client, project) => {
         </div>
 
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="שעות עסקים בלבד: א-ה 09:00-19:00, שישי עד 13:00, שבת וחגים לא נספרים" /></div>
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="התפלגות זמני התגובה הראשונים של אנשי המכירות לכל ליד שנכנס.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
         </div>
 
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות <InfoTip text="ממוצע הזמן שלוקח לכל איש מכירות לחזור ללידים חדשים (בשעות עסקים). מספרים קטנים = תגובה מהירה" /></div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות <InfoTip text="ממוצע הזמן שלוקח לכל איש מכירות לחזור ללידים החדשים שלו. מספרים קטנים = תגובה מהירה.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -587,7 +590,7 @@ const selectProject = async (client, project) => {
             </div>
           </div>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📡</div>הכי איטיים — לפי מקור <InfoTip text="המקורות מסודרים מהאיטי ביותר למהיר ביותר. עוזר לזהות איזה מקור לידים מקבל טיפול לקוי" /></div>
+            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📡</div>הכי איטיים — לפי מקור <InfoTip text="המקורות מסודרים מהאיטי ביותר למהיר ביותר. עוזר לזהות איזה מקור מקבל טיפול לקוי.\n\nשיטת חישוב: בשעות עסקים בלבד — א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>מקור</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
