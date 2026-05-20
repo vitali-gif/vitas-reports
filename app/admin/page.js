@@ -1,6 +1,6 @@
 'use client'
 // rebuild trigger
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
@@ -95,6 +95,7 @@ export default function AdminPage() {
   const [sortConfig, setSortConfig] = useState({});
   const [expandedCampaigns, setExpandedCampaigns] = useState(new Set());
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
+  const [expandedCrmSources, setExpandedCrmSources] = useState(new Set());
   const handleSort = (tableId, key) => { setSortConfig(prev => { const cur = prev[tableId]; if (cur && cur.key === key) return {...prev, [tableId]: {key, dir: cur.dir === 'desc' ? 'asc' : 'desc'}}; return {...prev, [tableId]: {key, dir: 'desc'}}; }); };
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -752,18 +753,18 @@ const selectProject = async (client, project) => {
     crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
     const crmData = aggregateCrmRows(allCrmRows);
 
-    // Merge Facebook campaign sources into single 'Facebook' entry
+    // Merge Facebook campaign sources into single 'Facebook' entry — children kept for drill-down
     const _fbCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('פייסבוק') || k.toLowerCase().includes('facebook'));
     if (_fbCrmKeys.length > 0) {
-      const _fbMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
-      _fbCrmKeys.forEach(k => { Object.keys(_fbMerged).forEach(f => { _fbMerged[f] += crmData.sources[k][f] || 0; }); delete crmData.sources[k]; });
+      const _fbMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [] };
+      _fbCrmKeys.forEach(k => { Object.keys(_fbMerged).forEach(f => { if (f === 'children') return; _fbMerged[f] += crmData.sources[k][f] || 0; }); _fbMerged.children.push({ name: k, ...crmData.sources[k] }); delete crmData.sources[k]; });
       crmData.sources['Facebook'] = _fbMerged;
     }
-    // Merge Google campaign sources into single 'Google' entry
+    // Merge Google campaign sources into single 'Google' entry — children kept for drill-down
     const _gCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('גוגל') || k.toLowerCase().includes('google'));
     if (_gCrmKeys.length > 0) {
-      const _gMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
-      _gCrmKeys.forEach(k => { Object.keys(_gMerged).forEach(f => { _gMerged[f] += crmData.sources[k][f] || 0; }); delete crmData.sources[k]; });
+      const _gMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [] };
+      _gCrmKeys.forEach(k => { Object.keys(_gMerged).forEach(f => { if (f === 'children') return; _gMerged[f] += crmData.sources[k][f] || 0; }); _gMerged.children.push({ name: k, ...crmData.sources[k] }); delete crmData.sources[k]; });
       crmData.sources['Google'] = _gMerged;
     }
 
@@ -905,9 +906,17 @@ const selectProject = async (client, project) => {
                 {sourceEntries.map(([name, d]) => {
                   const schedRate = d.totalLeads > 0 ? (d.meetingsScheduled / d.totalLeads * 100).toFixed(1) : '0.0';
                   const compRate = d.totalLeads > 0 ? (d.meetingsCompleted / d.totalLeads * 100).toFixed(1) : '0.0';
-                  return (
-                    <tr key={name}>
-                      <td style={{fontWeight:600}}>{name}</td>
+                  const children = Array.isArray(d.children) ? d.children : [];
+                  const hasChildren = children.length > 0;
+                  const isOpen = expandedCrmSources.has(name);
+                  const toggle = () => setExpandedCrmSources(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; });
+                  return (<Fragment key={name}>
+                    <tr style={hasChildren ? {cursor:'pointer'} : undefined} onClick={hasChildren ? toggle : undefined}>
+                      <td style={{fontWeight:600,whiteSpace:'nowrap'}}>
+                        {hasChildren && <span style={{display:'inline-block',width:'18px',color:'var(--accent)',userSelect:'none'}}>{isOpen ? '▼' : '◀'}</span>}
+                        {name}
+                        {hasChildren && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginRight:'6px'}}>({children.length})</span>}
+                      </td>
                       <td>{formatNum(d.totalLeads)}</td>
                       <td>{formatNum(d.relevantLeads)}</td>
                       <td>{formatNum(d.irrelevantLeads)}</td>
@@ -921,7 +930,27 @@ const selectProject = async (client, project) => {
                       <td>{formatNum(d.contracts)}</td>
                       <td>{formatCurrency(d.contractValue)}</td>
                     </tr>
-                  );
+                    {hasChildren && isOpen && children.map(ch => {
+                      const cSched = ch.totalLeads > 0 ? (ch.meetingsScheduled / ch.totalLeads * 100).toFixed(1) : '0.0';
+                      const cComp  = ch.totalLeads > 0 ? (ch.meetingsCompleted / ch.totalLeads * 100).toFixed(1) : '0.0';
+                      return (
+                        <tr key={`${name}::${ch.name}`} style={{background:'var(--bg-secondary)',fontSize:'0.92em'}}>
+                          <td style={{paddingRight:'42px',color:'#475569',unicodeBidi:'plaintext'}}>{ch.name}</td>
+                          <td>{formatNum(ch.totalLeads)}</td>
+                          <td>{formatNum(ch.relevantLeads)}</td>
+                          <td>{formatNum(ch.irrelevantLeads)}</td>
+                          <td>{formatNum(ch.meetingsScheduled)}</td>
+                          <td>{cSched}%</td>
+                          <td>{formatNum(ch.meetingsCompleted)}</td>
+                          <td>{cComp}%</td>
+                          <td>{formatNum(ch.meetingsCancelled)}</td>
+                          <td>{formatNum(ch.registrations)}</td>
+                          <td>{formatCurrency(ch.registrationValue)}</td>
+                          <td>{formatNum(ch.contracts)}</td>
+                          <td>{formatCurrency(ch.contractValue)}</td>
+                        </tr>);
+                    })}
+                  </Fragment>);
                 })}
                 <tr style={{fontWeight:700,background:'var(--bg-secondary)'}}>
                   <td>{'\u05e1\u05d4"\u05db'}</td>
@@ -952,7 +981,7 @@ const selectProject = async (client, project) => {
         </div>
       </>
     );
-  }, [selectedMonth, compareEnabled, reports]);
+  }, [selectedMonth, compareEnabled, reports, expandedCrmSources]);
 
   const renderDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
@@ -1577,7 +1606,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources]);
 
   if (loading) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
