@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency, formatNum, formatMonth, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS } from '../../../lib/helpers'
@@ -11,18 +12,38 @@ import Chart from 'chart.js/auto'
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
 function InfoTip({ text }) {
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef(null)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
-      if (!e.target.closest('.info-tip-wrapper')) setOpen(false)
+      if (!e.target.closest('.info-tip-popover') && !e.target.closest('.info-tip-wrapper')) {
+        setOpen(false)
+      }
     }
     document.addEventListener('click', handler)
     return () => document.removeEventListener('click', handler)
   }, [open])
+
+  const handleClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setPos({
+        top: rect.bottom + 8,
+        right: Math.max(8, window.innerWidth - rect.right - 4),
+      })
+    }
+    setOpen(!open)
+  }
+
   return (
     <span className="info-tip-wrapper" style={{ position: 'relative', display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }}>
       <span
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open) }}
+        ref={triggerRef}
+        onClick={handleClick}
         style={{
           cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           width: 18, height: 18, borderRadius: '50%',
@@ -33,26 +54,31 @@ function InfoTip({ text }) {
         }}
         title=""
       >i</span>
-      {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 10px)', right: -8,
-          background: '#1e293b', color: '#f1f5f9',
-          padding: '14px 16px', borderRadius: 10,
-          fontSize: 13, fontWeight: 400, lineHeight: 1.6,
-          width: 280, maxWidth: '90vw',
+      {open && typeof document !== 'undefined' && createPortal(
+        <div className="info-tip-popover" style={{
+          position: 'fixed',
+          top: pos.top,
+          right: pos.right,
+          background: '#1e293b',
+          color: '#f1f5f9',
+          padding: '14px 16px',
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 400,
+          lineHeight: 1.6,
+          width: 280,
+          maxWidth: '90vw',
           whiteSpace: 'pre-line',
-          boxShadow: '0 12px 32px rgba(15,23,42,0.25)',
-          zIndex: 1000, textAlign: 'right', direction: 'rtl',
+          boxShadow: '0 12px 32px rgba(15,23,42,0.4)',
+          zIndex: 10000,
+          textAlign: 'right',
+          direction: 'rtl',
         }}>
-          <div style={{
-            position: 'absolute', top: -6, right: 14,
-            width: 12, height: 12, background: '#1e293b',
-            transform: 'rotate(45deg)',
-          }}></div>
-          {text.split('\\n').map((line, i, arr) => (
+          {text.split('\n').map((line, i, arr) => (
             <span key={i}>{line}{i < arr.length - 1 && <br/>}</span>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   )
