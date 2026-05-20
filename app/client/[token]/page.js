@@ -73,6 +73,8 @@ export default function ClientPage() {
   const [dashTab, setDashTab] = useState('all')
   const [crmSubTab, setCrmSubTab] = useState('sources')
   const [expandedCrmSources, setExpandedCrmSources] = useState(new Set())
+  const [expandedCampaigns, setExpandedCampaigns] = useState(new Set())
+  const [expandedAdSets, setExpandedAdSets] = useState(new Set())
   const [sortConfig, setSortConfig] = useState({})
   const chartsRef = useRef([])
 
@@ -812,6 +814,7 @@ export default function ClientPage() {
       ? currentReports.filter(r => r.source && r.source.startsWith('google'))
       : []
     const isPmax = dashTab === 'google_pmax' || dashTab === 'google'
+    const isFb = dashTab === 'facebook'
 
     let allRows = []
     displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data) })
@@ -1034,11 +1037,102 @@ export default function ClientPage() {
 
         {trendData.length > 1 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>מגמות חודשיות <InfoTip text="השוואת חודש מול חודש קודם - תקציב, חשיפות, לידים, CPL. עוזר לזהות מגמות לאורך זמן" /></div><div className="chart-grid"><div className="chart-card"><h4>💰 לידים ועלות לליד</h4><div className="chart-container"><canvas id="trendLeads"></canvas></div></div><div className="chart-card"><h4>📈 תקציב וחשיפות</h4><div className="chart-container"><canvas id="trendSpend"></canvas></div></div></div></div>)}
 
-        {campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>קמפיינים <InfoTip text="סיכום ביצועים פר קמפיין. CPL (עלות לליד) הוא ה-KPI המרכזי" /></div><div className="chart-grid"><div className="chart-card"><h4>📊 התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>💰 לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין', 'campaigns')}</div>)}
+        {/* Flat campaigns chart+table only for PMax (which has its own asset-groups block below) */}
+        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>קמפיינים <InfoTip text="סיכום ביצועים פר קמפיין. CPL (עלות לליד) הוא ה-KPI המרכזי" /></div><div className="chart-grid"><div className="chart-card"><h4>📊 התפלגות תקציב</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>💰 לידים ו-CPL</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, 'קמפיין', 'campaigns')}</div>)}
 
-        {!isPmax && (
-        <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>🎯</div>קבוצות מודעות <InfoTip text="ביצועי Ad Sets - איזה קהל יעד הכי טוב" /></div>{buildTable(data.adSets, prevData?.adSets, 'קבוצת מודעות', 'adsets')}</div>
-        )}
+        {/* Nested expandable table - Campaign > Ad Set > Ad - for FB, All, Google Search */}
+        {(isFb || dashTab === 'all' || dashTab === 'google_search') && campNames.length > 0 && (() => {
+          const tree = {}
+          allRows.forEach(r => {
+            const cN = r.campaign || 'לא ידוע'
+            const aN = r.adSet || 'לא ידוע'
+            const aD = r.adName || 'לא ידוע'
+            const spend = parseFloat(r.spend) || 0
+            const imp = parseFloat(r.impressions) || 0
+            const reach = parseFloat(r.reach) || 0
+            const clicks = parseFloat(r.clicks) || 0
+            const leads = parseFloat(r.leads) || 0
+            if (!tree[cN]) tree[cN] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, adSets: {} }
+            tree[cN].spend += spend; tree[cN].impressions += imp; tree[cN].reach += reach; tree[cN].clicks += clicks; tree[cN].leads += leads
+            if (!tree[cN].adSets[aN]) tree[cN].adSets[aN] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, ads: {} }
+            tree[cN].adSets[aN].spend += spend; tree[cN].adSets[aN].impressions += imp; tree[cN].adSets[aN].reach += reach; tree[cN].adSets[aN].clicks += clicks; tree[cN].adSets[aN].leads += leads
+            if (!tree[cN].adSets[aN].ads[aD]) tree[cN].adSets[aN].ads[aD] = { spend:0, impressions:0, reach:0, clicks:0, leads:0 }
+            tree[cN].adSets[aN].ads[aD].spend += spend; tree[cN].adSets[aN].ads[aD].impressions += imp; tree[cN].adSets[aN].ads[aD].reach += reach; tree[cN].adSets[aN].ads[aD].clicks += clicks; tree[cN].adSets[aN].ads[aD].leads += leads
+          })
+          const campNamesSorted = Object.keys(tree).sort((a,b) => tree[b].spend - tree[a].spend)
+          const toggleC = (k) => setExpandedCampaigns(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })
+          const toggleA = (k) => setExpandedAdSets(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })
+          const cols = [
+            { key:'name', label:'קמפיין / קבוצה / מודעה' },
+            { key:'clicks', label:'קליקים' },
+            { key:'impressions', label:'חשיפות' },
+            { key:'cpc', label:'עלות לקליק' },
+            { key:'ctr', label:'CTR' },
+            { key:'cpm', label:'CPM' },
+            { key:'leads', label:'לידים' },
+            { key:'cpl', label:'עלות לליד' },
+            { key:'spend', label:'תקציב שנוצל' },
+          ]
+          const renderRow = (name, d, level, isExpanded, hasChildren, onToggle, key) => {
+            const cpl = d.leads > 0 ? d.spend/d.leads : 0
+            const cpc = d.clicks > 0 ? d.spend/d.clicks : 0
+            const ctr = d.impressions > 0 ? (d.clicks/d.impressions*100) : 0
+            const cpm = d.impressions > 0 ? (d.spend/d.impressions*1000) : 0
+            const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'
+            const rowBg = level === 0 ? 'transparent' : level === 1 ? 'rgba(59,130,246,0.05)' : 'rgba(16,185,129,0.05)'
+            const indent = level * 24
+            const fontW = level === 0 ? 700 : level === 1 ? 600 : 400
+            const fontSize = level === 2 ? '0.9em' : '1em'
+            return (
+              <tr key={key} style={{background: rowBg, cursor: hasChildren ? 'pointer' : 'default', borderRight: level === 1 ? '3px solid rgba(59,130,246,0.3)' : level === 2 ? '3px solid rgba(16,185,129,0.3)' : 'none'}} onClick={hasChildren ? onToggle : undefined}>
+                <td style={{fontWeight: fontW, fontSize, paddingRight: `${8 + indent}px`, unicodeBidi: 'plaintext', textAlign: 'right'}}>
+                  <span style={{display:'inline-block', width:'18px', color:'#64748b', marginLeft:'4px'}}>{hasChildren ? (isExpanded ? '▼' : '◀') : ''}</span>
+                  {name}
+                </td>
+                <td style={{fontSize}}>{formatNum(d.clicks)}</td>
+                <td style={{fontSize}}>{formatNum(d.impressions)}</td>
+                <td style={{fontSize}}>{formatCurrency(cpc)}</td>
+                <td style={{fontSize}}>{ctr.toFixed(2)}%</td>
+                <td style={{fontSize}}>{formatCurrency(cpm)}</td>
+                <td style={{fontSize}}>{d.leads}</td>
+                <td style={{fontSize}}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td>
+                <td style={{fontSize, fontWeight: 600}}>{formatCurrency(d.spend)}</td>
+              </tr>
+            )
+          }
+          return (
+            <div className="section">
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📋</div>קמפיינים, קבוצות מודעות ומודעות <InfoTip text="טבלה מאוחדת עם כל הרמות של החשבון הפרסומי" /></div>
+              <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:'12px',textAlign:'right'}}>💡 לחץ על קמפיין כדי לראות קבוצות מודעות, ועל קבוצת מודעות כדי לראות מודעות</div>
+              <div className="table-wrapper">
+                <table className="data-table">
+                  <thead><tr>{cols.map(col => <th key={col.key} style={{whiteSpace:'nowrap'}}>{col.label}</th>)}</tr></thead>
+                  <tbody>
+                    {campNamesSorted.flatMap(cN => {
+                      const cD = tree[cN]
+                      const isCExpanded = expandedCampaigns.has(cN)
+                      const asNames = Object.keys(cD.adSets).sort((x,y) => cD.adSets[y].spend - cD.adSets[x].spend)
+                      const rows = [renderRow(cN, cD, 0, isCExpanded, asNames.length > 0, () => toggleC(cN), `c-${cN}`)]
+                      if (isCExpanded) {
+                        asNames.forEach(aN => {
+                          const aD = cD.adSets[aN]
+                          const asKey = `${cN}|${aN}`
+                          const isAExpanded = expandedAdSets.has(asKey)
+                          const adNames = Object.keys(aD.ads).sort((x,y) => aD.ads[y].spend - aD.ads[x].spend)
+                          rows.push(renderRow(aN, aD, 1, isAExpanded, adNames.length > 0, () => toggleA(asKey), `as-${asKey}`))
+                          if (isAExpanded) {
+                            adNames.forEach(adN => { rows.push(renderRow(adN, aD.ads[adN], 2, false, false, null, `ad-${asKey}|${adN}`)) })
+                          }
+                        })
+                      }
+                      return rows
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })()}
 
         {isPmax && (() => {
           const allAGs = displayReports.flatMap(r => r.summary?.assetGroups || [])
@@ -1084,7 +1178,7 @@ export default function ClientPage() {
           )
         })()}
 
-        {!isPmax && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>📝</div>מודעות <InfoTip text="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)" /></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*עותק\s*$/, '').replace(/\s*-\s*עותק\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0) }); return merged })(), null, 'מודעה', 'ads')}</div>}
+        {false && !isPmax && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>📝</div>מודעות <InfoTip text="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)" /></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*עותק\s*$/, '').replace(/\s*-\s*עותק\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0) }); return merged })(), null, 'מודעה', 'ads')}</div>}
 
         {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section">
           <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>👥</div>פילוח דמוגרפי <InfoTip text="התפלגות הצופים/מקליקים/לידים לפי מגדר וגיל. עוזר להבין את הקהל ולמקד את הקמפיינים." /></div>
