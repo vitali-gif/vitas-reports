@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency, formatNum, formatMonth, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS } from '../../../lib/helpers'
 import { normalizeObjections } from '../../../lib/objection-normalize.js'
+import SkeletonDashboard from '../../../lib/skeleton'
 import Chart from 'chart.js/auto'
 
 
@@ -1409,7 +1410,14 @@ export default function ClientPage() {
     )
   }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig])
 
-  if (loading) return <div className="loading-page">טוען דוח...</div>
+  if (loading) return (
+    <div dir="rtl" style={{direction:'rtl',textAlign:'right'}}>
+      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div></div></div>
+      <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
+        <SkeletonDashboard />
+      </div>
+    </div>
+  )
 
   if (error) {
     return (

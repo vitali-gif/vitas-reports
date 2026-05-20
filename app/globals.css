@@ -695,3 +695,35 @@ a { color: var(--accent); text-decoration: none; }
   font-size: 0.8em;
 }
 .powered-by a { color: var(--accent); }
+
+/* SKELETON UI — placeholder shimmer effect while data loads */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+.skel {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.04) 100%);
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  border-radius: 6px;
+  display: inline-block;
+  line-height: 1;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  color: transparent;
+  user-select: none;
+}
+@media (prefers-color-scheme: light) {
+  .skel {
+    background: linear-gradient(90deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.12) 50%, rgba(0,0,0,0.06) 100%);
+    background-size: 200px 100%;
+    background-repeat: no-repeat;
+  }
+}
+.skel-block { display: block; height: 100%; width: 100%; }
+.skel-line { display: block; height: 14px; margin: 6px 0; }
+.skel-title { height: 22px; width: 60%; margin-bottom: 14px; }
+.skel-chart { height: 240px; width: 100%; border-radius: 12px; }
+.skel-table-row { height: 38px; margin-bottom: 6px; }
+.skel-kpi-icon { width: 40px; height: 40px; border-radius: 10px; margin-bottom: 10px; }
+.skel-kpi-label { height: 14px; width: 70%; margin-bottom: 10px; }
+.skel-kpi-value { height: 28px; width: 50%; }
