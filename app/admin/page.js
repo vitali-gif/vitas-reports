@@ -464,10 +464,10 @@ const selectProject = async (client, project) => {
 
     const crmRows = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
     let totalLids = 0, respondedCount = 0, noResponseCount = 0;
-    const bucketsTotal = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 };
-    const bucketsBusiness = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
-    const bucketMeetingTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 };
-    const bucketMeetingWith = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 };
+    const bucketsTotal = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
+    const bucketsBusiness = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 }
+    const bucketMeetingTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
+    const bucketMeetingWith = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
     const byUserMerged = {};
     const bySourceMerged = {};
     for (const r of crmRows) {
@@ -476,12 +476,12 @@ const selectProject = async (client, project) => {
       totalLids += rt.totalLids || 0;
       respondedCount += rt.respondedCount || 0;
       noResponseCount += rt.noResponseCount || 0;
-      for (const [k, v] of Object.entries(rt.buckets || {})) bucketsTotal[k === '4h-24h' ? '4h-1d' : k] = (bucketsTotal[k === '4h-24h' ? '4h-1d' : k] || 0) + v;
+      for (const [k, v] of Object.entries(rt.buckets || {})) bucketsTotal[(k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k] = (bucketsTotal[(k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k] || 0) + v;
       const bBuckets = (rt.business && rt.business.buckets) || {};
-      for (const [k, v] of Object.entries(bBuckets)) bucketsBusiness[k === '4h-24h' ? '4h-1d' : k] = (bucketsBusiness[k === '4h-24h' ? '4h-1d' : k] || 0) + v;
+      for (const [k, v] of Object.entries(bBuckets)) bucketsBusiness[(k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k] = (bucketsBusiness[(k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k] || 0) + v;
       const bRichBuckets = (rt.business && rt.business.bucketsWithMeeting) || {};
       for (const [k, v] of Object.entries(bRichBuckets)) {
-        const key = k === '4h-24h' ? '4h-1d' : k;
+        const key = (k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k;
         bucketMeetingTotals[key] = (bucketMeetingTotals[key] || 0) + (v.total || 0);
         bucketMeetingWith[key] = (bucketMeetingWith[key] || 0) + (v.withMeeting || 0);
       }
@@ -512,8 +512,8 @@ const selectProject = async (client, project) => {
       ? Math.round(Object.values(byUserMerged).reduce((s, v) => s + (v.sumBusinessMinutes || 0), 0) / respondedCount)
       : 0;
 
-    const bucketLabels = ['0-15m', '15m-1h', '1h-4h', '4h-1d', '1d-3d', '3d+'];
-    const bucketHumanLabels = ['פחות מ-15 דק׳', '15 דק׳-שעה', '1-4 שעות', '4-24 שעות', '1-3 ימים', 'יותר מ-3 ימים'];
+    const bucketLabels = ['0-15m', '15m-1h', '1h-4h', '4h-8h', '8h-1d', '1d-3d', '3d+'];
+    const bucketHumanLabels = ['פחות מ-15 דק׳', '15 דק׳-שעה', '1-4 שעות', '4-8 שעות', '8-24 שעות', '1-3 ימים', 'יותר מ-3 ימים'];
     const bucketValues = bucketLabels.map(k => bucketsTotal[k] || 0);
 
     setTimeout(() => {
@@ -524,7 +524,7 @@ const selectProject = async (client, project) => {
         return tot > 0 ? Math.round((bucketMeetingWith[k] || 0) / tot * 100) : 0;
       });
       createChart('responseBucketsChart', 'bar', bucketHumanLabels, [
-        { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: ['#10b981','#22c55e','#84cc16','#f59e0b','#f97316','#ef4444'], borderRadius: 6, yAxisID: 'y' },
+        { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: ['#10b981','#22c55e','#84cc16','#eab308','#f59e0b','#f97316','#ef4444'], borderRadius: 6, yAxisID: 'y' },
         { label: '% המרה לפגישה', type: 'line', data: conversionRates, borderColor: '#3b82f6', backgroundColor: '#3b82f6', pointRadius: 5, pointBackgroundColor: '#3b82f6', fill: false, tension: 0.3, yAxisID: 'y1' },
       ], {
         y: { beginAtZero: true, position: 'right', title: { display: true, text: 'מספר לידים' } },

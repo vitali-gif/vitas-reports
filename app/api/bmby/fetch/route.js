@@ -673,23 +673,20 @@ async function runSync(opts = {}) {
     const noResponseCount = responseTimes.length - responded.length
 
     // Bucketize WITH meeting-conversion tracking — output per-bucket { total, withMeeting }
+    // Split 4-24h into 4-8h (same workday) + 8-24h (next workday) for more granularity
     const bucketOf = (mn) => {
       if (mn <= 15) return '0-15m'
       if (mn <= 60) return '15m-1h'
       if (mn <= 240) return '1h-4h'
-      if (mn <= 1440) return '4h-1d'
+      if (mn <= 480) return '4h-8h'     // same workday late
+      if (mn <= 1440) return '8h-1d'    // next workday
       if (mn <= 4320) return '1d-3d'
       return '3d+'
     }
+    const BUCKET_KEYS = ['0-15m', '15m-1h', '1h-4h', '4h-8h', '8h-1d', '1d-3d', '3d+']
     const bucketsRich = (valKey) => {
-      const out = {
-        '0-15m':  { total: 0, withMeeting: 0 },
-        '15m-1h': { total: 0, withMeeting: 0 },
-        '1h-4h':  { total: 0, withMeeting: 0 },
-        '4h-1d':  { total: 0, withMeeting: 0 },
-        '1d-3d':  { total: 0, withMeeting: 0 },
-        '3d+':    { total: 0, withMeeting: 0 },
-      }
+      const out = {}
+      for (const k of BUCKET_KEYS) out[k] = { total: 0, withMeeting: 0 }
       for (const r of responded) {
         const b = bucketOf(r[valKey])
         out[b].total++
@@ -699,7 +696,8 @@ async function runSync(opts = {}) {
     }
     // Backwards-compat: keep old `buckets` (numeric counts) for older dashboard versions
     const buckets = (mins) => {
-      const out = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-1d': 0, '1d-3d': 0, '3d+': 0 }
+      const out = {}
+      for (const k of BUCKET_KEYS) out[k] = 0
       for (const mn of mins) out[bucketOf(mn)]++
       return out
     }
