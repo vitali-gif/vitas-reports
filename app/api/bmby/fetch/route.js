@@ -361,7 +361,7 @@ async function runSync(opts = {}) {
       const isDone = /done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)
       const isCanc = /cancel|בוטל/.test(status)
       if (!clientApptList.has(cid)) clientApptList.set(cid, [])
-      clientApptList.get(cid).push({ date: apptDate, completed: isDone, cancelled: isCanc, type: tyRaw, status: t.status || '' })
+      clientApptList.get(cid).push({ date: apptDate, completed: isDone, cancelled: isCanc })
       // Window-only sets (for compatibility with diag)
       if (inRangeDate(t.start_date || t.create_date)) {
         clientsWithAppt.add(cid)
@@ -455,7 +455,7 @@ async function runSync(opts = {}) {
         lid_date: lidDate,
         media,
         status: cstatus,
-        appts: apptList.map(a => ({ d: a.date, done: a.completed, canc: a.cancelled, t: a.type, st: a.status })),
+        appts: apptList.map(a => ({ d: a.date, done: a.completed, canc: a.cancelled })),
         postLidApptDates: postLidAppts.map(a => a.date),
         scheduledHit, completedHit, cancelledHit,
         // alt-counters under variant logic for comparison
