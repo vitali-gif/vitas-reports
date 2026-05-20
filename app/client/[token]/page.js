@@ -1057,13 +1057,14 @@ export default function ClientPage() {
 
         {!isPmax && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>📝</div>מודעות <InfoTip text="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)" /></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*עותק\s*$/, '').replace(/\s*-\s*עותק\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0) }); return merged })(), null, 'מודעה', 'ads')}</div>}
 
-        {/* GENDER SECTION */}
+        {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>👥</div>פילוח דמוגרפי <InfoTip text="התפלגות הצופים/מקליקים/לידים לפי מגדר וגיל. עוזר להבין את הקהל ולמקד את הקמפיינים." /></div>
         {!isPmax && genderNames.length > 0 && (() => {
           const gd = data.genders
           const genderMap = { female: { label: 'נשים', emoji: '♀' }, male: { label: 'גברים', emoji: '♂' }, unknown: { label: 'לא ידוע', emoji: '?' } }
           const gKeys = ['female', 'male', 'unknown'].filter(g => gd[g])
-          return (<div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>⚧</div>פילוח מגדרי <InfoTip text="התפלגות הצופים/מקליקים/לידים לפי מגדר" /></div>
+          return (<div style={{marginBottom: ageNames.length > 0 ? '28px' : 0}}>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}><span style={{fontSize:'1.2em'}}>⚧</span>פילוח מגדרי</h3>
             <div className="grid-3" style={{marginBottom:'20px',display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:'16px'}}>
               {gKeys.map(g => { const d = gd[g]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; return (
                 <div className="card" key={g}><div className="card-body" style={{textAlign:'center'}}>
@@ -1086,12 +1087,11 @@ export default function ClientPage() {
           </div>)
         })()}
 
-        {/* AGE SECTION */}
         {!isPmax && ageNames.length > 0 && (() => {
           const ad = data.ages
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb })
-          return (<div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📅</div>פילוח גילאי <InfoTip text="התפלגות הצופים/מקליקים/לידים לפי קבוצת גיל" /></div>
+          return (<div>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}><span style={{fontSize:'1.2em'}}>📅</span>פילוח גילאי</h3>
             <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲'})()}</th>))}
@@ -1112,6 +1112,7 @@ export default function ClientPage() {
             </>)}
           </div>)
         })()}
+        </div>)}
 
         {/* ACTIVE ADS SECTION (Facebook) — top 5 by leads, with video/image preview */}
         {(dashTab === 'facebook' || dashTab === 'all') && (() => {

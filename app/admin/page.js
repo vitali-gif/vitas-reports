@@ -1352,13 +1352,14 @@ const selectProject = async (client, project) => {
 
 {!isPmax && !isFb &&         <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'} <InfoTip text="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)" /></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>}
 
-        {/* GENDER SECTION — table format (like age) */}
+        {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section">
+          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83d\udc65'}</div>פילוח דמוגרפי <InfoTip text="התפלגות הצופים/מקליקים/לידים לפי מגדר וגיל. עוזר להבין את הקהל ולמקד את הקמפיינים." /></div>
         {!isPmax && genderNames.length > 0 && (() => {
           const gd = data.genders;
           const genderLabel = (g) => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : g === 'unknown' ? '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2' : g;
           const orderedKeys = ['female', 'male', 'unknown'].filter(g => gd[g]);
-          return (<div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\u26a7'}</div>{'\u05e4\u05d9\u05dc\u05d5\u05d7 \u05de\u05d2\u05d3\u05e8\u05d9'} <InfoTip text="התפלגות הצופים/מקליקים/לידים לפי מגדר" /></div>
+          return (<div style={{marginBottom: ageNames.length > 0 ? '28px' : 0}}>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}><span style={{fontSize:'1.2em'}}>⚧</span>פילוח מגדרי</h3>
             <div className="card"><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'gender',label:'\u05de\u05d2\u05d3\u05e8'},{key:'clicks',label:'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'},{key:'impressions',label:'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'},{key:'cpc',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'\u05dc\u05d9\u05d3\u05d9\u05dd'},{key:'cpl',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'},{key:'spend',label:'\u05ea\u05e7\u05e6\u05d9\u05d1 \u05e9\u05e0\u05d5\u05e6\u05dc'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('genders',c.key)}>{c.label}{(()=>{const s=sortConfig['genders'];if(!s||s.key!==c.key)return ' \u21c5';return s.dir==='desc'?' \u25bc':' \u25b2';})()}</th>))}
@@ -1379,12 +1380,11 @@ const selectProject = async (client, project) => {
           </div>);
         })()}
 
-        {/* AGE SECTION - full table + 4 charts */}
         {!isPmax && ageNames.length > 0 && (() => {
           const ad = data.ages;
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb; });
-          return (<div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcc5'}</div>{'\u05e4\u05d9\u05dc\u05d5\u05d7 \u05d2\u05d9\u05dc\u05d0\u05d9'} <InfoTip text="התפלגות הצופים/מקליקים/לידים לפי קבוצת גיל" /></div>
+          return (<div>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}><span style={{fontSize:'1.2em'}}>📅</span>פילוח גילאי</h3>
             <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
@@ -1405,6 +1405,7 @@ const selectProject = async (client, project) => {
             </>)}
           </div>);
         })()}
+        </div>)}
 
         {/* ACTIVE ADS SECTION (Facebook) — top 5 by leads, with video/image preview */}
         {(dashTab === 'facebook' || dashTab === 'all') && (() => {
