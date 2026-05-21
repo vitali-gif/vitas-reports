@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
-import { formatCurrency, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS } from '../../lib/helpers'
+import { formatCurrency, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER } from '../../lib/recommendations'
@@ -1262,10 +1262,12 @@ const selectProject = async (client, project) => {
         </div>
 
         {dashTab === 'recommendations' ? (() => {
-          // Build merged stats from current period's CRM + Meta + Google rows
-          const crmRowsRec = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
-          const fbRowsRec  = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
-          const ggRowsRec  = reports.filter(r => r.month === selectedMonth && r.source === 'google');
+          // 60-day rolling window — recommendations are ALWAYS based on the last 60 days,
+          // independent of selectedMonth (which only affects the KPI/chart tabs).
+          const recWindowMonths = getRecommendationsWindowMonths(60);
+          const crmRowsRec = reports.filter(r => recWindowMonths.includes(r.month) && r.source === 'crm');
+          const fbRowsRec  = reports.filter(r => recWindowMonths.includes(r.month) && r.source === 'facebook');
+          const ggRowsRec  = reports.filter(r => recWindowMonths.includes(r.month) && r.source === 'google');
           let _totalLids = 0;
           const _bucketTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
           const _bucketWith  = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
@@ -1326,6 +1328,21 @@ const selectProject = async (client, project) => {
           const _ggAdRows = [];
           for (const r of ggRowsRec) if (Array.isArray(r.data)) _ggAdRows.push(...r.data);
 
+          // Compute totalSpend across the 60-day window (Meta + Google ad-level rows)
+          let _totalSpend = 0;
+          for (const r of _fbAdRows) _totalSpend += Number(r.spend) || 0;
+          for (const r of _ggAdRows) _totalSpend += Number(r.spend) || 0;
+          // Compute costPerMeeting — use completed meetings (more conservative than scheduled,
+          // aligns with actual sales pipeline value). Falls back to scheduled if no completed.
+          let _completedMeetings = 0;
+          let _scheduledMeetings = 0;
+          for (const s of Object.values(_sources)) {
+            _completedMeetings += s.meetingsCompleted || 0;
+            _scheduledMeetings += s.meetingsScheduled || 0;
+          }
+          const _meetingsDenominator = _completedMeetings > 0 ? _completedMeetings : _scheduledMeetings;
+          const _costPerMeeting = _meetingsDenominator > 0 ? _totalSpend / _meetingsDenominator : 0;
+
           const recs = buildRecommendations({
             bucketTotals: _bucketTotals, bucketWith: _bucketWith,
             dowMerged: _dowMerged, totalLids: _totalLids,
@@ -1333,6 +1350,8 @@ const selectProject = async (client, project) => {
             byUser: _byUserFinal,
             sources: _sources,
             fbRows: _fbAdRows, googRows: _ggAdRows,
+            costPerMeeting: _costPerMeeting,
+            totalSpend: _totalSpend,
           });
           const grouped = groupByRole(recs);
 
@@ -1361,7 +1380,7 @@ const selectProject = async (client, project) => {
 
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>💡</div>המלצות חכמות לחודש הבא <InfoTip text="המלצות אישיות שנוצרות מתוך הנתונים של הפרויקט - דפוסים שזיהינו ושווה לנסות לפעול עליהם. ההמלצות מחולקות לפי תפקיד: משרד פרסום, מנהל קמפיינים, מנהל שיווק, ואיש מכירות. אם תפקיד מסוים לא מציג המלצות - אין דפוס מובהק מספיק לאותו תפקיד בנתונים." /></div>
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>💡</div>המלצות חכמות לחודש הבא <InfoTip text={`המלצות אישיות שנוצרות מתוך הנתונים של 60 הימים האחרונים — לא תלוי בחודש הנבחר בדשבורד. חלון של 60 יום נותן בסיס נתונים יציב לזיהוי דפוסים.\n\nההמלצות מחולקות לפי תפקיד: משרד פרסום, מנהל קמפיינים, מנהל שיווק, ואיש מכירות. אם תפקיד מסוים לא מציג המלצות - אין דפוס מובהק מספיק לאותו תפקיד בנתונים.\n\nסך תקציב בחלון: ₪${Math.round(_totalSpend).toLocaleString('he-IL')} · עלות פגישה: ${_costPerMeeting > 0 ? '₪' + Math.round(_costPerMeeting).toLocaleString('he-IL') : 'לא ידוע'}`} /></div>
               {recs.length === 0 ? (
                 <div className="welcome-center" style={{padding:'40px 20px',textAlign:'center'}}>
                   <div className="icon" style={{fontSize:'3.5em',marginBottom:'10px'}}>✨</div>
