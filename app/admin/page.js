@@ -112,6 +112,9 @@ export default function AdminPage() {
   const [refreshElapsed, setRefreshElapsed] = useState(0)
   const [dashTab, setDashTab] = useState('all')
   const [crmSubTab, setCrmSubTab] = useState('sources')
+  const [vitasTasks, setVitasTasks] = useState([])
+  const [recSubTab, setRecSubTab] = useState('new')
+  const [lockingRecKey, setLockingRecKey] = useState('')
   const chartsRef = useRef([])
   const [showAddClient, setShowAddClient] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
@@ -362,6 +365,75 @@ const loadClients = async () => {
     else { setReports([]); }
   };
 
+  const loadProjectTasks = async (projectId) => {
+    const { data } = await supabase.from('vitas_tasks').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
+    setVitasTasks(data || []);
+  };
+
+  const lockRecommendation = async (rec) => {
+    if (!selectedProject || !rec || !rec.dedupKey) return;
+    setLockingRecKey(rec.dedupKey);
+    try {
+      // Build a baseline_value: prefer the most representative numeric (conv/rate/share/count)
+      const b = rec.baseline || {};
+      const baselineValue = Number(b.conv || b.rate || b.share || b.slowestMin || b.fastestMin || b.count || b.leads || b.avgCpl || 0);
+      const description = (rec.body || []).join('\n\n') + (rec.suggestion ? '\n\nהמלצה: ' + rec.suggestion : '');
+      const res = await fetch('/api/tasks/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify({
+          projectId: selectedProject.id,
+          role: rec.role,
+          title: rec.title,
+          description,
+          recommendationKey: rec.dedupKey,
+          metricType: (rec.baseline && rec.baseline.metric) || rec.type,
+          baselineValue,
+          baselineMetadata: {
+            baseline: rec.baseline || {},
+            target: rec.target || {},
+            icon: rec.icon,
+            type: rec.type,
+            predictionValue: rec.prediction && rec.prediction.value,
+            predictionDetail: rec.prediction && rec.prediction.detail,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (res.status === 409) {
+        showToast('המלצה זו כבר נמצאת בתוכנית');
+      } else if (!res.ok) {
+        showToast('שגיאה: ' + (json.error || 'unknown'));
+      } else {
+        showToast('✓ נוסף לתוכנית עבודה');
+        setRecSubTab('pipeline');
+      }
+      await loadProjectTasks(selectedProject.id);
+    } catch (err) {
+      showToast('שגיאה: ' + (err.message || err));
+    } finally {
+      setLockingRecKey('');
+    }
+  };
+
+  const updateTaskStatus = async (taskId, status) => {
+    if (!selectedProject || !taskId) return;
+    try {
+      const res = await fetch('/api/tasks/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify({ taskId, status }),
+      });
+      const json = await res.json();
+      if (!res.ok) { showToast('שגיאה: ' + (json.error || 'unknown')); return; }
+      const labelMap = { pending: 'ממתינה', in_progress: 'בעבודה', done: 'הושלמה', dropped: 'נדחתה' };
+      showToast('✓ משימה ' + (labelMap[status] || ''));
+      await loadProjectTasks(selectedProject.id);
+    } catch (err) {
+      showToast('שגיאה: ' + (err.message || err));
+    }
+  };
+
   const addClient = async () => {
     if (!newClientName.trim()) return;
     const { data: client, error } = await supabase.from('clients').insert({ name: newClientName.trim(), color: newClientColor }).select().single();
@@ -381,7 +453,9 @@ const loadClients = async () => {
 
 const selectProject = async (client, project) => {
     setSelectedClient(client); setSelectedProject(project); setView('dashboard'); setCompareEnabled(false);
+    setVitasTasks([]); setRecSubTab('new');
     await loadProjectReports(project.id);
+    await loadProjectTasks(project.id);
   };
 
   // Tick elapsed time every 500ms while refresh is active (for the banner timer)
@@ -1353,77 +1427,235 @@ const selectProject = async (client, project) => {
             costPerMeeting: _costPerMeeting,
             totalSpend: _totalSpend,
           });
-          const grouped = groupByRole(recs);
+          // Build dedup lookup: which dedupKeys already have an OPEN task in vitas_tasks
+          const openTaskKeys = new Set();
+          const tasksByKey = {};
+          for (const t of vitasTasks) {
+            tasksByKey[t.recommendation_key] = t;
+            if (t.status === 'pending' || t.status === 'in_progress') openTaskKeys.add(t.recommendation_key);
+          }
+          // Split recs into new (not in pipeline) vs already-locked (matches open task)
+          const newRecs = recs.filter(r => !openTaskKeys.has(r.dedupKey));
+          const groupedNew = groupByRole(newRecs);
+          // Pipeline tasks: ALL tasks for this project, grouped by status
+          const pipelinePending = vitasTasks.filter(t => t.status === 'pending');
+          const pipelineInProgress = vitasTasks.filter(t => t.status === 'in_progress');
+          const pipelineDone = vitasTasks.filter(t => t.status === 'done');
+          const pipelineDropped = vitasTasks.filter(t => t.status === 'dropped');
+          const pipelineCount = pipelinePending.length + pipelineInProgress.length;
+          // "10 דקות ראשונות" — first pending task (oldest meeting_date first, so earliest commitment shows up)
+          const firstTask = [...pipelinePending].sort((a, b) => (a.meeting_date || '').localeCompare(b.meeting_date || ''))[0];
 
-          const renderCard = (rec, i) => (
-            <div key={i} className="rec-card">
-              <div className="rec-title"><span className="rec-icon">{rec.icon}</span>{rec.title}</div>
-              <div className="rec-body">{rec.body.map((p, j) => <p key={j}>{p}</p>)}</div>
-              {rec.suggestion && <div className="rec-suggestion">{rec.suggestion}</div>}
-              {rec.prediction && (
-                <div className="rec-prediction">
-                  <span className="pred-value">{rec.prediction.value}</span>
-                  <div>
-                    <div className="pred-label">{rec.prediction.label}</div>
-                    <div className="pred-detail">{rec.prediction.detail}</div>
+          const fmtDate = (s) => {
+            if (!s) return '';
+            const [y,m,d] = String(s).slice(0,10).split('-');
+            return `${d}.${m}.${y.slice(2)}`;
+          };
+
+          const renderCard = (rec, i) => {
+            const isLocking = lockingRecKey === rec.dedupKey;
+            return (
+              <div key={i} className="rec-card">
+                <div className="rec-title"><span className="rec-icon">{rec.icon}</span>{rec.title}</div>
+                <div className="rec-body">{rec.body.map((p, j) => <p key={j}>{p}</p>)}</div>
+                {rec.suggestion && <div className="rec-suggestion">{rec.suggestion}</div>}
+                {rec.prediction && (
+                  <div className="rec-prediction">
+                    <span className="pred-value">{rec.prediction.value}</span>
+                    <div>
+                      <div className="pred-label">{rec.prediction.label}</div>
+                      <div className="pred-detail">{rec.prediction.detail}</div>
+                    </div>
                   </div>
+                )}
+                {rec.measure && rec.measure.length > 0 && (
+                  <div className="rec-measure">
+                    <div className="rec-measure-title">איך נדע אם זה עבד החודש הבא?</div>
+                    <ul>{rec.measure.map((m, k) => <li key={k}>{m}</li>)}</ul>
+                  </div>
+                )}
+                <div className="rec-actions">
+                  <button
+                    className="rec-lock-btn"
+                    disabled={isLocking}
+                    onClick={() => lockRecommendation(rec)}
+                    title="נעל את ההמלצה הזאת בתוכנית העבודה — תוכל לעקוב אחרי הביצוע והאימפקט"
+                  >
+                    {isLocking ? '⏳ מוסיף...' : '➕ הוסף לתוכנית עבודה'}
+                  </button>
                 </div>
-              )}
-              {rec.measure && rec.measure.length > 0 && (
-                <div className="rec-measure">
-                  <div className="rec-measure-title">איך נדע אם זה עבד החודש הבא?</div>
-                  <ul>{rec.measure.map((m, k) => <li key={k}>{m}</li>)}</ul>
+              </div>
+            );
+          };
+
+          const renderPipelineCard = (task) => {
+            const statusMeta = {
+              pending: { label: 'ממתינה', color: '#94a3b8' },
+              in_progress: { label: 'בעבודה', color: '#3b82f6' },
+              done: { label: 'הושלמה', color: '#10b981' },
+              dropped: { label: 'נדחתה', color: '#64748b' },
+            }[task.status] || { label: task.status, color: '#94a3b8' };
+            const meta = ROLE_META[task.role] || {};
+            const md = task.baseline_metadata || {};
+            const predValue = md.predictionValue;
+            const isClosed = task.status === 'done' || task.status === 'dropped';
+            return (
+              <div key={task.id} className="pipeline-card" style={{borderRight: `4px solid ${meta.color || statusMeta.color}`}}>
+                <div className="pipeline-card-head">
+                  <div>
+                    <div className="pipeline-card-title">
+                      <span style={{fontSize:'1.2em'}}>{md.icon || meta.icon || '📌'}</span>
+                      {task.task_title}
+                    </div>
+                    <div className="pipeline-card-meta">
+                      <span className="pipeline-role-chip" style={{background: (meta.color || '#64748b') + '22', color: meta.color || '#64748b'}}>{meta.icon} {meta.label || task.role}</span>
+                      <span className="pipeline-status-chip" style={{background: statusMeta.color + '22', color: statusMeta.color}}>{statusMeta.label}</span>
+                      <span className="pipeline-date">ננעלה ב-{fmtDate(task.meeting_date)}</span>
+                      {task.closed_at && <span className="pipeline-date">נסגרה ב-{fmtDate(task.closed_at)}</span>}
+                    </div>
+                  </div>
+                  {predValue && <div className="pipeline-pred">{predValue}</div>}
                 </div>
-              )}
-            </div>
-          );
+                <div className="pipeline-card-body">{task.task_description}</div>
+                <div className="pipeline-actions">
+                  {task.status === 'pending' && (
+                    <>
+                      <button className="pipeline-btn pipeline-btn-primary" onClick={() => updateTaskStatus(task.id, 'in_progress')}>🚀 התחל לעבוד</button>
+                      <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'dropped')}>❌ דחה</button>
+                    </>
+                  )}
+                  {task.status === 'in_progress' && (
+                    <>
+                      <button className="pipeline-btn pipeline-btn-success" onClick={() => updateTaskStatus(task.id, 'done')}>✓ סמן הושלם</button>
+                      <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'pending')}>⏸️ חזרה להמתנה</button>
+                      <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'dropped')}>❌ דחה</button>
+                    </>
+                  )}
+                  {isClosed && (
+                    <>
+                      <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'pending')}>↩️ פתח מחדש</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          };
 
           return (
             <div className="section">
               <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>💡</div>המלצות חכמות לחודש הבא <InfoTip text={`המלצות אישיות שנוצרות מתוך הנתונים של 60 הימים האחרונים — לא תלוי בחודש הנבחר בדשבורד. חלון של 60 יום נותן בסיס נתונים יציב לזיהוי דפוסים.\n\nההמלצות מחולקות לפי תפקיד: משרד פרסום, מנהל קמפיינים, מנהל שיווק, ואיש מכירות. אם תפקיד מסוים לא מציג המלצות - אין דפוס מובהק מספיק לאותו תפקיד בנתונים.\n\nסך תקציב בחלון: ₪${Math.round(_totalSpend).toLocaleString('he-IL')} · עלות פגישה: ${_costPerMeeting > 0 ? '₪' + Math.round(_costPerMeeting).toLocaleString('he-IL') : 'לא ידוע'}`} /></div>
-              {recs.length === 0 ? (
-                <div className="welcome-center" style={{padding:'40px 20px',textAlign:'center'}}>
-                  <div className="icon" style={{fontSize:'3.5em',marginBottom:'10px'}}>✨</div>
-                  <h3>אין כרגע המלצות מובהקות</h3>
-                  <p style={{color:'var(--text-secondary)',marginTop:'8px',maxWidth:'520px',margin:'8px auto'}}>הנתונים לתקופה הנבחרת לא מציגים דפוס חזק מספיק כדי להוציא המלצה אחראית. ייתכן שהדפוסים יתבהרו בחודש הבא כשייאסף יותר מידע, או שהפרויקט פשוט מתפקד מאוזן. נסה לבחור חודש אחר או טווח רחב יותר.</p>
-                </div>
-              ) : (
-                <>
-                  <p style={{color:'var(--text-secondary)',fontSize:'0.9em',marginBottom:'18px'}}>מצאנו {recs.length === 1 ? 'דפוס מובהק' : `${recs.length} דפוסים מובהקים`} בנתוני הפרויקט, מחולקים לפי תפקיד. כל המלצה כוללת נתון נוכחי, תחזית כמותית, ואיך לדעת אם הצעד עבד.</p>
-                  {ROLE_ORDER.map(role => {
-                    const items = grouped[role] || [];
-                    const meta = ROLE_META[role];
-                    if (items.length === 0) {
+
+              <div className="client-tabs rec-subtabs" style={{marginBottom: 18}}>
+                <button className={`client-tab ${recSubTab === 'new' ? 'active' : ''}`} onClick={() => setRecSubTab('new')}>
+                  💡 חדשות {newRecs.length > 0 && <span className="subtab-badge">{newRecs.length}</span>}
+                </button>
+                <button className={`client-tab ${recSubTab === 'pipeline' ? 'active' : ''}`} onClick={() => setRecSubTab('pipeline')}>
+                  📋 בתוכנית {pipelineCount > 0 && <span className="subtab-badge">{pipelineCount}</span>}
+                </button>
+              </div>
+
+              {recSubTab === 'new' ? (
+                newRecs.length === 0 ? (
+                  <div className="welcome-center" style={{padding:'40px 20px',textAlign:'center'}}>
+                    <div className="icon" style={{fontSize:'3.5em',marginBottom:'10px'}}>✨</div>
+                    <h3>{recs.length === 0 ? 'אין כרגע המלצות מובהקות' : 'כל ההמלצות החדשות נוספו לתוכנית'}</h3>
+                    <p style={{color:'var(--text-secondary)',marginTop:'8px',maxWidth:'520px',margin:'8px auto'}}>
+                      {recs.length === 0
+                        ? 'הנתונים בחלון 60 הימים לא מציגים דפוס חזק מספיק כדי להוציא המלצה אחראית. ייתכן שהדפוסים יתבהרו כשייאסף יותר מידע, או שהפרויקט מתפקד מאוזן.'
+                        : 'כל הדפוסים המובהקים הקיימים כבר ננעלו בתוכנית העבודה. עבור לטאב "📋 בתוכנית" כדי לעקוב אחריהם.'}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{color:'var(--text-secondary)',fontSize:'0.9em',marginBottom:'18px'}}>מצאנו {newRecs.length === 1 ? 'דפוס מובהק חדש' : `${newRecs.length} דפוסים מובהקים חדשים`} שעדיין לא בתוכנית העבודה. לחץ "➕ הוסף לתוכנית עבודה" על כל אחד כדי להתחייב — ההשפעה תיבדק אוטומטית אחרי 14 יום.</p>
+                    {ROLE_ORDER.map(role => {
+                      const items = groupedNew[role] || [];
+                      const meta = ROLE_META[role];
+                      if (items.length === 0) {
+                        return (
+                          <div key={role} className="role-group role-empty">
+                            <div className="role-header" style={{borderRight: `4px solid ${meta.color}`}}>
+                              <span className="role-icon">{meta.icon}</span>
+                              <div>
+                                <div className="role-label">{meta.label}</div>
+                                <div className="role-desc">{meta.desc}</div>
+                              </div>
+                              <span className="role-count" style={{color: meta.color}}>אין המלצה</span>
+                            </div>
+                          </div>
+                        );
+                      }
                       return (
-                        <div key={role} className="role-group role-empty">
+                        <div key={role} className="role-group">
                           <div className="role-header" style={{borderRight: `4px solid ${meta.color}`}}>
                             <span className="role-icon">{meta.icon}</span>
                             <div>
                               <div className="role-label">{meta.label}</div>
                               <div className="role-desc">{meta.desc}</div>
                             </div>
-                            <span className="role-count" style={{color: meta.color}}>אין המלצה</span>
+                            <span className="role-count" style={{color: meta.color}}>{items.length === 1 ? 'המלצה אחת' : `${items.length} המלצות`}</span>
+                          </div>
+                          <div className="role-cards">
+                            {items.map((rec, i) => renderCard(rec, i))}
                           </div>
                         </div>
                       );
-                    }
-                    return (
-                      <div key={role} className="role-group">
-                        <div className="role-header" style={{borderRight: `4px solid ${meta.color}`}}>
-                          <span className="role-icon">{meta.icon}</span>
+                    })}
+                  </>
+                )
+              ) : (
+                // Pipeline tab
+                pipelinePending.length === 0 && pipelineInProgress.length === 0 && pipelineDone.length === 0 && pipelineDropped.length === 0 ? (
+                  <div className="welcome-center" style={{padding:'40px 20px',textAlign:'center'}}>
+                    <div className="icon" style={{fontSize:'3.5em',marginBottom:'10px'}}>📋</div>
+                    <h3>התוכנית ריקה</h3>
+                    <p style={{color:'var(--text-secondary)',marginTop:'8px',maxWidth:'520px',margin:'8px auto'}}>עדיין לא ננעלו המלצות בתוכנית. עבור לטאב "💡 חדשות" ולחץ על "➕ הוסף לתוכנית עבודה" כדי להתחייב לפעולה ולעקוב אחרי האימפקט.</p>
+                  </div>
+                ) : (
+                  <>
+                    {firstTask && (
+                      <div className="first-10-banner">
+                        <div className="first-10-head">
+                          <span className="first-10-icon">⏰</span>
                           <div>
-                            <div className="role-label">{meta.label}</div>
-                            <div className="role-desc">{meta.desc}</div>
+                            <div className="first-10-title">10 הדקות הראשונות שלך היום</div>
+                            <div className="first-10-sub">המשימה הוותיקה ביותר ממתינה — תתחיל ממנה</div>
                           </div>
-                          <span className="role-count" style={{color: meta.color}}>{items.length === 1 ? 'המלצה אחת' : `${items.length} המלצות`}</span>
                         </div>
-                        <div className="role-cards">
-                          {items.map((rec, i) => renderCard(rec, i))}
+                        <div className="first-10-task">
+                          <div><strong>{(firstTask.baseline_metadata && firstTask.baseline_metadata.icon) || ''} {firstTask.task_title}</strong></div>
+                          <div className="first-10-pred">{firstTask.baseline_metadata && firstTask.baseline_metadata.predictionValue}</div>
                         </div>
+                        <button className="pipeline-btn pipeline-btn-primary" onClick={() => updateTaskStatus(firstTask.id, 'in_progress')}>🚀 התחל לעבוד עכשיו</button>
                       </div>
-                    );
-                  })}
-                </>
+                    )}
+
+                    {pipelineInProgress.length > 0 && (
+                      <div className="pipeline-section">
+                        <div className="pipeline-section-title">🚀 בעבודה ({pipelineInProgress.length})</div>
+                        {pipelineInProgress.map(renderPipelineCard)}
+                      </div>
+                    )}
+                    {pipelinePending.length > 0 && (
+                      <div className="pipeline-section">
+                        <div className="pipeline-section-title">⏳ ממתינות ({pipelinePending.length})</div>
+                        {pipelinePending.map(renderPipelineCard)}
+                      </div>
+                    )}
+                    {pipelineDone.length > 0 && (
+                      <div className="pipeline-section">
+                        <div className="pipeline-section-title">✓ הושלמו ({pipelineDone.length})</div>
+                        {pipelineDone.map(renderPipelineCard)}
+                      </div>
+                    )}
+                    {pipelineDropped.length > 0 && (
+                      <div className="pipeline-section">
+                        <div className="pipeline-section-title">❌ נדחו ({pipelineDropped.length})</div>
+                        {pipelineDropped.map(renderPipelineCard)}
+                      </div>
+                    )}
+                  </>
+                )
               )}
             </div>
           );

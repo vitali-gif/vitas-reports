@@ -856,3 +856,165 @@ a { color: var(--accent); text-decoration: none; }
 .role-group.role-empty .role-cards {
   display: none;
 }
+
+/* ===== Stage 4: Recommendations sub-tabs + Pipeline ===== */
+.rec-subtabs { gap: 8px; }
+.subtab-badge {
+  display: inline-block;
+  background: rgba(255,255,255,0.15);
+  color: inherit;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.78em;
+  margin-right: 6px;
+  font-weight: 600;
+}
+.client-tab.active .subtab-badge { background: rgba(255,255,255,0.25); }
+
+.rec-actions {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  justify-content: flex-end;
+}
+.rec-lock-btn {
+  background: var(--gradient-1, linear-gradient(135deg,#3b82f6,#8b5cf6));
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.15s;
+}
+.rec-lock-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59,130,246,0.35);
+}
+.rec-lock-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Pipeline view */
+.first-10-banner {
+  background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.1));
+  border: 1px solid rgba(245,158,11,0.4);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 14px;
+}
+.first-10-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.first-10-icon { font-size: 1.8em; }
+.first-10-title { font-weight: 700; font-size: 1.05em; }
+.first-10-sub { color: var(--text-secondary); font-size: 0.85em; margin-top: 2px; }
+.first-10-task {
+  grid-column: 1 / 2;
+  font-size: 0.95em;
+}
+.first-10-pred {
+  color: var(--success, #10b981);
+  font-weight: 600;
+  font-size: 0.9em;
+  margin-top: 4px;
+}
+
+.pipeline-section { margin-bottom: 24px; }
+.pipeline-section-title {
+  font-weight: 700;
+  font-size: 1em;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+
+.pipeline-card {
+  background: var(--card-bg, rgba(15,23,42,0.6));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+}
+.pipeline-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.pipeline-card-title {
+  font-weight: 600;
+  font-size: 1em;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pipeline-card-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.78em;
+  color: var(--text-secondary);
+  align-items: center;
+}
+.pipeline-role-chip, .pipeline-status-chip {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+.pipeline-date { font-size: 0.8em; opacity: 0.75; }
+.pipeline-pred {
+  background: rgba(16,185,129,0.15);
+  color: var(--success, #10b981);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+.pipeline-card-body {
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  margin: 8px 0 14px;
+  line-height: 1.55;
+}
+.pipeline-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.pipeline-btn {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pipeline-btn:hover { background: rgba(255,255,255,0.12); }
+.pipeline-btn-primary {
+  background: rgba(59,130,246,0.2);
+  border-color: rgba(59,130,246,0.5);
+  color: #93c5fd;
+}
+.pipeline-btn-primary:hover { background: rgba(59,130,246,0.32); }
+.pipeline-btn-success {
+  background: rgba(16,185,129,0.2);
+  border-color: rgba(16,185,129,0.5);
+  color: #6ee7b7;
+}
+.pipeline-btn-success:hover { background: rgba(16,185,129,0.32); }
