@@ -806,3 +806,53 @@ a { color: var(--accent); text-decoration: none; }
 .rec-measure li {
   margin: 2px 0;
 }
+
+/* Role grouping for recommendations */
+.role-group {
+  margin-bottom: 28px;
+}
+.role-group.role-empty {
+  opacity: 0.55;
+  margin-bottom: 14px;
+}
+.role-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--bg-secondary, #f8fafc);
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+.role-header .role-icon {
+  font-size: 1.9em;
+  line-height: 1;
+}
+.role-header .role-label {
+  font-weight: 800;
+  font-size: 1.08em;
+  color: var(--text-primary);
+}
+.role-header .role-desc {
+  font-size: 0.82em;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.role-header .role-count {
+  margin-right: auto;
+  font-size: 0.85em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.role-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.role-group.role-empty .role-header {
+  background: var(--bg-secondary, #f8fafc);
+  padding: 9px 14px;
+}
+.role-group.role-empty .role-cards {
+  display: none;
+}

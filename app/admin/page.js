@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { formatCurrency, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
-import { buildRecommendations } from '../../lib/recommendations'
+import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
 
@@ -1262,24 +1262,37 @@ const selectProject = async (client, project) => {
         </div>
 
         {dashTab === 'recommendations' ? (() => {
-          // Build merged stats from current period's CRM rows + run recommendation engine
+          // Build merged stats from current period's CRM + Meta + Google rows
           const crmRowsRec = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
+          const fbRowsRec  = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
+          const ggRowsRec  = reports.filter(r => r.month === selectedMonth && r.source === 'google');
           let _totalLids = 0;
           const _bucketTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
           const _bucketWith  = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
           const _dowMerged = {};
+          const _crmRepRows = [];
+          const _byUser = {};
+          const _sources = {};
           for (const r of crmRowsRec) {
-            const rt = r.summary && r.summary.responseTimeStats; if (!rt) continue;
-            _totalLids += rt.totalLids || 0;
-            const biz = (rt.business && rt.business.bucketsWithMeeting) || {};
-            const bizB = (rt.business && rt.business.buckets) || {};
-            for (const [k,v] of Object.entries(bizB)) {
-              const key = (k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k;
-              _bucketTotals[key] = (_bucketTotals[key] || 0) + v;
-            }
-            for (const [k, v] of Object.entries(biz)) {
-              const key = (k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k;
-              _bucketWith[key] = (_bucketWith[key] || 0) + (v.withMeeting || 0);
+            const rt = r.summary && r.summary.responseTimeStats; if (rt) {
+              _totalLids += rt.totalLids || 0;
+              const biz = (rt.business && rt.business.bucketsWithMeeting) || {};
+              const bizB = (rt.business && rt.business.buckets) || {};
+              for (const [k,v] of Object.entries(bizB)) {
+                const key = (k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k;
+                _bucketTotals[key] = (_bucketTotals[key] || 0) + v;
+              }
+              for (const [k, v] of Object.entries(biz)) {
+                const key = (k === '4h-24h' || k === '4h-1d') ? '4h-8h' : k;
+                _bucketWith[key] = (_bucketWith[key] || 0) + (v.withMeeting || 0);
+              }
+              // Merge byUser - sum count + weighted-avg minutes
+              const bUser = (rt.business && rt.business.byUser) || {};
+              for (const [name, v] of Object.entries(bUser)) {
+                if (!_byUser[name]) _byUser[name] = { count: 0, sumMin: 0 };
+                _byUser[name].count += v.count || 0;
+                _byUser[name].sumMin += (v.avgMinutes || 0) * (v.count || 0);
+              }
             }
             const dow = r.summary && r.summary.dayOfWeekStats;
             if (dow) for (const k of Object.keys(dow)) {
@@ -1287,11 +1300,68 @@ const selectProject = async (client, project) => {
               _dowMerged[k].leads += dow[k].leads || 0;
               _dowMerged[k].scheduled += dow[k].scheduled || 0;
             }
+            if (Array.isArray(r.summary && r.summary.crmRepRows)) {
+              _crmRepRows.push(...r.summary.crmRepRows);
+            }
+            // Merge sources from per-source CRM rows (stored in data[])
+            if (Array.isArray(r.data)) {
+              for (const row of r.data) {
+                const src = (row.source || '').toString().trim() || 'ללא מקור';
+                if (!_sources[src]) _sources[src] = { totalLeads: 0, nonRelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0 };
+                _sources[src].totalLeads += Number(row.totalLeads) || 0;
+                _sources[src].nonRelevantLeads += Number(row.irrelevantLeads || row.nonRelevantLeads) || 0;
+                _sources[src].meetingsScheduled += Number(row.meetingsScheduled) || 0;
+                _sources[src].meetingsCompleted += Number(row.meetingsCompleted) || 0;
+              }
+            }
           }
-          const recs = buildRecommendations({ bucketTotals: _bucketTotals, bucketWith: _bucketWith, dowMerged: _dowMerged, totalLids: _totalLids });
+          // Finalize byUser averages
+          const _byUserFinal = {};
+          for (const [name, v] of Object.entries(_byUser)) {
+            _byUserFinal[name] = { count: v.count, avgMinutes: v.count > 0 ? Math.round(v.sumMin / v.count) : 0 };
+          }
+          // Build ad-level rows from Meta/Google reports (r.data[] has per-row ad records)
+          const _fbAdRows = [];
+          for (const r of fbRowsRec) if (Array.isArray(r.data)) _fbAdRows.push(...r.data);
+          const _ggAdRows = [];
+          for (const r of ggRowsRec) if (Array.isArray(r.data)) _ggAdRows.push(...r.data);
+
+          const recs = buildRecommendations({
+            bucketTotals: _bucketTotals, bucketWith: _bucketWith,
+            dowMerged: _dowMerged, totalLids: _totalLids,
+            crmRepRows: _crmRepRows,
+            byUser: _byUserFinal,
+            sources: _sources,
+            fbRows: _fbAdRows, googRows: _ggAdRows,
+          });
+          const grouped = groupByRole(recs);
+
+          const renderCard = (rec, i) => (
+            <div key={i} className="rec-card">
+              <div className="rec-title"><span className="rec-icon">{rec.icon}</span>{rec.title}</div>
+              <div className="rec-body">{rec.body.map((p, j) => <p key={j}>{p}</p>)}</div>
+              {rec.suggestion && <div className="rec-suggestion">{rec.suggestion}</div>}
+              {rec.prediction && (
+                <div className="rec-prediction">
+                  <span className="pred-value">{rec.prediction.value}</span>
+                  <div>
+                    <div className="pred-label">{rec.prediction.label}</div>
+                    <div className="pred-detail">{rec.prediction.detail}</div>
+                  </div>
+                </div>
+              )}
+              {rec.measure && rec.measure.length > 0 && (
+                <div className="rec-measure">
+                  <div className="rec-measure-title">איך נדע אם זה עבד החודש הבא?</div>
+                  <ul>{rec.measure.map((m, k) => <li key={k}>{m}</li>)}</ul>
+                </div>
+              )}
+            </div>
+          );
+
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>💡</div>המלצות חכמות לחודש הבא <InfoTip text="המלצות אישיות שנוצרות מתוך הנתונים של הפרויקט - דפוסים שזיהינו ושווה לנסות לפעול עליהם. הטקסט מתייחס למספרים אמיתיים מהתקופה הנבחרת, וכולל תחזית כמותית של מה לצפות אם תיישם את ההמלצה. אם אין המלצות - אין דפוס מובהק מספיק בנתונים, וזה דבר טוב (אין נורות אדומות)." /></div>
+              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>💡</div>המלצות חכמות לחודש הבא <InfoTip text="המלצות אישיות שנוצרות מתוך הנתונים של הפרויקט - דפוסים שזיהינו ושווה לנסות לפעול עליהם. ההמלצות מחולקות לפי תפקיד: משרד פרסום, מנהל קמפיינים, מנהל שיווק, ואיש מכירות. אם תפקיד מסוים לא מציג המלצות - אין דפוס מובהק מספיק לאותו תפקיד בנתונים." /></div>
               {recs.length === 0 ? (
                 <div className="welcome-center" style={{padding:'40px 20px',textAlign:'center'}}>
                   <div className="icon" style={{fontSize:'3.5em',marginBottom:'10px'}}>✨</div>
@@ -1300,29 +1370,40 @@ const selectProject = async (client, project) => {
                 </div>
               ) : (
                 <>
-                  <p style={{color:'var(--text-secondary)',fontSize:'0.9em',marginBottom:'18px'}}>מצאנו {recs.length === 1 ? 'דפוס מובהק' : `${recs.length} דפוסים מובהקים`} בנתוני הפרויקט שלך. כל המלצה כוללת את הנתון הנוכחי, תחזית כמותית, ואיך תוכל לדעת בחודש הבא אם הצעד עבד.</p>
-                  {recs.map((rec, i) => (
-                    <div key={i} className={`rec-card ${rec.type === 'response_time' ? '' : rec.type === 'day_of_week' ? 'green' : ''}`}>
-                      <div className="rec-title"><span className="rec-icon">{rec.icon}</span>{rec.title}</div>
-                      <div className="rec-body">{rec.body.map((p, j) => <p key={j}>{p}</p>)}</div>
-                      {rec.suggestion && <div className="rec-suggestion">{rec.suggestion}</div>}
-                      {rec.prediction && (
-                        <div className="rec-prediction">
-                          <span className="pred-value">{rec.prediction.value}</span>
-                          <div>
-                            <div className="pred-label">{rec.prediction.label}</div>
-                            <div className="pred-detail">{rec.prediction.detail}</div>
+                  <p style={{color:'var(--text-secondary)',fontSize:'0.9em',marginBottom:'18px'}}>מצאנו {recs.length === 1 ? 'דפוס מובהק' : `${recs.length} דפוסים מובהקים`} בנתוני הפרויקט, מחולקים לפי תפקיד. כל המלצה כוללת נתון נוכחי, תחזית כמותית, ואיך לדעת אם הצעד עבד.</p>
+                  {ROLE_ORDER.map(role => {
+                    const items = grouped[role] || [];
+                    const meta = ROLE_META[role];
+                    if (items.length === 0) {
+                      return (
+                        <div key={role} className="role-group role-empty">
+                          <div className="role-header" style={{borderRight: `4px solid ${meta.color}`}}>
+                            <span className="role-icon">{meta.icon}</span>
+                            <div>
+                              <div className="role-label">{meta.label}</div>
+                              <div className="role-desc">{meta.desc}</div>
+                            </div>
+                            <span className="role-count" style={{color: meta.color}}>אין המלצה</span>
                           </div>
                         </div>
-                      )}
-                      {rec.measure && rec.measure.length > 0 && (
-                        <div className="rec-measure">
-                          <div className="rec-measure-title">איך נדע אם זה עבד החודש הבא?</div>
-                          <ul>{rec.measure.map((m, k) => <li key={k}>{m}</li>)}</ul>
+                      );
+                    }
+                    return (
+                      <div key={role} className="role-group">
+                        <div className="role-header" style={{borderRight: `4px solid ${meta.color}`}}>
+                          <span className="role-icon">{meta.icon}</span>
+                          <div>
+                            <div className="role-label">{meta.label}</div>
+                            <div className="role-desc">{meta.desc}</div>
+                          </div>
+                          <span className="role-count" style={{color: meta.color}}>{items.length === 1 ? 'המלצה אחת' : `${items.length} המלצות`}</span>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        <div className="role-cards">
+                          {items.map((rec, i) => renderCard(rec, i))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </>
               )}
             </div>
