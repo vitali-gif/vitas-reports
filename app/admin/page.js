@@ -1401,6 +1401,15 @@ const selectProject = async (client, project) => {
           for (const r of fbRowsRec) if (Array.isArray(r.data)) _fbAdRows.push(...r.data);
           const _ggAdRows = [];
           for (const r of ggRowsRec) if (Array.isArray(r.data)) _ggAdRows.push(...r.data);
+          // Build a lookup of adName → creative details (imageUrl/videoUrl/permalink)
+          // Sourced from r.summary.activeAds (top 5 active per report — has the creative meta)
+          const _activeAdsByName = {};
+          for (const r of [...fbRowsRec, ...ggRowsRec]) {
+            const ads = (r.summary && r.summary.activeAds) || [];
+            for (const a of ads) {
+              if (a && a.adName && !_activeAdsByName[a.adName]) _activeAdsByName[a.adName] = a;
+            }
+          }
 
           // Compute totalSpend across the 60-day window (Meta + Google ad-level rows)
           let _totalSpend = 0;
@@ -1426,6 +1435,7 @@ const selectProject = async (client, project) => {
             fbRows: _fbAdRows, googRows: _ggAdRows,
             costPerMeeting: _costPerMeeting,
             totalSpend: _totalSpend,
+            activeAdsByName: _activeAdsByName,
           });
           // Build dedup lookup: which dedupKeys already have an OPEN task in vitas_tasks
           const openTaskKeys = new Set();
@@ -1466,6 +1476,42 @@ const selectProject = async (client, project) => {
                   <div className="rec-measure">
                     <div className="rec-measure-title">איך נדע אם זה עבד החודש הבא?</div>
                     <ul>{rec.measure.map((m, k) => <li key={k}>{m}</li>)}</ul>
+                  </div>
+                )}
+                {rec.assets && (rec.assets.best || rec.assets.worst) && (
+                  <div className="rec-ads-preview">
+                    {rec.assets.best && (
+                      <div className="rec-ad-card rec-ad-best">
+                        <div className="rec-ad-badge">✅ קריאטיב מנצח</div>
+                        <div className="rec-ad-name">{rec.assets.best.adName}</div>
+                        {rec.assets.best.videoUrl ? (
+                          <video src={rec.assets.best.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={rec.assets.best.imageUrl || undefined} />
+                        ) : rec.assets.best.imageUrl ? (
+                          <img src={rec.assets.best.imageUrl} className="rec-ad-media" alt={rec.assets.best.adName} loading="lazy" />
+                        ) : (
+                          <div className="rec-ad-noimg">אין תמונה זמינה</div>
+                        )}
+                        {rec.assets.best.title && <div className="rec-ad-title">{rec.assets.best.title}</div>}
+                        {rec.assets.best.body && <div className="rec-ad-body">{rec.assets.best.body}</div>}
+                        {rec.assets.best.permalink && <a href={rec.assets.best.permalink} target="_blank" rel="noopener noreferrer" className="rec-ad-link">פתח בפייסבוק ↗</a>}
+                      </div>
+                    )}
+                    {rec.assets.worst && (
+                      <div className="rec-ad-card rec-ad-worst">
+                        <div className="rec-ad-badge">❌ קריאטיב מבוזבז</div>
+                        <div className="rec-ad-name">{rec.assets.worst.adName}</div>
+                        {rec.assets.worst.videoUrl ? (
+                          <video src={rec.assets.worst.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={rec.assets.worst.imageUrl || undefined} />
+                        ) : rec.assets.worst.imageUrl ? (
+                          <img src={rec.assets.worst.imageUrl} className="rec-ad-media" alt={rec.assets.worst.adName} loading="lazy" />
+                        ) : (
+                          <div className="rec-ad-noimg">אין תמונה זמינה</div>
+                        )}
+                        {rec.assets.worst.title && <div className="rec-ad-title">{rec.assets.worst.title}</div>}
+                        {rec.assets.worst.body && <div className="rec-ad-body">{rec.assets.worst.body}</div>}
+                        {rec.assets.worst.permalink && <a href={rec.assets.worst.permalink} target="_blank" rel="noopener noreferrer" className="rec-ad-link">פתח בפייסבוק ↗</a>}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="rec-actions">
