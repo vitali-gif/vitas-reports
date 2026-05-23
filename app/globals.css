@@ -646,7 +646,7 @@ label {
   position: fixed;
   bottom: 24px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(20px);
   background: var(--text);
   color: var(--card);
   padding: 11px 18px;
@@ -657,6 +657,14 @@ label {
   z-index: 2000;
   max-width: 480px;
   text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
 }
 
 /* =====================================================================
