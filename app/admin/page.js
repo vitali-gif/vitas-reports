@@ -115,6 +115,8 @@ export default function AdminPage() {
   const [vitasTasks, setVitasTasks] = useState([])
   const [recSubTab, setRecSubTab] = useState('new')
   const [lockingRecKey, setLockingRecKey] = useState('')
+  const [ruleDialog, setRuleDialog] = useState(null)  // {recRef, ruleType, params}
+  const [creatingRule, setCreatingRule] = useState(false)
   const chartsRef = useRef([])
   const [showAddClient, setShowAddClient] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
@@ -431,6 +433,37 @@ const loadClients = async () => {
       await loadProjectTasks(selectedProject.id);
     } catch (err) {
       showToast('שגיאה: ' + (err.message || err));
+    }
+  };
+
+  const createMetaRule = async (ruleType, params, recommendationKey) => {
+    if (!selectedProject) return;
+    setCreatingRule(true);
+    try {
+      const res = await fetch('/api/meta/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify({
+          projectName: selectedProject.name,
+          ruleType,
+          params,
+          recommendationKey,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        const metaErr = json?.meta_error?.message || json?.error || 'unknown error';
+        showToast('שגיאה ב-Meta: ' + metaErr);
+        return false;
+      }
+      showToast(`✓ הכלל "${json.ruleName}" נוצר ב-Meta`);
+      setRuleDialog(null);
+      return true;
+    } catch (err) {
+      showToast('שגיאת רשת: ' + (err.message || err));
+      return false;
+    } finally {
+      setCreatingRule(false);
     }
   };
 
@@ -1515,6 +1548,40 @@ const selectProject = async (client, project) => {
                   </div>
                 )}
                 <div className="rec-actions">
+                  {rec.type === 'creative_performance' && rec.assets && rec.assets.worst && (
+                    <button
+                      className="rec-auto-btn"
+                      onClick={() => setRuleDialog({
+                        rec,
+                        ruleType: 'pause_high_cpl_ads',
+                        params: {
+                          minSpend: 200,
+                          cplThreshold: Math.round((rec.baseline?.avgCpl || 100) * 1.6),
+                          lookbackDays: 14,
+                        },
+                      })}
+                      title="צור כלל ב-Meta שמשהה אוטומטית כל מודעה בקמפיין שעוברת CPL מסוים — לנצח"
+                    >
+                      🤖 צור כלל אוטומטי
+                    </button>
+                  )}
+                  {rec.type === 'day_of_week' && (
+                    <button
+                      className="rec-auto-btn"
+                      onClick={() => {
+                        const dayMap = { 'ראשון': 0, 'שני': 1, 'שלישי': 2, 'רביעי': 3, 'חמישי': 4, 'שישי': 5, 'שבת': 6 };
+                        const dow = dayMap[rec.baseline?.metric?.replace(/^day_/, '')] ?? 0;
+                        setRuleDialog({
+                          rec,
+                          ruleType: 'boost_budget_on_day',
+                          params: { dayOfWeek: dow, pctIncrease: 30 },
+                        });
+                      }}
+                      title="צור כלל ב-Meta שמעלה אוטומטית את התקציב ביום הזה — לנצח"
+                    >
+                      🤖 צור כלל אוטומטי
+                    </button>
+                  )}
                   <button
                     className="rec-lock-btn"
                     disabled={isLocking}
@@ -1708,6 +1775,67 @@ const selectProject = async (client, project) => {
                     )}
                   </>
                 )
+              )}
+
+              {ruleDialog && (
+                <div className="rule-dialog-backdrop" onClick={() => !creatingRule && setRuleDialog(null)}>
+                  <div className="rule-dialog" onClick={e => e.stopPropagation()}>
+                    <div className="rule-dialog-title">🤖 יצירת כלל אוטומטי ב-Meta</div>
+                    <div className="rule-dialog-body">
+                      {ruleDialog.ruleType === 'pause_high_cpl_ads' && (
+                        <>
+                          <p><strong>מה הכלל יעשה:</strong></p>
+                          <p>ישהה אוטומטית כל מודעה בקמפיינים של <strong>{selectedProject?.name}</strong> שצוברת CPL גבוה מהסף שתגדיר, אחרי שהיא בזבזה לפחות {ruleDialog.params.minSpend}₪.</p>
+                          <div className="rule-dialog-input">
+                            <label>סף CPL להשהיה (₪):</label>
+                            <input
+                              type="number"
+                              value={ruleDialog.params.cplThreshold}
+                              onChange={e => setRuleDialog({...ruleDialog, params: {...ruleDialog.params, cplThreshold: Number(e.target.value)}})}
+                              min={10}
+                            />
+                          </div>
+                          <div className="rule-dialog-input">
+                            <label>סף הוצאה מינימלי לפני בדיקה (₪):</label>
+                            <input
+                              type="number"
+                              value={ruleDialog.params.minSpend}
+                              onChange={e => setRuleDialog({...ruleDialog, params: {...ruleDialog.params, minSpend: Number(e.target.value)}})}
+                              min={50}
+                            />
+                          </div>
+                        </>
+                      )}
+                      {ruleDialog.ruleType === 'boost_budget_on_day' && (
+                        <>
+                          <p><strong>מה הכלל יעשה:</strong></p>
+                          <p>יעלה את התקציב היומי של כל קבוצת מודעות בקמפיינים של <strong>{selectedProject?.name}</strong> ב-{ruleDialog.params.pctIncrease}%, רק בימים {['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][ruleDialog.params.dayOfWeek]}.</p>
+                          <div className="rule-dialog-input">
+                            <label>אחוז העלאה (%):</label>
+                            <input
+                              type="number"
+                              value={ruleDialog.params.pctIncrease}
+                              onChange={e => setRuleDialog({...ruleDialog, params: {...ruleDialog.params, pctIncrease: Number(e.target.value)}})}
+                              min={5}
+                              max={300}
+                            />
+                          </div>
+                        </>
+                      )}
+                      <p className="rule-dialog-note">⚠️ הכלל ייווצר ב-Meta Ads Manager תחת "Automated Rules" וירוץ אוטומטית עד שתשהה/תמחק אותו שם.</p>
+                    </div>
+                    <div className="rule-dialog-actions">
+                      <button className="pipeline-btn" disabled={creatingRule} onClick={() => setRuleDialog(null)}>ביטול</button>
+                      <button
+                        className="pipeline-btn pipeline-btn-primary"
+                        disabled={creatingRule}
+                        onClick={() => createMetaRule(ruleDialog.ruleType, ruleDialog.params, ruleDialog.rec?.dedupKey)}
+                      >
+                        {creatingRule ? '⏳ יוצר...' : '✓ צור כלל ב-Meta'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           );
@@ -2142,7 +2270,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, recSubTab, vitasTasks, lockingRecKey, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources]);
 
   if (loading) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 

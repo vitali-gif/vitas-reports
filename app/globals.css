@@ -1132,3 +1132,102 @@ a { color: var(--accent); text-decoration: none; }
   margin-top: 2px;
 }
 .rec-ad-link:hover { text-decoration: underline; }
+
+/* ===== Auto-rule button + Meta rule creation dialog ===== */
+.rec-auto-btn {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-size: 0.9em;
+  font-weight: 700;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: all 0.15s;
+}
+.rec-auto-btn:hover {
+  background: #fde68a;
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(245,158,11,0.3);
+}
+.rec-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.rule-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.rule-dialog {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 28px 32px;
+  max-width: 520px;
+  width: calc(100% - 40px);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border);
+}
+.rule-dialog-title {
+  font-size: 1.25em;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.rule-dialog-body { margin-bottom: 20px; font-size: 0.95em; color: var(--text); line-height: 1.65; }
+.rule-dialog-body p { margin-bottom: 12px; }
+.rule-dialog-input {
+  margin: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rule-dialog-input label {
+  font-weight: 600;
+  font-size: 0.88em;
+  color: var(--text-secondary);
+}
+.rule-dialog-input input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1em;
+  font-family: inherit;
+  direction: ltr;
+  text-align: right;
+}
+.rule-dialog-input input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+.rule-dialog-note {
+  background: #fffbeb;
+  border-right: 3px solid var(--warning);
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  color: #78350f;
+}
+.rule-dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
