@@ -614,11 +614,12 @@ label {
   inset: 0;
   background: rgba(24, 24, 27, 0.4);
   backdrop-filter: blur(2px);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   z-index: 1000;
 }
+.modal-overlay.active { display: flex; }
 .modal {
   background: var(--card);
   border: 1px solid var(--border);
