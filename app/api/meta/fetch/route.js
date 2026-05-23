@@ -326,12 +326,18 @@ async function runSync(opts = {}) {
 
     // Filter active ads that belong to this project (campaign contains project name)
     // then sort by leads desc and keep top 5
+    // Save ALL active ads for this project (not sliced to 5).
+    // We use this list as a membership filter — only ads whose effective_status
+    // is currently ACTIVE should be considered by the recommendations engine.
     const projectActiveAds = activeAdsAll
       .filter(a => (a.campaign || '').toLowerCase().includes(needle))
       .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
-      .slice(0, 5)
 
-    const summaryWithAds = { ...pt, activeAds: projectActiveAds }
+    const summaryWithAds = {
+      ...pt,
+      activeAds: projectActiveAds,
+      activeAdNames: projectActiveAds.map(a => a.name).filter(Boolean),
+    }
 
     const { error: upsertError } = await supabase.from('reports').upsert({
       project_id: p.id,

@@ -1434,13 +1434,23 @@ const selectProject = async (client, project) => {
           for (const r of fbRowsRec) if (Array.isArray(r.data)) _fbAdRows.push(...r.data);
           const _ggAdRows = [];
           for (const r of ggRowsRec) if (Array.isArray(r.data)) _ggAdRows.push(...r.data);
-          // Build a lookup of adName → creative details (imageUrl/videoUrl/permalink)
-          // Sourced from r.summary.activeAds (top 5 active per report — has the creative meta)
+          // Build a lookup of adName → creative details (imageUrl/videoUrl/permalink).
+          // Sourced from r.summary.activeAds (only effective_status=ACTIVE ads — full
+          // list since the fix to remove the top-5 slice).
+          // Also union with summary.activeAdNames for backwards compatibility with
+          // older fetches where the slice was still applied.
           const _activeAdsByName = {};
           for (const r of [...fbRowsRec, ...ggRowsRec]) {
             const ads = (r.summary && r.summary.activeAds) || [];
             for (const a of ads) {
-              if (a && a.adName && !_activeAdsByName[a.adName]) _activeAdsByName[a.adName] = a;
+              // Meta route stores ads with `name` field; alias to adName for the lookup
+              const nm = a && (a.adName || a.name);
+              if (nm && !_activeAdsByName[nm]) _activeAdsByName[nm] = { ...a, adName: nm };
+            }
+            // Also include any ad names from activeAdNames list (no creative meta)
+            const names = (r.summary && r.summary.activeAdNames) || [];
+            for (const nm of names) {
+              if (nm && !_activeAdsByName[nm]) _activeAdsByName[nm] = { adName: nm };
             }
           }
 
