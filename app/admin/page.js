@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { formatCurrency, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
-import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER } from '../../lib/recommendations'
+import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
 
@@ -405,7 +405,7 @@ const loadClients = async () => {
       } else if (!res.ok) {
         showToast('שגיאה: ' + (json.error || 'unknown'));
       } else {
-        showToast('✓ נוסף לתוכנית עבודה');
+        showToast('✓ ננעל בתוכנית · מדידה תופיע בעוד 28 ימים');
         setRecSubTab('pipeline');
       }
       await loadProjectTasks(selectedProject.id);
@@ -1437,14 +1437,8 @@ const selectProject = async (client, project) => {
           // Split recs into new (not in pipeline) vs already-locked (matches open task)
           const newRecs = recs.filter(r => !openTaskKeys.has(r.dedupKey));
           const groupedNew = groupByRole(newRecs);
-          // Pipeline tasks: ALL tasks for this project, grouped by status
-          const pipelinePending = vitasTasks.filter(t => t.status === 'pending');
-          const pipelineInProgress = vitasTasks.filter(t => t.status === 'in_progress');
-          const pipelineDone = vitasTasks.filter(t => t.status === 'done');
-          const pipelineDropped = vitasTasks.filter(t => t.status === 'dropped');
-          const pipelineCount = pipelinePending.length + pipelineInProgress.length;
-          // "10 דקות ראשונות" — first pending task (oldest meeting_date first, so earliest commitment shows up)
-          const firstTask = [...pipelinePending].sort((a, b) => (a.meeting_date || '').localeCompare(b.meeting_date || ''))[0];
+          // Pipeline tasks: all tasks for the project, simple counting (no in_progress/done split)
+          const activeTasksCount = vitasTasks.filter(t => t.status !== 'dropped' && t.status !== 'done').length;
 
           const fmtDate = (s) => {
             if (!s) return '';
@@ -1481,65 +1475,100 @@ const selectProject = async (client, project) => {
                     onClick={() => lockRecommendation(rec)}
                     title="נעל את ההמלצה הזאת בתוכנית העבודה — תוכל לעקוב אחרי הביצוע והאימפקט"
                   >
-                    {isLocking ? '⏳ מוסיף...' : '➕ הוסף לתוכנית עבודה'}
+                    {isLocking ? '⏳ נועל...' : '✓ אנחנו עושים את זה'}
                   </button>
                 </div>
               </div>
             );
           };
 
-          const renderPipelineCard = (task) => {
-            const statusMeta = {
-              pending: { label: 'ממתינה', color: '#94a3b8' },
-              in_progress: { label: 'בעבודה', color: '#3b82f6' },
-              done: { label: 'הושלמה', color: '#10b981' },
-              dropped: { label: 'נדחתה', color: '#64748b' },
-            }[task.status] || { label: task.status, color: '#94a3b8' };
+          // Build currentInput shape for compareImpact — same structure as buildRecommendations input
+          const _impactInput = {
+            bucketTotals: _bucketTotals, bucketWith: _bucketWith,
+            dowMerged: _dowMerged, crmRepRows: _crmRepRows,
+            byUser: _byUserFinal, sources: _sources,
+            fbRows: _fbAdRows, googRows: _ggAdRows,
+          };
+
+          // Compute impact verdict for each task
+          const tasksWithImpact = vitasTasks.map(t => ({ task: t, impact: compareImpact(t, _impactInput) }));
+
+          const renderPipelineCard = ({ task, impact }) => {
             const meta = ROLE_META[task.role] || {};
             const md = task.baseline_metadata || {};
             const predValue = md.predictionValue;
-            const isClosed = task.status === 'done' || task.status === 'dropped';
+            const isManuallyClosed = task.status === 'dropped' || task.status === 'done';
+            // Visual indicator from impact verdict
+            const indicatorStyle = {
+              pending: { bg: '#f1f5f9', color: '#64748b', icon: '⏳' },
+              green:   { bg: '#d1fae5', color: '#047857', icon: '🟢' },
+              red:     { bg: '#fee2e2', color: '#b91c1c', icon: '🔴' },
+              gray:    { bg: '#f1f5f9', color: '#475569', icon: '⚪' },
+              unknown: { bg: '#fef3c7', color: '#92400e', icon: '❓' },
+            }[impact.status] || { bg: '#f1f5f9', color: '#64748b', icon: '⏳' };
             return (
-              <div key={task.id} className="pipeline-card" style={{borderRight: `4px solid ${meta.color || statusMeta.color}`}}>
+              <div key={task.id} className="pipeline-card" style={{borderRight: `4px solid ${meta.color || '#64748b'}`, opacity: isManuallyClosed ? 0.65 : 1}}>
                 <div className="pipeline-card-head">
-                  <div>
+                  <div style={{flex: 1}}>
                     <div className="pipeline-card-title">
                       <span style={{fontSize:'1.2em'}}>{md.icon || meta.icon || '📌'}</span>
                       {task.task_title}
                     </div>
                     <div className="pipeline-card-meta">
                       <span className="pipeline-role-chip" style={{background: (meta.color || '#64748b') + '22', color: meta.color || '#64748b'}}>{meta.icon} {meta.label || task.role}</span>
-                      <span className="pipeline-status-chip" style={{background: statusMeta.color + '22', color: statusMeta.color}}>{statusMeta.label}</span>
-                      <span className="pipeline-date">ננעלה ב-{fmtDate(task.meeting_date)}</span>
-                      {task.closed_at && <span className="pipeline-date">נסגרה ב-{fmtDate(task.closed_at)}</span>}
+                      <span className="pipeline-date">ננעלה ב-{fmtDate(task.meeting_date)} · לפני {impact.daysSinceLock || 0} ימים</span>
+                      {isManuallyClosed && <span className="pipeline-status-chip" style={{background: '#f1f5f9', color: '#64748b'}}>נסגרה ידנית</span>}
                     </div>
                   </div>
                   {predValue && <div className="pipeline-pred">{predValue}</div>}
                 </div>
                 <div className="pipeline-card-body">{task.task_description}</div>
+                {!isManuallyClosed && (
+                  <div className="impact-indicator" style={{background: indicatorStyle.bg, color: indicatorStyle.color}}>
+                    <span className="impact-icon">{indicatorStyle.icon}</span>
+                    <div className="impact-content">
+                      {impact.status === 'pending' && (
+                        <>
+                          <div className="impact-label">{impact.label}</div>
+                          <div className="impact-sub">המדידה תופיע בעוד {impact.daysRemaining} ימים</div>
+                        </>
+                      )}
+                      {(impact.status === 'green' || impact.status === 'red' || impact.status === 'gray') && (
+                        <>
+                          <div className="impact-label">
+                            {impact.status === 'green' && 'אימפקט חיובי'}
+                            {impact.status === 'red' && 'אימפקט שלילי'}
+                            {impact.status === 'gray' && 'אין שינוי משמעותי'}
+                            <span className="impact-pct">{impact.pctChange > 0 ? '+' : ''}{impact.pctChange}%</span>
+                          </div>
+                          <div className="impact-sub">{impact.label} · {Math.round(impact.baselineValue * 10) / 10} → {Math.round(impact.currentValue * 10) / 10}</div>
+                        </>
+                      )}
+                      {impact.status === 'unknown' && (
+                        <>
+                          <div className="impact-label">לא ניתן למדוד</div>
+                          <div className="impact-sub">{impact.reason || 'נתונים חסרים'}</div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="pipeline-actions">
-                  {task.status === 'pending' && (
-                    <>
-                      <button className="pipeline-btn pipeline-btn-primary" onClick={() => updateTaskStatus(task.id, 'in_progress')}>🚀 התחל לעבוד</button>
-                      <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'dropped')}>❌ דחה</button>
-                    </>
+                  {!isManuallyClosed && (
+                    <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'dropped')}>סגור · לא רלוונטי יותר</button>
                   )}
-                  {task.status === 'in_progress' && (
-                    <>
-                      <button className="pipeline-btn pipeline-btn-success" onClick={() => updateTaskStatus(task.id, 'done')}>✓ סמן הושלם</button>
-                      <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'pending')}>⏸️ חזרה להמתנה</button>
-                      <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'dropped')}>❌ דחה</button>
-                    </>
-                  )}
-                  {isClosed && (
-                    <>
-                      <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'pending')}>↩️ פתח מחדש</button>
-                    </>
+                  {isManuallyClosed && (
+                    <button className="pipeline-btn" onClick={() => updateTaskStatus(task.id, 'pending')}>↩️ פתח מחדש</button>
                   )}
                 </div>
               </div>
             );
           };
+
+          // Group by impact status — completely replaces the old 4-section grouping
+          const tasksPending = tasksWithImpact.filter(x => x.impact.status === 'pending' && x.task.status !== 'dropped' && x.task.status !== 'done');
+          const tasksMeasured = tasksWithImpact.filter(x => ['green', 'red', 'gray'].includes(x.impact.status) && x.task.status !== 'dropped' && x.task.status !== 'done');
+          const tasksClosed = tasksWithImpact.filter(x => x.task.status === 'dropped' || x.task.status === 'done');
 
           return (
             <div className="section">
@@ -1550,7 +1579,7 @@ const selectProject = async (client, project) => {
                   💡 חדשות {newRecs.length > 0 && <span className="subtab-badge">{newRecs.length}</span>}
                 </button>
                 <button className={`client-tab ${recSubTab === 'pipeline' ? 'active' : ''}`} onClick={() => setRecSubTab('pipeline')}>
-                  📋 בתוכנית {pipelineCount > 0 && <span className="subtab-badge">{pipelineCount}</span>}
+                  📋 בתוכנית {activeTasksCount > 0 && <span className="subtab-badge">{activeTasksCount}</span>}
                 </button>
               </div>
 
@@ -1567,7 +1596,7 @@ const selectProject = async (client, project) => {
                   </div>
                 ) : (
                   <>
-                    <p style={{color:'var(--text-secondary)',fontSize:'0.9em',marginBottom:'18px'}}>מצאנו {newRecs.length === 1 ? 'דפוס מובהק חדש' : `${newRecs.length} דפוסים מובהקים חדשים`} שעדיין לא בתוכנית העבודה. לחץ "➕ הוסף לתוכנית עבודה" על כל אחד כדי להתחייב — ההשפעה תיבדק אוטומטית אחרי 14 יום.</p>
+                    <p style={{color:'var(--text-secondary)',fontSize:'0.9em',marginBottom:'18px'}}>מצאנו {newRecs.length === 1 ? 'דפוס מובהק חדש' : `${newRecs.length} דפוסים מובהקים חדשים`} שעדיין לא בתוכנית העבודה. לחץ "✓ אנחנו עושים את זה" על כל אחד כדי להתחייב — האימפקט יימדד אוטומטית אחרי 28 ימים.</p>
                     {ROLE_ORDER.map(role => {
                       const items = groupedNew[role] || [];
                       const meta = ROLE_META[role];
@@ -1605,53 +1634,30 @@ const selectProject = async (client, project) => {
                 )
               ) : (
                 // Pipeline tab
-                pipelinePending.length === 0 && pipelineInProgress.length === 0 && pipelineDone.length === 0 && pipelineDropped.length === 0 ? (
+                tasksPending.length === 0 && tasksMeasured.length === 0 && tasksClosed.length === 0 ? (
                   <div className="welcome-center" style={{padding:'40px 20px',textAlign:'center'}}>
                     <div className="icon" style={{fontSize:'3.5em',marginBottom:'10px'}}>📋</div>
                     <h3>התוכנית ריקה</h3>
-                    <p style={{color:'var(--text-secondary)',marginTop:'8px',maxWidth:'520px',margin:'8px auto'}}>עדיין לא ננעלו המלצות בתוכנית. עבור לטאב "💡 חדשות" ולחץ על "➕ הוסף לתוכנית עבודה" כדי להתחייב לפעולה ולעקוב אחרי האימפקט.</p>
+                    <p style={{color:'var(--text-secondary)',marginTop:'8px',maxWidth:'520px',margin:'8px auto'}}>עדיין לא ננעלו המלצות בתוכנית. עבור לטאב "💡 חדשות" ולחץ על "✓ אנחנו עושים את זה" כדי להתחייב לפעולה. האימפקט יימדד אוטומטית אחרי 28 ימים.</p>
                   </div>
                 ) : (
                   <>
-                    {firstTask && (
-                      <div className="first-10-banner">
-                        <div className="first-10-head">
-                          <span className="first-10-icon">⏰</span>
-                          <div>
-                            <div className="first-10-title">10 הדקות הראשונות שלך היום</div>
-                            <div className="first-10-sub">המשימה הוותיקה ביותר ממתינה — תתחיל ממנה</div>
-                          </div>
-                        </div>
-                        <div className="first-10-task">
-                          <div><strong>{(firstTask.baseline_metadata && firstTask.baseline_metadata.icon) || ''} {firstTask.task_title}</strong></div>
-                          <div className="first-10-pred">{firstTask.baseline_metadata && firstTask.baseline_metadata.predictionValue}</div>
-                        </div>
-                        <button className="pipeline-btn pipeline-btn-primary" onClick={() => updateTaskStatus(firstTask.id, 'in_progress')}>🚀 התחל לעבוד עכשיו</button>
+                    {tasksMeasured.length > 0 && (
+                      <div className="pipeline-section">
+                        <div className="pipeline-section-title">📊 נמדדו ({tasksMeasured.length})</div>
+                        {tasksMeasured.map(renderPipelineCard)}
                       </div>
                     )}
-
-                    {pipelineInProgress.length > 0 && (
+                    {tasksPending.length > 0 && (
                       <div className="pipeline-section">
-                        <div className="pipeline-section-title">🚀 בעבודה ({pipelineInProgress.length})</div>
-                        {pipelineInProgress.map(renderPipelineCard)}
+                        <div className="pipeline-section-title">⏳ ממתינות למדידה ({tasksPending.length})</div>
+                        {tasksPending.map(renderPipelineCard)}
                       </div>
                     )}
-                    {pipelinePending.length > 0 && (
+                    {tasksClosed.length > 0 && (
                       <div className="pipeline-section">
-                        <div className="pipeline-section-title">⏳ ממתינות ({pipelinePending.length})</div>
-                        {pipelinePending.map(renderPipelineCard)}
-                      </div>
-                    )}
-                    {pipelineDone.length > 0 && (
-                      <div className="pipeline-section">
-                        <div className="pipeline-section-title">✓ הושלמו ({pipelineDone.length})</div>
-                        {pipelineDone.map(renderPipelineCard)}
-                      </div>
-                    )}
-                    {pipelineDropped.length > 0 && (
-                      <div className="pipeline-section">
-                        <div className="pipeline-section-title">❌ נדחו ({pipelineDropped.length})</div>
-                        {pipelineDropped.map(renderPipelineCard)}
+                        <div className="pipeline-section-title">📦 נסגרו ידנית ({tasksClosed.length})</div>
+                        {tasksClosed.map(renderPipelineCard)}
                       </div>
                     )}
                   </>
