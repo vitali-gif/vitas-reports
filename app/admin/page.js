@@ -9,9 +9,9 @@ import SkeletonDashboard from '../../lib/skeleton'
 import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
-import Header from '../../components/shell/Header'
-import Sidebar from '../../components/shell/Sidebar'
-import TitleBar from '../../components/shell/TitleBar'
+import Header from '../components/shell/Header'
+import Sidebar from '../components/shell/Sidebar'
+import TitleBar from '../components/shell/TitleBar'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
