@@ -496,7 +496,7 @@
      ============================================================ */
   .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
     gap: 10px;
     margin-bottom: 36px;
   }
@@ -1392,7 +1392,7 @@
 /* --- KPI cards (old class names map to new gradients) --- */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   gap: 12px;
   margin-bottom: 32px;
 }
@@ -2426,3 +2426,23 @@
 .crm-fstep .pct { font-size: 11px; font-weight: 700; color: var(--text-3); margin-top: 2px; font-variant-numeric: tabular-nums; }
 .crm-farrow { display: flex; align-items: center; justify-content: center; color: var(--text-4); }
 .crm-farrow svg { width: 14px; height: 14px; }
+
+/* --- Chart card sub-components (screen-5-google v2 pattern) --- */
+.chart-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.chart-title {
+  font-size: 14px; font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.chart-meta {
+  font-size: 11.5px; font-weight: 700;
+  color: var(--text-3);
+}
+.chart-box {
+  position: relative;
+  height: 280px;
+  width: 100%;
+}

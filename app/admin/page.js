@@ -638,7 +638,7 @@ const selectProject = async (client, project) => {
 
     return (
       <div className="section">
-        <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><h2>Top 10 יישובים</h2></div>
+        <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><h2>Top 10 יישובים</h2><span className="sub">לפי מספר לידים</span></div>
         <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmRepCityChart"></canvas></div></div>
           <div className="chart-card" style={{padding: '20px'}}>
@@ -826,13 +826,13 @@ const selectProject = async (client, project) => {
         </div>
 
         <div className="section">
-          <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>התפלגות זמני תגובה</h2></div>
+          <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>התפלגות זמני תגובה</h2><span className="sub">חלוקת לידים ל-7 דליי זמן</span></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
         </div>
 
         {dowHasData && (
           <div className="section">
-            <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>פילוח לפי יום בשבוע</h2></div>
+            <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>פילוח לפי יום בשבוע</h2><span className="sub">לידים ו-% המרה לפי יום</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
           </div>
         )}
@@ -2205,7 +2205,7 @@ const selectProject = async (client, project) => {
 {false && !isPmax && !isFb && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'} <InfoTip text="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)" /></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>}
 
         {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section">
-          <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>פילוח דמוגרפי</h2><span className="sub"><InfoTip text="התפלגות לפי מגדר וגיל" /></span></div>
+          <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>פילוח דמוגרפי</h2><span className="sub">חלוקת ביצועים לפי מגדר וקבוצת גיל</span></div>
         {!isPmax && genderNames.length > 0 && (() => {
           const gd = data.genders;
           const genderLabel = (g) => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : g === 'unknown' ? '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2' : g;
