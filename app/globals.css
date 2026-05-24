@@ -624,9 +624,9 @@
      ============================================================ */
   .funnel {
     display: grid;
-    grid-template-columns: 1fr 14px 1fr 14px 1fr 14px 1fr 14px 1fr 14px 1fr;
+    grid-template-columns: 1fr 20px 1fr 20px 1fr 20px 1fr 20px 1fr 20px 1fr;
     align-items: stretch;
-    gap: 6px;
+    gap: 10px;
   }
   .fstep {
     background: var(--card);
@@ -2386,9 +2386,9 @@
   padding: 20px;
   box-shadow: var(--shadow-xs);
   display: grid;
-  grid-template-columns: 1fr 18px 1fr 18px 1fr 18px 1fr 18px 1fr 18px 1fr;
+  grid-template-columns: 1fr 22px 1fr 22px 1fr 22px 1fr 22px 1fr 22px 1fr;
   align-items: stretch;
-  gap: 6px;
+  gap: 10px;
 }
 @media (max-width: 900px) {
   .crm-funnel { grid-template-columns: 1fr 14px 1fr 14px 1fr; }

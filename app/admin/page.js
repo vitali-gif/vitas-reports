@@ -999,38 +999,7 @@ const selectProject = async (client, project) => {
         crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads };
       } else {
         crmData.totals.totalLeads -= (crmData.sources['Facebook'].totalLeads || 0);
-        crmData.totals.totalLeads += _fbLeads;
-      }
-    }
-    if (_gR.length > 0) {
-      let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data); });
-      const _gAgg = aggregateRows(_gRows);
-      _platformSpend += _gAgg.totals.spend || 0;
-      const _gLeads = _gAgg.totals.leads || 0;
-      if (!crmData.sources['Google']) {
-        crmData.totals.totalLeads += _gLeads;
-        crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads };
-      } else {
-        crmData.totals.totalLeads -= (crmData.sources['Google'].totalLeads || 0);
-        crmData.totals.totalLeads += _gLeads;
-      }
-    }
-
-    let prevCrmData = null;
-    if (compareEnabled) {
-      const prevMonth = getPrevMonth(selectedMonth);
-      const prevCrmReports = reports.filter(r => r.month === prevMonth && r.source === 'crm');
-      if (prevCrmReports.length > 0) {
-        let prevRows = [];
-        prevCrmReports.forEach(r => { prevRows = prevRows.concat(r.data || []); });
-        prevCrmData = aggregateCrmRows(prevRows);
-      }
-    }
-
-    const ct = crmData.totals;
-    const cp = prevCrmData?.totals;
-
-    const crmKpi = (label, value, color, current, prev, isCost, tip) => {
+        crmData.totals.totalLeadconst crmKpi = (label, value, color, current, prev, isCost, tip) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null;
       const sl = String(label);
       const iconPaths =
@@ -1045,6 +1014,30 @@ const selectProject = async (client, project) => {
         sl.includes('\u05e9\u05d5\u05d5\u05d9') ? <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/> :
         sl.includes('\u05e2\u05dc\u05d5\u05ea') ? <><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></> :
         (sl.includes('%') || sl.includes('\u05d0\u05d7\u05d5\u05d6')) ? <><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></> :
+        <><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></>;
+      const crmV2Color = { green:'emerald', orange:'terra', pink:'rose', purple:'violet', cyan:'sky', red:'amber', '':'indigo' };
+      const v2cls = crmV2Color[color] || 'indigo';
+      return (
+        <div className={`kpi ${v2cls}`} key={label}>
+          <div className="kpi-top">
+            <div className="kpi-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                {iconPaths}
+              </svg>
+            </div>
+            {ch ? (
+              <span className={`kpi-trend${ch.pct === 0 ? ' flat' : ''}`}>
+                {ch.pct > 0 ? '\u2191' : ch.pct < 0 ? '\u2193' : '\u2212'}
+                {ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '') + ch.pct.toFixed(0) + '%'}
+              </span>
+            ) : null}
+          </div>
+          <div className="kpi-label">{label}{tip ? <InfoTip text={tip} /> : null}</div>
+          <div className="kpi-value">{value}</div>
+          <div style={{height:28,marginTop:'auto'}}/>
+        </div>
+      );
+    };udes('\u05d0\u05d7\u05d5\u05d6')) ? <><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></> :
         <><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></>;
       const crmV2Color = { green:'emerald', orange:'terra', pink:'rose', purple:'violet', cyan:'sky', red:'amber', '':'indigo' };
       const v2cls = crmV2Color[color] || 'indigo';
@@ -1075,20 +1068,16 @@ const selectProject = async (client, project) => {
 
     return (
       <>
-        <div className="kpi-tier primary">
+        <div className="kpi-grid">
           {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), '', ct.totalLeads, cp?.totalLeads)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
           {crmKpi('\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.irrelevantLeads), 'red', ct.irrelevantLeads, cp?.irrelevantLeads, true)}
           {crmKpi('% \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d5\u05ea', ct.relevantRate.toFixed(1) + '%', 'cyan', ct.relevantRate, cp?.relevantRate)}
-        </div>
-        <div className="kpi-tier compact">
           {crmKpi('פגישות שתואמו', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, 'מספר הלידים בתקופה שהלקוח שלהם קבע פגישה (כולל פגישות עתידיות). השיטה: לכל LID נספרת פגישה אם הלקוח קבע פגישה בתאריך השווה או מאוחר מ-LID. ייתכן הבדל קטן (1-2) מול BMBY UI שמחריג לידים שהפכו לעסקה באותו יום או לקוחות חוזרים.')}
           {crmKpi('אחוז המרה לפגישה שתואמה', ct.scheduledRate.toFixed(1) + '%', 'pink', ct.scheduledRate, cp?.scheduledRate, false, 'אחוז הלידים שקבעו פגישה. חישוב: (פגישות שתואמו / סה"כ לידים) × 100')}
           {crmKpi('פגישות שבוצעו', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'מספר הלידים בתקופה שהלקוח שלהם קיים פגישה בפועל (סטטוס: done/בוצע). השיטה: לכל LID נספרת פגישה רק אם בוצעה והתרחשה בתאריך השווה או מאוחר מה-LID. ייתכן הבדל קטן מול BMBY UI עקב חוקי דדופ שונים.')}
           {crmKpi('אחוז המרה לפגישות שבוצעו', ct.completedRate.toFixed(1) + '%', '', ct.completedRate, cp?.completedRate, false, 'אחוז הלידים שקיימו פגישה בפועל. חישוב: (פגישות שבוצעו / סה"כ לידים) × 100')}
           {crmKpi('עלות פגישה שבוצעה', ct.meetingsCompleted > 0 ? formatCurrency(_platformSpend / ct.meetingsCompleted) : '₪0', 'purple', 0, 0, false, 'עלות פרסום ממוצעת לכל פגישה שבוצעה. חישוב: (סה"כ הוצאה בפלטפורמה / פגישות שבוצעו)')}
-        </div>
-        <div className="kpi-tier compact">
           {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled), 'red', ct.meetingsCancelled, cp?.meetingsCancelled, true, 'מספר הלידים בתקופה שלקוח שלהם קבע פגישה שבוטלה (בתוך התקופה). הפגישה לא התקיימה.')}
           {crmKpi('\u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations)}
           {crmKpi('\u05e9\u05d5\u05d5\u05d9 \u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', formatCurrency(ct.registrationValue), 'purple', ct.registrationValue, cp?.registrationValue)}
@@ -1400,7 +1389,7 @@ const selectProject = async (client, project) => {
       const thStyle = {cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'};
       const extremes = {};
       cols.forEach(c => { if (c.key === 'name' || c.key === 'spend') return; const vals = entries.map(([n,d]) => c.get(d,n)).filter(v => typeof v === 'number' && v > 0); if (vals.length < 2) return; extremes[c.key] = {min: Math.min(...vals), max: Math.max(...vals)}; });
-      const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {color:'#059669',fontWeight:700} : {color:'#dc2626',fontWeight:700}; if (val === e.min) return col.higher ? {color:'#dc2626',fontWeight:700} : {color:'#059669',fontWeight:700}; return {}; };
+      const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'} : {background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'}; if (val === e.min) return col.higher ? {background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'} : {background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'}; return {}; };
       return (<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{name}</td><td style={cellBg('clicks',d.clicks)}>{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{d.leads} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>);
     };
 
@@ -2047,11 +2036,6 @@ const selectProject = async (client, project) => {
               </div>
             </div>
           )}
-          <div className="units">
-            <div className="unit"><div className="lbl"><span className="tech">CPL</span>עלות לליד</div><div className="val"><span className="curr">₪</span>{activeT.cpl > 0 ? activeT.cpl.toLocaleString('he-IL', {maximumFractionDigits:0}) : '—'}</div></div>
-            <div className="unit"><div className="lbl"><span className="tech">CPC</span>עלות לקליק</div><div className="val"><span className="curr">₪</span>{activeT.cpc > 0 ? activeT.cpc.toLocaleString('he-IL', {maximumFractionDigits:2}) : '—'}</div></div>
-            <div className="unit"><div className="lbl"><span className="tech">CPM</span>עלות לאלף חשיפות</div><div className="val"><span className="curr">₪</span>{activeT.cpm > 0 ? activeT.cpm.toLocaleString('he-IL', {maximumFractionDigits:2}) : '—'}</div></div>
-          </div>
         </div>
 
                 {/* Non-FB tabs: keep existing campaigns charts + flat table */}
@@ -2224,7 +2208,7 @@ const selectProject = async (client, project) => {
                   if(sc&&gCols[sc.key]){sorted.sort((a,b)=>{const va=gCols[sc.key].get(gd[a],a),vb=gCols[sc.key].get(gd[b],b);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}
                   const gExtremes={};
                   Object.keys(gCols).forEach(k=>{if(k==='gender'||k==='spend')return;const c=gCols[k];const vals=sorted.map(g=>c.get(gd[g],g)).filter(v=>typeof v==='number'&&v>0);if(vals.length<2)return;gExtremes[k]={min:Math.min(...vals),max:Math.max(...vals)};});
-                  const gCellBg=(key,val)=>{const e=gExtremes[key];if(!e||val<=0||e.min===e.max)return {};const c=gCols[key];if(!c||c.higher===undefined)return {};if(val===e.max)return c.higher?{color:'#059669',fontWeight:700}:{color:'#dc2626',fontWeight:700};if(val===e.min)return c.higher?{color:'#dc2626',fontWeight:700}:{color:'#059669',fontWeight:700};return {};};
+                  const gCellBg=(key,val)=>{const e=gExtremes[key];if(!e||val<=0||e.min===e.max)return {};const c=gCols[key];if(!c||c.higher===undefined)return {};if(val===e.max)return c.higher?{background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'}:{background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'};if(val===e.min)return c.higher?{background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'}:{background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'};return {};};
                   return sorted.map(g => { const d = gd[g]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
                     <tr key={g}><td style={{fontWeight:600}}>{genderLabel(g)}</td><td style={gCellBg('clicks',d.clicks)}>{formatNum(d.clicks)}</td><td style={gCellBg('impressions',d.impressions)}>{formatNum(d.impressions)}</td><td style={gCellBg('cpc',cpc)}>{formatCurrency(cpc)}</td><td style={gCellBg('ctr',ctr)}>{ctr.toFixed(2)}%</td><td style={gCellBg('cpm',cpm)}>{formatCurrency(cpm)}</td><td style={gCellBg('leads',d.leads)}>{d.leads}</td><td style={gCellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>);});
                 })()}
@@ -2242,7 +2226,7 @@ const selectProject = async (client, project) => {
               <table className="data-table"><thead><tr>
                 {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
               </tr></thead><tbody>
-                {(()=>{const ageCols={age:{get:(d,n)=>n},clicks:{get:d=>d.clicks,higher:true},impressions:{get:d=>d.impressions,higher:true},cpc:{get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},ctr:{get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},cpm:{get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},leads:{get:d=>d.leads,higher:true},cpl:{get:d=>d.leads>0?d.spend/d.leads:0,higher:false},spend:{get:d=>d.spend}};const sc=sortConfig['ages'];let sorted=[...sortedAges];if(sc&&ageCols[sc.key]){sorted.sort((a,b)=>{const va=ageCols[sc.key].get(ad[a],a),vb=ageCols[sc.key].get(ad[b],b);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}const ageExtremes={};Object.keys(ageCols).forEach(k=>{if(k==='age'||k==='spend')return;const c=ageCols[k];const vals=sorted.map(a=>c.get(ad[a],a)).filter(v=>typeof v==='number'&&v>0);if(vals.length<2)return;ageExtremes[k]={min:Math.min(...vals),max:Math.max(...vals)};});const ageCellBg=(key,val)=>{const e=ageExtremes[key];if(!e||val<=0||e.min===e.max)return {};const c=ageCols[key];if(!c||c.higher===undefined)return {};if(val===e.max)return c.higher?{color:'#059669',fontWeight:700}:{color:'#dc2626',fontWeight:700};if(val===e.min)return c.higher?{color:'#dc2626',fontWeight:700}:{color:'#059669',fontWeight:700};return {};};return sorted.map(age => { const d = ad[age]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
+                {(()=>{const ageCols={age:{get:(d,n)=>n},clicks:{get:d=>d.clicks,higher:true},impressions:{get:d=>d.impressions,higher:true},cpc:{get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},ctr:{get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},cpm:{get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},leads:{get:d=>d.leads,higher:true},cpl:{get:d=>d.leads>0?d.spend/d.leads:0,higher:false},spend:{get:d=>d.spend}};const sc=sortConfig['ages'];let sorted=[...sortedAges];if(sc&&ageCols[sc.key]){sorted.sort((a,b)=>{const va=ageCols[sc.key].get(ad[a],a),vb=ageCols[sc.key].get(ad[b],b);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}const ageExtremes={};Object.keys(ageCols).forEach(k=>{if(k==='age'||k==='spend')return;const c=ageCols[k];const vals=sorted.map(a=>c.get(ad[a],a)).filter(v=>typeof v==='number'&&v>0);if(vals.length<2)return;ageExtremes[k]={min:Math.min(...vals),max:Math.max(...vals)};});const ageCellBg=(key,val)=>{const e=ageExtremes[key];if(!e||val<=0||e.min===e.max)return {};const c=ageCols[key];if(!c||c.higher===undefined)return {};if(val===e.max)return c.higher?{background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'}:{background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'};if(val===e.min)return c.higher?{background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'}:{background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'};return {};};return sorted.map(age => { const d = ad[age]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
                   <tr key={age}><td style={{fontWeight:600}}>{age}</td><td style={ageCellBg('clicks',d.clicks)}>{formatNum(d.clicks)}</td><td style={ageCellBg('impressions',d.impressions)}>{formatNum(d.impressions)}</td><td style={ageCellBg('cpc',cpc)}>{formatCurrency(cpc)}</td><td style={ageCellBg('ctr',ctr)}>{ctr.toFixed(2)}%</td><td style={ageCellBg('cpm',cpm)}>{formatCurrency(cpm)}</td><td style={ageCellBg('leads',d.leads)}>{d.leads}</td><td style={ageCellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>);});})()}
               </tbody></table>
             </div></div>
@@ -2548,8 +2532,8 @@ const selectProject = async (client, project) => {
                   <button className="btn btn-sm btn-primary" style={{padding:'4px 10px',fontSize:'0.82em'}} onClick={() => applyCustomRange()} disabled={!customSince || !customUntil || refreshing}>{'הצג'}</button>
                 </div>
               )}
-              <label style={{fontSize:'0.9em',display:'flex',alignItems:'center',gap:6,cursor:'pointer',padding:'6px 12px',background:'rgba(59,130,246,0.08)',borderRadius:'8px',border:'1px solid rgba(59,130,246,0.2)'}}>
-                <input type="checkbox" checked={compareEnabled} onChange={e => onComparisonToggle(e.target.checked)} />
+              <label style={{fontSize:'0.9em',display:'flex',alignItems:'center',gap:8,cursor:'pointer',padding:'6px 12px',background:compareEnabled?'rgba(99,102,241,0.08)':'var(--surface)',borderRadius:'20px',border:'1px solid',borderColor:compareEnabled?'rgba(99,102,241,0.3)':'var(--border)',transition:'all .2s'}} onClick={() => onComparisonToggle(!compareEnabled)}>
+                <span style={{display:'inline-flex',alignItems:'center',justifyContent:compareEnabled?'flex-end':'flex-start',width:'32px',height:'18px',borderRadius:'9px',padding:'2px',background:compareEnabled?'var(--indigo)':'var(--border-strong)',transition:'background .2s',flexShrink:0}}><span style={{width:'14px',height:'14px',borderRadius:'50%',background:'white',boxShadow:'0 1px 3px rgba(0,0,0,0.25)'}}/></span>
                 {'השוואה לאותה תקופה'}
                 {selectedMonth && (<InfoTip text={`משווה מול אותה תקופה בחודש הקודם:\n\nהתקופה הנסקרת: ${formatMonth(selectedMonth)}\nתקופת ההשוואה: ${formatMonth(getPrevMonth(selectedMonth))}\n\nהלוגיקה: המערכת מזיזה את כל הטווח בדיוק חודש אחורה - גם לקטעים קצרים כמו 7 ימים אחרונים (לא משווה לשבוע שעבר אלא לאותם הימים בחודש הקודם).`} />)}
               </label>
