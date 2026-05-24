@@ -1137,6 +1137,7 @@ const selectProject = async (client, project) => {
               <div className="pct">100%</div>
             </div>
           </div>
+        </div>
 
         {/* CRM Table by Source */}
         <div className="section">
