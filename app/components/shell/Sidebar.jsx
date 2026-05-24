@@ -21,6 +21,7 @@ export default function Sidebar({
   clients = [],
   activeClient,
   activeProject,
+  onSelectClient,
   onSelectProject,
   onAddClient,
   onAddProject,
@@ -38,6 +39,7 @@ export default function Sidebar({
               <div className="client-item" key={client.name}>
                 <div
                   className={`client-header ${isActive ? 'active' : ''}`}
+                  onClick={() => onSelectClient?.(client)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '10px 14px', color: isActive ? 'white' : 'var(--side-fg)',
