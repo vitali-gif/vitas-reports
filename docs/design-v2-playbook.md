@@ -162,3 +162,52 @@ Preview URL pattern: `https://vitas-reports-git-design-v2-vitali-gif.vercel.app`
 ## End-of-session status
 
 (Filled in by Opus at end of foundation session — see git log + last commit messages.)
+
+---
+
+## END-OF-SESSION STATUS (filled in by Opus 2026-05-24 ~18:45 Israel)
+
+Foundation session: **COMPLETE.**
+
+### Commits on `design-v2`:
+1. `89fcecc` — v2 foundation: playbook + Hi-Tech globals.css + Heebo 800/900 weights
+2. `3be48f7` — npm install lucide-react@1.16 + react-chartjs-2@5.3
+3. `605aeb8` — v2 toolkit: Shell components + Sparkline + Chart.js setup
+
+### Preview URL pattern
+`https://vitas-reports-git-design-v2-vitali-gif.vercel.app/admin`
+(Vercel auto-deploys preview branches; URL may vary slightly based on team scope.
+Vitali to confirm by checking https://vercel.com dashboard for the design-v2 branch.)
+
+### Visual verification: NOT performed by Opus
+The sandbox cannot fetch preview URLs (provenance restriction). Local `npm run build`
+showed `✓ Compiled successfully` for all our changes. Only failure was `supabaseUrl is required`
+during prerender — that's purely a local env-var miss; Vercel has the vars set.
+
+### What Sonnet should do FIRST in the next chat:
+1. Get a fresh PAT from Vitali if the current one (expires ~2026-05-31) is invalid.
+2. `git clone --depth 5 https://vitali-gif:$PAT@github.com/vitali-gif/vitas-reports.git -b design-v2`
+3. Open the Vercel preview URL → take a screenshot of `/admin`
+4. Compare to `C:\dev\reports dashboard\design_handoff_vitas_hitech_refresh\screen-2-hakol-v2.html`
+5. List the visible deltas → pick the easiest 1-2 and implement them as the first commit
+6. Re-deploy preview → re-screenshot → confirm fix
+7. Then proceed in the order in this playbook (Overview → Facebook → Google → CRM → Recommendations)
+
+### Files Sonnet has ready to import:
+- `app/components/shell/Header.jsx` — drop-in `<Header onExport={...} onLogout={...} />`
+- `app/components/shell/Sidebar.jsx` — `<Sidebar clients={clients} activeClient={...} activeProject={...} onSelectProject={...} />`
+- `app/components/shell/TitleBar.jsx` — `<TitleBar crumb={[...]} client={...} project={...} dateRange={...} comparisonOn={...} onToggleComparison={...} />`
+- `app/components/shell/Tabs.jsx` — `<Tabs active={activeTab} onChange={setActiveTab} recommendationsCount={5} />`
+- `app/components/Sparkline.jsx` — `<Sparkline values={[3,5,4,7,6,8,10]} />`
+- `lib/chart-setup.js` — `import { setupCharts, CHART_COLORS, tooltipCfg, legendCfg } from '@/lib/chart-setup'`
+
+### Known issues / blockers: NONE
+The foundation is clean. All 3 commits pushed without errors. Local Next.js build compiles successfully.
+Build/deploy issues — if any surface — will be visible at the Vercel dashboard after Vitali checks.
+
+### Important reminders persisting to next session:
+- **Add new useState to renderDashboard useCallback deps array** (around line ~2380 of admin/page.js)
+- **PRESERVE the "צור כלל אוטומטי" button** for Meta rules when redoing screen-6 — mockup omits it
+- **PRESERVE the Impact Tracking 28-day timer** flow when redoing screen-6
+- **Use `node --check`** before every push on .js files (skip for .jsx — Next compiler handles it)
+- **Wait 60-90s after push** for Vercel build before declaring "deployed"
