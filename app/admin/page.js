@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx'
 import Header from '../components/shell/Header'
 import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
+import Sparkline from '../components/Sparkline'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -1270,14 +1271,48 @@ const selectProject = async (client, project) => {
     const t = data.totals;
     const p = prevData?.totals;
 
-    const kpiIcons = { '\u05d4\u05d5\u05e6\u05d0\u05d4': '\u20aa', '\u05dc\u05d9\u05d3\u05d9\u05dd': '\ud83d\udc65', 'CPL': '\ud83d\udcb0', '\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea': '\ud83d\udc41', '\u05ea\u05e4\u05d5\u05e6\u05d4': '\ud83d\udce1', '\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd': '\ud83d\uddb1', 'CPC': '\ud83d\udcb8', 'CPM': '\ud83d\udcca', 'CTR': '\ud83d\udcc8', '\u05d4\u05de\u05e8\u05d4': '\ud83d\udd04', '\u05ea\u05d3\u05d9\u05e8\u05d5\u05ea': '\ud83d\udd04' };
-    const kpiColors = { green: 'rgba(16,185,129,0.1)', purple: 'rgba(139,92,246,0.1)', orange: 'rgba(245,158,11,0.1)', pink: 'rgba(236,72,153,0.1)', cyan: 'rgba(6,182,212,0.1)', red: 'rgba(239,68,68,0.1)' };
-    const kpiTextColors = { green: 'var(--success)', purple: 'var(--purple)', orange: 'var(--warning)', pink: 'var(--pink)', cyan: 'var(--cyan)', red: 'var(--danger)' };
+    // v2 color map: old name → new class
+    const v2Color = { green:'emerald', orange:'terra', pink:'rose', purple:'violet', cyan:'sky', red:'amber', '':'indigo' };
+
+    // v2 KPI SVG icons (inline, no lucide dep)
+    const kpiSvgIcon = (label) => {
+      if (label === 'לידים')           return <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>;
+      if (label === 'עלות לליד' || label === 'CPL') return <><circle cx="8" cy="8" r="5"/><path d="M14.5 12.5A5 5 0 1 1 20 18a5 5 0 0 1-5.5-5.5z"/></>; 
+      if (label === 'תקציב')           return <><path d="M21 12V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><path d="M21 12h-5a2 2 0 0 0 0 4h5"/></>;
+      if (label === 'פגישות שתואמו')  return <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="8 15 11 18 16 13"/></>;
+      if (label === 'פגישות שבוצעו')  return <><path d="M11 17l2 2a1 1 0 0 0 1.42 0l4.16-4.16a2 2 0 0 0 0-2.84L15 8h-3a2 2 0 0 0-1.42.59L9 10"/><path d="M16 16l-3.41-3.41a2 2 0 0 0-2.83 0L8 14.34a2 2 0 0 0 0 2.83L9.66 18.83a2 2 0 0 0 2.83 0L13 18.34"/></>;
+      if (label === 'הרשמות')          return <><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></>;
+      if (label === 'חוזים')           return <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 14c1.5 0 2-1 4-1s2.5 1 4 1 2-1 2-1"/><path d="M8 18h8"/></>;
+      return <><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></>;
+    };
 
     const kpi = (label, value, color, current, prev, isCost) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null;
-      const icon = kpiIcons[label] || '\ud83d\udcca';
-      return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '\u25b2' : '\u25bc'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>;
+      const v2cls = v2Color[color] || 'indigo';
+      // sparkline: extract this metric's values from trendData
+      const metricKey = label === 'לידים' ? 'leads' : label === 'תקציב' ? 'spend' : label === 'עלות לליד' ? 'cpl' : null;
+      const sparkVals = metricKey && trendData.length >= 2 ? trendData.map(d => d[metricKey] || 0) : null;
+      const trendPct = ch ? (ch.pct > 0 ? '+' : '') + Math.abs(ch.pct).toFixed(0) + '%' : null;
+      return (
+        <div className={`kpi ${v2cls}`} key={label}>
+          <div className="kpi-top">
+            <div className="kpi-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                {kpiSvgIcon(label)}
+              </svg>
+            </div>
+            {ch ? (
+              <span className={`kpi-trend${ch.pct === 0 ? ' flat' : ''}`}>
+                {ch.pct > 0 ? '↑' : ch.pct < 0 ? '↓' : '−'}
+                {ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '') + ch.pct.toFixed(0) + '%'}
+              </span>
+            ) : null}
+          </div>
+          <div className="kpi-label">{label}</div>
+          <div className="kpi-value">{value}</div>
+          {sparkVals ? <Sparkline values={sparkVals} /> : <div style={{height:28,marginTop:'auto'}}/>}
+        </div>
+      );
     };
 
     const buildTable = (items, prevItems, labelName, tableId) => {
