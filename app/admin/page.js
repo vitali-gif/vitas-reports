@@ -9,6 +9,9 @@ import SkeletonDashboard from '../../lib/skeleton'
 import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
+import Header from '../../components/shell/Header'
+import Sidebar from '../../components/shell/Sidebar'
+import TitleBar from '../../components/shell/TitleBar'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -2332,54 +2335,78 @@ const selectProject = async (client, project) => {
         );
       })()}
       <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div className="header"><div className="header-content"><div className="logo">VITAS REPORTS</div><div className="header-nav">{(refreshing || refreshingCrm) && <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'rgba(59,130,246,0.12)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:14}}><span style={{display:'inline-block',width:14,height:14,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}></span>{refreshingCrm ? 'מושך CRM...' : 'מושך נתונים...'}</div>}<button className="nav-btn danger" onClick={handleLogout}>{'\u05d9\u05e6\u05d9\u05d0\u05d4'}</button></div></div></div>
+      <Header
+        onLogout={handleLogout}
+        extraActions={(refreshing || refreshingCrm) && (
+          <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'rgba(59,130,246,0.12)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:14}}>
+            <span style={{display:'inline-block',width:14,height:14,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}></span>
+            {refreshingCrm ? 'מושך CRM...' : 'מושך נתונים...'}
+          </div>
+        )}
+      />
 
       <div className="app-layout">
-        <div className="sidebar"><div style={{padding: '0 15px', marginBottom: 20}}>
-          <div className="sidebar-title">{'\u05dc\u05e7\u05d5\u05d7\u05d5\u05ea'}</div>
-          {clients.map(client => (<div key={client.id}>
-            <div className={`client-item ${selectedClient?.id === client.id ? 'active' : ''}`} onClick={() => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}><div className="client-dot" style={{background: client.color}}></div>{client.name}</div>
-            {selectedClient?.id === client.id && client.projects?.map(proj => (<div key={proj.id} className={`project-item ${selectedProject?.id === proj.id ? 'active' : ''}`} onClick={() => selectProject(client, proj)}>{'\ud83d\udcc2'} {proj.name}</div>))}
-            {selectedClient?.id === client.id && (<><div className="add-btn indent" onClick={() => setShowAddProject(true)}>+ {'\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</div><div style={{padding: '5px 25px'}}><div className="link-box" style={{marginTop: 5}}><small>{'\u05dc\u05d9\u05e0\u05e7 \u05dc\u05dc\u05e7\u05d5\u05d7'}:</small><input readOnly value={typeof window !== 'undefined' ? `${window.location.origin}/client/${client.token}` : ''} onClick={e => {e.target.select(); navigator.clipboard?.writeText(e.target.value); showToast('\u05d4\u05dc\u05d9\u05e0\u05e7 \u05d4\u05d5\u05e2\u05ea\u05e7!');}} /></div></div></>)}
-          </div>))}
-          <div className="add-btn" onClick={() => setShowAddClient(true)}>+ {'\u05d4\u05d5\u05e1\u05e3 \u05dc\u05e7\u05d5\u05d7'}</div>
-        </div></div>
+        <Sidebar
+          clients={clients}
+          activeClient={selectedClient?.name}
+          activeProject={selectedProject?.name}
+          onSelectProject={(client, project) => selectProject(client, project)}
+          onAddClient={() => setShowAddClient(true)}
+          onAddProject={() => setShowAddProject(true)}
+          footerText="VITAS Reports v3.2"
+        />
 
         <div className="main-content">
           {view === 'welcome' && (<div className="welcome-center"><div className="icon">{'\ud83d\udcca'}</div><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05de\u05d4\u05ea\u05e4\u05e8\u05d9\u05d8 \u05db\u05d3\u05d9 \u05dc\u05e6\u05e4\u05d5\u05ea \u05d1\u05d3\u05d5\u05d7, \u05d0\u05d5 \u05d4\u05e2\u05dc\u05d4 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd'}</p></div>)}
 
           {view === 'dashboard' && selectedProject && (<>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25}}>
-              <h2 style={{fontSize: '1.8em', fontWeight: 800}}>{selectedClient?.name} / {selectedProject.name}</h2>
-              <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                <select className="form-input" style={{width:'auto',minWidth:'180px'}} value={selectedMonth || activePreset} onChange={e => applyPreset(e.target.value)}>
-                  {/* Hidden current-period option so the dropdown LABEL reflects the actual data period being shown */}
-                  {selectedMonth && (
-                    <option value={selectedMonth} style={{display:'none'}}>{formatMonth(selectedMonth)}</option>
-                  )}
-                  <option value="today">{'\ud83d\udcc5 \u05d4\u05d9\u05d5\u05dd'}</option>
-                  <option value="yesterday">{'\u05d0\u05ea\u05de\u05d5\u05dc'}</option>
-                  <option value="last7">{'7 \u05d9\u05de\u05d9\u05dd \u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd'}</option>
-                  <option value="last30">{'30 \u05d9\u05de\u05d9\u05dd \u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd'}</option>
-                  <option value="currentMonth">{'\u05d4\u05d7\u05d5\u05d3\u05e9 \u05d4\u05e0\u05d5\u05db\u05d7\u05d9'}</option>
-                  <option value="lastMonth">{'\u05d7\u05d5\u05d3\u05e9 \u05e9\u05e2\u05d1\u05e8'}</option>
-                  <option value="custom">{'\u05d8\u05d5\u05d5\u05d7 \u05de\u05d5\u05ea\u05d0\u05dd \u05d0\u05d9\u05e9\u05d9\u05ea...'}</option>
-                </select>
-                {activePreset === 'custom' && (
-                  <div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'6px 10px',background:'rgba(0,0,0,0.04)',borderRadius:'8px',fontSize:'0.85em'}}>
-                    <span style={{color:'var(--text-secondary)'}}>{'\u05de:'}</span>
-                    <input type="date" value={customSince} onChange={e => setCustomSince(e.target.value)} style={{padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em',border:'1px solid #d1d5db'}} />
-                    <span style={{color:'var(--text-secondary)'}}>{'\u05e2\u05d3:'}</span>
-                    <input type="date" value={customUntil} onChange={e => setCustomUntil(e.target.value)} style={{padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em',border:'1px solid #d1d5db'}} />
-                    <button className="btn btn-sm btn-primary" style={{padding:'4px 10px',fontSize:'0.82em'}} onClick={() => applyCustomRange()} disabled={!customSince || !customUntil || refreshing}>{'\u05d4\u05e6\u05d2'}</button>
-                  </div>
+            <TitleBar
+              crumb={['סקירה', selectedProject?.name || '', '']}
+              client={selectedClient?.name}
+              project={selectedProject?.name}
+              dateRange={
+                selectedMonth
+                  ? selectedMonth.includes('_')
+                    ? selectedMonth.split('_')[0] + ' – ' + selectedMonth.split('_')[1]
+                    : formatMonth(selectedMonth)
+                  : activePreset === 'today' ? 'היום'
+                  : activePreset === 'yesterday' ? 'אתמול'
+                  : activePreset === 'last7' ? '7 ימים אחרונים'
+                  : activePreset === 'last30' ? '30 ימים אחרונים'
+                  : activePreset === 'currentMonth' ? 'החודש הנוכחי'
+                  : activePreset === 'lastMonth' ? 'חודש שעבר'
+                  : null
+              }
+              comparisonOn={compareEnabled}
+              onToggleComparison={() => onComparisonToggle(!compareEnabled)}
+            />
+            <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:20}}>
+              <select className="form-input" style={{width:'auto',minWidth:'180px'}} value={selectedMonth || activePreset} onChange={e => applyPreset(e.target.value)}>
+                {selectedMonth && (
+                  <option value={selectedMonth} style={{display:'none'}}>{formatMonth(selectedMonth)}</option>
                 )}
-                <label style={{fontSize:'0.9em',display:'flex',alignItems:'center',gap:6,cursor:'pointer',padding:'6px 12px',background:'rgba(59,130,246,0.08)',borderRadius:'8px',border:'1px solid rgba(59,130,246,0.2)'}}>
-                  <input type="checkbox" checked={compareEnabled} onChange={e => onComparisonToggle(e.target.checked)} />
-                  {'\u05d4\u05e9\u05d5\u05d5\u05d0\u05d4 \u05dc\u05d0\u05d5\u05ea\u05d4 \u05ea\u05e7\u05d5\u05e4\u05d4'}
-                  {selectedMonth && (<InfoTip text={`\u05de\u05e9\u05d5\u05d5\u05d4 \u05de\u05d5\u05dc \u05d0\u05d5\u05ea\u05d4 \u05ea\u05e7\u05d5\u05e4\u05d4 \u05d1\u05d7\u05d5\u05d3\u05e9 \u05d4\u05e7\u05d5\u05d3\u05dd:\n\n\u05d4\u05ea\u05e7\u05d5\u05e4\u05d4 \u05d4\u05e0\u05e1\u05e7\u05e8\u05ea: ${formatMonth(selectedMonth)}\n\u05ea\u05e7\u05d5\u05e4\u05ea \u05d4\u05e9\u05d5\u05d5\u05d0\u05d4: ${formatMonth(getPrevMonth(selectedMonth))}\n\n\u05d4\u05dc\u05d5\u05d2\u05d9\u05e7\u05d4: \u05d4\u05de\u05e2\u05e8\u05db\u05ea \u05de\u05d6\u05d9\u05d6\u05d4 \u05d0\u05ea \u05db\u05dc \u05d4\u05d8\u05d5\u05d5\u05d7 \u05d1\u05d3\u05d9\u05d5\u05e7 \u05d7\u05d5\u05d3\u05e9 \u05d0\u05d7\u05d3 \u05d0\u05d7\u05d5\u05e8\u05d4 - \u05d2\u05dd \u05dc\u05e7\u05d8\u05e2\u05d9\u05dd \u05e7\u05e6\u05e8\u05d9\u05dd \u05db\u05de\u05d5 7 \u05d9\u05de\u05d9\u05dd \u05d0\u05d7\u05e8\u05d5\u05e0\u05d9\u05dd (\u05dc\u05d0 \u05de\u05e9\u05d5\u05d5\u05d4 \u05dc\u05e9\u05d1\u05d5\u05e2 \u05e9\u05e2\u05d1\u05e8 \u05d0\u05dc\u05d0 \u05dc\u05d0\u05d5\u05ea\u05dd \u05d4\u05d9\u05de\u05d9\u05dd \u05d1\u05d7\u05d5\u05d3\u05e9 \u05d4\u05e7\u05d5\u05d3\u05dd).`} />)}
-                </label>
-              </div>
+                <option value="today">{'📅 היום'}</option>
+                <option value="yesterday">{'אתמול'}</option>
+                <option value="last7">{'7 ימים אחרונים'}</option>
+                <option value="last30">{'30 ימים אחרונים'}</option>
+                <option value="currentMonth">{'החודש הנוכחי'}</option>
+                <option value="lastMonth">{'חודש שעבר'}</option>
+                <option value="custom">{'טווח מותאם אישית...'}</option>
+              </select>
+              {activePreset === 'custom' && (
+                <div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'6px 10px',background:'rgba(0,0,0,0.04)',borderRadius:'8px',fontSize:'0.85em'}}>
+                  <span style={{color:'var(--text-secondary)'}}>{'מ:'}</span>
+                  <input type="date" value={customSince} onChange={e => setCustomSince(e.target.value)} style={{padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em',border:'1px solid #d1d5db'}} />
+                  <span style={{color:'var(--text-secondary)'}}>{'עד:'}</span>
+                  <input type="date" value={customUntil} onChange={e => setCustomUntil(e.target.value)} style={{padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em',border:'1px solid #d1d5db'}} />
+                  <button className="btn btn-sm btn-primary" style={{padding:'4px 10px',fontSize:'0.82em'}} onClick={() => applyCustomRange()} disabled={!customSince || !customUntil || refreshing}>{'הצג'}</button>
+                </div>
+              )}
+              <label style={{fontSize:'0.9em',display:'flex',alignItems:'center',gap:6,cursor:'pointer',padding:'6px 12px',background:'rgba(59,130,246,0.08)',borderRadius:'8px',border:'1px solid rgba(59,130,246,0.2)'}}>
+                <input type="checkbox" checked={compareEnabled} onChange={e => onComparisonToggle(e.target.checked)} />
+                {'השוואה לאותה תקופה'}
+                {selectedMonth && (<InfoTip text={`משווה מול אותה תקופה בחודש הקודם:\n\nהתקופה הנסקרת: ${formatMonth(selectedMonth)}\nתקופת ההשוואה: ${formatMonth(getPrevMonth(selectedMonth))}\n\nהלוגיקה: המערכת מזיזה את כל הטווח בדיוק חודש אחורה - גם לקטעים קצרים כמו 7 ימים אחרונים (לא משווה לשבוע שעבר אלא לאותם הימים בחודש הקודם).`} />)}
+              </label>
             </div>
             {reports.length === 0 ? ((refreshing || refreshingCrm) ? <SkeletonDashboard /> : <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d3\u05d9\u05d9\u05df'}</h3><p style={{marginTop:10,color:'var(--text-secondary)'}}>{'\u05dc\u05d7\u05e5 \u05e2\u05dc \u05db\u05e4\u05ea\u05d5\u05e8 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05dc\u05de\u05e9\u05d9\u05db\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</p></div>) : renderDashboard()}
           </>)}
