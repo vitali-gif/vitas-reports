@@ -1265,7 +1265,15 @@ const selectProject = async (client, project) => {
     const trendData = allMonths.map(m => {
       let mRows = [];
       reports.filter(r => r.month === m && r.source !== 'crm' && r.source !== 'crm_reports').forEach(r => { mRows = mRows.concat(r.data || []); });
-      return { month: m, ...aggregateRows(mRows).totals };
+      let crmMRows = [];
+      reports.filter(r => r.month === m && r.source === 'crm').forEach(r => { if (r.data) crmMRows = crmMRows.concat(r.data); });
+      const crmMT = crmMRows.length > 0 ? aggregateCrmRows(crmMRows).totals : null;
+      return { month: m, ...aggregateRows(mRows).totals,
+        meetingsScheduled: crmMT?.meetingsScheduled || 0,
+        meetingsCompleted: crmMT?.meetingsCompleted || 0,
+        registrations: crmMT?.registrations || 0,
+        contracts: crmMT?.contracts || 0,
+      };
     });
 
     const t = data.totals;
@@ -1290,7 +1298,7 @@ const selectProject = async (client, project) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null;
       const v2cls = v2Color[color] || 'indigo';
       // sparkline: extract this metric's values from trendData
-      const metricKey = label === 'לידים' ? 'leads' : label === 'תקציב' ? 'spend' : label === 'עלות לליד' ? 'cpl' : null;
+      const metricKey = label === 'לידים' ? 'leads' : label === 'תקציב' ? 'spend' : label === 'עלות לליד' ? 'cpl' : label === 'פגישות שתואמו' ? 'meetingsScheduled' : label === 'פגישות שבוצעו' ? 'meetingsCompleted' : label === 'הרשמות' ? 'registrations' : label === 'חוזים' ? 'contracts' : null;
       const sparkVals = metricKey && trendData.length >= 2 ? trendData.map(d => d[metricKey] || 0) : null;
       const trendPct = ch ? (ch.pct > 0 ? '+' : '') + Math.abs(ch.pct).toFixed(0) + '%' : null;
       return (
@@ -1916,34 +1924,79 @@ const selectProject = async (client, project) => {
 
         {/* FUNNEL */}
         <div className="section">
-          <div className="section-header" style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
-            <div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udd3d'}</div>
-            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>{'\u05de\u05e9\u05e4\u05da \u05e9\u05d9\u05d5\u05d5\u05e7\u05d9'}</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>{'\u05de\u05e7\u05dc\u05d9\u05e7 \u05d5\u05e2\u05d3 \u05d7\u05d5\u05d6\u05d4'}</div></div>
+          <div className="section-head">
+            <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+            <h2>משפך שיווקי</h2>
+            <span className="sub">מקליק ועד חוזה</span>
           </div>
-          <div className="card" style={{padding:'24px'}}>
+          {crmTotals ? (
             <div className="funnel">
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(activeT.clicks)}</div><div className="funnel-label">{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</div></div>
-              <div className="funnel-arrow">&larr;</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(activeT.impressions)}</div><div className="funnel-label">{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</div></div>
-              {crmTotals ? <><div className="funnel-arrow">&larr;</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--cyan)'}}>{formatNum(crmTotals.meetingsScheduled || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05de\u05ea\u05d5\u05d0\u05de\u05d5\u05ea'}</div></div>
-              <div className="funnel-arrow">&larr;</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(crmTotals.meetingsCompleted || 0)}</div><div className="funnel-label">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5'}</div></div>
-              <div className="funnel-arrow">&larr;</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(crmTotals.registrations || 0)}</div><div className="funnel-label">{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</div></div>
-              <div className="funnel-arrow">&larr;</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-3)'}}>{formatNum(crmTotals.contracts || 0)}</div><div className="funnel-label">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div></div></> : <>
-              <div className="funnel-arrow">&larr;</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(activeT.leads)}</div><div className="funnel-label">{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</div><div className="funnel-rate">{'\u05d4\u05de\u05e8\u05d4'}: {activeT.convRate.toFixed(2)}%</div></div></>}
+              <div className="fstep rose">
+                <div className="flabel">חוזים</div>
+                <div className="fvalue">{formatNum(crmTotals.contracts || 0)}</div>
+                <div className="frate"><span className="pct">{crmTotals.registrations > 0 ? (crmTotals.contracts / crmTotals.registrations * 100).toFixed(0) + '%' : '—'}</span> מהרשמות</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep amber">
+                <div className="flabel">הרשמות</div>
+                <div className="fvalue">{formatNum(crmTotals.registrations || 0)}</div>
+                <div className="frate"><span className="pct">{crmTotals.meetingsCompleted > 0 ? (crmTotals.registrations / crmTotals.meetingsCompleted * 100).toFixed(0) + '%' : '—'}</span> משבוצעו</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep emerald">
+                <div className="flabel">פגישות שבוצעו</div>
+                <div className="fvalue">{formatNum(crmTotals.meetingsCompleted || 0)}</div>
+                <div className="frate"><span className="pct">{crmTotals.meetingsScheduled > 0 ? (crmTotals.meetingsCompleted / crmTotals.meetingsScheduled * 100).toFixed(0) + '%' : '—'}</span> ממתואמות</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep terra">
+                <div className="flabel">מתואמות</div>
+                <div className="fvalue">{formatNum(crmTotals.meetingsScheduled || 0)}</div>
+                <div className="frate"><span className="pct">{activeT.clicks > 0 ? ((crmTotals.meetingsScheduled || 0) / activeT.clicks * 100).toFixed(1) + '%' : '—'}</span> מקליק</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep sky">
+                <div className="flabel">קליקים</div>
+                <div className="fvalue">{formatNum(activeT.clicks)}</div>
+                <div className="frate"><span className="pct">{activeT.impressions > 0 ? (activeT.clicks / activeT.impressions * 100).toFixed(2) + '%' : '—'}</span> CTR</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep">
+                <div className="flabel">חשיפות</div>
+                <div className="fvalue">{formatNum(activeT.impressions)}</div>
+                <div className="frate"><span className="pct">100%</span> מצטבר</div>
+              </div>
             </div>
-            <div style={{textAlign:'center',marginTop:'10px',fontSize:'0.85em',color:'var(--text-secondary)'}}>
-              {'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpl)}</strong> &nbsp;|&nbsp; {'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'}: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpc)}</strong> &nbsp;|&nbsp; CPM: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(activeT.cpm)}</strong>
+          ) : (
+            <div className="funnel" style={{gridTemplateColumns:'1fr 14px 1fr 14px 1fr'}}>
+              <div className="fstep rose">
+                <div className="flabel">לידים</div>
+                <div className="fvalue">{formatNum(activeT.leads)}</div>
+                <div className="frate"><span className="pct">{activeT.convRate.toFixed(2)}%</span> המרה</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep sky">
+                <div className="flabel">קליקים</div>
+                <div className="fvalue">{formatNum(activeT.clicks)}</div>
+                <div className="frate"><span className="pct">{activeT.impressions > 0 ? (activeT.clicks / activeT.impressions * 100).toFixed(2) + '%' : '—'}</span> CTR</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep">
+                <div className="flabel">חשיפות</div>
+                <div className="fvalue">{formatNum(activeT.impressions)}</div>
+                <div className="frate"><span className="pct">100%</span> מצטבר</div>
+              </div>
             </div>
+          )}
+          <div className="units">
+            <div className="unit"><div className="lbl"><span className="tech">CPL</span>עלות לליד</div><div className="val"><span className="curr">₪</span>{activeT.cpl > 0 ? activeT.cpl.toLocaleString('he-IL', {maximumFractionDigits:0}) : '—'}</div></div>
+            <div className="unit"><div className="lbl"><span className="tech">CPC</span>עלות לקליק</div><div className="val"><span className="curr">₪</span>{activeT.cpc > 0 ? activeT.cpc.toLocaleString('he-IL', {maximumFractionDigits:2}) : '—'}</div></div>
+            <div className="unit"><div className="lbl"><span className="tech">CPM</span>עלות לאלף חשיפות</div><div className="val"><span className="curr">₪</span>{activeT.cpm > 0 ? activeT.cpm.toLocaleString('he-IL', {maximumFractionDigits:2}) : '—'}</div></div>
           </div>
         </div>
 
-        {/* Non-FB tabs: keep existing campaigns charts + flat table */}
-        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd'} <InfoTip text="סיכום ביצועים פר קמפיין. CPL (עלות לליד) הוא ה-KPI המרכזי" /></div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
+                {/* Non-FB tabs: keep existing campaigns charts + flat table */}
+        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
 
         {/* Nested expandable table - Campaign → Ad Set → Ad - for FB, All, Google Search */}
         {(isFb || dashTab === 'all' || dashTab === 'google_search') && campNames.length > 0 && (() => {
@@ -2011,7 +2064,7 @@ const selectProject = async (client, project) => {
           };
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udccb'}</div>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd, \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05d5\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'} <InfoTip text="טבלה מאוחדת עם כל הרמות של החשבון הפרסומי" /></div>
+              <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd, \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05d5\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</h2><span className="sub"><InfoTip text="טבלאה מאוחדת עם כל הרמות של החשבון הפרסומי" /></span></div>
               <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:'12px',textAlign:'right'}}>{'\ud83d\udca1 \u05dc\u05d7\u05e5 \u05e2\u05dc \u05e7\u05de\u05e4\u05d9\u05d9\u05df \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea, \u05d5\u05e2\u05dc \u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>
               <div className="table-wrapper">
                 <table className="data-table">
@@ -2053,7 +2106,7 @@ const selectProject = async (client, project) => {
           const sorted = [...allAGs].sort((a,b) => (b.spend || 0) - (a.spend || 0));
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83c\udfaf'}</div>{'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd - \u05e4\u05d9\u05e8\u05d5\u05d8'} <InfoTip text="Performance Max Asset Groups - התוכן והביצוע בכל קבוצה" /></div>
+              <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div><h2>קבוצות נכסים</h2><span className="sub">Performance Max Asset Groups</span></div>
               <div className="card" style={{overflowX:'auto'}}>
                 <table className="data-table"><thead><tr>
                   <th style={{whiteSpace:'nowrap'}}>{'\u05e7\u05d1\u05d5\u05e6\u05ea \u05e0\u05db\u05e1\u05d9\u05dd'}</th>
@@ -2094,7 +2147,7 @@ const selectProject = async (client, project) => {
 {false && !isPmax && !isFb && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'} <InfoTip text="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)" /></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>}
 
         {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-4)'}}>{'\ud83d\udc65'}</div>פילוח דמוגרפי <InfoTip text="התפלגות הצופים/מקליקים/לידים לפי מגדר וגיל. עוזר להבין את הקהל ולמקד את הקמפיינים." /></div>
+          <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>פילוח דמוגרפי</h2><span className="sub"><InfoTip text="התפלגות לפי מגדר וגיל" /></span></div>
         {!isPmax && genderNames.length > 0 && (() => {
           const gd = data.genders;
           const genderLabel = (g) => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : g === 'unknown' ? '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2' : g;
@@ -2158,9 +2211,10 @@ const selectProject = async (client, project) => {
             .slice(0, 5);
           return (
             <div className="section">
-              <div className="section-title">
-                <div className="section-icon" style={{background:'var(--gradient-3, linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%))'}}>{'\ud83c\udfc6'}</div>
-                {'\u05d4\u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05d4\u05db\u05d9 \u05de\u05d5\u05d1\u05d9\u05dc\u05d5\u05ea \u05d1-Facebook'} (Top {topAds.length})
+              <div className="section-head">
+                <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="8 6 2 6 2 12 8 12"/><polyline points="16 6 22 6 22 12 16 12"/><path d="M12 19v-7"/><path d="M8 19h8"/><path d="M8 12c0 2.21 1.79 4 4 4s4-1.79 4-4V6H8v6z"/></svg></div>
+                <h2>המודעות הכי מובילות ב-Facebook</h2>
+                <span className="sub">Top {topAds.length}</span>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'20px'}}>
                 {topAds.map((ad, i) => {
