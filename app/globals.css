@@ -1703,8 +1703,39 @@
   box-shadow: 0 0 0 3px var(--indigo-50);
 }
 
-/* --- Modal (used for Meta rule dialog) --- */
-.modal,
+/* --- Modal (used for add-client, add-project dialogs in admin/page.js) --- */
+/* JSX pattern: <div className={`modal-overlay ${show ? 'active' : ''}`}>
+                  <div className="modal"> ... </div>
+                </div>
+   .modal-overlay is the dim backdrop, .modal is the inner content card.
+   Hidden by default — only visible when .active class is added. */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(11,15,30,0.50);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+
+/* Inner modal card */
+.modal {
+  background: var(--card);
+  border-radius: var(--r-lg);
+  padding: 24px 28px;
+  width: 100%; max-width: 480px;
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+}
+.modal h3 {
+  font-size: 18px; font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 16px;
+}
+
+/* Meta rule dialog — different markup pattern (no .active toggle, always visible when mounted) */
 .rule-dialog-backdrop {
   position: fixed; inset: 0;
   background: rgba(11,15,30,0.50);
