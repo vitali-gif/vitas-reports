@@ -2272,3 +2272,157 @@
   margin-right: 2px; margin-left: 2px;
   letter-spacing: 0;
 }
+
+/* v2: chart card titles */
+.chart-card h4 {
+  font-size: 13px; font-weight: 700;
+  color: var(--text-2);
+  letter-spacing: -0.01em;
+  margin: 0 0 12px 0;
+  padding: 0;
+}
+
+/* ============================================================
+   CRM KPI — kpi-c cards + kpi-tier grids
+   ============================================================ */
+.kpi-tier {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.kpi-tier.primary { grid-template-columns: repeat(4, 1fr); margin-bottom: 12px; }
+.kpi-tier.compact { grid-template-columns: repeat(5, 1fr); margin-bottom: 12px; }
+.kpi-tier.compact:last-of-type { margin-bottom: 36px; }
+@media (max-width: 900px) {
+  .kpi-tier.primary { grid-template-columns: repeat(2, 1fr); }
+  .kpi-tier.compact { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 560px) {
+  .kpi-tier.primary, .kpi-tier.compact { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Compact sizing overrides */
+.kpi-tier.compact .kpi-c { padding: 12px 14px 13px; min-height: 0; }
+.kpi-tier.compact .kpi-c .ic-wrap { margin-bottom: 10px; }
+.kpi-tier.compact .kpi-c .ic { width: 28px; height: 28px; border-radius: 7px; }
+.kpi-tier.compact .kpi-c .ic svg { width: 14px; height: 14px; }
+.kpi-tier.compact .kpi-c .trend { font-size: 10.5px; padding: 2px 7px; }
+.kpi-tier.compact .kpi-c .lbl { font-size: 10px; margin-bottom: 5px; }
+.kpi-tier.compact .kpi-c .val { font-size: 20px; }
+
+.kpi-c {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow-xs);
+  position: relative;
+  overflow: hidden;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.kpi-c:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); border-color: var(--border-strong); }
+.kpi-c::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--g-indigo);
+}
+.kpi-c.indigo::before  { background: var(--g-indigo); }
+.kpi-c.emerald::before { background: var(--g-emerald); }
+.kpi-c.terra::before   { background: var(--g-terra); }
+.kpi-c.sky::before     { background: var(--g-sky); }
+.kpi-c.rose::before    { background: var(--g-rose); }
+.kpi-c.violet::before  { background: var(--g-violet); }
+.kpi-c.amber::before   { background: var(--g-amber); }
+
+.kpi-tier.primary .kpi-c { padding: 20px 22px 18px; min-height: 132px; }
+
+.kpi-c .ic-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.kpi-c .ic {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-2);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.kpi-c .ic svg { width: 16px; height: 16px; stroke-width: 1.8; fill: none; stroke: currentColor; }
+.kpi-c.indigo  .ic { background: var(--indigo-50);  color: var(--indigo);  border-color: transparent; }
+.kpi-c.emerald .ic { background: var(--emerald-50); color: var(--emerald); border-color: transparent; }
+.kpi-c.terra   .ic { background: var(--terra-50);   color: var(--terra);   border-color: transparent; }
+.kpi-c.sky     .ic { background: var(--sky-50);     color: var(--sky);     border-color: transparent; }
+.kpi-c.rose    .ic { background: var(--rose-50);    color: var(--rose);    border-color: transparent; }
+.kpi-c.violet  .ic { background: var(--violet-50);  color: var(--violet);  border-color: transparent; }
+.kpi-c.amber   .ic { background: var(--amber-50);   color: var(--amber);   border-color: transparent; }
+
+.kpi-c .trend {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 800;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--emerald-50); color: var(--emerald);
+  letter-spacing: -0.01em;
+}
+.kpi-c .trend.down { background: var(--rose-50); color: var(--rose); }
+.kpi-c .trend.flat { background: var(--surface-2); color: var(--text-3); }
+
+.kpi-c .lbl {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--text-3); text-transform: uppercase; margin-bottom: 6px;
+}
+.kpi-c .val {
+  font-size: 24px; font-weight: 800; letter-spacing: -0.03em;
+  line-height: 1; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.kpi-tier.primary .kpi-c .val { font-size: 36px; }
+.kpi-c .val .curr { font-size: 0.55em; font-weight: 700; color: var(--text-3); margin-left: 2px; }
+
+/* ============================================================
+   CRM FUNNEL — crm-funnel / crm-fstep
+   ============================================================ */
+.crm-funnel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 20px;
+  box-shadow: var(--shadow-xs);
+  display: grid;
+  grid-template-columns: 1fr 18px 1fr 18px 1fr 18px 1fr 18px 1fr 18px 1fr;
+  align-items: stretch;
+  gap: 6px;
+}
+@media (max-width: 900px) {
+  .crm-funnel { grid-template-columns: 1fr 14px 1fr 14px 1fr; }
+  .crm-funnel .crm-fstep:nth-child(n+8),
+  .crm-funnel .crm-farrow:nth-child(n+7) { display: none; }
+}
+.crm-fstep {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px 12px;
+  display: flex; flex-direction: column;
+  min-height: 100px;
+  position: relative; overflow: hidden;
+}
+.crm-fstep::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 3px; background: var(--g-indigo);
+}
+.crm-fstep.sky::before     { background: var(--g-sky); }
+.crm-fstep.terra::before   { background: var(--g-terra); }
+.crm-fstep.emerald::before { background: var(--g-emerald); }
+.crm-fstep.amber::before   { background: var(--g-amber); }
+.crm-fstep.rose::before    { background: var(--g-rose); }
+.crm-fstep.violet::before  { background: var(--g-violet); }
+.crm-fstep .v {
+  font-size: 26px; font-weight: 800; letter-spacing: -0.025em;
+  color: var(--text); font-variant-numeric: tabular-nums;
+  line-height: 1; margin-bottom: 4px; margin-top: 6px;
+}
+.crm-fstep .l {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--text-2); text-transform: uppercase; margin-top: auto;
+}
+.crm-fstep .pct { font-size: 11px; font-weight: 700; color: var(--text-3); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.crm-farrow { display: flex; align-items: center; justify-content: center; color: var(--text-4); }
+.crm-farrow svg { width: 14px; height: 14px; }

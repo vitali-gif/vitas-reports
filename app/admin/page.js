@@ -638,10 +638,7 @@ const selectProject = async (client, project) => {
 
     return (
       <div className="section">
-        <div className="section-title">
-          <div className="section-icon" style={{background:'var(--gradient-1)'}}>🏘️</div>
-          Top 10 יישובים <InfoTip text="10 הערים שמהן הגיעו הכי הרבה לידים. בסיס לבחירת אזורי גיאו-טרגטינג בקמפיינים" />
-        </div>
+        <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><h2>Top 10 יישובים</h2></div>
         <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmRepCityChart"></canvas></div></div>
           <div className="chart-card" style={{padding: '20px'}}>
@@ -797,28 +794,52 @@ const selectProject = async (client, project) => {
 
     return (
       <>
-        <div className="kpi-grid" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))'}}>
-          <div className="kpi-card"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(59,130,246,0.1)',color:'var(--accent)'}}>📊</div><div className="kpi-label">סה"כ לידים <InfoTip text="כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות." /></div><div className="kpi-value">{totalLids}</div></div>
-          <div className="kpi-card green"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(16,185,129,0.1)',color:'var(--success)'}}>✓</div><div className="kpi-label">קיבלו מענה <InfoTip text="לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות." /></div><div className="kpi-value">{respondedCount}</div></div>
-          <div className="kpi-card orange"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(245,158,11,0.1)',color:'var(--warning)'}}>⏱️</div><div className="kpi-label">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div><div className="kpi-value">{fmt(overallBusinessMin)}</div></div>
-          <div className="kpi-card purple"><div className="kpi-accent"></div><div className="kpi-icon" style={{background:'rgba(139,92,246,0.1)',color:'var(--purple)'}}>⚠️</div><div className="kpi-label">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div><div className="kpi-value">{noResponseCount}</div></div>
+                <div className="kpi-tier primary" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:'36px'}}>
+          <div className="kpi-c indigo">
+            <div className="ic-wrap">
+              <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            </div>
+            <div className="lbl">סה"כ לידים <InfoTip text="כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות." /></div>
+            <div className="val">{totalLids}</div>
+          </div>
+          <div className="kpi-c emerald">
+            <div className="ic-wrap">
+              <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            </div>
+            <div className="lbl">קיבלו מענה <InfoTip text="לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות." /></div>
+            <div className="val">{respondedCount}</div>
+          </div>
+          <div className="kpi-c terra">
+            <div className="ic-wrap">
+              <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            </div>
+            <div className="lbl">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div>
+            <div className="val">{fmt(overallBusinessMin)}</div>
+          </div>
+          <div className="kpi-c violet">
+            <div className="ic-wrap">
+              <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
+            </div>
+            <div className="lbl">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div>
+            <div className="val">{noResponseCount}</div>
+          </div>
         </div>
 
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>📈</div>התפלגות זמני תגובה <InfoTip text="התפלגות זמני התגובה הראשונים של אנשי המכירות לכל ליד שנכנס.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
+          <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>התפלגות זמני תגובה</h2></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
         </div>
 
         {dowHasData && (
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📅</div>פילוח לפי יום בשבוע <InfoTip text="כמה לידים נכנסו בכל יום בשבוע, ומתוכם כמה בסופו של דבר המירו לפגישה.\n\nחשוב: המדידה היא לפי יום כניסת הליד, לא לפי יום קביעת הפגישה. דוגמה - ליד שהגיע בשבת ואחר כך נקבעה לו פגישה ביום שני, נספר תחת 'שבת'.\n\nשימושי לזיהוי באיזה יום מגיע הקהל הכי איכותי, ולתזמון של תקציבי קמפיינים." /></div>
+            <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>פילוח לפי יום בשבוע</h2></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
           </div>
         )}
 
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>👤</div>זמן מענה לפי איש מכירות <InfoTip text="ממוצע הזמן שלוקח לכל איש מכירות לחזור ללידים החדשים שלו. מספרים קטנים = תגובה מהירה.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
+            <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><h2>זמן מענה לפי איש מכירות</h2></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -835,7 +856,7 @@ const selectProject = async (client, project) => {
             </div>
           </div>
           <div className="section">
-            <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>📡</div>הכי איטיים - לפי מקור <InfoTip text="המקורות מסודרים מהאיטי ביותר למהיר ביותר. עוזר לזהות איזה מקור מקבל טיפול לקוי.\n\nשיטת חישוב: בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00. שבת וחגי ישראל לא נספרים." /></div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="20" x2="2" y2="14"/><line x1="7" y1="20" x2="7" y2="8"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="17" y1="20" x2="17" y2="10"/><line x1="22" y1="20" x2="22" y2="2"/></svg></div><h2>הכי איטיים - לפי מקור</h2></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
                 <thead><tr><th>מקור</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
@@ -893,10 +914,7 @@ const selectProject = async (client, project) => {
 
     return (
       <div className="section">
-        <div className="section-title">
-          <div className="section-icon" style={{background:'var(--gradient-2)'}}>🚫</div>
-          התנגדויות לידים <InfoTip text="10 הסיבות הנפוצות ביותר שלידים לא ממשיכים בתהליך. עוזר לזהות חסמי מכירה ולהתאים את המסר" /> ({rowsWithObjection} מתוך {allRows.length})
-        </div>
+        <div className="section-head"><div className="ico rose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><h2>התנגדויות לידים</h2></div>
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmObjChart"></canvas></div></div>
           <div className="chart-card" style={{padding: '20px'}}>
@@ -1014,11 +1032,32 @@ const selectProject = async (client, project) => {
 
     const crmKpi = (label, value, color, current, prev, isCost, tip) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null;
-      const icons = { 'סה"כ לידים': 'בש', 'רלוונטיים': '✅', 'לא רלוונטיים': '❌', 'פגישות שתואמו': 'פג', 'פגישות שבוצעו': 'שט', 'פגישות שבוטלו': 'בט', 'הרשמות': 'הר', 'שווי הרשמות': '₪', 'חוזים': 'חז', 'שווי חוזים': '₪', 'אחוז המרה לפגישה שתואמה': '%', 'אחוז המרה לפגישות שבוצעו': '%', '% רלוונטיות': '%', 'עלות פגישה שבוצעה': '₪' };
-      const icon = icons[label] || '\ud83d\udcca';
-      const kpiColors = { green: 'rgba(16,185,129,0.1)', purple: 'rgba(139,92,246,0.1)', orange: 'rgba(245,158,11,0.1)', pink: 'rgba(236,72,153,0.1)', cyan: 'rgba(6,182,212,0.1)', red: 'rgba(239,68,68,0.1)' };
-      const kpiTextColors = { green: 'var(--success)', purple: 'var(--purple)', orange: 'var(--warning)', pink: 'var(--pink)', cyan: 'var(--cyan)', red: 'var(--danger)' };
-      return <div className={`kpi-card ${color}`} key={label}><div className="kpi-accent"></div><div className="kpi-icon" style={{background: kpiColors[color] || 'rgba(59,130,246,0.1)', color: kpiTextColors[color] || 'var(--accent)'}}>{icon}</div><div className="kpi-label">{label}{tip ? <InfoTip text={tip} /> : null}</div><div className="kpi-value">{value}</div>{ch && <div className={`kpi-change ${ch.isGood ? 'up' : 'down'}`}><span className="arrow">{ch.pct > 0 ? '\u25b2' : '\u25bc'}</span> {Math.abs(ch.pct).toFixed(1)}%</div>}</div>;
+      const sl = String(label);
+      const iconPaths =
+        sl.includes('\u05e1\u05d4') ? <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></> :
+        sl.includes('\u05ea\u05d5\u05d0\u05de') ? <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="8 15 11 18 16 13"/></> :
+        sl.includes('\u05d1\u05d5\u05e6\u05e2') ? <path d="M11 17l2 2a1 1 0 0 0 1.42 0l4.16-4.16a2 2 0 0 0 0-2.84L15 8h-3a2 2 0 0 0-1.42.59L9 10"/> :
+        sl.includes('\u05d1\u05d5\u05d8\u05dc') ? <><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></> :
+        sl.includes('\u05dc\u05d0 \u05e8') ? <><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></> :
+        sl.includes('\u05e8\u05dc\u05d5\u05d5') ? <polyline points="20 6 9 17 4 12"/> :
+        sl.includes('\u05d4\u05e8\u05e9\u05de') ? <><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></> :
+        sl.includes('\u05d7\u05d5\u05d6') ? <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></> :
+        sl.includes('\u05e9\u05d5\u05d5\u05d9') ? <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/> :
+        sl.includes('\u05e2\u05dc\u05d5\u05ea') ? <><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></> :
+        (sl.includes('%') || sl.includes('\u05d0\u05d7\u05d5\u05d6')) ? <><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></> :
+        <><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></>;
+      const crmV2Color = { green:'emerald', orange:'terra', pink:'rose', purple:'violet', cyan:'sky', red:'amber', '':'indigo' };
+      const v2cls = crmV2Color[color] || 'indigo';
+      return (
+        <div className={`kpi-c ${v2cls}`} key={label}>
+          <div className="ic-wrap">
+            <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{iconPaths}</svg></div>
+            {ch ? <span className={`trend${ch.pct===0?' flat':ch.isGood===false?' down':''}`}>{ch.pct>0?'+':''}{ch.pct===0?'0%':Math.abs(ch.pct).toFixed(0)+'%'}</span> : null}
+          </div>
+          <div className="lbl">{label}{tip ? <InfoTip text={tip} /> : null}</div>
+          <div className="val">{value}</div>
+        </div>
+      );
     };
 
     const sourceEntries = Object.entries(crmData.sources).sort((a, b) => b[1].totalLeads - a[1].totalLeads);
@@ -1036,53 +1075,72 @@ const selectProject = async (client, project) => {
 
     return (
       <>
-        <div className="kpi-grid">
+        <div className="kpi-tier primary">
           {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), '', ct.totalLeads, cp?.totalLeads)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
           {crmKpi('\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.irrelevantLeads), 'red', ct.irrelevantLeads, cp?.irrelevantLeads, true)}
           {crmKpi('% \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d5\u05ea', ct.relevantRate.toFixed(1) + '%', 'cyan', ct.relevantRate, cp?.relevantRate)}
+        </div>
+        <div className="kpi-tier compact">
           {crmKpi('פגישות שתואמו', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, 'מספר הלידים בתקופה שהלקוח שלהם קבע פגישה (כולל פגישות עתידיות). השיטה: לכל LID נספרת פגישה אם הלקוח קבע פגישה בתאריך השווה או מאוחר מ-LID. ייתכן הבדל קטן (1-2) מול BMBY UI שמחריג לידים שהפכו לעסקה באותו יום או לקוחות חוזרים.')}
-          {crmKpi('פגישות שבוצעו', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'מספר הלידים בתקופה שהלקוח שלהם קיים פגישה בפועל (סטטוס: done/בוצע). השיטה: לכל LID נספרת פגישה רק אם בוצעה והתרחשה בתאריך השווה או מאוחר מה-LID. ייתכן הבדל קטן מול BMBY UI עקב חוקי דדופ שונים.')}
           {crmKpi('אחוז המרה לפגישה שתואמה', ct.scheduledRate.toFixed(1) + '%', 'pink', ct.scheduledRate, cp?.scheduledRate, false, 'אחוז הלידים שקבעו פגישה. חישוב: (פגישות שתואמו / סה"כ לידים) × 100')}
+          {crmKpi('פגישות שבוצעו', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'מספר הלידים בתקופה שהלקוח שלהם קיים פגישה בפועל (סטטוס: done/בוצע). השיטה: לכל LID נספרת פגישה רק אם בוצעה והתרחשה בתאריך השווה או מאוחר מה-LID. ייתכן הבדל קטן מול BMBY UI עקב חוקי דדופ שונים.')}
           {crmKpi('אחוז המרה לפגישות שבוצעו', ct.completedRate.toFixed(1) + '%', '', ct.completedRate, cp?.completedRate, false, 'אחוז הלידים שקיימו פגישה בפועל. חישוב: (פגישות שבוצעו / סה"כ לידים) × 100')}
           {crmKpi('עלות פגישה שבוצעה', ct.meetingsCompleted > 0 ? formatCurrency(_platformSpend / ct.meetingsCompleted) : '₪0', 'purple', 0, 0, false, 'עלות פרסום ממוצעת לכל פגישה שבוצעה. חישוב: (סה"כ הוצאה בפלטפורמה / פגישות שבוצעו)')}
+        </div>
+        <div className="kpi-tier compact">
           {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled), 'red', ct.meetingsCancelled, cp?.meetingsCancelled, true, 'מספר הלידים בתקופה שלקוח שלהם קבע פגישה שבוטלה (בתוך התקופה). הפגישה לא התקיימה.')}
           {crmKpi('\u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations)}
           {crmKpi('\u05e9\u05d5\u05d5\u05d9 \u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', formatCurrency(ct.registrationValue), 'purple', ct.registrationValue, cp?.registrationValue)}
           {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'cyan', ct.contracts, cp?.contracts)}
           {crmKpi('\u05e9\u05d5\u05d5\u05d9 \u05d7\u05d5\u05d6\u05d9\u05dd', formatCurrency(ct.contractValue), 'orange', ct.contractValue, cp?.contractValue)}
-          
         </div>
+
 
         {/* CRM Funnel */}
         <div className="section">
-          <div className="section-header" style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}}>
-            <div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\uddc2\ufe0f'}</div>
-            <div><h2 style={{fontSize:'1.3em',fontWeight:700,color:'var(--primary)',margin:0}}>{'\u05de\u05e9\u05e4\u05da \u05dc\u05d9\u05d3\u05d9\u05dd'}</h2><div style={{fontSize:'0.85em',color:'var(--text-secondary)'}}>{'\u05dd\u05dc\u05d9\u05d3 \u05d5\u05e2\u05d3 \u05d7\u05d5\u05d6\u05d4'}</div></div>
-          </div>
-          <div className="card" style={{padding:'24px'}}>
-            <div className="funnel">
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-1)'}}>{formatNum(ct.totalLeads)}</div><div className="funnel-label">{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</div></div>
-              <div className="funnel-arrow">{'\u2190'}</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--accent)',opacity:0.85}}>{formatNum(ct.relevantLeads)}</div><div className="funnel-label">{'\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</div><div className="funnel-rate">{ct.relevantRate.toFixed(1)}%</div></div>
-              <div className="funnel-arrow">{'\u2190'}</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--purple)'}}>{formatNum(ct.meetingsScheduled)}</div><div className="funnel-label">{'\u05ea\u05d5\u05d0\u05de\u05d5'}</div><div className="funnel-rate">{ct.scheduledRate.toFixed(1)}%</div></div>
-              <div className="funnel-arrow">{'\u2190'}</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-2)'}}>{formatNum(ct.meetingsCompleted)}</div><div className="funnel-label">{'\u05d1\u05d5\u05e6\u05e2\u05d5'}</div><div className="funnel-rate">{ct.completedRate.toFixed(1)}%</div></div>
-              <div className="funnel-arrow">{'\u2190'}</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-4)'}}>{formatNum(ct.registrations)}</div><div className="funnel-label">{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</div></div>
-              <div className="funnel-arrow">{'\u2190'}</div>
-              <div className="funnel-step"><div className="funnel-bar" style={{background:'var(--gradient-3)'}}>{formatNum(ct.contracts)}</div><div className="funnel-label">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div></div>
+          <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><h2>{'\u05de\u05e9\u05e4\u05da \u05dc\u05d9\u05d3\u05d9\u05dd'}</h2><span className="sub">{'\u05de\u05dc\u05d9\u05d3 \u05d5\u05e2\u05d3 \u05d7\u05d5\u05d6\u05d4'}</span></div>
+          <div className="crm-funnel">
+            <div className="crm-fstep rose">
+              <div className="v">{formatNum(ct.contracts)}</div>
+              <div className="l">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div>
+              <div className="pct">{ct.registrations > 0 ? (ct.contracts / ct.registrations * 100).toFixed(0) + '%' : '\u2014'}</div>
             </div>
-            <div style={{textAlign:'center',marginTop:'10px',fontSize:'0.85em',color:'var(--text-secondary)'}}>
-              {'\u05e9\u05d5\u05d5\u05d9 \u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(ct.registrationValue)}</strong> &nbsp;|&nbsp; {'\u05e9\u05d5\u05d5\u05d9 \u05d7\u05d5\u05d6\u05d9\u05dd'}: <strong style={{color:'var(--accent-dark)'}}>{formatCurrency(ct.contractValue)}</strong>
+            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+            <div className="crm-fstep amber">
+              <div className="v">{formatNum(ct.registrations)}</div>
+              <div className="l">{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</div>
+              <div className="pct">{ct.meetingsCompleted > 0 ? (ct.registrations / ct.meetingsCompleted * 100).toFixed(0) + '%' : '\u2014'}</div>
+            </div>
+            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+            <div className="crm-fstep emerald">
+              <div className="v">{formatNum(ct.meetingsCompleted)}</div>
+              <div className="l">{'\u05d1\u05d5\u05e6\u05e2\u05d5'}</div>
+              <div className="pct">{ct.meetingsScheduled > 0 ? (ct.meetingsCompleted / ct.meetingsScheduled * 100).toFixed(0) + '%' : '\u2014'}</div>
+            </div>
+            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+            <div className="crm-fstep terra">
+              <div className="v">{formatNum(ct.meetingsScheduled)}</div>
+              <div className="l">{'\u05ea\u05d5\u05d0\u05de\u05d5'}</div>
+              <div className="pct">{ct.totalLeads > 0 ? ct.scheduledRate.toFixed(0) + '%' : '\u2014'}</div>
+            </div>
+            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+            <div className="crm-fstep">
+              <div className="v">{formatNum(ct.relevantLeads)}</div>
+              <div className="l">{'\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</div>
+              <div className="pct">{ct.totalLeads > 0 ? ct.relevantRate.toFixed(0) + '%' : '\u2014'}</div>
+            </div>
+            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+            <div className="crm-fstep sky">
+              <div className="v">{formatNum(ct.totalLeads)}</div>
+              <div className="l">{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</div>
+              <div className="pct">100%</div>
             </div>
           </div>
-        </div>
 
         {/* CRM Table by Source */}
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>{'\ud83d\udcca'}</div>{'\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05e4\u05d9 \u05de\u05e7\u05d5\u05e8 \u05d4\u05d2\u05e2\u05d4'} <InfoTip text="פירוט לידים, רלוונטיים, פגישות וחוזים לפי מקור (פייסבוק/גוגל/יד2). הבסיס לחישוב ROI פר מקור" /></div>
+          <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>נתונים לפי מקור הגעה</h2><span className="sub"> <InfoTip text="פירוט לידים, רלוונטיים, פגישות וחוזים לפי מקור" /></span></div>
           <div className="table-wrapper">
             <table className="data-table">
               <thead><tr>
@@ -1172,9 +1230,9 @@ const selectProject = async (client, project) => {
 
         {/* CRM Charts */}
         <div className="section">
-          <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-2)'}}>{'\ud83d\udcc8'}</div>{'\u05d2\u05e8\u05e4\u05d9\u05dd'} <InfoTip text="הצגה ויזואלית של ההמרות, האיכות, וההתפלגות לפי מקור" /></div>
+          <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>גרפים</h2></div>
           <div className="chart-grid" style={{gridTemplateColumns: '1fr'}}>
-            <div className="chart-card"><h4>{'\ud83e\udde9 \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05dc\u05d9\u05d3\u05d9\u05dd'}</h4><div className="chart-container"><canvas id="crmPieChart"></canvas></div></div>
+            <div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05dc\u05d9\u05d3\u05d9\u05dd'}</h4><div className="chart-container"><canvas id="crmPieChart"></canvas></div></div>
           </div>
         </div>
       </>
@@ -1741,7 +1799,7 @@ const selectProject = async (client, project) => {
 
           return (
             <div className="section">
-              <div className="section-title"><div className="section-icon" style={{background:'var(--gradient-1)'}}>💡</div>המלצות חכמות לחודש הבא <InfoTip text={`המלצות אישיות שנוצרות מתוך הנתונים של 60 הימים האחרונים — לא תלוי בחודש הנבחר בדשבורד. חלון של 60 יום נותן בסיס נתונים יציב לזיהוי דפוסים.\n\nההמלצות מחולקות לפי תפקיד: משרד פרסום, מנהל קמפיינים, מנהל שיווק, ואיש מכירות. אם תפקיד מסוים לא מציג המלצות - אין דפוס מובהק מספיק לאותו תפקיד בנתונים.\n\nסך תקציב בחלון: ₪${Math.round(_totalSpend).toLocaleString('he-IL')} · עלות פגישה: ${_costPerMeeting > 0 ? '₪' + Math.round(_costPerMeeting).toLocaleString('he-IL') : 'לא ידוע'}`} /></div>
+              <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></div><h2>המלצות חכמות לחודש הבא</h2></div>
 
               <div className="client-tabs rec-subtabs" style={{marginBottom: 18}}>
                 <button className={`client-tab ${recSubTab === 'new' ? 'active' : ''}`} onClick={() => setRecSubTab('new')}>
@@ -1996,7 +2054,7 @@ const selectProject = async (client, project) => {
         </div>
 
                 {/* Non-FB tabs: keep existing campaigns charts + flat table */}
-        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid"><div className="chart-card"><h4>{'\ud83d\udcca \u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\ud83d\udcb0 \u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
+        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid"><div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
 
         {/* Nested expandable table - Campaign → Ad Set → Ad - for FB, All, Google Search */}
         {(isFb || dashTab === 'all' || dashTab === 'google_search') && campNames.length > 0 && (() => {
@@ -2189,12 +2247,12 @@ const selectProject = async (client, project) => {
             </div></div>
             {dashTab !== 'all' && dashTab !== 'facebook' && (<>
             <div className="chart-grid">
-              <div className="chart-card"><h4>{'\ud83d\udcb0 \u05d4\u05d5\u05e6\u05d0\u05d4 \u05d5\u05dc\u05d9\u05d3\u05d9\u05dd'}</h4><div className="chart-container"><canvas id="ageSpendLeads"></canvas></div></div>
-              <div className="chart-card"><h4>{'\ud83d\udcc8 \u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3 (CPL)'}</h4><div className="chart-container"><canvas id="ageCPL"></canvas></div></div>
+              <div className="chart-card"><h4>{'\u05d4\u05d5\u05e6\u05d0\u05d4 \u05d5\u05dc\u05d9\u05d3\u05d9\u05dd'}</h4><div className="chart-container"><canvas id="ageSpendLeads"></canvas></div></div>
+              <div className="chart-card"><h4>{'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3 (CPL)'}</h4><div className="chart-container"><canvas id="ageCPL"></canvas></div></div>
             </div>
             <div className="chart-grid">
-              <div className="chart-card"><h4>{'\ud83d\uddb1 CTR \u05d1\u05d0\u05d7\u05d5\u05d6 \u05d4\u05de\u05e8\u05d4'}</h4><div className="chart-container"><canvas id="ageRates"></canvas></div></div>
-              <div className="chart-card"><h4>{'\ud83d\udce1 CPM'}</h4><div className="chart-container"><canvas id="ageCPM"></canvas></div></div>
+              <div className="chart-card"><h4>CTR \u05d1\u05d0\u05d7\u05d5\u05d6 \u05d4\u05de\u05e8\u05d4</h4><div className="chart-container"><canvas id="ageRates"></canvas></div></div>
+              <div className="chart-card"><h4>CPM</h4><div className="chart-container"><canvas id="ageCPM"></canvas></div></div>
             </div>
             </>)}
           </div>);
@@ -2285,10 +2343,7 @@ const selectProject = async (client, project) => {
           if (groups.length === 0) return null;
           return (
             <div className="section">
-              <div className="section-title">
-                <div className="section-icon" style={{background:'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)'}}>{'\ud83c\udfaf'}</div>
-                {'\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd \u05e4\u05e2\u05d9\u05dc\u05d5\u05ea (PMax)'} ({groups.length})
-              </div>
+              <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים Google Search</h2></div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
                   // Handle both old field names (imageUrl, type) and new GAQL names (image_url, field_type)
