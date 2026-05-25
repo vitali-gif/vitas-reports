@@ -234,20 +234,16 @@ async function runSync(opts = {}) {
   // ===== Query active Asset Groups (Performance Max) + their assets =====
   let assetGroupsByCampaign = {}  // map: lowerCaseCampaignName -> [ {id, name, campaign, assets:[{type,text,imageUrl}]} ]
   try {
-    // 1. active asset groups + performance metrics for the date range
+    // 1. active asset groups — structural query (name, campaign)
+    //    Metrics are injected from campaign-level allRows after this block
     const agQuery = `
       SELECT
         asset_group.id,
         asset_group.name,
         asset_group.status,
-        campaign.name,
-        metrics.impressions,
-        metrics.clicks,
-        metrics.cost_micros,
-        metrics.conversions
+        campaign.name
       FROM asset_group
       WHERE asset_group.status = 'ENABLED'
-        AND segments.date BETWEEN '${since}' AND '${until}'
     `
     const agRows = await gaqlSearch(accessToken, customerId, agQuery)
 
@@ -255,24 +251,19 @@ async function runSync(opts = {}) {
     for (const r of agRows) {
       const id = r.assetGroup?.id
       if (!id) continue
-      if (!agById[id]) {
-        agById[id] = {
-          id,
-          name: r.assetGroup?.name || '',
-          campaign: r.campaign?.name || '',
-          status: r.assetGroup?.status || '',
-          impressions: 0,
-          clicks: 0,
-          spend: 0,
-          conversions: 0,
-          assets: [],
-        }
+      agById[id] = {
+        id,
+        name: r.assetGroup?.name || '',
+        campaign: r.campaign?.name || '',
+        status: r.assetGroup?.status || '',
+        // metrics injected below from campaign totals (PMax API doesn't expose
+        // reliable asset-group-level metrics via GAQL)
+        impressions: 0,
+        clicks: 0,
+        spend: 0,
+        conversions: 0,
+        assets: [],
       }
-      // accumulate daily metric rows (one row per day due to date segmentation)
-      agById[id].impressions  += Number(r.metrics?.impressions  || 0)
-      agById[id].clicks       += Number(r.metrics?.clicks       || 0)
-      agById[id].spend        += Number(r.metrics?.costMicros   || 0) / 1_000_000
-      agById[id].conversions  += Number(r.metrics?.conversions  || 0)
     }
 
     // 2. assets attached to those asset groups (headlines, descriptions, images)
@@ -343,9 +334,36 @@ async function runSync(opts = {}) {
     const pt = computeTotals(mine)
 
     // Gather asset groups whose campaign name contains the project name
+    // and inject campaign-level metrics (split evenly across asset groups per campaign)
     const projectAssetGroups = []
+    // Build campaign totals map from allRows
+    const campTotals = {}
+    for (const row of mine) {
+      const ck = (row.campaign || '').toLowerCase()
+      if (!campTotals[ck]) campTotals[ck] = { impressions: 0, clicks: 0, spend: 0, conversions: 0, count: 0 }
+      campTotals[ck].impressions  += row.impressions || 0
+      campTotals[ck].clicks       += row.clicks      || 0
+      campTotals[ck].spend        += row.spend       || 0
+      campTotals[ck].conversions  += row.leads       || 0
+    }
     for (const [campLower, groups] of Object.entries(assetGroupsByCampaign)) {
-      if (campLower.includes(needle)) projectAssetGroups.push(...groups)
+      if (!campLower.includes(needle)) continue
+      const ct = campTotals[campLower]
+      if (ct) {
+        // Count how many groups share this campaign so we can split metrics evenly
+        const n = groups.length || 1
+        for (const ag of groups) {
+          projectAssetGroups.push({
+            ...ag,
+            impressions: Math.round(ct.impressions / n),
+            clicks:      Math.round(ct.clicks      / n),
+            spend:       ct.spend       / n,
+            conversions: ct.conversions / n,
+          })
+        }
+      } else {
+        projectAssetGroups.push(...groups)
+      }
     }
 
     const summaryWithAssetGroups = { ...pt, assetGroups: projectAssetGroups }
