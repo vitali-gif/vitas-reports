@@ -2697,6 +2697,7 @@ const selectProject = async (client, project) => {
           onAddClient={() => setShowAddClient(true)}
           onAddProject={() => setShowAddProject(true)}
           footerText="VITAS Reports v3.2"
+          lockedProjects={['ONCE', 'REHAVIA']}
         />
 
         <div className="main-content">

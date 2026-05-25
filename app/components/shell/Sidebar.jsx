@@ -25,6 +25,7 @@ export default function Sidebar({
   onSelectProject,
   onAddClient,
   onAddProject,
+  lockedProjects = [],
   footerText = 'VITAS Reports v3.2',
 }) {
   return (
@@ -60,25 +61,32 @@ export default function Sidebar({
 
                 {isActive && (client.projects || []).map((project) => {
                   const isCurrent = project.name === activeProject;
+                  const isLocked = lockedProjects.includes(project.name);
                   return (
                     <div
                       key={project.id || project.name}
-                      className={`project-item ${isCurrent ? 'active' : ''}`}
-                      onClick={() => onSelectProject?.(client, project)}
+                      className={`project-item ${isCurrent ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
+                      onClick={() => !isLocked && onSelectProject?.(client, project)}
+                      title={isLocked ? 'פרויקט נעול' : undefined}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '8px 14px 8px 24px',
                         marginRight: 14,
-                        color: isCurrent ? 'white' : 'var(--side-fg)',
+                        color: isLocked ? 'var(--side-fg-mute)' : isCurrent ? 'white' : 'var(--side-fg)',
                         fontWeight: isCurrent ? 700 : 500, fontSize: 13,
                         background: isCurrent ? 'var(--side-active)' : 'transparent',
                         borderRadius: 8,
-                        cursor: 'pointer',
+                        cursor: isLocked ? 'not-allowed' : 'pointer',
                         borderRight: isCurrent ? '2px solid var(--indigo)' : '2px solid transparent',
+                        opacity: isLocked ? 0.45 : 1,
                         transition: 'all var(--dur) var(--ease-out)',
                       }}
                     >
-                      {project.icon || '🏗️'} <span dir="ltr">{project.name}</span>
+                      {isLocked
+                        ? <span style={{ fontSize: 12, opacity: 0.7 }}>🔒</span>
+                        : (project.icon || '🏗️')
+                      }
+                      <span dir="ltr">{project.name}</span>
                     </div>
                   );
                 })}
