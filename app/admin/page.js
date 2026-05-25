@@ -239,7 +239,7 @@ export default function AdminPage() {
     // What do we already have cached in 'reports' for this period?
     const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
     const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google'));
-    const CRM_SCHEMA_VERSION = 3;  // keep in sync with route.js + useEffect below
+    const CRM_SCHEMA_VERSION = 4;  // keep in sync with route.js + useEffect below
     const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
     const haveCrm = !!crmRow && (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION;
     const haveAll = haveFb && haveGoog && haveCrm;
@@ -521,7 +521,7 @@ const selectProject = async (client, project) => {
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
     const hasGoogle = reports.some(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-    const CRM_SCHEMA_VERSION = 3  // must match server-side route in api/bmby/fetch
+    const CRM_SCHEMA_VERSION = 4  // must match server-side route in api/bmby/fetch
     const crmRow = reports.find(r => r.month === selectedMonth && r.source === 'crm')
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
     const hasCrm = !!crmRow && cachedCrmVersion >= CRM_SCHEMA_VERSION;

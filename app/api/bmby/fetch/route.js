@@ -776,13 +776,12 @@ async function runSync(opts = {}) {
     }
 
     // Build client_id -> full name map for namedLeads modal labels
+    // Enrich from all available sources: clients + contracts + price_offers
     const clientName = new Map()
-    for (const c of clients) {
-      const cid = String(c.client_id || '')
-      if (!cid) continue
-      const name = ((c.client_fname || '') + ' ' + (c.client_lname || '')).trim()
-      if (name) clientName.set(cid, name)
-    }
+    const _nameFromObj = (o) => ((o.client_fname || o.fname || '') + ' ' + (o.client_lname || o.lname || '')).trim()
+    for (const c of clients)   { const cid = String(c.client_id || ''); const n = _nameFromObj(c); if (cid && n) clientName.set(cid, n) }
+    for (const k of contracts) { const cid = String(k.client_id || ''); const n = _nameFromObj(k); if (cid && n && !clientName.has(cid)) clientName.set(cid, n) }
+    for (const po of prices)   { const cid = String(po.client_id || ''); const n = _nameFromObj(po); if (cid && n && !clientName.has(cid)) clientName.set(cid, n) }
 
     // Build namedLeads arrays — used by the dashboard's clickable KPI cards modal
     const _noResponseCids = new Set()
@@ -810,12 +809,17 @@ async function runSync(opts = {}) {
         .map(lid => clientName.get(String(lid.client_id || '')) || `ליד #${lid.client_id}`)
         .filter(Boolean),
       registrations: pricesInRange
-        .map(po => clientName.get(String(po.client_id || '')) || `ליד #${po.client_id}`)
+        .map(po => {
+          return ((po.client_fname || '') + ' ' + (po.client_lname || '')).trim()
+            || clientName.get(String(po.client_id || ''))
+            || `ליד #${po.client_id}`
+        })
         .filter(Boolean),
       contracts: contractsInRange
         .map(k => {
-          const cid = String(k.client_id || '')
-          const name = clientName.get(cid) || `ליד #${k.client_id}`
+          const name = ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim()
+            || clientName.get(String(k.client_id || ''))
+            || `ליד #${k.client_id}`
           const val = k.price_agreement_inc_vat || k.final_price_inc_vat || k.list_price || k.price_agreement || k.final_price || null
           return val ? `${name} (\u20aa${Number(val).toLocaleString('he-IL')})` : name
         })
@@ -830,7 +834,7 @@ async function runSync(opts = {}) {
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
-    const CRM_SCHEMA_VERSION = 3  // v3: namedLeads arrays for modal KPI cards (2026-05-25)
+    const CRM_SCHEMA_VERSION = 4  // v4: clientName from contracts+prices (full name coverage)
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
