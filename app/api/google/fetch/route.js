@@ -234,15 +234,20 @@ async function runSync(opts = {}) {
   // ===== Query active Asset Groups (Performance Max) + their assets =====
   let assetGroupsByCampaign = {}  // map: lowerCaseCampaignName -> [ {id, name, campaign, assets:[{type,text,imageUrl}]} ]
   try {
-    // 1. active asset groups
+    // 1. active asset groups + performance metrics for the date range
     const agQuery = `
       SELECT
         asset_group.id,
         asset_group.name,
         asset_group.status,
-        campaign.name
+        campaign.name,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions
       FROM asset_group
       WHERE asset_group.status = 'ENABLED'
+        AND segments.date BETWEEN '${since}' AND '${until}'
     `
     const agRows = await gaqlSearch(accessToken, customerId, agQuery)
 
@@ -250,13 +255,24 @@ async function runSync(opts = {}) {
     for (const r of agRows) {
       const id = r.assetGroup?.id
       if (!id) continue
-      agById[id] = {
-        id,
-        name: r.assetGroup?.name || '',
-        campaign: r.campaign?.name || '',
-        status: r.assetGroup?.status || '',
-        assets: [],
+      if (!agById[id]) {
+        agById[id] = {
+          id,
+          name: r.assetGroup?.name || '',
+          campaign: r.campaign?.name || '',
+          status: r.assetGroup?.status || '',
+          impressions: 0,
+          clicks: 0,
+          spend: 0,
+          conversions: 0,
+          assets: [],
+        }
       }
+      // accumulate daily metric rows (one row per day due to date segmentation)
+      agById[id].impressions  += Number(r.metrics?.impressions  || 0)
+      agById[id].clicks       += Number(r.metrics?.clicks       || 0)
+      agById[id].spend        += Number(r.metrics?.costMicros   || 0) / 1_000_000
+      agById[id].conversions  += Number(r.metrics?.conversions  || 0)
     }
 
     // 2. assets attached to those asset groups (headlines, descriptions, images)
