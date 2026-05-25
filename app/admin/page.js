@@ -166,6 +166,11 @@ export default function AdminPage() {
     if (preset === 'last30') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-30); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
     if (preset === 'currentMonth') { const start = new Date(today.getFullYear(), today.getMonth(), 1); const s = toYMD(start), e = toYMD(today); return { payload: { since: s, until: e }, key: s + '_' + e }; }
     if (preset === 'lastMonth') { const y = today.getMonth()===0 ? today.getFullYear()-1 : today.getFullYear(); const m = today.getMonth()===0 ? 12 : today.getMonth(); const mm = String(m).padStart(2,'0'); return { payload: { month: `${y}-${mm}` }, key: `${y}-${mm}` }; }
+    if (preset === 'last14') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-14); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
+    if (preset === 'last28') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-28); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
+    if (preset === 'last90') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-90); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
+    if (preset === 'currentYear') { const start = new Date(today.getFullYear(), 0, 1); const s = toYMD(start), e = toYMD(today); return { payload: { since: s, until: e }, key: s + '_' + e }; }
+    if (preset === 'lastYear') { const y = today.getFullYear()-1; const s = toYMD(new Date(y,0,1)), e = toYMD(new Date(y,11,31)); return { payload: { since: s, until: e }, key: s + '_' + e }; }
     return null;
   };
 
@@ -281,10 +286,13 @@ export default function AdminPage() {
     if (ok) setSelectedMonth(r.key);
   };
 
-  const applyCustomRange = async () => {
-    if (!customSince || !customUntil) return;
-    const payload = { since: customSince, until: customUntil };
-    const targetKey = customSince + '_' + customUntil;
+  const applyCustomRange = async (sinceParam, untilParam) => {
+    const s = sinceParam || customSince;
+    const u = untilParam || customUntil;
+    if (!s || !u) return;
+    if (sinceParam) { setCustomSince(sinceParam); setCustomUntil(untilParam); }
+    const payload = { since: s, until: u };
+    const targetKey = s + '_' + u;
     setSelectedMonth(targetKey);
     const ok = await triggerFetch(payload);
     if (ok) setSelectedMonth(targetKey);
@@ -592,8 +600,38 @@ const selectProject = async (client, project) => {
   const createChart = (id, type, labels, datasets, scalesConfig) => {
     const canvas = document.getElementById(id);
     if (!canvas) return;
-    const config = { type, data: { labels, datasets }, plugins: [arcLabelsPlugin], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', rtl: true, labels: { font: { family: 'Heebo' } } } } } };
-    if (type !== 'doughnut' && type !== 'pie') { config.options.scales = scalesConfig || { y: { beginAtZero: true, position: 'right' } }; }
+    const isDoughnut = type === 'doughnut' || type === 'pie';
+    const enhancedDatasets = datasets.map(ds => isDoughnut
+      ? { borderColor: '#FFFFFF', borderWidth: 3, hoverOffset: 8, ...ds }
+      : { borderRadius: 4, ...ds });
+    const tooltipCfg = {
+      backgroundColor: '#0B0F1E', titleColor: '#FFFFFF', bodyColor: '#C9CEDC',
+      borderColor: 'transparent', cornerRadius: 8, padding: 10,
+      titleFont: { size: 12, weight: '700' }, bodyFont: { size: 12, weight: '500' },
+      displayColors: true, boxPadding: 6, rtl: true, textDirection: 'rtl',
+    };
+    const legendCfg = {
+      position: 'bottom', rtl: true, textDirection: 'rtl',
+      labels: { boxWidth: 10, boxHeight: 10, padding: 14,
+        font: { weight: '600', size: 11 }, usePointStyle: true,
+        pointStyle: 'rectRounded', color: '#374151' }
+    };
+    const config = {
+      type, data: { labels, datasets: enhancedDatasets },
+      plugins: [arcLabelsPlugin],
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        ...(isDoughnut && { cutout: '62%' }),
+        plugins: { legend: legendCfg, tooltip: tooltipCfg },
+      }
+    };
+    if (!isDoughnut) {
+      config.options.scales = scalesConfig || {
+        y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
+             ticks: { font: { size: 11 }, color: '#6B7280' } },
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#6B7280' } }
+      };
+    }
     const chart = new Chart(canvas, config);
     chartsRef.current.push(chart);
   };
@@ -644,7 +682,7 @@ const selectProject = async (client, project) => {
           <div className="chart-card" style={{padding: '20px'}}>
             <ol style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '15px'}}>
               {cityEntries.map(([name, count], i) => (
-                <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',borderBottom: i < cityEntries.length-1 ? '1px solid #eee' : 'none'}}>
+                <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',borderBottom: i < cityEntries.length-1 ? '1px solid var(--border)' : 'none'}}>
                   <span style={{display:'flex',alignItems:'center',gap:'10px'}}>
                     <span style={{display:'inline-block',width:24,height:24,borderRadius:'50%',background:COLORS[i] || 'var(--accent)',color:'#fff',fontSize:12,fontWeight:700,textAlign:'center',lineHeight:'24px'}}>{i + 1}</span>
                     <span style={{fontWeight: 600}}>{name}</span>
@@ -737,12 +775,20 @@ const selectProject = async (client, project) => {
         return tot > 0 ? Math.round((bucketMeetingWith[k] || 0) / tot * 100) : 0;
       });
       createChart('responseBucketsChart', 'bar', bucketHumanLabels, [
-        { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y', order: 2 },
-        { label: 'מתוכם - המירו לפגישה', type: 'bar', data: bucketMeetingValues, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
-        { label: '% המרה לפגישה', type: 'line', data: conversionRates, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, pointBackgroundColor: '#f59e0b', fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
+        { label: 'מספר לידים', type: 'bar', data: bucketBusinessValues, backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 38, yAxisID: 'y', order: 2 },
+        { label: 'מתוכם - המירו לפגישה', type: 'bar', data: bucketMeetingValues, backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 38, yAxisID: 'y', order: 3 },
+        { label: '% המרה לפגישה', type: 'line', data: conversionRates,
+          borderColor: '#F59E0B', backgroundColor: '#F59E0B', tension: 0.35,
+          borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: '#F59E0B', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
+          fill: false, yAxisID: 'y1', order: 1 },
       ], {
-        y: { beginAtZero: true, position: 'right', title: { display: true, text: 'מספר לידים' } },
-        y1: { beginAtZero: true, position: 'left', max: 100, title: { display: true, text: '% המרה' }, grid: { drawOnChartArea: false } },
+        x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } },
+        y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
+             title: { display: true, text: 'מספר לידים', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+        y1: { beginAtZero: true, position: 'left', max: 100,
+              title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+              ticks: { callback: v => v + '%' }, grid: { drawOnChartArea: false } },
       });
     }, 200);
 
@@ -760,12 +806,20 @@ const selectProject = async (client, project) => {
           return ld > 0 ? Math.round(sc / ld * 100) : 0;
         });
         createChart('dowChart', 'bar', labels, [
-          { label: 'לידים', type: 'bar', data: leadsData, backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y', order: 2 },
-          { label: 'מתוכם - המירו לפגישה', type: 'bar', data: schedData, backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y', order: 2 },
-          { label: '% המרה לפגישה', type: 'line', data: conv, borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 5, fill: false, tension: 0.3, yAxisID: 'y1', order: 1 },
+          { label: 'לידים', type: 'bar', data: leadsData, backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 32, yAxisID: 'y', order: 2 },
+          { label: 'מתוכם - המירו לפגישה', type: 'bar', data: schedData, backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 32, yAxisID: 'y', order: 3 },
+          { label: '% המרה לפגישה', type: 'line', data: conv,
+            borderColor: '#F59E0B', backgroundColor: '#F59E0B', tension: 0.35,
+            borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 6,
+            pointBackgroundColor: '#F59E0B', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
+            fill: false, yAxisID: 'y1', order: 1 },
         ], {
-          y: { beginAtZero: true, position: 'right', title: { display: true, text: 'כמות' } },
-          y1: { beginAtZero: true, position: 'left', max: 100, title: { display: true, text: '% המרה' }, grid: { drawOnChartArea: false } },
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
+               title: { display: true, text: 'כמות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+          y1: { beginAtZero: true, position: 'left', max: 100,
+                title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                ticks: { callback: v => v + '%' }, grid: { drawOnChartArea: false } },
         });
       }, 300);
     }
@@ -922,9 +976,9 @@ const selectProject = async (client, project) => {
               {objEntries.map(([name, count], i) => {
                 const pct = total > 0 ? (count / total * 100) : 0;
                 return (
-                  <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',borderBottom: i < objEntries.length-1 ? '1px solid #eee' : 'none'}}>
+                  <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',borderBottom: i < objEntries.length-1 ? '1px solid var(--border)' : 'none'}}>
                     <span style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                      <span style={{display:'inline-block',width:12,height:12,borderRadius:'3px',background:COLORS[i] || 'var(--accent)'}}></span>
+                      <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:24,height:24,borderRadius:'50%',background:COLORS[i] || 'var(--accent)',color:'#fff',fontSize:12,fontWeight:700,flexShrink:0}}>{i + 1}</span>
                       <span style={{fontWeight: 600}}>{name}</span>
                     </span>
                     <span style={{color: 'var(--accent)', fontWeight: 700}}>{count} <span style={{color:'#888',fontWeight:400,fontSize:12}}>({pct.toFixed(0)}%)</span></span>
@@ -1371,7 +1425,7 @@ const selectProject = async (client, project) => {
       );
     };
 
-    const buildTable = (items, prevItems, labelName, tableId) => {
+    const buildTable = (items, prevItems, labelName, tableId, source = '') => {
       if (!items || Object.keys(items).length === 0) return null;
       const cols = [{key:'name',label:labelName,get:(_,n)=>n},{key:'clicks',label:'קליקים',get:d=>d.clicks,higher:true},{key:'impressions',label:'חשיפות',get:d=>d.impressions,higher:true},{key:'cpc',label:'עלות לקליק',get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},{key:'ctr',label:'CTR',get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},{key:'cpm',label:'CPM',get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},{key:'leads',label:'לידים',get:d=>d.leads,higher:true},{key:'cpl',label:'עלות לליד',get:d=>d.leads>0?d.spend/d.leads:0,higher:false},{key:'spend',label:'תקציב שנוצל',get:d=>d.spend}];
       const sc = sortConfig[tableId];
@@ -1390,7 +1444,7 @@ const selectProject = async (client, project) => {
       const extremes = {};
       cols.forEach(c => { if (c.key === 'name' || c.key === 'spend') return; const vals = entries.map(([n,d]) => c.get(d,n)).filter(v => typeof v === 'number' && v > 0); if (vals.length < 2) return; extremes[c.key] = {min: Math.min(...vals), max: Math.max(...vals)}; });
       const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'} : {background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'}; if (val === e.min) return col.higher ? {background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'} : {background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'}; return {}; };
-      return (<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{name}</td><td style={cellBg('clicks',d.clicks)}>{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{d.leads} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>);
+      return (<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:source==='google'?'var(--sky-50)':'var(--indigo-50)',color:source==='google'?'var(--sky)':'var(--indigo)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{source==='google'?'G':'F'}</span> : null}{name}{source ? <span className={`platform-tag${source==='google'?' google':''}`} style={{marginRight:'8px'}}>{source==='google'?'GOOGLE':'FACEBOOK'}</span> : null}</td><td style={cellBg('clicks',d.clicks)}>{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{d.leads} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>);
     };
 
 
@@ -1400,18 +1454,52 @@ const selectProject = async (client, project) => {
       const campNames2 = Object.keys(data.campaigns);
       if (campNames2.length > 0) {
         createChart('campSpend', 'doughnut', campNames2, [{ data: campNames2.map(n => data.campaigns[n].spend), backgroundColor: COLORS.slice(0, campNames2.length) }]);
-        createChart('campLeads', 'bar', campNames2, [{ label: 'Leads', data: campNames2.map(n => data.campaigns[n].leads), backgroundColor: 'rgba(16,185,129,0.7)', yAxisID: 'y' }, { label: 'CPL', data: campNames2.map(n => data.campaigns[n].leads > 0 ? data.campaigns[n].spend / data.campaigns[n].leads : 0), borderColor: '#ef4444', type: 'line', yAxisID: 'y1', tension: 0.3 }], { y: { position: 'right' }, y1: { position: 'left', grid: { drawOnChartArea: false } } });
+        createChart('campLeads', 'bar', campNames2, [
+          { label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: campNames2.map(n => data.campaigns[n].leads),
+            backgroundColor: '#10B981', maxBarThickness: 80, yAxisID: 'y', order: 2 },
+          { label: 'CPL', data: campNames2.map(n => data.campaigns[n].leads > 0 ? data.campaigns[n].spend / data.campaigns[n].leads : 0),
+            type: 'line', borderColor: '#F43F5E', backgroundColor: '#F43F5E',
+            tension: 0.35, borderWidth: 2.5,
+            pointRadius: 5, pointHoverRadius: 7,
+            pointBackgroundColor: '#F43F5E', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
+            yAxisID: 'y1', order: 1 }
+        ], {
+          x: { grid: { display: false }, ticks: { font: { size: 10.5, weight: '700' } } },
+          y: { position: 'right', beginAtZero: true, grid: { color: '#F2F4F8' },
+               title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+          y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false },
+                title: { display: true, text: '\u20aa CPL', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                ticks: { callback: v => '\u20aa' + Math.round(v) } }
+        });
       }
       // gender doughnut charts removed (replaced by table)
       const an = Object.keys(data.ages).filter(a => a !== 'unknown').sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999));
       if (an.length > 0 && dashTab !== 'all' && dashTab !== 'facebook') {
-        createChart('ageSpendLeads', 'bar', an, [{ label: '\u05d4\u05d5\u05e6\u05d0\u05d4', data: an.map(a => data.ages[a].spend), backgroundColor: 'rgba(59,130,246,0.15)', borderColor: '#3b82f6', borderWidth: 2, yAxisID: 'y' }, { label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: an.map(a => data.ages[a].leads), backgroundColor: 'rgba(16,185,129,0.15)', borderColor: '#10b981', borderWidth: 2, yAxisID: 'y1' }], { y: { position: 'right', title: { display: true, text: '\u05d4\u05d5\u05e6\u05d0\u05d4 (\u20aa)' } }, y1: { position: 'left', title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd' }, grid: { drawOnChartArea: false } } });
+        createChart('ageSpendLeads', 'bar', an, [
+          { label: '\u05d4\u05d5\u05e6\u05d0\u05d4', data: an.map(a => data.ages[a].spend),
+            backgroundColor: '#6366F1', maxBarThickness: 40, yAxisID: 'y', order: 2 },
+          { label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: an.map(a => data.ages[a].leads),
+            type: 'line', borderColor: '#10B981', backgroundColor: '#10B981',
+            tension: 0.35, borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 6,
+            pointBackgroundColor: '#10B981', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
+            yAxisID: 'y1', order: 1 }],
+          { x: { grid: { display: false } },
+            y: { position: 'right', beginAtZero: true, grid: { color: '#F2F4F8' },
+                 title: { display: true, text: '\u05d4\u05d5\u05e6\u05d0\u05d4 (\u20aa)', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                 ticks: { callback: v => '\u20aa' + v.toLocaleString() } },
+            y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false },
+                  title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: 10.5, weight: '700' }, color: '#5E6478' } } });
         const ageCPLdata = an.map(a => data.ages[a].leads > 0 ? data.ages[a].spend / data.ages[a].leads : 0);
         const ageCPLcolors = ageCPLdata.map(v => v < 80 ? '#10b981' : v < 120 ? '#3b82f6' : v < 150 ? '#8b5cf6' : '#ef4444');
         const ageCPLbg = ageCPLdata.map(v => v < 80 ? 'rgba(16,185,129,0.15)' : v < 120 ? 'rgba(59,130,246,0.15)' : v < 150 ? 'rgba(139,92,246,0.15)' : 'rgba(239,68,68,0.15)');
-        createChart('ageCPL', 'bar', an, [{ label: 'CPL (\u20aa)', data: ageCPLdata, backgroundColor: ageCPLbg, borderColor: ageCPLcolors, borderWidth: 2 }]);
-        createChart('ageRates', 'bar', an, [{ label: 'CTR %', data: an.map(a => data.ages[a].impressions > 0 ? (data.ages[a].clicks / data.ages[a].impressions * 100) : 0), backgroundColor: 'rgba(6,182,212,0.15)', borderColor: '#06b6d4', borderWidth: 2 }, { label: '\u05d0\u05d7\u05d5\u05d6 \u05d4\u05de\u05e8\u05d4 %', data: an.map(a => data.ages[a].clicks > 0 ? (data.ages[a].leads / data.ages[a].clicks * 100) : 0), backgroundColor: 'rgba(139,92,246,0.15)', borderColor: '#8b5cf6', borderWidth: 2 }]);
-        createChart('ageCPM', 'bar', an, [{ label: 'CPM (\u20aa)', data: an.map(a => data.ages[a].impressions > 0 ? (data.ages[a].spend / data.ages[a].impressions * 1000) : 0), backgroundColor: 'rgba(245,158,11,0.15)', borderColor: '#f59e0b', borderWidth: 2 }]);
+        createChart('ageCPL', 'bar', an, [{ label: 'CPL (\u20aa)', data: ageCPLdata, backgroundColor: ageCPLbg, maxBarThickness: 48 }]);
+        createChart('ageRates', 'bar', an, [
+          { label: 'CTR %', data: an.map(a => data.ages[a].impressions > 0 ? (data.ages[a].clicks / data.ages[a].impressions * 100) : 0),
+            backgroundColor: '#0EA5E9', maxBarThickness: 40 },
+          { label: '\u05d0\u05d7\u05d5\u05d6 \u05d4\u05de\u05e8\u05d4 %',
+            data: an.map(a => data.ages[a].clicks > 0 ? (data.ages[a].leads / data.ages[a].clicks * 100) : 0),
+            backgroundColor: '#8B5CF6', maxBarThickness: 40 }]);
+        createChart('ageCPM', 'bar', an, [{ label: 'CPM (\u20aa)', data: an.map(a => data.ages[a].impressions > 0 ? (data.ages[a].spend / data.ages[a].impressions * 1000) : 0), backgroundColor: '#F59E0B', maxBarThickness: 48 }]);
       }
     }, 200);
 
@@ -1597,7 +1685,7 @@ const selectProject = async (client, project) => {
             const isLocking = lockingRecKey === rec.dedupKey;
             return (
               <div key={i} className="rec-card">
-                <div className="rec-title"><span className="rec-icon">{rec.icon}</span>{rec.title}</div>
+                <div className="rec-title"><span className="rec-icon">{rec.icon}</span><h3>{rec.title}</h3></div>
                 <div className="rec-body">{rec.body.map((p, j) => <p key={j}>{p}</p>)}</div>
                 {rec.suggestion && <div className="rec-suggestion">{rec.suggestion}</div>}
                 {rec.prediction && (
@@ -1651,7 +1739,7 @@ const selectProject = async (client, project) => {
                     )}
                   </div>
                 )}
-                <div className="rec-actions">
+                <div className="rec-foot">
                   {rec.type === 'creative_performance' && rec.assets && rec.assets.worst && (
                     <button
                       className="rec-auto-btn"
@@ -1687,7 +1775,7 @@ const selectProject = async (client, project) => {
                     </button>
                   )}
                   <button
-                    className="rec-lock-btn"
+                    className="btn-primary"
                     disabled={isLocking}
                     onClick={() => lockRecommendation(rec)}
                     title="נעל את ההמלצה הזאת בתוכנית העבודה — תוכל לעקוב אחרי הביצוע והאימפקט"
@@ -1747,7 +1835,7 @@ const selectProject = async (client, project) => {
                       {impact.status === 'pending' && (
                         <>
                           <div className="impact-label">{impact.label}</div>
-                          <div className="impact-sub">המדידה תופיע בעוד {impact.daysRemaining} ימים</div>
+                          <div className="impact-sub">המדידה תופיע בעוד {impact.daysRemaining} ימים</div><div style={{display:'flex',alignItems:'center',gap:'10px',marginTop:'8px'}}><div style={{flex:1,height:'4px',background:'var(--border)',borderRadius:'2px',overflow:'hidden'}}><div style={{height:'100%',background:'var(--indigo)',borderRadius:'2px',width:`${Math.max(4, Math.round((1-(impact.daysRemaining||28)/28)*100))}%`}} /></div><span style={{fontSize:'11px',fontWeight:700,color:'var(--text-3)',whiteSpace:'nowrap'}}>עוד {impact.daysRemaining} ימים</span></div>
                         </>
                       )}
                       {(impact.status === 'green' || impact.status === 'red' || impact.status === 'gray') && (
@@ -2039,7 +2127,7 @@ const selectProject = async (client, project) => {
         </div>
 
                 {/* Non-FB tabs: keep existing campaigns charts + flat table */}
-        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid"><div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns')}</div>)}
+        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid"><div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns', 'google')}</div>)}
 
         {/* Nested expandable table - Campaign → Ad Set → Ad - for FB, All, Google Search */}
         {(isFb || dashTab === 'all' || dashTab === 'google_search') && campNames.length > 0 && (() => {
@@ -2054,7 +2142,7 @@ const selectProject = async (client, project) => {
             const reach = parseFloat(r.reach) || 0;
             const clicks = parseFloat(r.clicks) || 0;
             const leads = parseFloat(r.leads) || 0;
-            if (!tree[c]) tree[c] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, adSets: {} };
+            if (!tree[c]) tree[c] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, adSets: {}, source: r.source || '' };
             tree[c].spend += spend; tree[c].impressions += imp; tree[c].reach += reach; tree[c].clicks += clicks; tree[c].leads += leads;
             if (!tree[c].adSets[a]) tree[c].adSets[a] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, ads: {} };
             tree[c].adSets[a].spend += spend; tree[c].adSets[a].impressions += imp; tree[c].adSets[a].reach += reach; tree[c].adSets[a].clicks += clicks; tree[c].adSets[a].leads += leads;
@@ -2092,7 +2180,9 @@ const selectProject = async (client, project) => {
                   <span style={{display:'inline-block', width:'18px', color:'#64748b', marginLeft:'4px'}}>
                     {hasChildren ? (isExpanded ? '\u25bc' : '\u25c0') : ''}
                   </span>
+                  {level === 0 && data.source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:data.source.includes('google')?'var(--sky-50)':'var(--indigo-50)',color:data.source.includes('google')?'var(--sky)':'var(--indigo)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{data.source.includes('google')?'G':'F'}</span> : null}
                   {name}
+                  {level === 0 && data.source ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
                 </td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
                 <td style={{fontSize}}>{formatNum(data.impressions)}</td>
@@ -2145,7 +2235,16 @@ const selectProject = async (client, project) => {
         {/* PMax: detailed asset-groups table (replaces both ad-groups + ads tables) */}
         {isPmax && (() => {
           const allAGs = displayReports.flatMap(r => r.summary?.assetGroups || []);
-          if (allAGs.length === 0) return null;
+          if (allAGs.length === 0) return (
+            <div className="section">
+              <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div><h2>\u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd</h2><span className="sub">Performance Max Asset Groups</span></div>
+              <div className="card" style={{padding:'32px',textAlign:'center',color:'var(--text-3)'}}>
+                <div style={{fontSize:'2em',marginBottom:'12px'}}>\ud83d\udce6</div>
+                <div style={{fontWeight:600,fontSize:'0.95em',color:'var(--text-2)',marginBottom:'8px'}}>\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd \u05dc\u05ea\u05e7\u05d5\u05e4\u05d4 \u05d6\u05d5</div>
+                <div style={{fontSize:'0.85em'}}>\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e0\u05d8\u05e2\u05e0\u05d5 \u05dc\u05dc\u05d0 \u05e4\u05e8\u05d8\u05d9 \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e0\u05db\u05e1\u05d9\u05dd, \u05d0\u05d5 \u05e9\u05e9\u05d9\u05e7\u05ea \u05d4-API \u05dc\u05d0 \u05d4\u05d7\u05d6\u05d9\u05e8\u05d4 \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05e4\u05e2\u05d9\u05dc\u05d5\u05ea. \u05d8\u05e2\u05df \u05de\u05d7\u05d3\u05e9 \u05d3\u05e8\u05da \u05d4\u05de\'\u05e0\u05d4 \u05db\u05d3\u05d9 \u05dc\u05e7\u05d1\u05dc \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de\u05e2\u05d5\u05d3\u05db\u05e0\u05d9\u05dd.</div>
+              </div>
+            </div>
+          );
           const sorted = [...allAGs].sort((a,b) => (b.spend || 0) - (a.spend || 0));
           return (
             <div className="section">
@@ -2191,7 +2290,9 @@ const selectProject = async (client, project) => {
 
         {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section">
           <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>פילוח דמוגרפי</h2><span className="sub">חלוקת ביצועים לפי מגדר וקבוצת גיל</span></div>
-        {!isPmax && genderNames.length > 0 && (() => {
+        <div style={{display:'flex',gap:'20px',alignItems:'flex-start'}}>
+          <div style={{flex:1,minWidth:0}}>
+          {!isPmax && genderNames.length > 0 && (() => {
           const gd = data.genders;
           const genderLabel = (g) => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : g === 'unknown' ? '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2' : g;
           const orderedKeys = ['female', 'male', 'unknown'].filter(g => gd[g]);
@@ -2216,8 +2317,9 @@ const selectProject = async (client, project) => {
             </div></div>
           </div>);
         })()}
-
-        {!isPmax && ageNames.length > 0 && (() => {
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+          {!isPmax && ageNames.length > 0 && (() => {
           const ad = data.ages;
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb; });
           return (<div>
@@ -2242,6 +2344,8 @@ const selectProject = async (client, project) => {
             </>)}
           </div>);
         })()}
+          </div>
+        </div>
         </div>)}
 
         {/* ACTIVE ADS SECTION (Facebook) - top 5 by leads, with video/image preview */}
@@ -2490,54 +2594,18 @@ const selectProject = async (client, project) => {
           {view === 'welcome' && (<div className="welcome-center"><div className="icon">{'\ud83d\udcca'}</div><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05de\u05d4\u05ea\u05e4\u05e8\u05d9\u05d8 \u05db\u05d3\u05d9 \u05dc\u05e6\u05e4\u05d5\u05ea \u05d1\u05d3\u05d5\u05d7, \u05d0\u05d5 \u05d4\u05e2\u05dc\u05d4 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd'}</p></div>)}
 
           {view === 'dashboard' && selectedProject && (<>
-            <TitleBar
+                        <TitleBar
               crumb={['סקירה', selectedProject?.name || '', '']}
               client={selectedClient?.name}
               project={selectedProject?.name}
-              dateRange={
-                selectedMonth
-                  ? selectedMonth.includes('_')
-                    ? selectedMonth.split('_')[0] + ' – ' + selectedMonth.split('_')[1]
-                    : formatMonth(selectedMonth)
-                  : activePreset === 'today' ? 'היום'
-                  : activePreset === 'yesterday' ? 'אתמול'
-                  : activePreset === 'last7' ? '7 ימים אחרונים'
-                  : activePreset === 'last30' ? '30 ימים אחרונים'
-                  : activePreset === 'currentMonth' ? 'החודש הנוכחי'
-                  : activePreset === 'lastMonth' ? 'חודש שעבר'
-                  : null
-              }
+              activePreset={activePreset}
+              since={customSince}
+              until={customUntil}
+              onApplyPreset={applyPreset}
+              onApplyRange={applyCustomRange}
               comparisonOn={compareEnabled}
               onToggleComparison={() => onComparisonToggle(!compareEnabled)}
             />
-            <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:20}}>
-              <select className="form-input" style={{width:'auto',minWidth:'180px'}} value={selectedMonth || activePreset} onChange={e => applyPreset(e.target.value)}>
-                {selectedMonth && (
-                  <option value={selectedMonth} style={{display:'none'}}>{formatMonth(selectedMonth)}</option>
-                )}
-                <option value="today">{'📅 היום'}</option>
-                <option value="yesterday">{'אתמול'}</option>
-                <option value="last7">{'7 ימים אחרונים'}</option>
-                <option value="last30">{'30 ימים אחרונים'}</option>
-                <option value="currentMonth">{'החודש הנוכחי'}</option>
-                <option value="lastMonth">{'חודש שעבר'}</option>
-                <option value="custom">{'טווח מותאם אישית...'}</option>
-              </select>
-              {activePreset === 'custom' && (
-                <div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'6px 10px',background:'rgba(0,0,0,0.04)',borderRadius:'8px',fontSize:'0.85em'}}>
-                  <span style={{color:'var(--text-secondary)'}}>{'מ:'}</span>
-                  <input type="date" value={customSince} onChange={e => setCustomSince(e.target.value)} style={{padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em',border:'1px solid #d1d5db'}} />
-                  <span style={{color:'var(--text-secondary)'}}>{'עד:'}</span>
-                  <input type="date" value={customUntil} onChange={e => setCustomUntil(e.target.value)} style={{padding:'4px 6px',borderRadius:'4px',fontSize:'0.88em',border:'1px solid #d1d5db'}} />
-                  <button className="btn btn-sm btn-primary" style={{padding:'4px 10px',fontSize:'0.82em'}} onClick={() => applyCustomRange()} disabled={!customSince || !customUntil || refreshing}>{'הצג'}</button>
-                </div>
-              )}
-              <label style={{fontSize:'0.9em',display:'flex',alignItems:'center',gap:8,cursor:'pointer',padding:'6px 12px',background:compareEnabled?'rgba(99,102,241,0.08)':'var(--surface)',borderRadius:'20px',border:'1px solid',borderColor:compareEnabled?'rgba(99,102,241,0.3)':'var(--border)',transition:'all .2s'}} onClick={() => onComparisonToggle(!compareEnabled)}>
-                <span style={{display:'inline-flex',alignItems:'center',justifyContent:compareEnabled?'flex-end':'flex-start',width:'32px',height:'18px',borderRadius:'9px',padding:'2px',background:compareEnabled?'var(--indigo)':'var(--border-strong)',transition:'background .2s',flexShrink:0}}><span style={{width:'14px',height:'14px',borderRadius:'50%',background:'white',boxShadow:'0 1px 3px rgba(0,0,0,0.25)'}}/></span>
-                {'השוואה לאותה תקופה'}
-                {selectedMonth && (<InfoTip text={`משווה מול אותה תקופה בחודש הקודם:\n\nהתקופה הנסקרת: ${formatMonth(selectedMonth)}\nתקופת ההשוואה: ${formatMonth(getPrevMonth(selectedMonth))}\n\nהלוגיקה: המערכת מזיזה את כל הטווח בדיוק חודש אחורה - גם לקטעים קצרים כמו 7 ימים אחרונים (לא משווה לשבוע שעבר אלא לאותם הימים בחודש הקודם).`} />)}
-              </label>
-            </div>
             {reports.length === 0 ? ((refreshing || refreshingCrm) ? <SkeletonDashboard /> : <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d3\u05d9\u05d9\u05df'}</h3><p style={{marginTop:10,color:'var(--text-secondary)'}}>{'\u05dc\u05d7\u05e5 \u05e2\u05dc \u05db\u05e4\u05ea\u05d5\u05e8 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05dc\u05de\u05e9\u05d9\u05db\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</p></div>) : renderDashboard()}
           </>)}
 

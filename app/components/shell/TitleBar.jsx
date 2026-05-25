@@ -1,27 +1,33 @@
 'use client'
+import DatePicker from './DatePicker'
 
-// VITAS v2 TitleBar — extracted from design_handoff_vitas_hitech_refresh/screen-2-hakol-v2.html
-// Shows breadcrumb above H1, with period pill + comparison toggle on the right.
+// VITAS v2 TitleBar — breadcrumb + H1 + date picker + comparison toggle
 //
-// Drop-in usage from admin/page.js:
+// Usage from admin/page.js:
 //   <TitleBar
-//     crumb={['סקירה חודשית', 'HI PARK', '5 חודשים']}
+//     crumb={['סקירה', 'HI PARK', '']}
 //     client={'ש.ברוך'}
 //     project={'HI PARK'}
-//     dateRange={'19.05.26 – 19.10.26'}
-//     comparisonOn={true}
-//     onToggleComparison={() => setCompare(c => !c)}
-//     onClickDateRange={() => setDatePickerOpen(true)}
+//     activePreset={'lastMonth'}
+//     since={''}
+//     until={''}
+//     onApplyPreset={(key) => applyPreset(key)}
+//     onApplyRange={(s, u) => applyCustomRange(s, u)}
+//     comparisonOn={compareEnabled}
+//     onToggleComparison={() => onComparisonToggle(!compareEnabled)}
 //   />
 
 export default function TitleBar({
   crumb = [],
   client,
   project,
-  dateRange,
+  activePreset,
+  since,
+  until,
+  onApplyPreset,
+  onApplyRange,
   comparisonOn = false,
   onToggleComparison,
-  onClickDateRange,
 }) {
   return (
     <div
@@ -31,6 +37,7 @@ export default function TitleBar({
         gap: 24, marginBottom: 28,
       }}
     >
+      {/* Left: breadcrumb + title */}
       <div>
         {crumb.length > 0 && (
           <div
@@ -67,26 +74,16 @@ export default function TitleBar({
         </h1>
       </div>
 
+      {/* Right: date picker + comparison toggle */}
       <div className="controls" style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-        {dateRange && (
-          <button
-            className="pill-dd"
-            onClick={onClickDateRange}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 10,
-              padding: '9px 14px', background: 'var(--card)',
-              border: '1px solid var(--border)', borderRadius: 999,
-              fontSize: 13, fontWeight: 700, color: 'var(--text)',
-              fontFamily: 'var(--font)', cursor: 'pointer',
-              transition: 'all var(--dur) var(--ease-out)',
-            }}
-          >
-            <span style={{ fontWeight: 600, color: 'var(--text-3)', fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              תקופה
-            </span>
-            <span dir="ltr" style={{ fontVariantNumeric: 'tabular-nums' }}>{dateRange}</span>
-            <span style={{ color: 'var(--text-3)', fontSize: 10 }}>▾</span>
-          </button>
+        {onApplyPreset && (
+          <DatePicker
+            activePreset={activePreset}
+            since={since}
+            until={until}
+            onApplyPreset={onApplyPreset}
+            onApplyRange={onApplyRange}
+          />
         )}
 
         {onToggleComparison && (
@@ -122,5 +119,5 @@ export default function TitleBar({
         )}
       </div>
     </div>
-  );
+  )
 }
