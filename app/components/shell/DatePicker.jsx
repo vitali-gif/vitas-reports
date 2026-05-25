@@ -214,6 +214,36 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
   const viewRight = prevMonthOf(viewLeft.year, viewLeft.month)
 
   const wrapRef = useRef(null)
+  const triggerRef = useRef(null)
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, width: 760 })
+
+  // Compute fixed position when opening
+  useEffect(() => {
+    if (!open || !triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const vw = window.innerWidth
+    const pickerW = Math.min(760, vw - 24)
+    let left = rect.right - pickerW
+    if (left < 12) left = 12
+    setPopoverPos({ top: rect.bottom + 10, left, width: pickerW })
+  }, [open])
+
+  // Reposition on scroll/resize while open
+  useEffect(() => {
+    if (!open) return
+    const update = () => {
+      if (!triggerRef.current) return
+      const rect = triggerRef.current.getBoundingClientRect()
+      const vw = window.innerWidth
+      const pickerW = Math.min(760, vw - 24)
+      let left = rect.right - pickerW
+      if (left < 12) left = 12
+      setPopoverPos({ top: rect.bottom + 10, left, width: pickerW })
+    }
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => { window.removeEventListener('resize', update); window.removeEventListener('scroll', update, true) }
+  }, [open])
 
   // Sync temp state when picker opens
   useEffect(() => {
@@ -325,6 +355,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
     <div ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>
       {/* ── Trigger button ─────────────────────────────────────── */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(v => !v)}
         style={{
@@ -384,8 +415,8 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
       {/* ── Popover ─────────────────────────────────────────────── */}
       {open && (
         <div style={{
-          position: 'absolute', top: '100%', right: 0, marginTop: 10,
-          width: 860, background: 'var(--card)',
+          position: 'fixed', top: popoverPos.top, left: popoverPos.left,
+          width: popoverPos.width, background: 'var(--card)',
           border: '1px solid var(--border)', borderRadius: 16,
           boxShadow: '0 24px 48px -16px rgba(11,15,30,0.18), 0 4px 12px rgba(11,15,30,0.06)',
           zIndex: 9999, overflow: 'hidden',
@@ -403,10 +434,10 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
           }} />
 
           {/* ── Main grid: calendars | presets ──────────────── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 210px', minHeight: 360 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 175px', minHeight: 360 }}>
 
             {/* LEFT: dual calendars */}
-            <div style={{ padding: '18px 22px 0' }}>
+            <div style={{ padding: '14px 16px 0' }}>
               {/* Month navigation */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -428,7 +459,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                 </button>
 
                 {/* Month labels */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, flex: 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
                       {HE_MONTHS_SHORT[viewRight.month]} {viewRight.year}
@@ -458,7 +489,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
               </div>
 
               {/* Two calendars */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, paddingBottom: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, paddingBottom: 14 }}>
                 <CalGrid
                   year={viewRight.year} month={viewRight.month}
                   tempStart={tempStart} tempEnd={tempEnd}
@@ -529,7 +560,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
           {/* ── Footer ──────────────────────────────────────────── */}
           <div style={{
             background: 'var(--surface, #F5F7FB)', borderTop: '1px solid var(--border)',
-            padding: '14px 22px',
+            padding: '12px 16px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
           }}>
             {/* Date range display */}
