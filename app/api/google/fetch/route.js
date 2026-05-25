@@ -151,9 +151,12 @@ async function runSync(opts = {}) {
   const query = `
     SELECT
       campaign.name,
+      campaign.status,
       ad_group.name,
+      ad_group.status,
       ad_group_ad.ad.name,
       ad_group_ad.ad.id,
+      ad_group_ad.status,
       ad_group_ad.ad.text_ad.description1,
       ad_group_ad.ad.expanded_text_ad.description,
       ad_group_ad.ad.responsive_search_ad.descriptions,
@@ -176,8 +179,11 @@ async function runSync(opts = {}) {
   // Transform ad_group_ad rows (Search/Display ad-level metrics)
   const allRows = rawRows.map(r => ({
     campaign: r.campaign?.name || '',
+    campaignStatus: r.campaign?.status || '',
     adSet: r.adGroup?.name || '',
+    adSetStatus: r.adGroup?.status || '',
     adName: r.adGroupAd?.ad?.name || (r.adGroupAd?.ad?.id ? `Ad ${r.adGroupAd.ad.id}` : ''),
+    adStatus: r.adGroupAd?.status || '',
     adText: extractAdText(r.adGroupAd?.ad),
     gender: '',
     age: '',
@@ -195,6 +201,7 @@ async function runSync(opts = {}) {
     const campQuery = `
       SELECT
         campaign.name,
+        campaign.status,
         campaign.advertising_channel_type,
         metrics.cost_micros,
         metrics.impressions,
@@ -213,8 +220,11 @@ async function runSync(opts = {}) {
       const channelType = r.campaign?.advertisingChannelType || ''
       allRows.push({
         campaign: cn,
+        campaignStatus: r.campaign?.status || '',
         adSet: channelType || '(campaign-level)',
+        adSetStatus: '',
         adName: cn,
+        adStatus: '',
         adText: '',
         gender: '',
         age: '',

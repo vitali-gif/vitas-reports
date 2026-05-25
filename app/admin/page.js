@@ -2241,12 +2241,15 @@ const selectProject = async (client, project) => {
             const reach = parseFloat(r.reach) || 0;
             const clicks = parseFloat(r.clicks) || 0;
             const leads = parseFloat(r.leads) || 0;
-            if (!tree[c]) tree[c] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, adSets: {}, source: r._reportSource || '' };
+            if (!tree[c]) tree[c] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, adSets: {}, source: r._reportSource || '', status: r.campaignStatus || '' };
             tree[c].spend += spend; tree[c].impressions += imp; tree[c].reach += reach; tree[c].clicks += clicks; tree[c].leads += leads;
-            if (!tree[c].adSets[a]) tree[c].adSets[a] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, ads: {} };
+            if (r.campaignStatus) tree[c].status = r.campaignStatus;
+            if (!tree[c].adSets[a]) tree[c].adSets[a] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, ads: {}, status: r.adSetStatus || '' };
             tree[c].adSets[a].spend += spend; tree[c].adSets[a].impressions += imp; tree[c].adSets[a].reach += reach; tree[c].adSets[a].clicks += clicks; tree[c].adSets[a].leads += leads;
-            if (!tree[c].adSets[a].ads[ad]) tree[c].adSets[a].ads[ad] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, text:'' };
+            if (r.adSetStatus) tree[c].adSets[a].status = r.adSetStatus;
+            if (!tree[c].adSets[a].ads[ad]) tree[c].adSets[a].ads[ad] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, text:'', status: r.adStatus || '' };
             tree[c].adSets[a].ads[ad].spend += spend; tree[c].adSets[a].ads[ad].impressions += imp; tree[c].adSets[a].ads[ad].reach += reach; tree[c].adSets[a].ads[ad].clicks += clicks; tree[c].adSets[a].ads[ad].leads += leads;
+            if (r.adStatus) tree[c].adSets[a].ads[ad].status = r.adStatus;
             if (r.adText) tree[c].adSets[a].ads[ad].text = r.adText;
           });
           const campaignNames = Object.keys(tree).sort((a,b) => tree[b].spend - tree[a].spend);
@@ -2254,6 +2257,7 @@ const selectProject = async (client, project) => {
           const toggleAdSet = (k) => setExpandedAdSets(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
           const cols = [
             { key:'name', label:'\u05e7\u05de\u05e4\u05d9\u05d9\u05df / \u05e7\u05d1\u05d5\u05e6\u05d4 / \u05de\u05d5\u05d3\u05e2\u05d4' },
+            { key:'status', label:'\u05e1\u05d8\u05d0\u05d8\u05d5\u05e1' },
             { key:'clicks', label:'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd' },
             { key:'impressions', label:'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea' },
             { key:'cpc', label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7' },
@@ -2283,6 +2287,7 @@ const selectProject = async (client, project) => {
                   {name}
                   {level === 0 && data.source ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
                 </td>
+                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : st === 'REMOVED' ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
                 <td style={{fontSize}}>{formatNum(data.impressions)}</td>
                 <td style={{fontSize}}>{formatCurrency(cpc)}</td>
@@ -2352,6 +2357,7 @@ const selectProject = async (client, project) => {
                 <table className="data-table"><thead><tr>
                   <th style={{whiteSpace:'nowrap'}}>{'\u05e7\u05d1\u05d5\u05e6\u05ea \u05e0\u05db\u05e1\u05d9\u05dd'}</th>
                   <th style={{whiteSpace:'nowrap'}}>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05df'}</th>
+                  <th style={{whiteSpace:'nowrap'}}>{'\u05e1\u05d8\u05d0\u05d8\u05d5\u05e1'}</th>
                   <th style={{whiteSpace:'nowrap'}}>{'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'}</th>
                   <th style={{whiteSpace:'nowrap'}}>{'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'}</th>
                   <th style={{whiteSpace:'nowrap'}}>CTR</th>
@@ -2370,6 +2376,7 @@ const selectProject = async (client, project) => {
                       <tr key={ag.id || i}>
                         <td style={{fontWeight:600,unicodeBidi:'plaintext',textAlign:'right'}}>{ag.name || '-'}</td>
                         <td style={{fontSize:'0.85em',color:'#64748b',unicodeBidi:'plaintext'}}>{ag.campaign || '-'}</td>
+                        <td>{(() => { const st = ag.status || ''; const isA = st==='ENABLED'; const isP = st==='PAUSED'; const bg = isA ? 'rgba(16,185,129,0.12)' : isP ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isA ? '#059669' : isP ? '#d97706' : '#64748b'; const lbl = isA ? 'פעיל' : isP ? 'מושהה' : st==='REMOVED' ? 'הוסר' : st || '-'; return <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{lbl}</span>; })()}</td>
                         <td>{formatNum(clicks)}</td>
                         <td>{formatNum(imps)}</td>
                         <td>{ctr.toFixed(2)}%</td>
