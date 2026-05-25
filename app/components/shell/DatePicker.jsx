@@ -11,7 +11,7 @@ const PRESET_LABELS = {
   last90: '90 ימים אחרונים',
   currentMonth: 'החודש הנוכחי', lastMonth: 'חודש שעבר',
   currentYear: 'השנה הנוכחית', lastYear: 'השנה שעברה',
-  custom: 'טווח מותאם',
+  custom: 'טווח גמיש',
 }
 
 const PRESET_LIST = [
