@@ -1085,7 +1085,9 @@ const selectProject = async (client, project) => {
     const cp = prevCrmData?.totals;
 
     const crmKpi = (label, value, color, current, prev, isCost, tip) => {
-      const ch = prev != null ? changePercent(current, prev, isCost) : null;
+      const ch = (prev != null && prev !== 0) ? changePercent(current, prev, isCost)
+        : (prev === 0 && current > 0) ? { pct: null, isGood: !isCost, newVal: true }
+        : null;
       const sl = String(label);
       const iconPaths =
         sl.includes('\u05e1\u05d4') ? <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></> :
@@ -1111,6 +1113,10 @@ const selectProject = async (client, project) => {
               </svg>
             </div>
             {ch ? (() => {
+              if (ch.newVal) {
+                const absDelta = isCost ? formatCurrency(current) : formatNum(Math.round(current));
+                return <span className="kpi-trend">↑ +{absDelta} (חדש)</span>;
+              }
               const delta = current - prev;
               const absDelta = isCost ? formatCurrency(Math.abs(delta)) : formatNum(Math.abs(Math.round(delta)));
               const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
@@ -1163,36 +1169,42 @@ const selectProject = async (client, project) => {
               <div className="v">{formatNum(ct.totalLeads)}</div>
               <div className="l">{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</div>
               <div className="pct">100%</div>
+              {compareEnabled && cp ? (() => { const _c=ct.totalLeads; const _p=(cp.totalLeads)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
             </div>
             <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
             <div className="crm-fstep">
               <div className="v">{formatNum(ct.relevantLeads)}</div>
               <div className="l">{'\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</div>
               <div className="pct">{ct.totalLeads > 0 ? ct.relevantRate.toFixed(0) + '%' : '-'}</div>
+              {compareEnabled && cp ? (() => { const _c=ct.relevantLeads; const _p=(cp.relevantLeads)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
             </div>
             <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
             <div className="crm-fstep terra">
               <div className="v">{formatNum(ct.meetingsScheduled)}</div>
               <div className="l">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5'}</div>
               <div className="pct">{ct.totalLeads > 0 ? ct.scheduledRate.toFixed(0) + '%' : '-'}</div>
+              {compareEnabled && cp ? (() => { const _c=ct.meetingsScheduled; const _p=(cp.meetingsScheduled)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
             </div>
             <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
             <div className="crm-fstep emerald">
               <div className="v">{formatNum(ct.meetingsCompleted)}</div>
               <div className="l">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5'}</div>
               <div className="pct">{ct.meetingsScheduled > 0 ? (ct.meetingsCompleted / ct.meetingsScheduled * 100).toFixed(0) + '%' : '-'}</div>
+              {compareEnabled && cp ? (() => { const _c=ct.meetingsCompleted; const _p=(cp.meetingsCompleted)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
             </div>
             <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
             <div className="crm-fstep amber">
               <div className="v">{formatNum(ct.registrations)}</div>
               <div className="l">{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</div>
               <div className="pct">{ct.meetingsCompleted > 0 ? (ct.registrations / ct.meetingsCompleted * 100).toFixed(0) + '%' : '-'}</div>
+              {compareEnabled && cp ? (() => { const _c=ct.registrations; const _p=(cp.registrations)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
             </div>
             <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
             <div className="crm-fstep rose">
               <div className="v">{formatNum(ct.contracts)}</div>
               <div className="l">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div>
               <div className="pct">{ct.registrations > 0 ? (ct.contracts / ct.registrations * 100).toFixed(0) + '%' : '-'}</div>
+              {compareEnabled && cp ? (() => { const _c=ct.contracts; const _p=(cp.contracts)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
             </div>
           </div>
         </div>
@@ -1426,7 +1438,9 @@ const selectProject = async (client, project) => {
     };
 
     const kpi = (label, value, color, current, prev, isCost) => {
-      const ch = prev != null ? changePercent(current, prev, isCost) : null;
+      const ch = (prev != null && prev !== 0) ? changePercent(current, prev, isCost)
+        : (prev === 0 && current > 0) ? { pct: null, isGood: !isCost, newVal: true }
+        : null;
       const v2cls = v2Color[color] || 'indigo';
       // sparkline: extract this metric's values from trendData
       const metricKey = label === 'לידים' ? 'leads' : label === 'תקציב' ? 'spend' : label === 'עלות לליד' ? 'cpl' : label === 'פגישות שתואמו' ? 'meetingsScheduled' : label === 'פגישות שבוצעו' ? 'meetingsCompleted' : label === 'הרשמות' ? 'registrations' : label === 'חוזים' ? 'contracts' : null;
@@ -1441,6 +1455,10 @@ const selectProject = async (client, project) => {
               </svg>
             </div>
             {ch ? (() => {
+              if (ch.newVal) {
+                const absDelta = isCost ? formatCurrency(current) : formatNum(Math.round(current));
+                return <span className="kpi-trend">↑ +{absDelta} (חדש)</span>;
+              }
               const delta = current - prev;
               const absDelta = isCost ? formatCurrency(Math.abs(delta)) : formatNum(Math.abs(Math.round(delta)));
               const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
