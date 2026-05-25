@@ -104,7 +104,7 @@ async function runSync(opts = {}) {
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }))
 
   const fields = [
-    'campaign_name', 'adset_name', 'ad_name', 'ad_id',
+    'campaign_name', 'campaign_id', 'adset_name', 'adset_id', 'ad_name', 'ad_id',
     'spend', 'impressions', 'reach', 'frequency',
     'clicks', 'inline_link_clicks', 'ctr', 'cpc', 'cpm',
     'actions',
@@ -145,6 +145,20 @@ async function runSync(opts = {}) {
   } catch (err) {
     return { status: 500, body: { error: String(err.message || err) } }
   }
+
+  // Fetch campaign + adset effective_status maps (for status column in UI)
+  const campStatusUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/campaigns?fields=id,effective_status,status&limit=500&access_token=${encodeURIComponent(token)}`
+  const adsetStatusUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/adsets?fields=id,effective_status,status&limit=500&access_token=${encodeURIComponent(token)}`
+  const campaignStatusById = {}
+  const adSetStatusById = {}
+  try {
+    const [csRaw, asRaw] = await Promise.all([
+      metaFetchAll(campStatusUrl, token),
+      metaFetchAll(adsetStatusUrl, token),
+    ])
+    for (const c of csRaw) campaignStatusById[c.id] = c.effective_status || c.status || ''
+    for (const a of asRaw) adSetStatusById[a.id] = a.effective_status || a.status || ''
+  } catch {}
 
   // Helper: pull the best creative data (body, title, image) from nested Meta structures
   const extractCreative = (cr = {}) => {
@@ -274,6 +288,9 @@ async function runSync(opts = {}) {
     reach: num(r.reach),
     clicks: num(r.inline_link_clicks),  // link clicks only — matches Ads Manager 'Link clicks'
     leads: extractLeads(r.actions),
+    campaignStatus: r.campaign_id ? (campaignStatusById[r.campaign_id] || '') : '',
+    adSetStatus: r.adset_id ? (adSetStatusById[r.adset_id] || '') : '',
+    adStatus: r.ad_id ? (adDetailsById[r.ad_id]?.status || '') : '',
   })
 
   const allRows = breakdownRows.map(buildRow)

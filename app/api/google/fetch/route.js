@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const GOOGLE_ADS_API_VERSION = 'v22'
+const GOOGLE_SCHEMA_VERSION = 2  // bump when stored summary shape changes
 
 // ===== helpers =====
 
@@ -370,7 +371,7 @@ async function runSync(opts = {}) {
       source: 'google',
       month: m,
       data: mine,
-      summary: summaryWithAssetGroups,
+      summary: { ...summaryWithAssetGroups, schemaVersion: GOOGLE_SCHEMA_VERSION },
       file_name: 'Google Ads API (live)',
       row_count: mine.length,
     }, { onConflict: 'project_id,source,month' })

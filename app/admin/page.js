@@ -238,7 +238,8 @@ export default function AdminPage() {
 
     // What do we already have cached in 'reports' for this period?
     const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
-    const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google'));
+    const GOOGLE_SCHEMA_VERSION = 2;  // keep in sync with google route.js
+    const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google') && (r.summary?.schemaVersion || 0) >= GOOGLE_SCHEMA_VERSION);
     const CRM_SCHEMA_VERSION = 5;  // keep in sync with route.js + useEffect below
     const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
     const haveCrm = !!crmRow && (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION;
@@ -705,6 +706,7 @@ const selectProject = async (client, project) => {
 
     const crmRows = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
     const crmNamedLeads = crmRows[0]?.summary?.namedLeads || null;
+    const _crmRespLeads = crmNamedLeads?.all || crmNamedLeads;  // v5: namedLeads nested under .all
     let totalLids = 0, respondedCount = 0, noResponseCount = 0;
     const bucketsTotal = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
     const bucketsBusiness = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 }
@@ -872,7 +874,7 @@ const selectProject = async (client, project) => {
             <div className="lbl">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div>
             <div className="val">{fmt(overallBusinessMin)}</div>
           </div>
-          <div className="kpi-c violet" style={crmNamedLeads?.noResponse?.length > 0 ? {cursor:'pointer'} : undefined} onClick={crmNamedLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים בלי מענה', names: crmNamedLeads.noResponse}) : undefined}>
+          <div className="kpi-c violet" style={_crmRespLeads?.noResponse?.length > 0 ? {cursor:'pointer'} : undefined} onClick={_crmRespLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים בלי מענה', names: _crmRespLeads.noResponse}) : undefined}>
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
             </div>
@@ -1025,6 +1027,7 @@ const selectProject = async (client, project) => {
     crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
     const crmData = aggregateCrmRows(allCrmRows);
     const crmNamedLeads = crmReports[0]?.summary?.namedLeads || null;
+    const _crmLeads = crmNamedLeads?.all || crmNamedLeads;  // v5: namedLeads nested under .all
 
     // Merge Facebook campaign sources into single 'Facebook' entry - children kept for drill-down
     const _fbCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('פייסבוק') || k.toLowerCase().includes('facebook'));
@@ -1165,10 +1168,10 @@ const selectProject = async (client, project) => {
         <div className="kpi-grid">
           {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
-          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, '\u05de\u05e1\u05e4\u05e8 \u05d4\u05dc\u05d9\u05d3\u05d9\u05dd \u05e9\u05e7\u05d1\u05e2\u05d5 \u05e4\u05d2\u05d9\u05e9\u05d4', crmNamedLeads?.meetingsScheduled)}
-          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, '\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5 \u05d1\u05e4\u05d5\u05e2\u05dc', crmNamedLeads?.meetingsCompleted)}
-          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, crmNamedLeads?.registrations)}
-          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, crmNamedLeads?.contracts)}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, '\u05de\u05e1\u05e4\u05e8 \u05d4\u05dc\u05d9\u05d3\u05d9\u05dd \u05e9\u05e7\u05d1\u05e2\u05d5 \u05e4\u05d2\u05d9\u05e9\u05d4', _crmLeads?.meetingsScheduled)}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, '\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5 \u05d1\u05e4\u05d5\u05e2\u05dc', _crmLeads?.meetingsCompleted)}
+          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations)}
+          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts)}
         </div>
 
 
