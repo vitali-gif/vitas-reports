@@ -252,7 +252,7 @@ export default function AdminPage() {
 
     // Closed period with full cache: instant render, never re-fetch (data is final).
     if (haveAll && !isOpen) {
-      showToast('\u2713 \u05de\u05d8\u05de\u05d5\u05df \u2014 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e1\u05d5\u05e4\u05d9\u05d9\u05dd');  // "מטמון - נתונים סופיים"
+      showToast('\u2713 \u05de\u05d8\u05de\u05d5\u05df - \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e1\u05d5\u05e4\u05d9\u05d9\u05dd');  // "מטמון - נתונים סופיים"
       return true;
     }
 
@@ -1140,20 +1140,12 @@ const selectProject = async (client, project) => {
     return (
       <>
         <div className="kpi-grid">
-          {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), '', ct.totalLeads, cp?.totalLeads)}
+          {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
-          {crmKpi('\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.irrelevantLeads), 'red', ct.irrelevantLeads, cp?.irrelevantLeads, true)}
-          {crmKpi('% \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d5\u05ea', ct.relevantRate.toFixed(1) + '%', 'cyan', ct.relevantRate, cp?.relevantRate)}
-          {crmKpi('פגישות שתואמו', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, 'מספר הלידים בתקופה שהלקוח שלהם קבע פגישה (כולל פגישות עתידיות). השיטה: לכל LID נספרת פגישה אם הלקוח קבע פגישה בתאריך השווה או מאוחר מ-LID. ייתכן הבדל קטן (1-2) מול BMBY UI שמחריג לידים שהפכו לעסקה באותו יום או לקוחות חוזרים.')}
-          {crmKpi('אחוז המרה לפגישה שתואמה', ct.scheduledRate.toFixed(1) + '%', 'pink', ct.scheduledRate, cp?.scheduledRate, false, 'אחוז הלידים שקבעו פגישה. חישוב: (פגישות שתואמו / סה"כ לידים) × 100')}
-          {crmKpi('פגישות שבוצעו', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'מספר הלידים בתקופה שהלקוח שלהם קיים פגישה בפועל (סטטוס: done/בוצע). השיטה: לכל LID נספרת פגישה רק אם בוצעה והתרחשה בתאריך השווה או מאוחר מה-LID. ייתכן הבדל קטן מול BMBY UI עקב חוקי דדופ שונים.')}
-          {crmKpi('אחוז המרה לפגישות שבוצעו', ct.completedRate.toFixed(1) + '%', '', ct.completedRate, cp?.completedRate, false, 'אחוז הלידים שקיימו פגישה בפועל. חישוב: (פגישות שבוצעו / סה"כ לידים) × 100')}
-          {crmKpi('עלות פגישה שבוצעה', ct.meetingsCompleted > 0 ? formatCurrency(_platformSpend / ct.meetingsCompleted) : '₪0', 'purple', 0, 0, false, 'עלות פרסום ממוצעת לכל פגישה שבוצעה. חישוב: (סה"כ הוצאה בפלטפורמה / פגישות שבוצעו)')}
-          {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled), 'red', ct.meetingsCancelled, cp?.meetingsCancelled, true, 'מספר הלידים בתקופה שלקוח שלהם קבע פגישה שבוטלה (בתוך התקופה). הפגישה לא התקיימה.')}
-          {crmKpi('\u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations)}
-          {crmKpi('\u05e9\u05d5\u05d5\u05d9 \u05d4\u05e8\u05e9\u05dd\u05d5\u05ea', formatCurrency(ct.registrationValue), 'purple', ct.registrationValue, cp?.registrationValue)}
-          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'cyan', ct.contracts, cp?.contracts)}
-          {crmKpi('\u05e9\u05d5\u05d5\u05d9 \u05d7\u05d5\u05d6\u05d9\u05dd', formatCurrency(ct.contractValue), 'orange', ct.contractValue, cp?.contractValue)}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, '\u05de\u05e1\u05e4\u05e8 \u05d4\u05dc\u05d9\u05d3\u05d9\u05dd \u05e9\u05e7\u05d1\u05e2\u05d5 \u05e4\u05d2\u05d9\u05e9\u05d4')}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, '\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5 \u05d1\u05e4\u05d5\u05e2\u05dc')}
+          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations)}
+          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts)}
         </div>
 
 
@@ -1161,40 +1153,40 @@ const selectProject = async (client, project) => {
         <div className="section">
           <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><h2>{'\u05de\u05e9\u05e4\u05da \u05dc\u05d9\u05d3\u05d9\u05dd'}</h2><span className="sub">{'\u05de\u05dc\u05d9\u05d3 \u05d5\u05e2\u05d3 \u05d7\u05d5\u05d6\u05d4'}</span></div>
           <div className="crm-funnel">
-            <div className="crm-fstep rose">
-              <div className="v">{formatNum(ct.contracts)}</div>
-              <div className="l">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div>
-              <div className="pct">{ct.registrations > 0 ? (ct.contracts / ct.registrations * 100).toFixed(0) + '%' : '\u2014'}</div>
-            </div>
-            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-            <div className="crm-fstep amber">
-              <div className="v">{formatNum(ct.registrations)}</div>
-              <div className="l">{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</div>
-              <div className="pct">{ct.meetingsCompleted > 0 ? (ct.registrations / ct.meetingsCompleted * 100).toFixed(0) + '%' : '\u2014'}</div>
-            </div>
-            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-            <div className="crm-fstep emerald">
-              <div className="v">{formatNum(ct.meetingsCompleted)}</div>
-              <div className="l">{'\u05d1\u05d5\u05e6\u05e2\u05d5'}</div>
-              <div className="pct">{ct.meetingsScheduled > 0 ? (ct.meetingsCompleted / ct.meetingsScheduled * 100).toFixed(0) + '%' : '\u2014'}</div>
-            </div>
-            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-            <div className="crm-fstep terra">
-              <div className="v">{formatNum(ct.meetingsScheduled)}</div>
-              <div className="l">{'\u05ea\u05d5\u05d0\u05de\u05d5'}</div>
-              <div className="pct">{ct.totalLeads > 0 ? ct.scheduledRate.toFixed(0) + '%' : '\u2014'}</div>
+            <div className="crm-fstep sky">
+              <div className="v">{formatNum(ct.totalLeads)}</div>
+              <div className="l">{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</div>
+              <div className="pct">100%</div>
             </div>
             <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
             <div className="crm-fstep">
               <div className="v">{formatNum(ct.relevantLeads)}</div>
               <div className="l">{'\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</div>
-              <div className="pct">{ct.totalLeads > 0 ? ct.relevantRate.toFixed(0) + '%' : '\u2014'}</div>
+              <div className="pct">{ct.totalLeads > 0 ? ct.relevantRate.toFixed(0) + '%' : '-'}</div>
             </div>
             <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-            <div className="crm-fstep sky">
-              <div className="v">{formatNum(ct.totalLeads)}</div>
-              <div className="l">{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</div>
-              <div className="pct">100%</div>
+            <div className="crm-fstep terra">
+              <div className="v">{formatNum(ct.meetingsScheduled)}</div>
+              <div className="l">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5'}</div>
+              <div className="pct">{ct.totalLeads > 0 ? ct.scheduledRate.toFixed(0) + '%' : '-'}</div>
+            </div>
+            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+            <div className="crm-fstep emerald">
+              <div className="v">{formatNum(ct.meetingsCompleted)}</div>
+              <div className="l">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5'}</div>
+              <div className="pct">{ct.meetingsScheduled > 0 ? (ct.meetingsCompleted / ct.meetingsScheduled * 100).toFixed(0) + '%' : '-'}</div>
+            </div>
+            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+            <div className="crm-fstep amber">
+              <div className="v">{formatNum(ct.registrations)}</div>
+              <div className="l">{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</div>
+              <div className="pct">{ct.meetingsCompleted > 0 ? (ct.registrations / ct.meetingsCompleted * 100).toFixed(0) + '%' : '-'}</div>
+            </div>
+            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+            <div className="crm-fstep rose">
+              <div className="v">{formatNum(ct.contracts)}</div>
+              <div className="l">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div>
+              <div className="pct">{ct.registrations > 0 ? (ct.contracts / ct.registrations * 100).toFixed(0) + '%' : '-'}</div>
             </div>
           </div>
         </div>
@@ -1458,10 +1450,11 @@ const selectProject = async (client, project) => {
       };
       const sortIcon = (key) => { if(!sc||sc.key!==key) return ' ⇅'; return sc.dir==='desc'?' ▼':' ▲'; };
       const thStyle = {cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'};
+      const cellMark = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return null; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return null; if (val === e.max) return <span style={{fontSize:9,marginRight:2,opacity:0.75}}>{col.higher ? '\u25b2' : '\u25bc'}</span>; if (val === e.min) return <span style={{fontSize:9,marginRight:2,opacity:0.75}}>{col.higher ? '\u25bc' : '\u25b2'}</span>; return null; };
       const extremes = {};
       cols.forEach(c => { if (c.key === 'name' || c.key === 'spend') return; const vals = entries.map(([n,d]) => c.get(d,n)).filter(v => typeof v === 'number' && v > 0); if (vals.length < 2) return; extremes[c.key] = {min: Math.min(...vals), max: Math.max(...vals)}; });
-      const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'} : {background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'}; if (val === e.min) return col.higher ? {background:'rgba(239,68,68,0.08)',color:'#dc2626',fontWeight:800,boxShadow:'inset 3px 0 0 #ef4444'} : {background:'rgba(16,185,129,0.10)',color:'#059669',fontWeight:800,boxShadow:'inset 3px 0 0 #10b981'}; return {}; };
-      return (<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:source==='google'?'var(--sky-50)':'var(--indigo-50)',color:source==='google'?'var(--sky)':'var(--indigo)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{source==='google'?'G':'F'}</span> : null}{name}{source ? <span className={`platform-tag${source==='google'?' google':''}`} style={{marginRight:'8px'}}>{source==='google'?'GOOGLE':'FACEBOOK'}</span> : null}</td><td style={cellBg('clicks',d.clicks)}>{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{d.leads} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>);
+      const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {color:'#059669',fontWeight:800} : {color:'#dc2626',fontWeight:800}; if (val === e.min) return col.higher ? {color:'#dc2626',fontWeight:800} : {color:'#059669',fontWeight:800}; return {}; };
+      return (<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:source==='google'?'var(--rose-50)':'var(--sky-50)',color:source==='google'?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{source==='google'?'G':'F'}</span> : null}{name}{source ? <span className={`platform-tag${source==='google'?' google':''}`} style={{marginRight:'8px'}}>{source==='google'?'GOOGLE':'FACEBOOK'}</span> : null}</td><td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{d.leads} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>);
     };
 
 
@@ -1568,7 +1561,7 @@ const selectProject = async (client, project) => {
         </div>
 
         {dashTab === 'recommendations' ? (() => {
-          // 60-day rolling window — recommendations are ALWAYS based on the last 60 days,
+          // 60-day rolling window - recommendations are ALWAYS based on the last 60 days,
           // independent of selectedMonth (which only affects the KPI/chart tabs).
           const recWindowMonths = getRecommendationsWindowMonths(60);
           const crmRowsRec = reports.filter(r => recWindowMonths.includes(r.month) && r.source === 'crm');
@@ -1634,7 +1627,7 @@ const selectProject = async (client, project) => {
           const _ggAdRows = [];
           for (const r of ggRowsRec) if (Array.isArray(r.data)) _ggAdRows.push(...r.data);
           // Build a lookup of adName → creative details (imageUrl/videoUrl/permalink).
-          // Sourced from r.summary.activeAds (only effective_status=ACTIVE ads — full
+          // Sourced from r.summary.activeAds (only effective_status=ACTIVE ads - full
           // list since the fix to remove the top-5 slice).
           // Also union with summary.activeAdNames for backwards compatibility with
           // older fetches where the slice was still applied.
@@ -1657,7 +1650,7 @@ const selectProject = async (client, project) => {
           let _totalSpend = 0;
           for (const r of _fbAdRows) _totalSpend += Number(r.spend) || 0;
           for (const r of _ggAdRows) _totalSpend += Number(r.spend) || 0;
-          // Compute costPerMeeting — use completed meetings (more conservative than scheduled,
+          // Compute costPerMeeting - use completed meetings (more conservative than scheduled,
           // aligns with actual sales pipeline value). Falls back to scheduled if no completed.
           let _completedMeetings = 0;
           let _scheduledMeetings = 0;
@@ -1769,7 +1762,7 @@ const selectProject = async (client, project) => {
                           lookbackDays: 14,
                         },
                       })}
-                      title="צור כלל ב-Meta שמשהה אוטומטית כל מודעה בקמפיין שעוברת CPL מסוים — לנצח"
+                      title="צור כלל ב-Meta שמשהה אוטומטית כל מודעה בקמפיין שעוברת CPL מסוים - לנצח"
                     >
                       🤖 צור כלל אוטומטי
                     </button>
@@ -1786,7 +1779,7 @@ const selectProject = async (client, project) => {
                           params: { dayOfWeek: dow, pctIncrease: 30 },
                         });
                       }}
-                      title="צור כלל ב-Meta שמעלה אוטומטית את התקציב ביום הזה — לנצח"
+                      title="צור כלל ב-Meta שמעלה אוטומטית את התקציב ביום הזה - לנצח"
                     >
                       🤖 צור כלל אוטומטי
                     </button>
@@ -1795,7 +1788,7 @@ const selectProject = async (client, project) => {
                     className="btn-primary"
                     disabled={isLocking}
                     onClick={() => lockRecommendation(rec)}
-                    title="נעל את ההמלצה הזאת בתוכנית העבודה — תוכל לעקוב אחרי הביצוע והאימפקט"
+                    title="נעל את ההמלצה הזאת בתוכנית העבודה - תוכל לעקוב אחרי הביצוע והאימפקט"
                   >
                     {isLocking ? '⏳ נועל...' : '✓ אנחנו עושים את זה'}
                   </button>
@@ -1804,7 +1797,7 @@ const selectProject = async (client, project) => {
             );
           };
 
-          // Build currentInput shape for compareImpact — same structure as buildRecommendations input
+          // Build currentInput shape for compareImpact - same structure as buildRecommendations input
           const _impactInput = {
             bucketTotals: _bucketTotals, bucketWith: _bucketWith,
             dowMerged: _dowMerged, crmRepRows: _crmRepRows,
@@ -1887,7 +1880,7 @@ const selectProject = async (client, project) => {
             );
           };
 
-          // Group by impact status — completely replaces the old 4-section grouping
+          // Group by impact status - completely replaces the old 4-section grouping
           const tasksPending = tasksWithImpact.filter(x => x.impact.status === 'pending' && x.task.status !== 'dropped' && x.task.status !== 'done');
           const tasksMeasured = tasksWithImpact.filter(x => ['green', 'red', 'gray'].includes(x.impact.status) && x.task.status !== 'dropped' && x.task.status !== 'done');
           const tasksClosed = tasksWithImpact.filter(x => x.task.status === 'dropped' || x.task.status === 'done');
@@ -1918,7 +1911,7 @@ const selectProject = async (client, project) => {
                   </div>
                 ) : (
                   <>
-                    <p style={{color:'var(--text-secondary)',fontSize:'0.9em',marginBottom:'18px'}}>מצאנו {newRecs.length === 1 ? 'דפוס מובהק חדש' : `${newRecs.length} דפוסים מובהקים חדשים`} שעדיין לא בתוכנית העבודה. לחץ "✓ אנחנו עושים את זה" על כל אחד כדי להתחייב — האימפקט יימדד אוטומטית אחרי 28 ימים.</p>
+                    <p style={{color:'var(--text-secondary)',fontSize:'0.9em',marginBottom:'18px'}}>מצאנו {newRecs.length === 1 ? 'דפוס מובהק חדש' : `${newRecs.length} דפוסים מובהקים חדשים`} שעדיין לא בתוכנית העבודה. לחץ "✓ אנחנו עושים את זה" על כל אחד כדי להתחייב - האימפקט יימדד אוטומטית אחרי 28 ימים.</p>
                     {ROLE_ORDER.map(role => {
                       const items = groupedNew[role] || [];
                       const meta = ROLE_META[role];
@@ -2084,40 +2077,40 @@ const selectProject = async (client, project) => {
           </div>
           {crmTotals ? (
             <div className="funnel">
-              <div className="fstep rose">
-                <div className="flabel">חוזים</div>
-                <div className="fvalue">{formatNum(crmTotals.contracts || 0)}</div>
-                <div className="frate"><span className="pct">{crmTotals.registrations > 0 ? (crmTotals.contracts / crmTotals.registrations * 100).toFixed(0) + '%' : '—'}</span> מהרשמות</div>
-              </div>
-              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-              <div className="fstep amber">
-                <div className="flabel">הרשמות</div>
-                <div className="fvalue">{formatNum(crmTotals.registrations || 0)}</div>
-                <div className="frate"><span className="pct">{crmTotals.meetingsCompleted > 0 ? (crmTotals.registrations / crmTotals.meetingsCompleted * 100).toFixed(0) + '%' : '—'}</span> משבוצעו</div>
-              </div>
-              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-              <div className="fstep emerald">
-                <div className="flabel">פגישות שבוצעו</div>
-                <div className="fvalue">{formatNum(crmTotals.meetingsCompleted || 0)}</div>
-                <div className="frate"><span className="pct">{crmTotals.meetingsScheduled > 0 ? (crmTotals.meetingsCompleted / crmTotals.meetingsScheduled * 100).toFixed(0) + '%' : '—'}</span> ממתואמות</div>
-              </div>
-              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-              <div className="fstep terra">
-                <div className="flabel">מתואמות</div>
-                <div className="fvalue">{formatNum(crmTotals.meetingsScheduled || 0)}</div>
-                <div className="frate"><span className="pct">{activeT.clicks > 0 ? ((crmTotals.meetingsScheduled || 0) / activeT.clicks * 100).toFixed(1) + '%' : '—'}</span> מקליק</div>
-              </div>
-              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep sky">
                 <div className="flabel">קליקים</div>
                 <div className="fvalue">{formatNum(activeT.clicks)}</div>
-                <div className="frate"><span className="pct">{activeT.impressions > 0 ? (activeT.clicks / activeT.impressions * 100).toFixed(2) + '%' : '—'}</span> CTR</div>
+                <div className="frate"><span className="pct">{activeT.impressions > 0 ? (activeT.clicks / activeT.impressions * 100).toFixed(2) + '%' : '-'}</span> CTR</div>
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep">
                 <div className="flabel">חשיפות</div>
                 <div className="fvalue">{formatNum(activeT.impressions)}</div>
                 <div className="frate"><span className="pct">100%</span> מצטבר</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep terra">
+                <div className="flabel">פגישות מתואמות</div>
+                <div className="fvalue">{formatNum(crmTotals.meetingsScheduled || 0)}</div>
+                <div className="frate"><span className="pct">{activeT.clicks > 0 ? ((crmTotals.meetingsScheduled || 0) / activeT.clicks * 100).toFixed(1) + '%' : '-'}</span> מקליקים</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep emerald">
+                <div className="flabel">פגישות שבוצעו</div>
+                <div className="fvalue">{formatNum(crmTotals.meetingsCompleted || 0)}</div>
+                <div className="frate"><span className="pct">{crmTotals.meetingsScheduled > 0 ? (crmTotals.meetingsCompleted / crmTotals.meetingsScheduled * 100).toFixed(0) + '%' : '-'}</span> ממתואמות</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep amber">
+                <div className="flabel">הרשמות</div>
+                <div className="fvalue">{formatNum(crmTotals.registrations || 0)}</div>
+                <div className="frate"><span className="pct">{crmTotals.meetingsCompleted > 0 ? (crmTotals.registrations / crmTotals.meetingsCompleted * 100).toFixed(0) + '%' : '-'}</span> משבוצעו</div>
+              </div>
+              <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+              <div className="fstep rose">
+                <div className="flabel">חוזים</div>
+                <div className="fvalue">{formatNum(crmTotals.contracts || 0)}</div>
+                <div className="frate"><span className="pct">{crmTotals.registrations > 0 ? (crmTotals.contracts / crmTotals.registrations * 100).toFixed(0) + '%' : '-'}</span> מהרשמות</div>
               </div>
             </div>
           ) : (
@@ -2131,7 +2124,7 @@ const selectProject = async (client, project) => {
               <div className="fstep sky">
                 <div className="flabel">קליקים</div>
                 <div className="fvalue">{formatNum(activeT.clicks)}</div>
-                <div className="frate"><span className="pct">{activeT.impressions > 0 ? (activeT.clicks / activeT.impressions * 100).toFixed(2) + '%' : '—'}</span> CTR</div>
+                <div className="frate"><span className="pct">{activeT.impressions > 0 ? (activeT.clicks / activeT.impressions * 100).toFixed(2) + '%' : '-'}</span> CTR</div>
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep">
@@ -2197,7 +2190,7 @@ const selectProject = async (client, project) => {
                   <span style={{display:'inline-block', width:'18px', color:'#64748b', marginLeft:'4px'}}>
                     {hasChildren ? (isExpanded ? '\u25bc' : '\u25c0') : ''}
                   </span>
-                  {level === 0 && data.source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:data.source.includes('google')?'var(--sky-50)':'var(--indigo-50)',color:data.source.includes('google')?'var(--sky)':'var(--indigo)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{data.source.includes('google')?'G':'F'}</span> : null}
+                  {level === 0 && data.source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:data.source.includes('google')?'var(--rose-50)':'var(--sky-50)',color:data.source.includes('google')?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{data.source.includes('google')?'G':'F'}</span> : null}
                   {name}
                   {level === 0 && data.source ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
                 </td>

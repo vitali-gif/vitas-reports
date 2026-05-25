@@ -152,17 +152,17 @@ function CalGrid({ year, month, tempStart, tempEnd, pickMode, hoverYmd, todayYmd
           return (
             <div
               key={cell.ymd + i}
-              style={{ position: 'relative', height: 32 }}
+              style={{ position: 'relative', height: 32, cursor: 'pointer', userSelect: 'none' }}
               onClick={() => onClickDay(cell.ymd)}
               onMouseEnter={() => onHoverDay(cell.ymd)}
               onMouseLeave={() => onHoverDay(null)}
             >
               {/* range background */}
               {(inRange) && (
-                <div style={{ position: 'absolute', inset: 0, background: rowBg, borderRadius: rowBorderRadius }} />
+                <div style={{ position: 'absolute', inset: 0, background: rowBg, borderRadius: rowBorderRadius, pointerEvents: 'none' }} />
               )}
               {/* endpoint strip */}
-              {stripStyle && <div style={stripStyle} />}
+              {stripStyle && <div style={{...stripStyle, pointerEvents: 'none'}} />}
               {/* circle / number */}
               <div style={{
                 position: 'absolute', inset: 0,
@@ -577,7 +577,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                   color: 'var(--text-3)', textTransform: 'uppercase',
                   paddingLeft: 8, borderLeft: '1px solid var(--border)', marginLeft: 0,
                 }}>מתאריך</span>
-                <span dir="ltr">{footerSince ? formatDateHe(footerSince) : '—'}</span>
+                <span dir="ltr">{footerSince ? formatDateHe(footerSince) : '-'}</span>
               </div>
               <span style={{ color: 'var(--text-3)', fontSize: 14 }}>←</span>
               <div style={{
@@ -593,7 +593,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                   color: 'var(--text-3)', textTransform: 'uppercase',
                   paddingLeft: 8, borderLeft: '1px solid var(--border)', marginLeft: 0,
                 }}>עד תאריך</span>
-                <span dir="ltr">{footerUntil ? formatDateHe(footerUntil) : (pickMode === 'end' ? '...' : '—')}</span>
+                <span dir="ltr">{footerUntil ? formatDateHe(footerUntil) : (pickMode === 'end' ? '...' : '-')}</span>
               </div>
             </div>
 

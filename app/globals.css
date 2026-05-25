@@ -839,12 +839,12 @@
     font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em;
     padding: 2px 7px;
     border-radius: var(--r-xs);
-    background: var(--indigo-50);
-    color: var(--indigo);
+    background: var(--sky-50);
+    color: var(--sky);
     margin-right: 6px;
     text-transform: uppercase;
   }
-  .platform-tag.google { background: var(--sky-50); color: var(--sky); }
+  .platform-tag.google { background: var(--rose-50); color: var(--rose); }
   .status {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 12px; font-weight: 700;

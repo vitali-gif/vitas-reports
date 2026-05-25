@@ -1,7 +1,7 @@
 'use client'
 import DatePicker from './DatePicker'
 
-// VITAS v2 TitleBar — breadcrumb + H1 + date picker + comparison toggle
+// VITAS v2 TitleBar - breadcrumb + H1 + date picker + comparison toggle
 //
 // Usage from admin/page.js:
 //   <TitleBar
