@@ -1391,6 +1391,7 @@ const selectProject = async (client, project) => {
     }
 
     let prevCrmTotals = null;
+    let prevCrmTotalLeads = 0;
     if (compareEnabled) {
       const prevMonth2 = getPrevMonth(selectedMonth);
       const prevCrmReps = reports.filter(r => r.month === prevMonth2 && r.source === 'crm');
@@ -1401,6 +1402,15 @@ const selectProject = async (client, project) => {
         if (dashTab === 'facebook') filtPrev = allPrevCrm.filter(r => /פייסבוק|facebook/i.test(r.source || ''));
         else if (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') filtPrev = allPrevCrm.filter(r => /גוגל|google|pmax|search/i.test(r.source || ''));
         if (filtPrev.length > 0) prevCrmTotals = aggregateCrmRows(filtPrev).totals;
+        // Compute CRM-only (non-ad) leads for prev period — mirrors crmTotalLeads logic
+        if (dashTab === 'all') {
+          allPrevCrm.forEach(row => {
+            const src = String(row.source || '').toLowerCase();
+            if (/פייסבוק|facebook|fb|מטא/.test(src)) return;
+            if (/גוגל|google|pmax|search|adwords/.test(src)) return;
+            prevCrmTotalLeads += (typeof row.totalLeads === 'number' ? row.totalLeads : parseFloat(String(row.totalLeads).replace(/[^0-9.\-]/g, '')) || 0);
+          });
+        }
       }
     }
 
@@ -2102,7 +2112,7 @@ const selectProject = async (client, project) => {
         ) : (<>
         <div className="kpi-grid">
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
-          {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP?.leads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
+          {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP != null ? (activeP.leads + prevCrmTotalLeads) : null) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
           {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled) : null}
           {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted) : null}
