@@ -5,16 +5,8 @@
       "schedule": "30 2 * * *"
     },
     {
-      "path": "/api/meta/fetch",
+      "path": "/api/cron/prefetch",
       "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/google/fetch",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/bmby/fetch",
-      "schedule": "0 5 * * *"
     }
   ]
 }
