@@ -9,7 +9,7 @@
 export default function Header({ onExport, onLogout, extraActions = null }) {
   return (
     <header className="header">
-      <div className="header-content">
+      <div className="header-content" style={{ width: '100%' }}>
         <div className="header-brand">
           <img
             className="logo-img"
@@ -17,16 +17,7 @@ export default function Header({ onExport, onLogout, extraActions = null }) {
             alt="VITAS"
             style={{ height: 28, display: 'block' }}
           />
-          <span
-            className="eyebrow"
-            style={{
-              fontSize: 11, fontWeight: 800, letterSpacing: '0.18em',
-              color: 'var(--text-3)', paddingRight: 16, marginRight: 16,
-              borderRight: '1px solid var(--border)', textTransform: 'uppercase',
-            }}
-          >
-            Real Estate Analytics
-          </span>
+
         </div>
         <div className="header-actions header-nav" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {extraActions}
