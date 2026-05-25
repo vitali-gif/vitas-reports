@@ -2214,9 +2214,11 @@ const selectProject = async (client, project) => {
 
         {/* Nested expandable table - Campaign → Ad Set → Ad - for FB, All, Google Search */}
         {(isFb || dashTab === 'all' || dashTab === 'google_search') && campNames.length > 0 && (() => {
-          // Build hierarchy from raw rows
+          // Build hierarchy from raw rows — inject _reportSource from the parent report
+          const treeRows = [];
+          displayReports.forEach(rep => { if (rep.data) rep.data.forEach(row => treeRows.push({...row, _reportSource: rep.source || ''})); });
           const tree = {};
-          allRows.forEach(r => {
+          treeRows.forEach(r => {
             const c = r.campaign || '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2';
             const a = r.adSet || '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2';
             const ad = r.adName || '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2';
@@ -2225,7 +2227,7 @@ const selectProject = async (client, project) => {
             const reach = parseFloat(r.reach) || 0;
             const clicks = parseFloat(r.clicks) || 0;
             const leads = parseFloat(r.leads) || 0;
-            if (!tree[c]) tree[c] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, adSets: {}, source: r.source || '' };
+            if (!tree[c]) tree[c] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, adSets: {}, source: r._reportSource || '' };
             tree[c].spend += spend; tree[c].impressions += imp; tree[c].reach += reach; tree[c].clicks += clicks; tree[c].leads += leads;
             if (!tree[c].adSets[a]) tree[c].adSets[a] = { spend:0, impressions:0, reach:0, clicks:0, leads:0, ads: {} };
             tree[c].adSets[a].spend += spend; tree[c].adSets[a].impressions += imp; tree[c].adSets[a].reach += reach; tree[c].adSets[a].clicks += clicks; tree[c].adSets[a].leads += leads;
