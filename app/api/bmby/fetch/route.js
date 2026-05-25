@@ -775,6 +775,15 @@ async function runSync(opts = {}) {
       if (scheduledHit) dayOfWeekStats[dow].scheduled++
     }
 
+    // Build client_id -> full name map for namedLeads modal labels
+    const clientName = new Map()
+    for (const c of clients) {
+      const cid = String(c.client_id || '')
+      if (!cid) continue
+      const name = ((c.client_fname || '') + ' ' + (c.client_lname || '')).trim()
+      if (name) clientName.set(cid, name)
+    }
+
     // Build namedLeads arrays — used by the dashboard's clickable KPI cards modal
     const _noResponseCids = new Set()
     for (const lid of aprilLids) {
