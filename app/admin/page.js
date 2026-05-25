@@ -1053,7 +1053,38 @@ const selectProject = async (client, project) => {
         crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads };
       } else {
         crmData.totals.totalLeads -= (crmData.sources['Facebook'].totalLeads || 0);
-        crmData.totals.totalLeadconst crmKpi = (label, value, color, current, prev, isCost, tip) => {
+        crmData.totals.totalLeads += _fbLeads;
+      }
+    }
+    if (_gR.length > 0) {
+      let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data); });
+      const _gAgg = aggregateRows(_gRows);
+      _platformSpend += _gAgg.totals.spend || 0;
+      const _gLeads = _gAgg.totals.leads || 0;
+      if (!crmData.sources['Google']) {
+        crmData.totals.totalLeads += _gLeads;
+        crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads };
+      } else {
+        crmData.totals.totalLeads -= (crmData.sources['Google'].totalLeads || 0);
+        crmData.totals.totalLeads += _gLeads;
+      }
+    }
+
+    let prevCrmData = null;
+    if (compareEnabled) {
+      const prevMonth = getPrevMonth(selectedMonth);
+      const prevCrmReports = reports.filter(r => r.month === prevMonth && r.source === 'crm');
+      if (prevCrmReports.length > 0) {
+        let prevRows = [];
+        prevCrmReports.forEach(r => { prevRows = prevRows.concat(r.data || []); });
+        prevCrmData = aggregateCrmRows(prevRows);
+      }
+    }
+
+    const ct = crmData.totals;
+    const cp = prevCrmData?.totals;
+
+    const crmKpi = (label, value, color, current, prev, isCost, tip) => {
       const ch = prev != null ? changePercent(current, prev, isCost) : null;
       const sl = String(label);
       const iconPaths =
@@ -1089,20 +1120,6 @@ const selectProject = async (client, project) => {
           <div className="kpi-label">{label}{tip ? <InfoTip text={tip} /> : null}</div>
           <div className="kpi-value">{value}</div>
           <div style={{height:28,marginTop:'auto'}}/>
-        </div>
-      );
-    };udes('\u05d0\u05d7\u05d5\u05d6')) ? <><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></> :
-        <><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></>;
-      const crmV2Color = { green:'emerald', orange:'terra', pink:'rose', purple:'violet', cyan:'sky', red:'amber', '':'indigo' };
-      const v2cls = crmV2Color[color] || 'indigo';
-      return (
-        <div className={`kpi-c ${v2cls}`} key={label}>
-          <div className="ic-wrap">
-            <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{iconPaths}</svg></div>
-            {ch ? <span className={`trend${ch.pct===0?' flat':ch.isGood===false?' down':''}`}>{ch.pct>0?'+':''}{ch.pct===0?'0%':Math.abs(ch.pct).toFixed(0)+'%'}</span> : null}
-          </div>
-          <div className="lbl">{label}{tip ? <InfoTip text={tip} /> : null}</div>
-          <div className="val">{value}</div>
         </div>
       );
     };
