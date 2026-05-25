@@ -129,6 +129,7 @@ export default function AdminPage() {
   const [newClientColor, setNewClientColor] = useState('#3b82f6')
   const [newProjectName, setNewProjectName] = useState('')
   const [toast, setToast] = useState('')
+  const [namedLeadsModal, setNamedLeadsModal] = useState(null) // {title, names:[]}
   const [sortConfig, setSortConfig] = useState({});
   const [expandedCampaigns, setExpandedCampaigns] = useState(new Set());
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
@@ -703,6 +704,7 @@ const selectProject = async (client, project) => {
     destroyCharts();
 
     const crmRows = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
+    const crmNamedLeads = crmRows[0]?.summary?.namedLeads || null;
     let totalLids = 0, respondedCount = 0, noResponseCount = 0;
     const bucketsTotal = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
     const bucketsBusiness = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 }
@@ -870,7 +872,7 @@ const selectProject = async (client, project) => {
             <div className="lbl">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div>
             <div className="val">{fmt(overallBusinessMin)}</div>
           </div>
-          <div className="kpi-c violet">
+          <div className="kpi-c violet" style={crmNamedLeads?.noResponse?.length > 0 ? {cursor:'pointer'} : undefined} onClick={crmNamedLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים בלי מענה', names: crmNamedLeads.noResponse}) : undefined}>
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
             </div>
@@ -1022,6 +1024,7 @@ const selectProject = async (client, project) => {
     let allCrmRows = [];
     crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
     const crmData = aggregateCrmRows(allCrmRows);
+    const crmNamedLeads = crmReports[0]?.summary?.namedLeads || null;
 
     // Merge Facebook campaign sources into single 'Facebook' entry - children kept for drill-down
     const _fbCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('פייסבוק') || k.toLowerCase().includes('facebook'));
@@ -1374,6 +1377,8 @@ const selectProject = async (client, project) => {
       }
     }
 
+    const dashCrmNamedLeads = currentReports.find(r => r.source === 'crm')?.summary?.namedLeads || null;
+
     let prevData = null;
     if (compareEnabled) {
       const prevMonth = getPrevMonth(selectedMonth);
@@ -1447,7 +1452,7 @@ const selectProject = async (client, project) => {
       return <><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></>;
     };
 
-    const kpi = (label, value, color, current, prev, isCost) => {
+    const kpi = (label, value, color, current, prev, isCost, namesArr) => {
       const ch = (prev != null && prev !== 0) ? changePercent(current, prev, isCost)
         : (prev === 0 && current > 0) ? { pct: null, isGood: !isCost, newVal: true }
         : null;
@@ -1456,8 +1461,9 @@ const selectProject = async (client, project) => {
       const metricKey = label === 'לידים' ? 'leads' : label === 'תקציב' ? 'spend' : label === 'עלות לליד' ? 'cpl' : label === 'פגישות שתואמו' ? 'meetingsScheduled' : label === 'פגישות שבוצעו' ? 'meetingsCompleted' : label === 'הרשמות' ? 'registrations' : label === 'חוזים' ? 'contracts' : null;
       const sparkVals = metricKey && trendData.length >= 2 ? trendData.map(d => d[metricKey] || 0) : null;
       const trendPct = ch ? (ch.pct > 0 ? '+' : '') + Math.abs(ch.pct).toFixed(0) + '%' : null;
+      const _hasNames = namesArr && namesArr.length > 0;
       return (
-        <div className={`kpi ${v2cls}`} key={label}>
+        <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined}>
           <div className="kpi-top">
             <div className="kpi-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -2114,10 +2120,10 @@ const selectProject = async (client, project) => {
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP != null ? (activeP.leads + prevCrmTotalLeads) : null) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
-          {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled) : null}
-          {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted) : null}
-          {crmTotals ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations) : null}
-          {crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts) : null}
+          {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, dashCrmNamedLeads?.meetingsScheduled) : null}
+          {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, dashCrmNamedLeads?.meetingsCompleted) : null}
+          {crmTotals ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, dashCrmNamedLeads?.registrations) : null}
+          {crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, dashCrmNamedLeads?.contracts) : null}
           {crmTotals && dashTab !== 'all' && crmTotals.meetingsCompleted > 0 ? kpi('עלות לפגישה שבוצעה', formatCurrency(activeT.spend / crmTotals.meetingsCompleted), 'purple', activeT.spend / crmTotals.meetingsCompleted, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
           {crmTotals && dashTab !== 'all' && crmTotals.contracts > 0 ? kpi('עלות לחוזה', formatCurrency(activeT.spend / crmTotals.contracts), 'red', activeT.spend / crmTotals.contracts, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
         </div>
@@ -2701,6 +2707,32 @@ const selectProject = async (client, project) => {
       <div className={`modal-overlay ${showAddClient ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddClient(false); }}><div className="modal"><h3>{'\u05d4\u05d5\u05e1\u05e3 \u05dc\u05e7\u05d5\u05d7 \u05d7\u05d3\u05e9'}</h3><div className="form-group"><label>{'\u05e9\u05dd \u05dc\u05e7\u05d5\u05d7'}</label><input className="form-input" value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: \u05e9.\u05d1\u05e8\u05d5\u05dc'} /></div><div className="form-group"><label>{'\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd (\u05de\u05d5\u05e4\u05e8\u05d3\u05d9\u05dd \u05d1\u05e4\u05e1\u05d9\u05e7\u05d9\u05dd)'}</label><input className="form-input" value={newClientProjects} onChange={e => setNewClientProjects(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK, ONCE'} /></div><div className="form-group"><label>{'\u05e6\u05d1\u05e2'}</label><select className="form-input" value={newClientColor} onChange={e => setNewClientColor(e.target.value)}><option value="#3b82f6">{'\u05db\u05d7\u05d5\u05dc'}</option><option value="#10b981">{'\u05d9\u05e8\u05d5\u05e7'}</option><option value="#8b5cf6">{'\u05e1\u05d2\u05d5\u05dc'}</option><option value="#f59e0b">{'\u05db\u05ea\u05d5\u05dd'}</option><option value="#ec4899">{'\u05d5\u05e8\u05d5\u05d3'}</option></select></div><div className="modal-actions"><button className="btn btn-primary" onClick={addClient}>{'\u05d4\u05d5\u05e1\u05e3'}</button><button className="btn btn-outline" onClick={() => setShowAddClient(false)}>{'\u05d1\u05d9\u05d8\u05d5\u05dc'}</button></div></div></div>
 
       <div className={`modal-overlay ${showAddProject ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddProject(false); }}><div className="modal"><h3>{'\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05dc-'}{selectedClient?.name}</h3><div className="form-group"><label>{'\u05e9\u05dd \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</label><input className="form-input" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK'} /></div><div className="modal-actions"><button className="btn btn-primary" onClick={addProject}>{'\u05d4\u05d5\u05e1\u05e3'}</button><button className="btn btn-outline" onClick={() => setShowAddProject(false)}>{'\u05d1\u05d9\u05d8\u05d5\u05dc'}</button></div></div></div>
+
+      {namedLeadsModal && (
+        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setNamedLeadsModal(null); }} style={{zIndex:9999}}>
+          <div className="modal" style={{maxWidth:420,maxHeight:'75vh',display:'flex',flexDirection:'column',direction:'rtl'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700}}>{namedLeadsModal.title}</h3>
+              <button onClick={() => setNamedLeadsModal(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
+            </div>
+            {namedLeadsModal.names.length === 0 ? (
+              <p style={{color:'#94a3b8',textAlign:'center',margin:'24px 0'}}>אין נתונים להצגה</p>
+            ) : (
+              <ul style={{margin:0,padding:0,listStyle:'none',overflowY:'auto',flex:1}}>
+                {namedLeadsModal.names.map((name, i) => (
+                  <li key={i} style={{padding:'9px 12px',borderBottom:'1px solid var(--border)',fontSize:14,display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{width:22,height:22,borderRadius:'50%',background:'var(--indigo-50)',color:'var(--indigo)',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div style={{marginTop:14,textAlign:'left'}}>
+              <span style={{fontSize:12,color:'#94a3b8'}}>{namedLeadsModal.names.length} רשומות</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
     </div>
