@@ -799,42 +799,69 @@ async function runSync(opts = {}) {
       })
       if (!hasFollowup) _noResponseCids.add(cid)
     }
-    const namedLeads = {
-      meetingsScheduled: aprilLids
+    // Classify each lid by source platform for per-tab filtering
+    const _isFbLid   = (lid) => /\u05e4\u05d9\u05d9\u05e1\u05d1\u05d5\u05e7|facebook/i.test(lid.media_title || '')
+    const _isGlLid   = (lid) => /\u05d2\u05d5\u05d2\u05dc|google|pmax|search/i.test(lid.media_title || '')
+    // Map client_id -> platform for registrations/contracts (inherit from their lid)
+    const _cidSource = new Map()
+    for (const lid of aprilLids) {
+      const cid = String(lid.client_id || '')
+      if (!cid) continue
+      if (_isFbLid(lid))      _cidSource.set(cid, 'facebook')
+      else if (_isGlLid(lid)) _cidSource.set(cid, 'google')
+      else if (!_cidSource.has(cid)) _cidSource.set(cid, 'other')
+    }
+
+    // Helper: build one namedLeads group from a subset of lids/registrations/contracts
+    const _buildGroup = (lids, regs, conts) => ({
+      meetingsScheduled: lids
         .filter(lid => clientsWithAppt.has(String(lid.client_id || '')))
-        .map(lid => clientName.get(String(lid.client_id || '')) || `ליד #${lid.client_id}`)
+        .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
         .filter(Boolean),
-      meetingsCompleted: aprilLids
+      meetingsCompleted: lids
         .filter(lid => clientsWithDoneAppt.has(String(lid.client_id || '')))
-        .map(lid => clientName.get(String(lid.client_id || '')) || `ליד #${lid.client_id}`)
+        .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
         .filter(Boolean),
-      registrations: pricesInRange
+      registrations: regs
         .map(po => {
           return ((po.client_fname || '') + ' ' + (po.client_lname || '')).trim()
             || clientName.get(String(po.client_id || ''))
-            || `ליד #${po.client_id}`
+            || `\u05dc\u05d9\u05d3 #${po.client_id}`
         })
         .filter(Boolean),
-      contracts: contractsInRange
+      contracts: conts
         .map(k => {
           const name = ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim()
             || clientName.get(String(k.client_id || ''))
-            || `ליד #${k.client_id}`
+            || `\u05dc\u05d9\u05d3 #${k.client_id}`
           const val = k.price_agreement_inc_vat || k.final_price_inc_vat || k.list_price || k.price_agreement || k.final_price || null
           return val ? `${name} (\u20aa${Number(val).toLocaleString('he-IL')})` : name
         })
         .filter(Boolean),
-      noResponse: aprilLids
+      noResponse: lids
         .filter(lid => _noResponseCids.has(String(lid.client_id || '')))
-        .map(lid => clientName.get(String(lid.client_id || '')) || `ליד #${lid.client_id}`)
+        .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
         .filter(Boolean),
+    })
+
+    const _fbLids  = aprilLids.filter(_isFbLid)
+    const _glLids  = aprilLids.filter(_isGlLid)
+    const _fbRegs  = pricesInRange.filter(po => _cidSource.get(String(po.client_id || '')) === 'facebook')
+    const _glRegs  = pricesInRange.filter(po => _cidSource.get(String(po.client_id || '')) === 'google')
+    const _fbConts = contractsInRange.filter(k => _cidSource.get(String(k.client_id || '')) === 'facebook')
+    const _glConts = contractsInRange.filter(k => _cidSource.get(String(k.client_id || '')) === 'google')
+
+    const namedLeads = {
+      all:      _buildGroup(aprilLids, pricesInRange, contractsInRange),
+      facebook: _buildGroup(_fbLids, _fbRegs, _fbConts),
+      google:   _buildGroup(_glLids, _glRegs, _glConts),
     }
 
     // Single upsert: store source-level rows in `data`, and per-LID city/objection
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
-    const CRM_SCHEMA_VERSION = 4  // v4: clientName from contracts+prices (full name coverage)
+    const CRM_SCHEMA_VERSION = 5  // v5: namedLeads split by platform { all, facebook, google }
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
