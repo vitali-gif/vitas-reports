@@ -390,6 +390,13 @@ async function runSync(opts = {}) {
       const obj = (c.objection || '').toString().trim()
       if (obj) clientObjection.set(cid, obj)
     }
+    const clientName = new Map()  // cid → "שם פרטי שם משפחה"
+    for (const c of clients) {
+      if (!c.client_id) continue
+      const cid = String(c.client_id)
+      const n = ((c.client_fname || '') + ' ' + (c.client_lname || '')).trim()
+      if (n) clientName.set(cid, n)
+    }
 
     // 4. Per-media aggregation from LIDs
     const totals = {
@@ -775,17 +782,59 @@ async function runSync(opts = {}) {
       if (scheduledHit) dayOfWeekStats[dow].scheduled++
     }
 
+    // Build namedLeads arrays — used by the dashboard's clickable KPI cards modal
+    const _noResponseCids = new Set()
+    for (const lid of aprilLids) {
+      const cid = String(lid.client_id || '')
+      if (!cid) continue
+      const lidMs = parseTs(lid.create_date || lid.start_date)
+      if (isNaN(lidMs)) continue
+      const hasFollowup = (tasksByClient.get(cid) || []).some(t => {
+        if ((t.type || '').toString().toLowerCase() === 'lid') return false
+        const subj = (t.subject || '').toString().trim().toLowerCase()
+        if (subj === 'update info lead') return false
+        const tMs = parseTs(t.create_date || t.start_date)
+        return !isNaN(tMs) && tMs >= lidMs
+      })
+      if (!hasFollowup) _noResponseCids.add(cid)
+    }
+    const namedLeads = {
+      meetingsScheduled: aprilLids
+        .filter(lid => clientsWithAppt.has(String(lid.client_id || '')))
+        .map(lid => clientName.get(String(lid.client_id || '')) || `ליד #${lid.client_id}`)
+        .filter(Boolean),
+      meetingsCompleted: aprilLids
+        .filter(lid => clientsWithDoneAppt.has(String(lid.client_id || '')))
+        .map(lid => clientName.get(String(lid.client_id || '')) || `ליד #${lid.client_id}`)
+        .filter(Boolean),
+      registrations: pricesInRange
+        .map(po => clientName.get(String(po.client_id || '')) || `ליד #${po.client_id}`)
+        .filter(Boolean),
+      contracts: contractsInRange
+        .map(k => {
+          const cid = String(k.client_id || '')
+          const name = clientName.get(cid) || `ליד #${k.client_id}`
+          const val = k.price_agreement_inc_vat || k.final_price_inc_vat || k.list_price || k.price_agreement || k.final_price || null
+          return val ? `${name} (₪${Number(val).toLocaleString('he-IL')})` : name
+        })
+        .filter(Boolean),
+      noResponse: aprilLids
+        .filter(lid => _noResponseCids.has(String(lid.client_id || '')))
+        .map(lid => clientName.get(String(lid.client_id || '')) || `ליד #${lid.client_id}`)
+        .filter(Boolean),
+    }
+
     // Single upsert: store source-level rows in `data`, and per-LID city/objection
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
-    const CRM_SCHEMA_VERSION = 2  // v2: meetingsCancelled per-source (fixed 2026-05-20)
+    const CRM_SCHEMA_VERSION = 3  // v3: namedLeads arrays for modal KPI cards (2026-05-25)
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
       month: m,
       data: xlsxRows,
-      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, schemaVersion: CRM_SCHEMA_VERSION },
+      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, namedLeads, schemaVersion: CRM_SCHEMA_VERSION },
       file_name: 'BMBY API (live)',
       row_count: aprilLids.length + contractsInRange.length + pricesInRange.length,
     }, { onConflict: 'project_id,source,month' })
