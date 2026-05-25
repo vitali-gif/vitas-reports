@@ -1110,12 +1110,18 @@ const selectProject = async (client, project) => {
                 {iconPaths}
               </svg>
             </div>
-            {ch ? (
-              <span className={`kpi-trend${ch.pct === 0 ? ' flat' : ''}`}>
-                {ch.pct > 0 ? '\u2191' : ch.pct < 0 ? '\u2193' : '\u2212'}
-                {ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '') + ch.pct.toFixed(0) + '%'}
-              </span>
-            ) : null}
+            {ch ? (() => {
+              const delta = current - prev;
+              const absDelta = isCost ? formatCurrency(Math.abs(delta)) : formatNum(Math.abs(Math.round(delta)));
+              const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
+              const arrow = ch.pct > 0 ? '\u2191' : ch.pct < 0 ? '\u2193' : '\u2212';
+              const pctStr = Math.abs(ch.pct).toFixed(0) + '%';
+              return (
+                <span className={`kpi-trend${ch.pct === 0 ? ' flat' : ''}`}>
+                  {arrow} {sign}{absDelta} ({ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '-') + pctStr})
+                </span>
+              );
+            })() : null}
           </div>
           <div className="kpi-label">{label}{tip ? <InfoTip text={tip} /> : null}</div>
           <div className="kpi-value">{value}</div>
@@ -1372,6 +1378,20 @@ const selectProject = async (client, project) => {
       if (displayPrev.length) { let prevRows = []; displayPrev.forEach(r => { prevRows = prevRows.concat(r.data); }); prevData = aggregateRows(prevRows); }
     }
 
+    let prevCrmTotals = null;
+    if (compareEnabled) {
+      const prevMonth2 = getPrevMonth(selectedMonth);
+      const prevCrmReps = reports.filter(r => r.month === prevMonth2 && r.source === 'crm');
+      if (prevCrmReps.length > 0) {
+        let allPrevCrm = [];
+        prevCrmReps.forEach(r => { if (r.data) allPrevCrm = allPrevCrm.concat(r.data); });
+        let filtPrev = allPrevCrm;
+        if (dashTab === 'facebook') filtPrev = allPrevCrm.filter(r => /פייסבוק|facebook/i.test(r.source || ''));
+        else if (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') filtPrev = allPrevCrm.filter(r => /גוגל|google|pmax|search/i.test(r.source || ''));
+        if (filtPrev.length > 0) prevCrmTotals = aggregateCrmRows(filtPrev).totals;
+      }
+    }
+
     const allMonths = [...new Set(reports.map(r => r.month))].sort();
     const trendData = allMonths.map(m => {
       let mRows = [];
@@ -1420,12 +1440,18 @@ const selectProject = async (client, project) => {
                 {kpiSvgIcon(label)}
               </svg>
             </div>
-            {ch ? (
-              <span className={`kpi-trend${ch.pct === 0 ? ' flat' : ''}`}>
-                {ch.pct > 0 ? '↑' : ch.pct < 0 ? '↓' : '−'}
-                {ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '') + ch.pct.toFixed(0) + '%'}
-              </span>
-            ) : null}
+            {ch ? (() => {
+              const delta = current - prev;
+              const absDelta = isCost ? formatCurrency(Math.abs(delta)) : formatNum(Math.abs(Math.round(delta)));
+              const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
+              const arrow = ch.pct > 0 ? '↑' : ch.pct < 0 ? '↓' : '−';
+              const pctStr = Math.abs(ch.pct).toFixed(0) + '%';
+              return (
+                <span className={`kpi-trend${ch.pct === 0 ? ' flat' : ''}`}>
+                  {arrow} {sign}{absDelta} ({ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '-') + pctStr})
+                </span>
+              );
+            })() : null}
           </div>
           <div className="kpi-label">{label}</div>
           <div className="kpi-value">{value}</div>
@@ -1542,7 +1568,7 @@ const selectProject = async (client, project) => {
     if (hasG) { let gRows = []; gReports.forEach(r => { if (r.data) gRows = gRows.concat(r.data); }); gTotals = aggregateRows(gRows).totals; }
 
     const activeT = dashTab === 'facebook' && fbTotals ? fbTotals : dashTab === 'google' && gTotals ? gTotals : t;
-    const activeP = dashTab !== 'all' ? null : p;
+    const activeP = p;
 
     // Total leads including CRM for "all" tab display
     const totalLeadsWithCrm = dashTab === 'all' ? t.leads + crmTotalLeads : activeT.leads;
@@ -2075,45 +2101,63 @@ const selectProject = async (client, project) => {
             <h2>משפך שיווקי</h2>
             <span className="sub">מקליק ועד חוזה</span>
           </div>
-          {crmTotals ? (
+          {(() => {
+            const fCh = (cur, prev) => {
+              if (!compareEnabled || prev == null || prev === 0) return null;
+              const delta = cur - prev;
+              const pct = ((delta) / prev) * 100;
+              const sign = delta > 0 ? '+' : delta < 0 ? '-' : '';
+              const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '−';
+              const absDelta = formatNum(Math.abs(Math.round(delta)));
+              const pctStr = Math.abs(pct).toFixed(0) + '%';
+              const isFlat = delta === 0;
+              return <span className={`kpi-trend${isFlat ? ' flat' : ''}`} style={{fontSize:10,padding:'2px 6px',marginTop:4,display:'inline-block'}}>{arrow} {sign}{absDelta} ({isFlat ? '0%' : (delta > 0 ? '+' : '-') + pctStr})</span>;
+            };
+            return crmTotals ? (
             <div className="funnel">
               <div className="fstep sky">
                 <div className="flabel">קליקים</div>
                 <div className="fvalue">{formatNum(activeT.clicks)}</div>
                 <div className="frate"><span className="pct">{activeT.impressions > 0 ? (activeT.clicks / activeT.impressions * 100).toFixed(2) + '%' : '-'}</span> CTR</div>
+                {fCh(activeT.clicks, p?.clicks)}
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep">
                 <div className="flabel">חשיפות</div>
                 <div className="fvalue">{formatNum(activeT.impressions)}</div>
                 <div className="frate"><span className="pct">100%</span> מצטבר</div>
+                {fCh(activeT.impressions, p?.impressions)}
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep terra">
                 <div className="flabel">פגישות מתואמות</div>
                 <div className="fvalue">{formatNum(crmTotals.meetingsScheduled || 0)}</div>
                 <div className="frate"><span className="pct">{totalLeadsWithCrm > 0 ? ((crmTotals.meetingsScheduled || 0) / totalLeadsWithCrm * 100).toFixed(1) + '%' : '-'}</span> מלידים</div>
+                {fCh(crmTotals.meetingsScheduled || 0, prevCrmTotals?.meetingsScheduled)}
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep emerald">
                 <div className="flabel">פגישות שבוצעו</div>
                 <div className="fvalue">{formatNum(crmTotals.meetingsCompleted || 0)}</div>
                 <div className="frate"><span className="pct">{totalLeadsWithCrm > 0 ? (crmTotals.meetingsCompleted / totalLeadsWithCrm * 100).toFixed(1) + '%' : '-'}</span> מלידים</div>
+                {fCh(crmTotals.meetingsCompleted || 0, prevCrmTotals?.meetingsCompleted)}
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep amber">
                 <div className="flabel">הרשמות</div>
                 <div className="fvalue">{formatNum(crmTotals.registrations || 0)}</div>
                 <div className="frate"><span className="pct">{crmTotals.meetingsCompleted > 0 ? (crmTotals.registrations / crmTotals.meetingsCompleted * 100).toFixed(0) + '%' : '-'}</span> משבוצעו</div>
+                {fCh(crmTotals.registrations || 0, prevCrmTotals?.registrations)}
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep rose">
                 <div className="flabel">חוזים</div>
                 <div className="fvalue">{formatNum(crmTotals.contracts || 0)}</div>
                 <div className="frate"><span className="pct">{crmTotals.registrations > 0 ? (crmTotals.contracts / crmTotals.registrations * 100).toFixed(0) + '%' : '-'}</span> מהרשמות</div>
+                {fCh(crmTotals.contracts || 0, prevCrmTotals?.contracts)}
               </div>
             </div>
-          ) : (
+            ) : (
             <div className="funnel" style={{gridTemplateColumns:'1fr 14px 1fr 14px 1fr'}}>
               <div className="fstep rose">
                 <div className="flabel">לידים</div>
@@ -2133,7 +2177,8 @@ const selectProject = async (client, project) => {
                 <div className="frate"><span className="pct">100%</span> מצטבר</div>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
 
                 {/* Non-FB tabs: keep existing campaigns charts + flat table */}
