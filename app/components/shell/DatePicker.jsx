@@ -309,24 +309,23 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
   }
 
   const clickDay = ymd => {
-    // Any day click switches to custom mode
-    if (pickMode === 'done' && tempPreset !== 'custom') {
-      setTempPreset('custom')
-    }
-    if (pickMode === 'done' || pickMode === 'start') {
-      setTempStart(ymd)
-      setTempEnd('')
-      setPickMode('end')
-    } else if (pickMode === 'end') {
+    // If actively picking end date, complete the range
+    if (pickMode === 'end' && tempStart) {
       if (ymd < tempStart) {
-        // Click before start: start over
+        // Clicked before start: restart selection from this date
         setTempStart(ymd)
         setTempEnd('')
       } else {
         setTempEnd(ymd)
         setPickMode('done')
       }
+      return
     }
+    // Otherwise start a new selection
+    setTempPreset('custom')
+    setTempStart(ymd)
+    setTempEnd('')
+    setPickMode('end')
   }
 
   const handleApply = () => {
