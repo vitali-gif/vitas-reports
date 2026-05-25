@@ -2092,13 +2092,13 @@ const selectProject = async (client, project) => {
               <div className="fstep terra">
                 <div className="flabel">פגישות מתואמות</div>
                 <div className="fvalue">{formatNum(crmTotals.meetingsScheduled || 0)}</div>
-                <div className="frate"><span className="pct">{activeT.clicks > 0 ? ((crmTotals.meetingsScheduled || 0) / activeT.clicks * 100).toFixed(1) + '%' : '-'}</span> מקליקים</div>
+                <div className="frate"><span className="pct">{totalLeadsWithCrm > 0 ? ((crmTotals.meetingsScheduled || 0) / totalLeadsWithCrm * 100).toFixed(1) + '%' : '-'}</span> מלידים</div>
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep emerald">
                 <div className="flabel">פגישות שבוצעו</div>
                 <div className="fvalue">{formatNum(crmTotals.meetingsCompleted || 0)}</div>
-                <div className="frate"><span className="pct">{crmTotals.meetingsScheduled > 0 ? (crmTotals.meetingsCompleted / crmTotals.meetingsScheduled * 100).toFixed(0) + '%' : '-'}</span> ממתואמות</div>
+                <div className="frate"><span className="pct">{totalLeadsWithCrm > 0 ? (crmTotals.meetingsCompleted / totalLeadsWithCrm * 100).toFixed(1) + '%' : '-'}</span> מלידים</div>
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
               <div className="fstep amber">
