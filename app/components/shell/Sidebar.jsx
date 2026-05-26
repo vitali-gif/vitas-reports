@@ -27,9 +27,11 @@ export default function Sidebar({
   onAddProject,
   lockedProjects = [],
   footerText = 'VITAS Reports v3.2',
+  isOpen = false,
+  onClose,
 }) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? ' mobile-open' : ''}`}>
       <div className="sidebar-inner" style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 60px)' }}>
         <div className="sidebar-section">
           <div className="sidebar-title">לקוחות</div>

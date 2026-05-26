@@ -117,6 +117,7 @@ export default function AdminPage() {
   const [dashTab, setDashTab] = useState('all')
   const [crmSubTab, setCrmSubTab] = useState('sources')
   const [cityMetric, setCityMetric] = useState('leads')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [vitasTasks, setVitasTasks] = useState([])
   const [recSubTab, setRecSubTab] = useState('new')
   const [lockingRecKey, setLockingRecKey] = useState('')
@@ -2699,14 +2700,22 @@ const selectProject = async (client, project) => {
         );
       })()}
       <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} style={{display: sidebarOpen ? 'block' : 'none'}} />
       <Header
         onLogout={handleLogout}
-        extraActions={(refreshing || refreshingCrm) && (
-          <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'rgba(59,130,246,0.12)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:14}}>
-            <span style={{display:'inline-block',width:14,height:14,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}></span>
-            {refreshingCrm ? 'מושך CRM...' : 'מושך נתונים...'}
-          </div>
-        )}
+        extraActions={<>
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="תפריט">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <line x1="2" y1="4.5" x2="16" y2="4.5"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="13.5" x2="16" y2="13.5"/>
+            </svg>
+          </button>
+          {(refreshing || refreshingCrm) && (
+            <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'rgba(59,130,246,0.12)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:14}}>
+              <span style={{display:'inline-block',width:14,height:14,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}></span>
+              {refreshingCrm ? 'מושך CRM...' : 'מושך נתונים...'}
+            </div>
+          )}
+        </>}
       />
 
       <div className="app-layout">
@@ -2714,12 +2723,14 @@ const selectProject = async (client, project) => {
           clients={clients}
           activeClient={selectedClient?.name}
           activeProject={selectedProject?.name}
-          onSelectClient={(client) => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}
-          onSelectProject={(client, project) => selectProject(client, project)}
+          onSelectClient={(client) => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); setSidebarOpen(false); }}
+          onSelectProject={(client, project) => { selectProject(client, project); setSidebarOpen(false); }}
           onAddClient={() => setShowAddClient(true)}
           onAddProject={() => setShowAddProject(true)}
           footerText="VITAS Reports v3.2"
           lockedProjects={['ONCE', 'REHAVIA']}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
 
         <div className="main-content">

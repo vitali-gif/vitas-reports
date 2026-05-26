@@ -2452,3 +2452,161 @@
   height: 280px;
   width: 100%;
 }
+
+/* =====================================================
+   MOBILE RESPONSIVE — added 2026-05-26
+   Breakpoints: 768px (tablet), 480px (phone)
+   ===================================================== */
+
+/* --- Hamburger button (hidden on desktop) --- */
+.hamburger-btn {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 36px; height: 36px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.hamburger-btn:hover { background: var(--surface); color: var(--text); }
+
+/* --- Sidebar overlay (mobile only) --- */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 199;
+  backdrop-filter: blur(2px);
+}
+
+@media (max-width: 768px) {
+  /* Show hamburger */
+  .hamburger-btn { display: flex; }
+
+  /* Overlay appears when sidebar open */
+  .sidebar-overlay.open { display: block; }
+
+  /* Layout: single column, sidebar becomes drawer */
+  .app-layout, .layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Sidebar becomes fixed slide-in drawer */
+  .sidebar {
+    position: fixed !important;
+    top: 0; right: -280px;
+    width: 260px;
+    height: 100vh;
+    z-index: 200;
+    transition: right 0.25s cubic-bezier(0.4,0,0.2,1);
+    overflow-y: auto;
+    padding-top: 60px;
+  }
+  .sidebar.mobile-open {
+    right: 0;
+  }
+
+  /* Main content full width, reduce padding */
+  .main-content {
+    padding: 20px 16px 60px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Header — tighter */
+  .header-content { padding: 0 16px; }
+
+  /* KPI grid — 2 cols on tablet */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px;
+  }
+
+  /* KPI card — smaller font */
+  .kpi-value { font-size: 26px !important; }
+  .kpi-label { font-size: 11px !important; }
+
+  /* Tabs — horizontal scroll */
+  .client-tabs, .tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .client-tabs::-webkit-scrollbar { display: none; }
+  .client-tab, .tab {
+    white-space: nowrap;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  /* Tables — horizontal scroll wrapper */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .data-table {
+    min-width: 600px;
+  }
+
+  /* Chart grid — single column */
+  .chart-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Section grid — single column */
+  .section-grid, .demo-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Funnel — show only first 4 steps on mobile */
+  .funnel {
+    grid-template-columns: 1fr 16px 1fr 16px 1fr 16px 1fr !important;
+    gap: 4px;
+  }
+  .funnel .fstep:nth-child(n+9),
+  .funnel .farrow:nth-child(n+8) { display: none; }
+
+  /* CRM funnel — 3 steps */
+  .crm-funnel {
+    grid-template-columns: 1fr 12px 1fr 12px 1fr !important;
+  }
+  .crm-funnel .crm-fstep:nth-child(n+8),
+  .crm-funnel .crm-farrow:nth-child(n+7) { display: none; }
+
+  /* Date picker — full width */
+  .date-bar, .datepicker-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Section head — stack on narrow */
+  .section-head {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .section-head .sub { font-size: 11px; }
+
+  /* Title bar crumb — shorter */
+  .title-bar { padding: 12px 16px; }
+}
+
+@media (max-width: 480px) {
+  /* Phone: 1 column KPI */
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Even tighter main padding */
+  .main-content { padding: 14px 12px 50px; }
+
+  /* Smaller KPI font */
+  .kpi-value { font-size: 22px !important; }
+
+  /* Crumb titles shorter */
+  .title-bar h1 { font-size: 16px; }
+}
