@@ -2744,7 +2744,8 @@
      dense mobile (section head + card padding + chart-box).
      Drop them — KPI trend % and the funnel already carry the trend
      story. Re-enable a specific one by removing this rule. */
-  .section:has(> .chart-card),
+  /* :has(> .chart-card) removed — not supported by cssnano in this Next.js version.
+     To hide a chart section on mobile, add class="section mobile-hide" to its wrapper. */
   .section.mobile-hide { display: none; }
 
   /* ---------------------------------------------------------------
@@ -2853,7 +2854,7 @@
   /* ---------------------------------------------------------------
      12 · CRM — objections list
      Hide the desktop ranked-list table; render top-3 as cards.
-     Cards are opt-in: <ul class="objections-mobile"><li>… */
+     Cards are opt-in: <ul class="objections-mobile"><li>…
      --------------------------------------------------------------- */
   .rank-list.objections,
   .crm-objections-table { display: none !important; }
