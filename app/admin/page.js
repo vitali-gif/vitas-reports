@@ -118,6 +118,12 @@ export default function AdminPage() {
   const [crmSubTab, setCrmSubTab] = useState('sources')
   const [cityMetric, setCityMetric] = useState('leads')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [clientAccessList, setClientAccessList] = useState([])
+  const [showClientAccess, setShowClientAccess] = useState(false)
+  const [caEmail, setCaEmail] = useState('')
+  const [caProjectId, setCaProjectId] = useState('')
+  const [caLabel, setCaLabel] = useState('')
+  const [caSaving, setCaSaving] = useState(false)
   const [vitasTasks, setVitasTasks] = useState([])
   const [recSubTab, setRecSubTab] = useState('new')
   const [lockingRecKey, setLockingRecKey] = useState('')
@@ -158,6 +164,38 @@ export default function AdminPage() {
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
+
+  const loadClientAccess = async () => {
+    const res = await fetch('/api/client-access')
+    const data = await res.json()
+    setClientAccessList(Array.isArray(data) ? data : [])
+  }
+
+  const addClientAccess = async () => {
+    if (!caEmail.trim() || !caProjectId) return
+    setCaSaving(true)
+    const res = await fetch('/api/client-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: caEmail.trim(), project_id: caProjectId, label: caLabel.trim() || null })
+    })
+    setCaSaving(false)
+    if (res.ok) {
+      setCaEmail(''); setCaProjectId(''); setCaLabel('')
+      await loadClientAccess()
+      showToast('✓ גישה נוספה')
+    } else {
+      const err = await res.json()
+      showToast('שגיאה: ' + (err.error || 'unknown'))
+    }
+  }
+
+  const deleteClientAccess = async (id) => {
+    if (!confirm('למחוק גישה זו?')) return
+    await fetch('/api/client-access?id=' + id, { method: 'DELETE' })
+    setClientAccessList(prev => prev.filter(x => x.id !== id))
+    showToast('✓ גישה נמחקה')
+  }
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -2709,6 +2747,9 @@ const selectProject = async (client, project) => {
               <line x1="2" y1="4.5" x2="16" y2="4.5"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="13.5" x2="16" y2="13.5"/>
             </svg>
           </button>
+          <button className="nav-btn" onClick={() => { setShowClientAccess(true); loadClientAccess(); }} title="ניהול גישת לקוחות">
+            👥 גישת לקוחות
+          </button>
           {(refreshing || refreshingCrm) && (
             <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'rgba(59,130,246,0.12)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:14}}>
               <span style={{display:'inline-block',width:14,height:14,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}></span>
@@ -2759,6 +2800,82 @@ const selectProject = async (client, project) => {
       <div className={`modal-overlay ${showAddClient ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddClient(false); }}><div className="modal"><h3>{'\u05d4\u05d5\u05e1\u05e3 \u05dc\u05e7\u05d5\u05d7 \u05d7\u05d3\u05e9'}</h3><div className="form-group"><label>{'\u05e9\u05dd \u05dc\u05e7\u05d5\u05d7'}</label><input className="form-input" value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: \u05e9.\u05d1\u05e8\u05d5\u05dc'} /></div><div className="form-group"><label>{'\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd (\u05de\u05d5\u05e4\u05e8\u05d3\u05d9\u05dd \u05d1\u05e4\u05e1\u05d9\u05e7\u05d9\u05dd)'}</label><input className="form-input" value={newClientProjects} onChange={e => setNewClientProjects(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK, ONCE'} /></div><div className="form-group"><label>{'\u05e6\u05d1\u05e2'}</label><select className="form-input" value={newClientColor} onChange={e => setNewClientColor(e.target.value)}><option value="#3b82f6">{'\u05db\u05d7\u05d5\u05dc'}</option><option value="#10b981">{'\u05d9\u05e8\u05d5\u05e7'}</option><option value="#8b5cf6">{'\u05e1\u05d2\u05d5\u05dc'}</option><option value="#f59e0b">{'\u05db\u05ea\u05d5\u05dd'}</option><option value="#ec4899">{'\u05d5\u05e8\u05d5\u05d3'}</option></select></div><div className="modal-actions"><button className="btn btn-primary" onClick={addClient}>{'\u05d4\u05d5\u05e1\u05e3'}</button><button className="btn btn-outline" onClick={() => setShowAddClient(false)}>{'\u05d1\u05d9\u05d8\u05d5\u05dc'}</button></div></div></div>
 
       <div className={`modal-overlay ${showAddProject ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddProject(false); }}><div className="modal"><h3>{'\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05dc-'}{selectedClient?.name}</h3><div className="form-group"><label>{'\u05e9\u05dd \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</label><input className="form-input" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK'} /></div><div className="modal-actions"><button className="btn btn-primary" onClick={addProject}>{'\u05d4\u05d5\u05e1\u05e3'}</button><button className="btn btn-outline" onClick={() => setShowAddProject(false)}>{'\u05d1\u05d9\u05d8\u05d5\u05dc'}</button></div></div></div>
+
+      {showClientAccess && (
+        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setShowClientAccess(false); }}>
+          <div className="modal" style={{maxWidth:560,width:'100%',direction:'rtl',maxHeight:'80vh',overflow:'auto'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+              <h3 style={{margin:0,fontSize:17,fontWeight:700}}>👥 ניהול גישת לקוחות</h3>
+              <button onClick={() => setShowClientAccess(false)} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'#64748b'}}>&times;</button>
+            </div>
+            <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:16,lineHeight:1.6}}>
+              הוסף כתובת מייל של לקוח וקשר אותה לפרויקט. הלקוח יוכל להיכנס ל-<strong>reports.vitas.co.il/client</strong> עם קישור קסם שנשלח למייל שלו.
+            </p>
+
+            {/* Add form */}
+            <div style={{background:'var(--surface)',borderRadius:12,padding:'16px',marginBottom:20,display:'flex',flexDirection:'column',gap:10}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div>
+                  <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>מייל לקוח</label>
+                  <input className="form-input" type="email" value={caEmail} onChange={e => setCaEmail(e.target.value)}
+                    placeholder="client@example.com" style={{direction:'ltr',textAlign:'left'}} />
+                </div>
+                <div>
+                  <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>פרויקט</label>
+                  <select className="form-input" value={caProjectId} onChange={e => setCaProjectId(e.target.value)}>
+                    <option value="">-- בחר פרויקט --</option>
+                    {clients.flatMap(cl => (cl.projects || []).map(pr => (
+                      <option key={pr.id} value={pr.id}>{cl.name} - {pr.name}</option>
+                    )))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>תווית (אופציונלי)</label>
+                <input className="form-input" value={caLabel} onChange={e => setCaLabel(e.target.value)} placeholder="לדוגמה: ש.ברוך - HI PARK" />
+              </div>
+              <button className="btn btn-primary" onClick={addClientAccess} disabled={caSaving || !caEmail || !caProjectId}
+                style={{alignSelf:'flex-end',padding:'8px 20px'}}>
+                {caSaving ? 'שומר...' : '+ הוסף גישה'}
+              </button>
+            </div>
+
+            {/* List */}
+            {clientAccessList.length === 0
+              ? <div style={{textAlign:'center',padding:'24px 0',color:'var(--text-secondary)',fontSize:13}}>אין גישות מוגדרות עדיין</div>
+              : (
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                  <thead>
+                    <tr style={{borderBottom:'1px solid var(--border)'}}>
+                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>מייל</th>
+                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>פרויקט</th>
+                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>תווית</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientAccessList.map(ca => (
+                      <tr key={ca.id} style={{borderBottom:'1px solid var(--surface)'}}>
+                        <td style={{padding:'10px',direction:'ltr',textAlign:'left',fontFamily:'monospace',fontSize:12}}>{ca.email}</td>
+                        <td style={{padding:'10px',fontWeight:600}}>{ca.projects?.clients?.name} - {ca.projects?.name}</td>
+                        <td style={{padding:'10px',color:'var(--text-secondary)',fontSize:12}}>{ca.label || '—'}</td>
+                        <td style={{padding:'10px',textAlign:'center'}}>
+                          <button onClick={() => deleteClientAccess(ca.id)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:16,padding:'2px 6px'}}>🗑</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            }
+
+            <div style={{marginTop:20,padding:'12px',background:'#eff6ff',borderRadius:8,fontSize:12,color:'#1e40af',lineHeight:1.6}}>
+              <strong>קישור לדאשבורד לקוח:</strong>{' '}
+              <span style={{direction:'ltr',display:'inline-block'}}>{typeof window !== 'undefined' ? window.location.origin : ''}/client</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {namedLeadsModal && (
         <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setNamedLeadsModal(null); }} style={{zIndex:9999}}>
