@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
-import { formatCurrency, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, getRecommendationsWindowMonths } from '../../lib/helpers'
+import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact } from '../../lib/recommendations'
@@ -1187,7 +1187,7 @@ const selectProject = async (client, project) => {
           {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts)}
           {ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
           {ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
-          {(ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrency(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
+          {(ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrencyCompact(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
         </div>
 
 
@@ -2153,7 +2153,7 @@ const selectProject = async (client, project) => {
           {crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts) : null}
           {crmTotals && crmTotals.meetingsCompleted > 0 ? kpi('עלות לפגישה שבוצעה', formatCurrency(activeT.spend / crmTotals.meetingsCompleted), 'purple', activeT.spend / crmTotals.meetingsCompleted, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
           {crmTotals && crmTotals.contracts > 0 ? kpi('עלות לחוזה', formatCurrency(activeT.spend / crmTotals.contracts), 'red', activeT.spend / crmTotals.contracts, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
-          {crmTotals && (crmTotals.contractValue || 0) > 0 ? kpi('שווי חוזים', formatCurrency(crmTotals.contractValue), 'green', crmTotals.contractValue, prevCrmTotals?.contractValue || null) : null}
+          {crmTotals && (crmTotals.contractValue || 0) > 0 ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals.contractValue), 'green', crmTotals.contractValue, prevCrmTotals?.contractValue || null) : null}
         </div>
 
         {/* FUNNEL */}
