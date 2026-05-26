@@ -584,6 +584,7 @@ async function runSync(opts = {}) {
     // Build per-LID rows for the "מחולל דוחות" sub-tab (city/objection/last-meeting view).
     // Shape: { address, objections, lastMeeting } - same shape `mapCrmReportRows` produces from xlsx.
     const crmReportRows = []
+    const aprilLidClientIds = new Set(aprilLids.map(l => String(l.client_id || '')).filter(Boolean))
     for (const lid of aprilLids) {
       const cid = String(lid.client_id || '')
       if (!cid) continue
@@ -598,6 +599,21 @@ async function runSync(opts = {}) {
         objections: objection,
         lastMeeting,
         hasContract: contractClientSet.has(cid),
+      })
+    }
+    // Add contract-only rows: clients who signed a contract this period but whose lead
+    // came from a previous month (not in aprilLids). Without this, contracts from old
+    // leads show zero city data when toggling to "חוזים" view.
+    for (const cid of contractClientSet) {
+      if (aprilLidClientIds.has(cid)) continue  // already included above
+      const city = clientCity.get(cid) || clientAddress.get(cid) || ''
+      if (!city) continue
+      crmReportRows.push({
+        address: city,
+        objections: '',
+        lastMeeting: '',
+        hasContract: true,
+        contractOnly: true,  // flag: don't count as a lead
       })
     }
 

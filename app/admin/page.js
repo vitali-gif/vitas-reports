@@ -686,14 +686,19 @@ const selectProject = async (client, project) => {
           <div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
           <h2>Top 10 יישובים</h2>
           <span className="sub">לפי {metricLabel}</span>
-          <div style={{marginRight:'auto',display:'flex',gap:4}}>
-            {[['leads','לידים'],['meetings','פגישות'],['contracts','חוזים']].map(([k,l]) => (
-              <button key={k} onClick={() => setCityMetric(k)} style={{fontSize:12,padding:'3px 10px',borderRadius:20,border:'1px solid var(--border)',background: cityMetric === k ? 'var(--accent)' : 'transparent',color: cityMetric === k ? '#fff' : 'var(--text-secondary)',cursor:'pointer',fontWeight: cityMetric === k ? 600 : 400,transition:'all 0.15s'}}>{l}</button>
-            ))}
-          </div>
         </div>
         <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
-          <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmRepCityChart"></canvas></div></div>
+          <div className="chart-card">
+            <div className="chart-container" style={{height: 400}}><canvas id="crmRepCityChart"></canvas></div>
+            <div style={{display:'flex',justifyContent:'center',gap:6,padding:'10px 0 4px'}}>
+              {[['leads','לידים',COLORS[0]],['meetings','פגישות',COLORS[1]],['contracts','חוזים',COLORS[2]]].map(([k,l,col]) => (
+                <button key={k} onClick={() => setCityMetric(k)} style={{display:'flex',alignItems:'center',gap:5,fontSize:12,padding:'4px 12px',borderRadius:20,border: cityMetric === k ? `1.5px solid ${col}` : '1.5px solid var(--border)',background: cityMetric === k ? col + '18' : 'transparent',color: cityMetric === k ? col : 'var(--text-secondary)',cursor:'pointer',fontWeight: cityMetric === k ? 700 : 400,transition:'all 0.15s'}}>
+                  <span style={{width:10,height:10,borderRadius:'50%',background: cityMetric === k ? col : 'var(--border)',display:'inline-block',flexShrink:0}}/>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="chart-card" style={{padding: '20px'}}>
             <ol style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '15px'}}>
               {cityEntries.map(([name, cityData], i) => (
