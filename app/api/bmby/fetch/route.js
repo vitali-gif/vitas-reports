@@ -549,6 +549,8 @@ async function runSync(opts = {}) {
       totals.contractValue += val
       bucket.contractValue += val
     }
+    // Build set of client_ids with contracts in window (for per-city breakdown)
+    const contractClientSet = new Set(contractsInRange.map(k => String(k.client_id || '')).filter(Boolean))
 
     // 6. Price offers (currently unused for ש.ברוך - kept for future)
     const pricesInRange = prices.filter(po => inRangeDate(po.offer_date || po.create_date))
@@ -595,6 +597,7 @@ async function runSync(opts = {}) {
         address: city || address || '',
         objections: objection,
         lastMeeting,
+        hasContract: contractClientSet.has(cid),
       })
     }
 

@@ -116,6 +116,7 @@ export default function AdminPage() {
   const [refreshElapsed, setRefreshElapsed] = useState(0)
   const [dashTab, setDashTab] = useState('all')
   const [crmSubTab, setCrmSubTab] = useState('sources')
+  const [cityMetric, setCityMetric] = useState('leads')
   const [vitasTasks, setVitasTasks] = useState([])
   const [recSubTab, setRecSubTab] = useState('new')
   const [lockingRecKey, setLockingRecKey] = useState('')
@@ -647,22 +648,25 @@ const selectProject = async (client, project) => {
     let allRows = [];
     crmRows.forEach(r => { if (r.summary && Array.isArray(r.summary.crmRepRows)) allRows = allRows.concat(r.summary.crmRepRows); });
     legacyRepRows.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
-    if (allRows.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udcad'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 CRM \u05d3\u05d5\u05d7\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d6\u05d4'}</h3></div>;
+    if (allRows.length === 0) return <div className="welcome-center"><div className="icon">{\'\ud83d\udcad\'}</div><h3>{\'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 CRM \u05d3\u05d5\u05d7\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d6\u05d4\'}</h3></div>;
     const repData = aggregateCrmReportRows(allRows);
 
-    // Top 10 cities only - clean, focused view
+    const metricKey = cityMetric === 'meetings' ? 'meetings' : cityMetric === 'contracts' ? 'contracts' : 'leads';
+    const metricLabel = cityMetric === 'meetings' ? 'פגישות' : cityMetric === 'contracts' ? 'חוזים' : 'לידים';
+
+    // Top 10 cities sorted by selected metric
     const cityEntries = Object.entries(repData.cities)
       .filter(([n]) => n && n !== 'לא צוין')
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => (b[1][metricKey] || 0) - (a[1][metricKey] || 0))
       .slice(0, 10);
     const cityNames = cityEntries.map(([n]) => n);
-    const cityCounts = cityEntries.map(([, c]) => c);
+    const cityCounts = cityEntries.map(([, c]) => c[metricKey] || 0);
 
     setTimeout(() => {
       destroyCharts();
       if (cityNames.length > 0) {
         createChart('crmRepCityChart', 'bar', cityNames, [{
-          label: 'לידים', data: cityCounts,
+          label: metricLabel, data: cityCounts,
           backgroundColor: COLORS.slice(0, cityNames.length),
           borderRadius: 6,
         }], {
@@ -678,18 +682,27 @@ const selectProject = async (client, project) => {
 
     return (
       <div className="section">
-        <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><h2>Top 10 יישובים</h2><span className="sub">לפי מספר לידים</span></div>
+        <div className="section-head">
+          <div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+          <h2>Top 10 יישובים</h2>
+          <span className="sub">לפי {metricLabel}</span>
+          <div style={{marginRight:'auto',display:'flex',gap:4}}>
+            {[['leads','לידים'],['meetings','פגישות'],['contracts','חוזים']].map(([k,l]) => (
+              <button key={k} onClick={() => setCityMetric(k)} style={{fontSize:12,padding:'3px 10px',borderRadius:20,border:'1px solid var(--border)',background: cityMetric === k ? 'var(--accent)' : 'transparent',color: cityMetric === k ? '#fff' : 'var(--text-secondary)',cursor:'pointer',fontWeight: cityMetric === k ? 600 : 400,transition:'all 0.15s'}}>{l}</button>
+            ))}
+          </div>
+        </div>
         <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmRepCityChart"></canvas></div></div>
           <div className="chart-card" style={{padding: '20px'}}>
             <ol style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '15px'}}>
-              {cityEntries.map(([name, count], i) => (
+              {cityEntries.map(([name, cityData], i) => (
                 <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',borderBottom: i < cityEntries.length-1 ? '1px solid var(--border)' : 'none'}}>
                   <span style={{display:'flex',alignItems:'center',gap:'10px'}}>
                     <span style={{display:'inline-block',width:24,height:24,borderRadius:'50%',background:COLORS[i] || 'var(--accent)',color:'#fff',fontSize:12,fontWeight:700,textAlign:'center',lineHeight:'24px'}}>{i + 1}</span>
                     <span style={{fontWeight: 600}}>{name}</span>
                   </span>
-                  <span style={{color: 'var(--accent)', fontWeight: 700}}>{count}</span>
+                  <span style={{color: 'var(--accent)', fontWeight: 700}}>{cityData[metricKey] || 0}</span>
                 </li>
               ))}
             </ol>
@@ -697,7 +710,7 @@ const selectProject = async (client, project) => {
         </div>
       </div>
     );
-  }, [selectedMonth, reports]);
+  }, [selectedMonth, reports, cityMetric, setCityMetric]);
 
   // ==================== CRM RESPONSE TIME SUB-TAB ====================
   const renderCrmResponseDashboard = useCallback(() => {
@@ -1172,6 +1185,9 @@ const selectProject = async (client, project) => {
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, '\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5 \u05d1\u05e4\u05d5\u05e2\u05dc', _crmLeads?.meetingsCompleted)}
           {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations)}
           {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts)}
+          {ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
+          {ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
+          {(ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrency(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
         </div>
 
 
@@ -2135,8 +2151,9 @@ const selectProject = async (client, project) => {
           {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted) : null}
           {crmTotals ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations) : null}
           {crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts) : null}
-          {crmTotals && dashTab !== 'all' && crmTotals.meetingsCompleted > 0 ? kpi('עלות לפגישה שבוצעה', formatCurrency(activeT.spend / crmTotals.meetingsCompleted), 'purple', activeT.spend / crmTotals.meetingsCompleted, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
-          {crmTotals && dashTab !== 'all' && crmTotals.contracts > 0 ? kpi('עלות לחוזה', formatCurrency(activeT.spend / crmTotals.contracts), 'red', activeT.spend / crmTotals.contracts, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          {crmTotals && crmTotals.meetingsCompleted > 0 ? kpi('עלות לפגישה שבוצעה', formatCurrency(activeT.spend / crmTotals.meetingsCompleted), 'purple', activeT.spend / crmTotals.meetingsCompleted, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
+          {crmTotals && crmTotals.contracts > 0 ? kpi('עלות לחוזה', formatCurrency(activeT.spend / crmTotals.contracts), 'red', activeT.spend / crmTotals.contracts, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          {crmTotals && (crmTotals.contractValue || 0) > 0 ? kpi('שווי חוזים', formatCurrency(crmTotals.contractValue), 'green', crmTotals.contractValue, prevCrmTotals?.contractValue || null) : null}
         </div>
 
         {/* FUNNEL */}
@@ -2625,7 +2642,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources]);
 
   if (loading) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
