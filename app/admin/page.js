@@ -118,6 +118,12 @@ export default function AdminPage() {
   const [crmSubTab, setCrmSubTab] = useState('sources')
   const [cityMetric, setCityMetric] = useState('leads')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Lock page scroll while the mobile drawer is open
+  useEffect(() => {
+    document.body.classList.toggle('no-scroll', sidebarOpen);
+    return () => document.body.classList.remove('no-scroll');
+  }, [sidebarOpen])
   const [clientAccessList, setClientAccessList] = useState([])
   const [showClientAccess, setShowClientAccess] = useState(false)
   const [caEmail, setCaEmail] = useState('')
@@ -164,6 +170,8 @@ export default function AdminPage() {
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
+  const handleClientAccess = () => { setShowClientAccess(true); loadClientAccess(); };
+  const handleExport = () => { alert('ייצוא לאקסל יהיה זמין בקרוב'); };
 
   const loadClientAccess = async () => {
     const res = await fetch('/api/client-access')
@@ -1049,6 +1057,20 @@ const selectProject = async (client, project) => {
             </ol>
           </div>
         </div>
+        {/* MOBILE: top-5 objections as cards. Desktop hides this via CSS. */}
+        <ul className="objections-mobile">
+          {objEntries.slice(0, 5).map(([name, count], i) => {
+            const pct = total > 0 ? (count / total * 100) : 0;
+            const rankColors = ['rank-rose','rank-violet','rank-indigo','rank-emerald','rank-amber'];
+            return (
+              <li key={name}>
+                <div className={`rank ${rankColors[i] || 'rank-rose'}`}>{i + 1}</div>
+                <div className="lbl">{name}</div>
+                <div className="count"><span className="pct">{pct.toFixed(0)}%</span>{count}</div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     );
   }, [selectedMonth, reports]);
@@ -1371,6 +1393,20 @@ const selectProject = async (client, project) => {
               </tbody>
             </table>
           </div>
+          <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div>
+          {/* MOBILE: top-5 sources as cards */}
+          <ul className="objections-mobile">
+            {sourceEntries.slice(0, 5).map(([name, d], i) => {
+              const rankColors = ['rank-indigo','rank-emerald','rank-violet','rank-amber','rank-sky'];
+              return (
+                <li key={name}>
+                  <div className={`rank ${rankColors[i] || 'rank-indigo'}`}>{i + 1}</div>
+                  <div className="lbl">{name}</div>
+                  <div className="count">{d.totalLeads}<span className="pct" style={{marginRight:4,marginLeft:0}}> ליד</span></div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
 
         {/* CRM Charts */}
@@ -1585,7 +1621,8 @@ const selectProject = async (client, project) => {
       const extremes = {};
       cols.forEach(c => { if (c.key === 'name' || c.key === 'spend') return; const vals = entries.map(([n,d]) => c.get(d,n)).filter(v => typeof v === 'number' && v > 0); if (vals.length < 2) return; extremes[c.key] = {min: Math.min(...vals), max: Math.max(...vals)}; });
       const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {color:'#059669',fontWeight:800} : {color:'#dc2626',fontWeight:800}; if (val === e.min) return col.higher ? {color:'#dc2626',fontWeight:800} : {color:'#059669',fontWeight:800}; return {}; };
-      return (<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:source==='google'?'var(--rose-50)':'var(--sky-50)',color:source==='google'?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{source==='google'?'G':'F'}</span> : null}{name}{source ? <span className={`platform-tag${source==='google'?' google':''}`} style={{marginRight:'8px'}}>{source==='google'?'GOOGLE':'FACEBOOK'}</span> : null}</td><td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{d.leads} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>);
+      return (<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:source==='google'?'var(--rose-50)':'var(--sky-50)',color:source==='google'?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{source==='google'?'G':'F'}</span> : null}{name}{source ? <span className={`platform-tag${source==='google'?' google':''}`} style={{marginRight:'8px'}}>{source==='google'?'GOOGLE':'FACEBOOK'}</span> : null}</td><td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{d.leads} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>
+          <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div>);
     };
 
 
@@ -2393,6 +2430,7 @@ const selectProject = async (client, project) => {
                   </tbody>
                 </table>
               </div>
+          <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div>
             </div>
           );
         })()}
@@ -2738,25 +2776,18 @@ const selectProject = async (client, project) => {
         );
       })()}
       <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} style={{display: sidebarOpen ? 'block' : 'none'}} />
+      <div className={`sidebar-overlay${sidebarOpen ? ' active' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
       <Header
+        onMenuOpen={() => setSidebarOpen(true)}
+        onExport={handleExport}
+        onClientAccess={handleClientAccess}
         onLogout={handleLogout}
-        extraActions={<>
-          <button className="hamburger-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="תפריט">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <line x1="2" y1="4.5" x2="16" y2="4.5"/><line x1="2" y1="9" x2="16" y2="9"/><line x1="2" y1="13.5" x2="16" y2="13.5"/>
-            </svg>
-          </button>
-          <button className="nav-btn" onClick={() => { setShowClientAccess(true); loadClientAccess(); }} title="ניהול גישת לקוחות">
-            👥 גישת לקוחות
-          </button>
-          {(refreshing || refreshingCrm) && (
-            <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'8px 14px',background:'rgba(59,130,246,0.12)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:14}}>
-              <span style={{display:'inline-block',width:14,height:14,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}></span>
-              {refreshingCrm ? 'מושך CRM...' : 'מושך נתונים...'}
-            </div>
-          )}
-        </>}
+        loadingIndicator={(refreshing || refreshingCrm) ? (
+          <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'6px 12px',background:'rgba(99,102,241,0.1)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:13}}>
+            <span style={{display:'inline-block',width:12,height:12,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
+            {refreshingCrm ? 'מושך CRM...' : 'מושך נתונים...'}
+          </div>
+        ) : null}
       />
 
       <div className="app-layout">
@@ -2772,6 +2803,8 @@ const selectProject = async (client, project) => {
           lockedProjects={['ONCE', 'REHAVIA']}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          onExport={handleExport}
+          onClientAccess={handleClientAccess}
         />
 
         <div className="main-content">

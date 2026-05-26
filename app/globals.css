@@ -2453,160 +2453,487 @@
   width: 100%;
 }
 
-/* =====================================================
-   MOBILE RESPONSIVE — added 2026-05-26
-   Breakpoints: 768px (tablet), 480px (phone)
-   ===================================================== */
-
-/* --- Hamburger button (hidden on desktop) --- */
-.hamburger-btn {
-  display: none;
-  align-items: center; justify-content: center;
-  width: 36px; height: 36px;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  color: var(--text-2);
-  flex-shrink: 0;
-}
-.hamburger-btn:hover { background: var(--surface); color: var(--text); }
-
-/* --- Sidebar overlay (mobile only) --- */
-.sidebar-overlay {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.5);
-  z-index: 199;
-  backdrop-filter: blur(2px);
-}
+/* ===============================================================
+   VITAS Reports — Mobile overrides
+   Append to app/globals.css. Activates only ≤ 768px.
+   All desktop styles are left intact.
+   =============================================================== */
 
 @media (max-width: 768px) {
-  /* Show hamburger */
-  .hamburger-btn { display: flex; }
 
-  /* Overlay appears when sidebar open */
-  .sidebar-overlay.open { display: block; }
+  /* ---------------------------------------------------------------
+     1 · Shell / layout
+     The desktop layout uses a 260/280px fixed sidebar + main grid.
+     On mobile we collapse to a single column and let the sidebar
+     become a slide-in drawer over the page.
+     --------------------------------------------------------------- */
+  .shell {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;            /* clip any rogue child that
+                                      forces a wider intrinsic size */
+  }
+  .layout {
+    grid-template-columns: minmax(0, 1fr);   /* allow .main to shrink
+                                                below content min-width */
+    min-height: calc(100vh - 52px);
+  }
+  .main { min-width: 0; }          /* same fix on the grid item */
 
-  /* Layout: single column, sidebar becomes drawer */
-  .app-layout, .layout {
-    grid-template-columns: 1fr;
+  /* ---------------------------------------------------------------
+     2 · Header — compact 48px
+     Right (RTL start):  ☰ hamburger
+     Center:             VITAS logo
+     Left  (RTL end):    overflow ⋮  +  logout
+     --------------------------------------------------------------- */
+  .header {
+    height: 48px;
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .h-hamburger {
+    display: inline-flex !important;
+    align-items: center; justify-content: center;
+    width: 34px; height: 34px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm, 8px);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .h-hamburger svg { width: 16px; height: 16px; stroke: var(--text); }
+
+  /* Brand: center it, drop the eyebrow + pipe */
+  .h-brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    gap: 0;
+  }
+  .h-brand img { height: 16px; }
+  .h-brand .pipe,
+  .h-brand .eyebrow { display: none; }
+
+  /* Hide desktop-only header actions */
+  .h-actions .btn-export,
+  .h-actions .btn-client-access,
+  .h-actions .h-search { display: none !important; }
+
+  /* Keep only the kebab + logout on the left */
+  .h-actions { gap: 4px; }
+  .h-actions .btn {
+    height: 34px; padding: 0 8px;
+    border-color: transparent;
+  }
+  .h-actions .btn:not(.btn-logout):not(.btn-kebab) { display: none; }
+  .h-kebab {
+    display: inline-flex !important;
+    width: 34px; padding: 0;
+    justify-content: center;
   }
 
-  /* Sidebar becomes fixed slide-in drawer */
+  /* ---------------------------------------------------------------
+     3 · Sidebar drawer
+     The component already accepts `isOpen` and applies `mobile-open`.
+     We hide it offscreen by default and slide it in from the right.
+     --------------------------------------------------------------- */
   .sidebar {
-    position: fixed !important;
-    top: 0; right: -280px;
-    width: 260px;
-    height: 100vh;
-    z-index: 200;
-    transition: right 0.25s cubic-bezier(0.4,0,0.2,1);
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: 86vw;
+    max-width: 320px;
+    z-index: 1000;
+    transform: translateX(100%);     /* RTL: hidden off the right */
+    transition: transform .26s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: -18px 0 40px -12px rgba(11,15,30,0.35);
+    padding-top: 18px;
     overflow-y: auto;
-    padding-top: 60px;
   }
-  .sidebar.mobile-open {
-    right: 0;
+  .sidebar.mobile-open { transform: translateX(0); }
+
+  /* Backdrop — markup added by admin/page.js when sidebarOpen=true */
+  .sidebar-overlay {
+    position: fixed; inset: 0;
+    background: rgba(11,15,30,0.55);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .26s ease;
+  }
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
   }
 
-  /* Main content full width, reduce padding */
-  .main-content {
-    padding: 20px 16px 60px;
+  /* Add a close (×) button at the top of the drawer */
+  .side-close {
+    display: inline-flex !important;
+    position: absolute;
+    top: 12px; left: 12px;          /* RTL → visual left of drawer */
+    width: 32px; height: 32px;
+    align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: var(--r-sm, 8px);
+    color: var(--side-fg, #C9CEDC);
+    cursor: pointer;
+    z-index: 2;
+  }
+  .side-close svg { width: 16px; height: 16px; }
+
+  /* Surface the hidden header actions inside the drawer */
+  .side-mobile-actions {
+    display: flex !important;
+    flex-direction: column; gap: 6px;
+    padding: 0 8px;
+    margin: 8px 0 16px;
+  }
+  .side-mobile-actions .btn {
+    width: 100%; justify-content: flex-start;
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.08);
+    color: var(--side-fg, #C9CEDC);
+    height: 40px;
+  }
+  .side-mobile-actions .btn:hover {
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* ---------------------------------------------------------------
+     4 · Main padding — tightened for dense mobile
+     --------------------------------------------------------------- */
+  .main { padding: 10px 12px 32px; }
+
+  /* ---------------------------------------------------------------
+     5 · Title bar — single row, ultra-compact
+     --------------------------------------------------------------- */
+  .titlebar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .titlebar h1 {
+    font-size: 17px;
+    flex-wrap: wrap;
+    gap: 6px;
+    line-height: 1.1;
+  }
+  .titlebar h1 .pulse { font-size: 9px; padding: 2px 6px; gap: 4px; }
+  .titlebar h1 .pulse .blip { width: 5px; height: 5px; }
+  .crumb { font-size: 9.5px; margin-bottom: 0; gap: 6px; }
+
+  .controls { flex-wrap: wrap; gap: 6px; }
+  .controls .switch,            /* comparison mode toggle */
+  .controls .switch-compare { display: none !important; }
+
+  /* Date-range pill: full-width, compact 28px */
+  .pill {
     width: 100%;
-    box-sizing: border-box;
+    justify-content: space-between;
+    height: 28px;
+    padding: 0 10px;
+    font-size: 11.5px;
   }
-
-  /* Header — tighter */
-  .header-content { padding: 0 16px; }
-
-  /* KPI grid — 2 cols on tablet */
-  .kpi-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px;
+  .pill .lbl { font-size: 9px; padding-left: 6px; }
+  .daterange-popover {
+    width: calc(100vw - 28px);
+    left: 14px; right: 14px;
   }
+  .daterange-presets {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .daterange-custom {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .daterange-custom input { width: 100%; }
 
-  /* KPI card — smaller font */
-  .kpi-value { font-size: 26px !important; }
-  .kpi-label { font-size: 11px !important; }
-
-  /* Tabs — horizontal scroll */
-  .client-tabs, .tabs {
+  /* ---------------------------------------------------------------
+     6 · Tabs — horizontal scroll, compact
+     --------------------------------------------------------------- */
+  .tabs {
+    position: sticky;
+    top: 48px;
+    z-index: 30;
+    background: var(--bg, #fff);
+    margin: 0 -12px 10px;
+    padding: 0 12px;
     overflow-x: auto;
     overflow-y: hidden;
     flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-  }
-  .client-tabs::-webkit-scrollbar { display: none; }
-  .client-tab, .tab {
     white-space: nowrap;
-    padding: 10px 12px;
-    font-size: 12px;
-  }
-
-  /* Tables — horizontal scroll wrapper */
-  .table-wrapper {
-    overflow-x: auto;
+    scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    /* Soft fade on the trailing edge as a scroll hint */
+    -webkit-mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+            mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
   }
-  .data-table {
-    min-width: 600px;
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0;
+    padding: 8px 10px;
+    font-size: 12px;
+    gap: 5px;
   }
+  .tab svg { width: 12px; height: 12px; }
 
-  /* Chart grid — single column */
-  .chart-grid {
-    grid-template-columns: 1fr !important;
+  /* Sub-tabs (CRM) — same scroll treatment, compact */
+  .subtabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    margin: 0 -12px 10px;
+    padding: 4px 12px;
+    scrollbar-width: none;
+    border-radius: 0;
+    background: transparent;
   }
+  .subtabs::-webkit-scrollbar { display: none; }
+  .subtab { flex-shrink: 0; padding: 6px 10px; font-size: 11.5px; }
 
-  /* Section grid — single column */
-  .section-grid, .demo-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Funnel — show only first 4 steps on mobile */
-  .funnel {
-    grid-template-columns: 1fr 16px 1fr 16px 1fr 16px 1fr !important;
-    gap: 4px;
-  }
-  .funnel .fstep:nth-child(n+9),
-  .funnel .farrow:nth-child(n+8) { display: none; }
-
-  /* CRM funnel — 3 steps */
-  .crm-funnel {
-    grid-template-columns: 1fr 12px 1fr 12px 1fr !important;
-  }
-  .crm-funnel .crm-fstep:nth-child(n+8),
-  .crm-funnel .crm-farrow:nth-child(n+7) { display: none; }
-
-  /* Date picker — full width */
-  .date-bar, .datepicker-bar {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  /* Section head — stack on narrow */
-  .section-head {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .section-head .sub { font-size: 11px; }
-
-  /* Title bar crumb — shorter */
-  .title-bar { padding: 12px 16px; }
-}
-
-@media (max-width: 480px) {
-  /* Phone: 1 column KPI */
+  /* ---------------------------------------------------------------
+     7 · KPI grid — 2 columns, ultra-compact
+     Sparkline removed; trend pill shrunk; just the essentials.
+     --------------------------------------------------------------- */
   .kpi-grid {
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .kpi {
+    min-height: 0;
+    padding: 8px 10px 8px;
+  }
+  .kpi-icon { width: 22px; height: 22px; border-radius: 6px; }
+  .kpi-icon svg { width: 12px; height: 12px; }
+  .kpi-trend {
+    font-size: 9.5px; padding: 1px 5px;
+    gap: 2px;
+  }
+  .kpi-trend svg { width: 7px; height: 7px; }
+  .kpi-label {
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
+  .kpi-value {
+    font-size: 19px;
+    margin-bottom: 0;
+  }
+  .kpi-value .currency,
+  .kpi-value .unit { font-size: 11px; }
+  .kpi-spark { display: none; }   /* drop sparkline in dense mode */
+  .kpi-top { margin-bottom: 6px; }
+
+  /* ---------------------------------------------------------------
+     8 · Section heads — tight
+     --------------------------------------------------------------- */
+  .section { margin-bottom: 8px; }
+  .section-head { gap: 8px; margin-bottom: 6px; }
+  .section-head h2 { font-size: 13px; }
+  .section-head .sub { display: none; }
+  .section-head .ico { width: 22px; height: 22px; border-radius: 6px; }
+  .section-head .ico svg { width: 12px; height: 12px; }
+  .section-head .head-right { display: none; }
+
+  /* Standalone time-series chart sections add too much chrome for
+     dense mobile (section head + card padding + chart-box).
+     Drop them — KPI trend % and the funnel already carry the trend
+     story. Re-enable a specific one by removing this rule. */
+  .section:has(> .chart-card),
+  .section.mobile-hide { display: none; }
+
+  /* ---------------------------------------------------------------
+     9 · Funnel — 3×2 mini grid
+     6 steps in a compact 3-column grid; color sleeves preserve
+     the funnel ordering so we can drop the arrows entirely.
+     --------------------------------------------------------------- */
+  .funnel {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 4px !important;
+  }
+  .fstep {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    min-height: 0;
+    padding: 6px 8px 6px 6px;
+    gap: 1px;
+  }
+  .fstep .flabel {
+    margin-bottom: 1px;
+    font-size: 8.5px;
+    letter-spacing: 0.05em;
+  }
+  .fstep .fvalue {
+    font-size: 16px;
+    margin-bottom: 0;
+    letter-spacing: -0.02em;
+  }
+  .fstep .frate {
+    margin-top: 1px;
+    font-size: 9px;
+    gap: 3px;
+  }
+  /* arrows are redundant in the grid layout */
+  .farrow { display: none; }
+
+  /* Unit-cost row (CPL / CPM / CPC) — 3-col compact */
+  .units { grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+  .unit { padding: 8px 10px; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .unit .val { font-size: 15px; }
+  .unit .lbl .tech { font-size: 9px; }
+
+  /* ---------------------------------------------------------------
+     10 · Charts — single column, ultra-compact 70px
+     --------------------------------------------------------------- */
+  .two-col,
+  .chart-grid,
+  .demo-grid {
+    grid-template-columns: 1fr !important;
+    gap: 6px;
+  }
+  .chart-card { padding: 8px 10px; }
+  .chart-card .chart-box {
+    height: 70px !important;
+    min-height: 60px;
+  }
+  .chart-card .chart-box.tall { height: 100px !important; }
+  .chart-card .chart-head { margin-bottom: 4px; }
+  .chart-card .chart-title { font-size: 11.5px; }
+  .chart-card .chart-meta { display: none; }
+
+  /* ---------------------------------------------------------------
+     11 · Data tables → hide entirely, show "open on desktop" notice
+     Applies to: campaigns/ad-sets/ads/asset-groups + demographic tables.
+     The notice element is opt-in: render <div class="desktop-only-msg">
+     immediately AFTER each .tbl-wrap or .demo-grid in the JSX.
+     --------------------------------------------------------------- */
+  .tbl-wrap,
+  .table-wrapper,
+  .demo-grid,
+  .perf,                     /* perf-by-placement table on Facebook */
+  .pmax-body {               /* PMAX asset-group table on Google */
+    display: none !important;
+  }
+  .desktop-only-msg {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface, #F5F7FB);
+    border: 1px dashed var(--border-strong, #C4CAD6);
+    border-radius: var(--r-sm, 8px);
+    color: var(--text-2, #383E52);
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .desktop-only-msg .icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .desktop-only-msg .body {
+    flex: 1;
+    text-wrap: pretty;
+  }
+  .desktop-only-msg .body .hint {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-3, #5E6478);
   }
 
-  /* Even tighter main padding */
-  .main-content { padding: 14px 12px 50px; }
+  /* ---------------------------------------------------------------
+     12 · CRM — objections list
+     Hide the desktop ranked-list table; render top-3 as cards.
+     Cards are opt-in: <ul class="objections-mobile"><li>… */
+     --------------------------------------------------------------- */
+  .rank-list.objections,
+  .crm-objections-table { display: none !important; }
 
-  /* Smaller KPI font */
-  .kpi-value { font-size: 22px !important; }
+  .objections-mobile {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 0; padding: 0;
+    list-style: none;
+  }
+  .objections-mobile { gap: 4px !important; }
+  .objections-mobile li {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    background: var(--card, #fff);
+    border: 1px solid var(--border, #DDE2EC);
+    border-radius: var(--r-sm, 8px);
+    box-shadow: var(--shadow-xs);
+  }
+  .objections-mobile .rank {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    background: var(--rose-50, #FEECEF);
+    color: var(--rose, #F43F5E);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .objections-mobile .rank.rank-indigo  { background: var(--indigo-50);  color: var(--indigo); }
+  .objections-mobile .rank.rank-emerald { background: var(--emerald-50); color: var(--emerald); }
+  .objections-mobile .rank.rank-violet  { background: var(--violet-50);  color: var(--violet); }
+  .objections-mobile .rank.rank-amber   { background: var(--amber-50);   color: var(--amber); }
+  .objections-mobile .rank.rank-sky     { background: var(--sky-50);     color: var(--sky); }
+  .objections-mobile .rank.rank-terra   { background: var(--terra-50);   color: var(--terra); }
+  .objections-mobile .lbl {
+    flex: 1; font-size: 12px; font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .objections-mobile .count {
+    font-size: 13px; font-weight: 800;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .objections-mobile .count .pct {
+    font-size: 10px; font-weight: 600;
+    color: var(--text-3, #5E6478);
+    margin-right: 3px;
+  }
 
-  /* Crumb titles shorter */
-  .title-bar h1 { font-size: 16px; }
+  /* CRM funnel — full width single col already covered by .funnel block */
+
+  /* ---------------------------------------------------------------
+     13 · Recommendations card — tightened
+     --------------------------------------------------------------- */
+  .reco-card { padding: 10px 12px; margin-bottom: 6px; }
+  .reco-card h3 { font-size: 12.5px; }
+  .reco-card .body { font-size: 11.5px; line-height: 1.4; }
+
+  /* ---------------------------------------------------------------
+     14 · Body lock when drawer open
+     Toggled by admin/page.js: document.body.classList.toggle('no-scroll', sidebarOpen)
+     --------------------------------------------------------------- */
+  body.no-scroll { overflow: hidden; }
 }
+
+/* ===============================================================
+   ≥ 769px — make sure mobile-only elements stay hidden on desktop.
+   These selectors are rendered in JSX but should never show on
+   desktop.
+   =============================================================== */
+.h-hamburger,
+.h-kebab,
+.side-close,
+.side-mobile-actions,
+.desktop-only-msg,
+.objections-mobile { display: none; }
+
+/* Overlay hidden on desktop, shown inside media query */
+.sidebar-overlay { display: none; }
+@media (max-width: 768px) { .sidebar-overlay { display: block; } }

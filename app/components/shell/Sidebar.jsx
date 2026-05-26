@@ -29,9 +29,24 @@ export default function Sidebar({
   footerText = 'VITAS Reports v3.2',
   isOpen = false,
   onClose,
+  onExport,
+  onClientAccess,
 }) {
   return (
     <aside className={`sidebar${isOpen ? ' mobile-open' : ''}`}>
+
+      {/* MOBILE ONLY: close button — CSS hides on desktop, shows in drawer */}
+      <button
+        type="button"
+        className="side-close"
+        onClick={onClose}
+        aria-label="סגור תפריט"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+
       <div className="sidebar-inner" style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 60px)' }}>
         <div className="sidebar-section">
           <div className="sidebar-title">לקוחות</div>
@@ -111,6 +126,22 @@ export default function Sidebar({
             </div>
           )}
         </div>
+
+        {/* MOBILE ONLY: surface the hidden header actions inside the drawer */}
+        {(onExport || onClientAccess) && (
+          <div className="side-mobile-actions">
+            {onExport && (
+              <button className="btn" onClick={() => { onExport(); onClose?.(); }}>
+                📤 ייצוא לאקסל
+              </button>
+            )}
+            {onClientAccess && (
+              <button className="btn" onClick={() => { onClientAccess(); onClose?.(); }}>
+                🔗 גישת לקוחות
+              </button>
+            )}
+          </div>
+        )}
 
         {footerText && (
           <div
