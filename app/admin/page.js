@@ -648,7 +648,7 @@ const selectProject = async (client, project) => {
     let allRows = [];
     crmRows.forEach(r => { if (r.summary && Array.isArray(r.summary.crmRepRows)) allRows = allRows.concat(r.summary.crmRepRows); });
     legacyRepRows.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
-    if (allRows.length === 0) return <div className="welcome-center"><div className="icon">{\'\ud83d\udcad\'}</div><h3>{\'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 CRM \u05d3\u05d5\u05d7\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d6\u05d4\'}</h3></div>;
+    if (allRows.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udcad'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 CRM \u05d3\u05d5\u05d7\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d6\u05d4'}</h3></div>;
     const repData = aggregateCrmReportRows(allRows);
 
     const metricKey = cityMetric === 'meetings' ? 'meetings' : cityMetric === 'contracts' ? 'contracts' : 'leads';
