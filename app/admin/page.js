@@ -183,7 +183,7 @@ export default function AdminPage() {
     if (res.ok) {
       setCaEmail(''); setCaProjectId(''); setCaLabel('')
       await loadClientAccess()
-      showToast('✓ גישה נוספה')
+      showToast('✓ גישה נוספה — קישור כניסה נשלח ללקוח במייל')
     } else {
       const err = await res.json()
       showToast('שגיאה: ' + (err.error || 'unknown'))

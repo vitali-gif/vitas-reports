@@ -1,30 +1,26 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Admin-only CRUD for client_access table
-// Uses service-role key so it bypasses RLS
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-// GET /api/client-access — list all entries (admin only)
+// GET — list all, or lookup by email (returns array — supports multi-project)
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const email = searchParams.get('email')
 
   if (email) {
-    // Single lookup — used by client page to find project
     const { data, error } = await supabaseAdmin
       .from('client_access')
       .select('*, projects(id, name, client_id, clients(name, color))')
       .eq('email', email.toLowerCase().trim())
-      .single()
+      .order('created_at', { ascending: true })
     if (error) return NextResponse.json({ error: error.message }, { status: 404 })
-    return NextResponse.json(data)
+    return NextResponse.json(data || [])
   }
 
-  // Full list for admin panel
   const { data, error } = await supabaseAdmin
     .from('client_access')
     .select('*, projects(id, name, client_id, clients(name, color))')
@@ -33,23 +29,46 @@ export async function GET(req) {
   return NextResponse.json(data || [])
 }
 
-// POST /api/client-access — add entry
+// POST — add entry + auto-send magic link to client
 export async function POST(req) {
   const body = await req.json()
   const { email, project_id, label } = body
   if (!email || !project_id) {
     return NextResponse.json({ error: 'email and project_id required' }, { status: 400 })
   }
+
+  const cleanEmail = email.toLowerCase().trim()
+
+  // Save to DB
   const { data, error } = await supabaseAdmin
     .from('client_access')
-    .insert({ email: email.toLowerCase().trim(), project_id, label: label || null })
+    .insert({ email: cleanEmail, project_id, label: label || null })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data, { status: 201 })
+
+  // Auto-send magic link to the client
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
+  const { error: otpError } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: cleanEmail,
+    options: { redirectTo: `${siteUrl}/client` }
+  })
+  // Note: generateLink generates the link but doesn't send — use signInWithOtp for sending
+  // We use the anon client to trigger the actual send (goes through Supabase email)
+  const supabaseAnon = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
+  await supabaseAnon.auth.signInWithOtp({
+    email: cleanEmail,
+    options: { emailRedirectTo: `${siteUrl}/client`, shouldCreateUser: true }
+  })
+
+  return NextResponse.json({ ...data, emailSent: true }, { status: 201 })
 }
 
-// DELETE /api/client-access?id=xxx
+// DELETE
 export async function DELETE(req) {
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')

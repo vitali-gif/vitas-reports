@@ -63,7 +63,8 @@ export default function ClientPage() {
   const [email, setEmail] = useState('')
   const [emailInput, setEmailInput] = useState('')
   const [sendingLink, setSendingLink] = useState(false)
-  const [accessInfo, setAccessInfo] = useState(null) // { project_id, projects: { name, clients: { name } } }
+  const [accessList, setAccessList] = useState([]) // array of access entries
+  const [accessInfo, setAccessInfo] = useState(null) // currently selected entry
   const [reports, setReports] = useState([])
   const [selectedMonth, setSelectedMonth] = useState('')
   const [activePreset, setActivePreset] = useState('lastMonth')
@@ -105,29 +106,36 @@ export default function ClientPage() {
     setEmail(userEmail)
     try {
       const res = await fetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`)
-      if (!res.ok) {
-        setStep('error')
+      if (!res.ok) { setStep('error'); setLoading(false); return }
+      const list = await res.json()
+      if (!Array.isArray(list) || list.length === 0) { setStep('error'); setLoading(false); return }
+      setAccessList(list)
+      if (list.length === 1) {
+        await loadProject(list[0])
+      } else {
+        // Multiple projects — show picker
+        setStep('picker')
         setLoading(false)
-        return
       }
-      const info = await res.json()
-      setAccessInfo(info)
-      // Load cached reports for this project
-      const { data } = await supabase
-        .from('reports')
-        .select('*')
-        .eq('project_id', info.project_id)
-        .order('month', { ascending: false })
-      if (data && data.length > 0) {
-        setReports(data)
-        setSelectedMonth(data[0].month)
-      }
-      setStep('dashboard')
     } catch {
       setStep('error')
-    } finally {
       setLoading(false)
     }
+  }
+
+  const loadProject = async (info) => {
+    setAccessInfo(info)
+    const { data } = await supabase
+      .from('reports')
+      .select('*')
+      .eq('project_id', info.project_id)
+      .order('month', { ascending: false })
+    if (data && data.length > 0) {
+      setReports(data)
+      setSelectedMonth(data[0].month)
+    }
+    setStep('dashboard')
+    setLoading(false)
   }
 
   // ── Send magic link ────────────────────────────────────────────────────
@@ -340,6 +348,32 @@ export default function ClientPage() {
     </div>
   )
 
+  if (step === 'picker') return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg,#0b0f1e 0%,#1e1b4b 100%)', fontFamily: 'Heebo,sans-serif' }}>
+      <div style={{ background: 'white', borderRadius: 20, padding: '40px 36px', width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', textAlign: 'center' }}>
+        <img src="/brand/vitas-logo-black.png" alt="VITAS" style={{ height: 28, marginBottom: 24, display: 'block', margin: '0 auto 24px' }} />
+        <h2 style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 6 }}>בחר פרויקט</h2>
+        <p style={{ color: '#6b7280', fontSize: 13, marginBottom: 24 }}>יש לך גישה למספר פרויקטים</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {accessList.map(acc => (
+            <button key={acc.id} onClick={() => loadProject(acc)} style={{
+              padding: '14px 20px', background: '#f8fafc', border: '1px solid #e5e7eb',
+              borderRadius: 12, cursor: 'pointer', fontFamily: 'Heebo,sans-serif',
+              fontSize: 15, fontWeight: 700, color: '#111827', textAlign: 'right',
+              display: 'flex', alignItems: 'center', gap: 10, transition: 'all 0.15s'
+            }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: acc.projects?.clients?.color || '#6366f1', flexShrink: 0 }} />
+              <span>{acc.projects?.clients?.name} - {acc.projects?.name}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={logout} style={{ marginTop: 20, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: 'Heebo,sans-serif' }}>
+          יציאה
+        </button>
+      </div>
+    </div>
+  )
+
   if (step === 'email') return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'linear-gradient(135deg,#0b0f1e 0%,#1e1b4b 100%)', fontFamily: 'Heebo,sans-serif' }}>
       <div style={{ background: 'white', borderRadius: 20, padding: '40px 36px', width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', textAlign: 'center' }}>
@@ -407,9 +441,16 @@ export default function ClientPage() {
             {clientName && <div style={{ fontSize: 12, color: '#9ca3af' }}>{clientName}</div>}
           </div>
         </div>
-        <button onClick={logout} style={{ padding: '7px 16px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, fontFamily: 'Heebo,sans-serif', cursor: 'pointer', color: '#374151', fontWeight: 600 }}>
-          יציאה
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {accessList.length > 1 && (
+            <button onClick={() => { setStep('picker'); setReports([]); setAccessInfo(null); }} style={{ padding: '7px 14px', background: '#ede9fe', border: '1px solid #c4b5fd', borderRadius: 8, fontSize: 13, fontFamily: 'Heebo,sans-serif', cursor: 'pointer', color: '#4f46e5', fontWeight: 600 }}>
+              החלף פרויקט
+            </button>
+          )}
+          <button onClick={logout} style={{ padding: '7px 16px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, fontFamily: 'Heebo,sans-serif', cursor: 'pointer', color: '#374151', fontWeight: 600 }}>
+            יציאה
+          </button>
+        </div>
       </header>
 
       {/* Toast */}
