@@ -340,4 +340,16 @@ export default function DateRangePicker({
               </button>
               <button
                 type="button"
-                className="drp-btn drp-btn
+                className="drp-btn drp-btn-primary"
+                onClick={handleConfirm}
+                disabled={!draftFrom || !draftTo}>
+                עדכן
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
