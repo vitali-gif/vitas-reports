@@ -225,7 +225,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
     const isMobile = vw <= 768
     if (isMobile) {
       const w = vw - 20
-      setPopoverPos({ top: rect.bottom + 6, left: 10, width: w, isMobile: true })
+      setPopoverPos({ left: 0, width: vw, isMobile: true })
     } else {
       const pickerW = Math.min(760, vw - 24)
       let left = rect.right - pickerW
@@ -244,7 +244,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
       const isMobile = vw <= 768
       if (isMobile) {
         const w = vw - 20
-        setPopoverPos({ top: rect.bottom + 6, left: 10, width: w, isMobile: true })
+        setPopoverPos({ left: 0, width: vw, isMobile: true })
       } else {
         const pickerW = Math.min(760, vw - 24)
         let left = rect.right - pickerW
@@ -424,8 +424,30 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
       </button>
 
       {/* ── Popover ─────────────────────────────────────────────── */}
+      {/* Mobile backdrop */}
+      {open && popoverPos.isMobile && (
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(11,15,30,0.45)',
+            backdropFilter: 'blur(2px)',
+            zIndex: 9998,
+          }}
+        />
+      )}
+
       {open && (
-        <div style={{
+        <div style={popoverPos.isMobile ? {
+          position: 'fixed', bottom: 0, left: 0,
+          width: '100vw', background: 'var(--card)',
+          border: '1px solid var(--border)',
+          borderRadius: '20px 20px 0 0',
+          boxShadow: '0 -8px 40px rgba(11,15,30,0.22)',
+          zIndex: 9999,
+          maxHeight: '88vh',
+          overflowY: 'auto',
+        } : {
           position: 'fixed', top: popoverPos.top, left: popoverPos.left,
           width: popoverPos.width, background: 'var(--card)',
           border: '1px solid var(--border)', borderRadius: 16,
@@ -438,6 +460,10 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
           {/* ── MOBILE layout ── */}
           {popoverPos.isMobile ? (
             <div>
+              {/* Drag handle */}
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border)' }} />
+              </div>
               {/* Presets grid — 3 columns */}
               <div style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
