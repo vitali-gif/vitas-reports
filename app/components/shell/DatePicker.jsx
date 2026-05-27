@@ -215,17 +215,23 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
 
   const wrapRef = useRef(null)
   const triggerRef = useRef(null)
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, width: 760 })
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, width: 760, isMobile: false })
 
   // Compute fixed position when opening
   useEffect(() => {
     if (!open || !triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
     const vw = window.innerWidth
-    const pickerW = Math.min(760, vw - 24)
-    let left = rect.right - pickerW
-    if (left < 12) left = 12
-    setPopoverPos({ top: rect.bottom + 10, left, width: pickerW })
+    const isMobile = vw <= 768
+    if (isMobile) {
+      const w = vw - 20
+      setPopoverPos({ top: rect.bottom + 6, left: 10, width: w, isMobile: true })
+    } else {
+      const pickerW = Math.min(760, vw - 24)
+      let left = rect.right - pickerW
+      if (left < 12) left = 12
+      setPopoverPos({ top: rect.bottom + 10, left, width: pickerW, isMobile: false })
+    }
   }, [open])
 
   // Reposition on scroll/resize while open
@@ -235,10 +241,16 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
       if (!triggerRef.current) return
       const rect = triggerRef.current.getBoundingClientRect()
       const vw = window.innerWidth
-      const pickerW = Math.min(760, vw - 24)
-      let left = rect.right - pickerW
-      if (left < 12) left = 12
-      setPopoverPos({ top: rect.bottom + 10, left, width: pickerW })
+      const isMobile = vw <= 768
+      if (isMobile) {
+        const w = vw - 20
+        setPopoverPos({ top: rect.bottom + 6, left: 10, width: w, isMobile: true })
+      } else {
+        const pickerW = Math.min(760, vw - 24)
+        let left = rect.right - pickerW
+        if (left < 12) left = 12
+        setPopoverPos({ top: rect.bottom + 10, left, width: pickerW, isMobile: false })
+      }
     }
     window.addEventListener('resize', update)
     window.addEventListener('scroll', update, true)
@@ -419,82 +431,70 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
           border: '1px solid var(--border)', borderRadius: 16,
           boxShadow: '0 24px 48px -16px rgba(11,15,30,0.18), 0 4px 12px rgba(11,15,30,0.06)',
           zIndex: 9999, overflow: 'hidden',
-          // Triangle pointer
+          maxHeight: 'calc(100vh - ' + popoverPos.top + 'px - 16px)',
+          overflowY: 'auto',
         }}>
-          {/* Pointer triangle */}
-          <div style={{
-            position: 'absolute', top: -7, right: 28,
-            width: 12, height: 12,
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            borderBottom: 'none', borderLeft: 'none',
-            transform: 'rotate(-45deg)',
-            borderTopRightRadius: 2,
-          }} />
 
-          {/* ── Main grid: calendars | presets ──────────────── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 175px', minHeight: 360 }}>
-
-            {/* LEFT: dual calendars */}
-            <div style={{ padding: '14px 16px 0' }}>
-              {/* Month navigation */}
+          {/* ── MOBILE layout ── */}
+          {popoverPos.isMobile ? (
+            <div>
+              {/* Presets grid — 3 columns */}
               <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                gap: 14, paddingBottom: 14, borderBottom: '1px solid var(--border)', marginBottom: 14,
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 6, padding: '12px 12px 8px',
+                borderBottom: '1px solid var(--border)',
               }}>
-                {/* Prev month (chev-right in RTL) */}
+                {PRESET_LIST.filter(p => p.key !== 'custom').map(p => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => selectPreset(p.key)}
+                    style={{
+                      padding: '7px 4px', borderRadius: 8, cursor: 'pointer',
+                      background: tempPreset === p.key ? 'var(--indigo)' : 'var(--surface)',
+                      border: '1px solid ' + (tempPreset === p.key ? 'var(--indigo)' : 'var(--border)'),
+                      font: 'inherit', fontSize: 11, fontWeight: 700,
+                      color: tempPreset === p.key ? 'white' : 'var(--text-2)',
+                      textAlign: 'center', lineHeight: 1.3,
+                      fontFamily: 'var(--font)',
+                    }}
+                  >{p.label}</button>
+                ))}
                 <button
-                  type="button" onClick={() => navMonth(-1)}
+                  key="custom"
+                  type="button"
+                  onClick={() => selectPreset('custom')}
                   style={{
-                    width: 30, height: 30, borderRadius: 8, background: 'transparent',
-                    border: '1px solid transparent', color: 'var(--text-2)',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', flexShrink: 0,
+                    padding: '7px 4px', borderRadius: 8, cursor: 'pointer',
+                    background: tempPreset === 'custom' ? 'var(--indigo)' : 'var(--surface)',
+                    border: '1px solid ' + (tempPreset === 'custom' ? 'var(--indigo)' : 'var(--border)'),
+                    font: 'inherit', fontSize: 11, fontWeight: 700,
+                    color: tempPreset === 'custom' ? 'white' : 'var(--text-2)',
+                    textAlign: 'center', gridColumn: 'span 3',
+                    fontFamily: 'var(--font)',
                   }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
-
-                {/* Month labels */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
-                      {HE_MONTHS_SHORT[viewRight.month]} {viewRight.year}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
-                      {HE_MONTHS_SHORT[viewLeft.month]} {viewLeft.year}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Next month (chev-left in RTL) */}
-                <button
-                  type="button" onClick={() => navMonth(1)}
-                  style={{
-                    width: 30, height: 30, borderRadius: 8, background: 'transparent',
-                    border: '1px solid transparent', color: 'var(--text-2)',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', flexShrink: 0,
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 18 9 12 15 6"/>
-                  </svg>
-                </button>
+                >טווח מותאם אישית</button>
               </div>
 
-              {/* Two calendars */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, paddingBottom: 14 }}>
-                <CalGrid
-                  year={viewRight.year} month={viewRight.month}
-                  tempStart={tempStart} tempEnd={tempEnd}
-                  pickMode={pickMode} hoverYmd={hoverYmd} todayYmd={todayYmd}
-                  onClickDay={clickDay} onHoverDay={setHoverYmd}
-                />
+              {/* Single calendar */}
+              <div style={{ padding: '12px 12px 0' }}>
+                {/* Month nav */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  paddingBottom: 10, borderBottom: '1px solid var(--border)', marginBottom: 10,
+                }}>
+                  <button type="button" onClick={() => navMonth(-1)}
+                    style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>
+                    {HE_MONTHS_SHORT[viewLeft.month]} {viewLeft.year}
+                  </span>
+                  <button type="button" onClick={() => navMonth(1)}
+                    style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                </div>
                 <CalGrid
                   year={viewLeft.year} month={viewLeft.month}
                   tempStart={tempStart} tempEnd={tempEnd}
@@ -502,138 +502,238 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                   onClickDay={clickDay} onHoverDay={setHoverYmd}
                 />
               </div>
-            </div>
 
-            {/* RIGHT: presets sidebar */}
-            <aside style={{
-              background: 'var(--surface, #F5F7FB)', borderRight: '1px solid var(--border)',
-              padding: '18px 14px', display: 'flex', flexDirection: 'column',
-              gap: 2, overflowY: 'auto',
-            }}>
+              {/* Footer */}
               <div style={{
-                fontSize: 11, fontWeight: 800, letterSpacing: '0.12em',
-                color: 'var(--text-3)', textTransform: 'uppercase',
-                padding: '0 12px 8px',
+                background: 'var(--surface)', borderTop: '1px solid var(--border)',
+                padding: '10px 12px', marginTop: 10,
+                display: 'flex', alignItems: 'center', gap: 8,
               }}>
-                תקופות
-              </div>
-              {PRESET_LIST.map(p => (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => selectPreset(p.key)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
-                    background: tempPreset === p.key ? 'var(--card)' : 'transparent',
-                    border: 'none', font: 'inherit',
-                    fontSize: 13, fontWeight: tempPreset === p.key ? 700 : 600,
-                    color: tempPreset === p.key ? 'var(--indigo)' : 'var(--text-2)',
-                    textAlign: 'right', width: '100%',
-                    boxShadow: tempPreset === p.key ? '0 1px 2px rgba(11,15,30,0.06)' : 'none',
-                    transition: 'all .12s',
-                    fontFamily: 'var(--font)',
-                  }}
-                >
-                  {p.label}
-                  {/* Radio button */}
-                  <span style={{
-                    width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
-                    marginRight: 'auto', position: 'relative',
-                    border: `1.5px solid ${tempPreset === p.key ? 'var(--indigo)' : 'var(--border-strong, var(--border))'}`,
-                    background: tempPreset === p.key ? 'var(--indigo)' : 'transparent',
-                    transition: 'all .12s',
-                  }}>
-                    {tempPreset === p.key && (
-                      <span style={{
-                        position: 'absolute', inset: 3, borderRadius: '50%',
-                        background: 'var(--card)',
-                      }} />
-                    )}
-                  </span>
+                <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>
+                  {footerSince ? formatDateHe(footerSince) : '-'}
+                  {footerUntil && footerSince !== footerUntil ? ' ← ' + formatDateHe(footerUntil) : ''}
+                </div>
+                <button type="button" onClick={() => setOpen(false)}
+                  style={{ height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  ביטול
                 </button>
-              ))}
-            </aside>
-          </div>
-
-          {/* ── Footer ──────────────────────────────────────────── */}
-          <div style={{
-            background: 'var(--surface, #F5F7FB)', borderTop: '1px solid var(--border)',
-            padding: '12px 16px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-          }}>
-            {/* Date range display */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                background: 'var(--card)', border: '1px solid var(--border-strong, var(--border))',
-                borderRadius: 8, padding: '8px 12px',
-                fontSize: 12.5, fontWeight: 600, color: 'var(--text)',
-                boxShadow: '0 1px 2px rgba(11,15,30,0.06)',
-                fontVariantNumeric: 'tabular-nums',
-              }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 800, letterSpacing: '0.10em',
-                  color: 'var(--text-3)', textTransform: 'uppercase',
-                  paddingLeft: 8, borderLeft: '1px solid var(--border)', marginLeft: 0,
-                }}>מתאריך</span>
-                <span dir="ltr">{footerSince ? formatDateHe(footerSince) : '-'}</span>
-              </div>
-              <span style={{ color: 'var(--text-3)', fontSize: 14 }}>←</span>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                background: 'var(--card)', border: '1px solid var(--border-strong, var(--border))',
-                borderRadius: 8, padding: '8px 12px',
-                fontSize: 12.5, fontWeight: 600, color: 'var(--text)',
-                boxShadow: '0 1px 2px rgba(11,15,30,0.06)',
-                fontVariantNumeric: 'tabular-nums',
-              }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 800, letterSpacing: '0.10em',
-                  color: 'var(--text-3)', textTransform: 'uppercase',
-                  paddingLeft: 8, borderLeft: '1px solid var(--border)', marginLeft: 0,
-                }}>עד תאריך</span>
-                <span dir="ltr">{footerUntil ? formatDateHe(footerUntil) : (pickMode === 'end' ? '...' : '-')}</span>
+                <button type="button" onClick={handleApply}
+                  disabled={tempPreset === 'custom' && !tempStart}
+                  style={{ height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--indigo)', color: 'white', font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', opacity: (tempPreset === 'custom' && !tempStart) ? 0.5 : 1 }}>
+                  עדכן
+                </button>
               </div>
             </div>
 
-            <span style={{ fontSize: 11.5, color: 'var(--text-3)', marginRight: 'auto', paddingRight: 14 }}>
-              שעון ירושלים
-            </span>
+          ) : (
+            /* ── DESKTOP layout (original) ── */
+            <div>
+              {/* Pointer triangle */}
+              <div style={{
+                position: 'absolute', top: -7, right: 28,
+                width: 12, height: 12,
+                background: 'var(--card)',
+                border: '1px solid var(--border)',
+                borderBottom: 'none', borderLeft: 'none',
+                transform: 'rotate(-45deg)',
+                borderTopRightRadius: 2,
+              }} />
 
-            {/* Action buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                style={{
-                  height: 34, padding: '0 16px', borderRadius: 8,
-                  font: 'inherit', fontSize: 13, fontWeight: 700,
-                  cursor: 'pointer', border: '1px solid var(--border-strong, var(--border))',
-                  background: 'var(--card)', color: 'var(--text)',
-                  fontFamily: 'var(--font)',
-                }}
-              >
-                ביטול
-              </button>
-              <button
-                type="button"
-                onClick={handleApply}
-                disabled={tempPreset === 'custom' && !tempStart}
-                style={{
-                  height: 34, padding: '0 16px', borderRadius: 8,
-                  font: 'inherit', fontSize: 13, fontWeight: 700,
-                  cursor: 'pointer', border: '1px solid transparent',
-                  background: 'var(--indigo)', color: 'white',
-                  boxShadow: '0 4px 12px -4px rgba(91,94,244,0.5)',
-                  opacity: (tempPreset === 'custom' && !tempStart) ? 0.5 : 1,
-                  fontFamily: 'var(--font)',
-                }}
-              >
-                עדכן
-              </button>
+              {/* ── Main grid: calendars | presets ──────────────── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 175px', minHeight: 360 }}>
+
+                {/* LEFT: dual calendars */}
+                <div style={{ padding: '14px 16px 0' }}>
+                  {/* Month navigation */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    gap: 14, paddingBottom: 14, borderBottom: '1px solid var(--border)', marginBottom: 14,
+                  }}>
+                    <button
+                      type="button" onClick={() => navMonth(-1)}
+                      style={{
+                        width: 30, height: 30, borderRadius: 8, background: 'transparent',
+                        border: '1px solid transparent', color: 'var(--text-2)',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </button>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+                          {HE_MONTHS_SHORT[viewRight.month]} {viewRight.year}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)' }}>
+                          {HE_MONTHS_SHORT[viewLeft.month]} {viewLeft.year}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button" onClick={() => navMonth(1)}
+                      style={{
+                        width: 30, height: 30, borderRadius: 8, background: 'transparent',
+                        border: '1px solid transparent', color: 'var(--text-2)',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 18 9 12 15 6"/>
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, paddingBottom: 14 }}>
+                    <CalGrid
+                      year={viewRight.year} month={viewRight.month}
+                      tempStart={tempStart} tempEnd={tempEnd}
+                      pickMode={pickMode} hoverYmd={hoverYmd} todayYmd={todayYmd}
+                      onClickDay={clickDay} onHoverDay={setHoverYmd}
+                    />
+                    <CalGrid
+                      year={viewLeft.year} month={viewLeft.month}
+                      tempStart={tempStart} tempEnd={tempEnd}
+                      pickMode={pickMode} hoverYmd={hoverYmd} todayYmd={todayYmd}
+                      onClickDay={clickDay} onHoverDay={setHoverYmd}
+                    />
+                  </div>
+                </div>
+
+                {/* RIGHT: presets sidebar */}
+                <aside style={{
+                  background: 'var(--surface, #F5F7FB)', borderRight: '1px solid var(--border)',
+                  padding: '18px 14px', display: 'flex', flexDirection: 'column',
+                  gap: 2, overflowY: 'auto',
+                }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 800, letterSpacing: '0.12em',
+                    color: 'var(--text-3)', textTransform: 'uppercase',
+                    padding: '0 12px 8px',
+                  }}>
+                    תקופות
+                  </div>
+                  {PRESET_LIST.map(p => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => selectPreset(p.key)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+                        background: tempPreset === p.key ? 'var(--card)' : 'transparent',
+                        border: 'none', font: 'inherit',
+                        fontSize: 13, fontWeight: tempPreset === p.key ? 700 : 600,
+                        color: tempPreset === p.key ? 'var(--indigo)' : 'var(--text-2)',
+                        textAlign: 'right', width: '100%',
+                        boxShadow: tempPreset === p.key ? '0 1px 2px rgba(11,15,30,0.06)' : 'none',
+                        transition: 'all .12s',
+                        fontFamily: 'var(--font)',
+                      }}
+                    >
+                      {p.label}
+                      <span style={{
+                        width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                        marginRight: 'auto', position: 'relative',
+                        border: '1.5px solid ' + (tempPreset === p.key ? 'var(--indigo)' : 'var(--border-strong, var(--border))'),
+                        background: tempPreset === p.key ? 'var(--indigo)' : 'transparent',
+                        transition: 'all .12s',
+                      }}>
+                        {tempPreset === p.key && (
+                          <span style={{
+                            position: 'absolute', inset: 3, borderRadius: '50%',
+                            background: 'var(--card)',
+                          }} />
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </aside>
+              </div>
+
+              {/* ── Desktop Footer ── */}
+              <div style={{
+                background: 'var(--surface, #F5F7FB)', borderTop: '1px solid var(--border)',
+                padding: '12px 16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    background: 'var(--card)', border: '1px solid var(--border-strong, var(--border))',
+                    borderRadius: 8, padding: '8px 12px',
+                    fontSize: 12.5, fontWeight: 600, color: 'var(--text)',
+                    boxShadow: '0 1px 2px rgba(11,15,30,0.06)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 800, letterSpacing: '0.10em',
+                      color: 'var(--text-3)', textTransform: 'uppercase',
+                      paddingLeft: 8, borderLeft: '1px solid var(--border)', marginLeft: 0,
+                    }}>מתאריך</span>
+                    <span dir="ltr">{footerSince ? formatDateHe(footerSince) : '-'}</span>
+                  </div>
+                  <span style={{ color: 'var(--text-3)', fontSize: 14 }}>←</span>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    background: 'var(--card)', border: '1px solid var(--border-strong, var(--border))',
+                    borderRadius: 8, padding: '8px 12px',
+                    fontSize: 12.5, fontWeight: 600, color: 'var(--text)',
+                    boxShadow: '0 1px 2px rgba(11,15,30,0.06)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 800, letterSpacing: '0.10em',
+                      color: 'var(--text-3)', textTransform: 'uppercase',
+                      paddingLeft: 8, borderLeft: '1px solid var(--border)', marginLeft: 0,
+                    }}>עד תאריך</span>
+                    <span dir="ltr">{footerUntil ? formatDateHe(footerUntil) : (pickMode === 'end' ? '...' : '-')}</span>
+                  </div>
+                </div>
+                <span style={{ fontSize: 11.5, color: 'var(--text-3)', marginRight: 'auto', paddingRight: 14 }}>
+                  שעון ירושלים
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    style={{
+                      height: 34, padding: '0 16px', borderRadius: 8,
+                      font: 'inherit', fontSize: 13, fontWeight: 700,
+                      cursor: 'pointer', border: '1px solid var(--border-strong, var(--border))',
+                      background: 'var(--card)', color: 'var(--text)',
+                      fontFamily: 'var(--font)',
+                    }}
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApply}
+                    disabled={tempPreset === 'custom' && !tempStart}
+                    style={{
+                      height: 34, padding: '0 16px', borderRadius: 8,
+                      font: 'inherit', fontSize: 13, fontWeight: 700,
+                      cursor: 'pointer', border: '1px solid transparent',
+                      background: 'var(--indigo)', color: 'white',
+                      boxShadow: '0 4px 12px -4px rgba(91,94,244,0.5)',
+                      opacity: (tempPreset === 'custom' && !tempStart) ? 0.5 : 1,
+                      fontFamily: 'var(--font)',
+                    }}
+                  >
+                    עדכן
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

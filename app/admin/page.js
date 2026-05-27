@@ -2795,7 +2795,7 @@ const selectProject = async (client, project) => {
           clients={clients}
           activeClient={selectedClient?.name}
           activeProject={selectedProject?.name}
-          onSelectClient={(client) => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); setSidebarOpen(false); }}
+          onSelectClient={(client) => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}
           onSelectProject={(client, project) => { selectProject(client, project); setSidebarOpen(false); }}
           onAddClient={() => setShowAddClient(true)}
           onAddProject={() => setShowAddProject(true)}
