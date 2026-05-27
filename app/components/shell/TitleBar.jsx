@@ -1,21 +1,33 @@
 'use client'
 import DatePicker from './DatePicker'
+import DateRangePicker from './DateRangePicker'
 
-// VITAS v2 TitleBar - breadcrumb + H1 + date picker + comparison toggle
-//
-// Usage from admin/page.js:
-//   <TitleBar
-//     crumb={['סקירה', 'HI PARK', '']}
-//     client={'ש.ברוך'}
-//     project={'HI PARK'}
-//     activePreset={'lastMonth'}
-//     since={''}
-//     until={''}
-//     onApplyPreset={(key) => applyPreset(key)}
-//     onApplyRange={(s, u) => applyCustomRange(s, u)}
-//     comparisonOn={compareEnabled}
-//     onToggleComparison={() => onComparisonToggle(!compareEnabled)}
-//   />
+// ── Mobile presets (IDs match the existing DatePicker keys) ──────────────────
+const sod = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x }
+const agoD = (n) => { const d = sod(new Date()); d.setDate(d.getDate() - n); return d }
+
+const MOBILE_PRESETS = [
+  { id: 'today',        label: 'היום',      range: () => { const t = sod(new Date()); return { from: t, to: t } } },
+  { id: 'yesterday',    label: 'אתמול',     range: () => { const t = agoD(1); return { from: t, to: t } } },
+  { id: 'last7',        label: '7 ימים',    range: () => ({ from: agoD(7),  to: agoD(1) }) },
+  { id: 'last14',       label: '14 ימים',   range: () => ({ from: agoD(14), to: agoD(1) }) },
+  { id: 'last30',       label: '30 ימים',   range: () => ({ from: agoD(30), to: agoD(1) }) },
+  { id: 'currentMonth', label: 'החודש',     range: () => { const t = sod(new Date()); return { from: new Date(t.getFullYear(), t.getMonth(), 1), to: t } } },
+  { id: 'lastMonth',    label: 'חודש שעבר', range: () => {
+    const t = sod(new Date())
+    const y = t.getMonth() === 0 ? t.getFullYear() - 1 : t.getFullYear()
+    const m = t.getMonth() === 0 ? 11 : t.getMonth() - 1
+    return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) }
+  }},
+  { id: 'last90',       label: '90 ימים',   range: () => ({ from: agoD(90), to: agoD(1) }) },
+  { id: 'currentYear',  label: 'השנה',      range: () => { const t = sod(new Date()); return { from: new Date(t.getFullYear(), 0, 1), to: t } } },
+]
+
+const toYMD = (d) => d
+  ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+  : ''
+
+const fromYMD = (s) => s ? new Date(s + 'T00:00:00') : null
 
 export default function TitleBar({
   crumb = [],
@@ -29,6 +41,20 @@ export default function TitleBar({
   comparisonOn = false,
   onToggleComparison,
 }) {
+  const drpValue = {
+    from: fromYMD(since),
+    to:   fromYMD(until),
+    presetId: activePreset === 'custom' ? null : (activePreset || null),
+  }
+
+  const handleDrpChange = ({ from, to, presetId }) => {
+    if (presetId && presetId !== 'custom') {
+      onApplyPreset?.(presetId)
+    } else {
+      onApplyRange?.(toYMD(from), toYMD(to))
+    }
+  }
+
   return (
     <div
       className="title-bar"
@@ -77,13 +103,27 @@ export default function TitleBar({
       {/* Right: date picker + comparison toggle */}
       <div className="controls" style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
         {onApplyPreset && (
-          <DatePicker
-            activePreset={activePreset}
-            since={since}
-            until={until}
-            onApplyPreset={onApplyPreset}
-            onApplyRange={onApplyRange}
-          />
+          <>
+            {/* Desktop: existing anchored popover */}
+            <div className="drp-desktop-only">
+              <DatePicker
+                activePreset={activePreset}
+                since={since}
+                until={until}
+                onApplyPreset={onApplyPreset}
+                onApplyRange={onApplyRange}
+              />
+            </div>
+
+            {/* Mobile: Claude Design bottom-sheet (portal → never clips) */}
+            <div className="drp-mobile-only">
+              <DateRangePicker
+                value={drpValue}
+                onChange={handleDrpChange}
+                presets={MOBILE_PRESETS}
+              />
+            </div>
+          </>
         )}
 
         {onToggleComparison && (

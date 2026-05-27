@@ -2938,3 +2938,421 @@
 /* Overlay hidden on desktop, shown inside media query */
 .sidebar-overlay { display: none; }
 @media (max-width: 768px) { .sidebar-overlay { display: block; } }
+
+/* ===== MOBILE DATE RANGE PICKER — Claude Design handoff ===== */
+/* ============================================================
+   VITAS Reports — Mobile Date Range Picker
+   Bottom-sheet picker for mobile (≤ 768px).
+   Imports nothing; uses the tokens already in app/globals.css
+   (--text, --border, --surface, --indigo, --r-sm, etc.).
+   Add to app/globals.css OR drop in as a sibling file and
+   @import it from the component.
+   ============================================================ */
+
+/* ---------- Local fallbacks for tokens that may differ
+   between codebases. Override in your globals if needed. */
+.drp-pill,
+.drp-sheet,
+.drp-scrim {
+  --drp-indigo: var(--indigo, #5B5EF4);
+  --drp-indigo-50: var(--indigo-50, #EEF0FF);
+  --drp-indigo-100: var(--indigo-100, #DDE0FE);
+  --drp-bg: var(--bg, #FFFFFF);
+  --drp-surface: var(--surface, #F5F7FB);
+  --drp-surface-2: var(--surface-2, #EDF0F6);
+  --drp-border: var(--border, #DDE2EC);
+  --drp-border-strong: var(--border-strong, #C4CAD6);
+  --drp-divider: var(--divider, #E5E9F1);
+  --drp-text: var(--text, #0B0F1E);
+  --drp-text-2: var(--text-2, #383E52);
+  --drp-text-3: var(--text-3, #5E6478);
+  --drp-text-4: var(--text-4, #98A0B2);
+  --drp-r-sm: var(--r-sm, 8px);
+  --drp-r-pill: var(--r-pill, 999px);
+}
+
+/* ============================================================
+   1 · Trigger pill (lives inside .titlebar .controls)
+   Full-width on mobile; styled like the existing .pill.
+   ============================================================ */
+.drp-pill {
+  width: 100%;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--drp-bg);
+  border: 1px solid var(--drp-border-strong);
+  border-radius: var(--drp-r-sm);
+  padding: 0 12px;
+  height: 38px;
+  font: inherit;
+  font-size: 12.5px; font-weight: 600;
+  color: var(--drp-text);
+  box-shadow: 0 1px 2px rgba(11,15,30,0.06);
+  cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.drp-pill:hover { border-color: var(--drp-text-3); }
+.drp-pill.is-open {
+  border-color: var(--drp-indigo);
+  background: var(--drp-indigo-50);
+  box-shadow: 0 0 0 3px rgba(91,94,244,0.12);
+}
+.drp-pill .drp-cal-ico { color: var(--drp-text-3); width: 14px; height: 14px; }
+.drp-pill.is-open .drp-cal-ico { color: var(--drp-indigo); }
+.drp-pill .drp-range {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+.drp-pill .drp-badge {
+  margin-right: auto;
+  font-size: 10px; font-weight: 800;
+  color: var(--drp-indigo);
+  background: var(--drp-indigo-100);
+  padding: 3px 8px;
+  border-radius: var(--drp-r-pill);
+}
+.drp-pill .drp-chev {
+  color: var(--drp-text-3);
+  width: 12px; height: 12px;
+  transition: transform .15s ease;
+}
+.drp-pill.is-open .drp-chev { transform: rotate(180deg); color: var(--drp-indigo); }
+
+/* ============================================================
+   2 · Scrim + bottom sheet
+   Rendered via portal under document.body.
+   ============================================================ */
+.drp-scrim {
+  position: fixed; inset: 0;
+  background: rgba(11,15,30,0.55);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+  animation: drp-fade-in .2s ease forwards;
+}
+@keyframes drp-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.drp-sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--drp-bg);
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  box-shadow:
+    0 -24px 56px -8px rgba(11,15,30,0.18),
+    0 -4px 12px rgba(11,15,30,0.06);
+  z-index: 1001;
+  display: flex; flex-direction: column;
+  max-height: 90vh;
+  padding-bottom: max(22px, env(safe-area-inset-bottom));
+  direction: rtl;
+  animation: drp-slide-up .26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes drp-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.drp-sheet.is-closing {
+  animation: drp-slide-down .22s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@keyframes drp-slide-down {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+
+.drp-handle-wrap {
+  display: flex; justify-content: center;
+  padding: 8px 0 4px;
+}
+.drp-handle {
+  width: 36px; height: 4px;
+  border-radius: 999px;
+  background: var(--drp-border-strong);
+}
+
+/* Header row */
+.drp-head {
+  display: flex; align-items: center;
+  padding: 6px 16px 12px;
+  border-bottom: 1px solid var(--drp-divider);
+}
+.drp-head h3 {
+  margin: 0;
+  font-size: 15px; font-weight: 800;
+  letter-spacing: -0.015em;
+  color: var(--drp-text);
+}
+.drp-close {
+  margin-right: auto;
+  width: 32px; height: 32px;
+  background: var(--drp-surface);
+  border: 1px solid var(--drp-border);
+  border-radius: var(--drp-r-sm);
+  color: var(--drp-text-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.drp-close svg { width: 14px; height: 14px; }
+
+/* Range banner (from → to) */
+.drp-banner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px 4px;
+}
+.drp-field {
+  display: flex; flex-direction: column;
+  gap: 3px;
+  background: var(--drp-surface);
+  border: 1px solid var(--drp-border);
+  border-radius: var(--drp-r-sm);
+  padding: 9px 16px;
+  text-align: right;
+  min-width: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.drp-field.is-focused {
+  background: var(--drp-indigo-50);
+  border-color: var(--drp-indigo);
+  box-shadow: 0 0 0 3px rgba(91,94,244,0.12);
+}
+.drp-field .drp-field-lbl {
+  font-size: 9.5px; font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--drp-text-3);
+  text-transform: uppercase;
+}
+.drp-field .drp-field-val {
+  font-size: 13px; font-weight: 700;
+  color: var(--drp-text);
+  font-variant-numeric: tabular-nums;
+  direction: ltr; text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drp-banner .drp-arrow {
+  color: var(--drp-text-4);
+  font-size: 16px;
+  padding-top: 12px;
+}
+
+/* Preset chip row */
+.drp-presets-wrap { padding: 10px 0 8px; }
+.drp-presets-eyebrow {
+  font-size: 9.5px; font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--drp-text-3);
+  text-transform: uppercase;
+  padding: 0 16px 6px;
+}
+.drp-presets {
+  display: flex; gap: 6px;
+  padding: 0 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+          mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+}
+.drp-presets::-webkit-scrollbar { display: none; }
+.drp-chip {
+  flex-shrink: 0;
+  height: 32px; padding: 0 12px;
+  border-radius: var(--drp-r-pill);
+  background: var(--drp-surface);
+  border: 1px solid var(--drp-border);
+  font: inherit;
+  font-size: 12px; font-weight: 600;
+  color: var(--drp-text-2);
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.drp-chip:hover { background: var(--drp-surface-2); }
+.drp-chip.is-active {
+  background: var(--drp-indigo);
+  border-color: var(--drp-indigo);
+  color: white;
+  box-shadow: 0 4px 12px -4px rgba(91,94,244,0.5);
+}
+
+/* Calendar */
+.drp-cal {
+  padding: 4px 12px 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.drp-cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 4px 8px;
+}
+.drp-nav-btn {
+  width: 32px; height: 32px;
+  border-radius: var(--drp-r-sm);
+  background: var(--drp-surface);
+  border: 1px solid var(--drp-border);
+  color: var(--drp-text-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.drp-nav-btn:hover { background: var(--drp-surface-2); }
+.drp-nav-btn svg { width: 14px; height: 14px; stroke-width: 2.2; }
+.drp-month-label {
+  font-size: 14px; font-weight: 800;
+  color: var(--drp-text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.drp-dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+.drp-dow span {
+  text-align: center;
+  font-size: 10.5px; font-weight: 700;
+  color: var(--drp-text-3);
+  padding: 4px 0;
+}
+.drp-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  row-gap: 2px;
+}
+.drp-day {
+  height: 38px;
+  width: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13.5px; font-weight: 500;
+  color: var(--drp-text);
+  cursor: pointer;
+  border-radius: var(--drp-r-pill);
+  font-variant-numeric: tabular-nums;
+  position: relative;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  transition: background .12s ease, color .12s ease;
+}
+.drp-day:hover { background: var(--drp-surface-2); }
+.drp-day.is-muted { color: var(--drp-text-4); }
+
+/* Range light fill */
+.drp-day.is-in-range {
+  background: var(--drp-indigo-50);
+  color: var(--drp-text);
+  border-radius: 0;
+  z-index: 1;
+}
+/* Endpoint circle — drawn via radial-gradient so it stays a circle
+   regardless of cell aspect ratio. */
+.drp-day.is-range-start,
+.drp-day.is-range-end {
+  background:
+    radial-gradient(circle at center, var(--drp-indigo) 18.5px, transparent 19px)
+    center / 100% 100% no-repeat;
+  color: white;
+  font-weight: 800;
+  border-radius: 0;
+  z-index: 3;
+  filter: drop-shadow(0 4px 8px rgba(91,94,244,0.4));
+}
+/* Bar that bridges the endpoint to adjacent in-range cells */
+.drp-day.is-range-start::before,
+.drp-day.is-range-end::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 50%;
+  background: var(--drp-indigo-50);
+  z-index: -1;
+}
+/* RTL: start sits on the right end of fill → fill extends LEFT.
+   end sits on the left end of fill → fill extends RIGHT. */
+.drp-day.is-range-start::before { left: 0; }
+.drp-day.is-range-end::before   { right: 0; }
+.drp-day.is-range-start.is-range-end::before { display: none; }
+
+/* Week-row edges shouldn't overflow the row */
+.drp-day.is-in-range.is-row-start {
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+}
+.drp-day.is-in-range.is-row-end {
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+}
+
+/* Today marker */
+.drp-day.is-today { font-weight: 800; color: var(--drp-indigo); }
+.drp-day.is-today.is-range-start,
+.drp-day.is-today.is-range-end { color: white; }
+.drp-day.is-today::after {
+  content: '';
+  position: absolute;
+  bottom: 5px; left: 50%; transform: translateX(-50%);
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: var(--drp-indigo);
+}
+.drp-day.is-today.is-range-start::after,
+.drp-day.is-today.is-range-end::after { background: white; }
+
+/* Footer actions */
+.drp-foot {
+  padding: 12px 16px 4px;
+  border-top: 1px solid var(--drp-divider);
+  display: flex; gap: 8px;
+  background: var(--drp-bg);
+}
+.drp-btn {
+  flex: 1;
+  height: 44px;
+  border-radius: var(--drp-r-sm);
+  font: inherit;
+  font-size: 13.5px; font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px;
+}
+.drp-btn-secondary {
+  background: var(--drp-bg);
+  color: var(--drp-text);
+  border-color: var(--drp-border-strong);
+}
+.drp-btn-secondary:hover { background: var(--drp-surface); }
+.drp-btn-primary {
+  background: var(--drp-indigo);
+  color: white;
+  box-shadow: 0 6px 14px -4px rgba(91,94,244,0.5);
+}
+.drp-btn-primary:hover { background: #4548D8; }
+
+/* Body lock helper — toggle from JS while sheet is open */
+body.drp-no-scroll { overflow: hidden; }
+
+/* ============================================================
+   ≥ 769px — desktop falls back to a popover-style picker;
+   this file targets mobile only. Hide the sheet/pill mobile
+   styles at desktop widths so they don't interfere.
+   ============================================================ */
+@media (min-width: 769px) {
+  .drp-sheet {
+    /* If you also use this component on desktop, override here
+       to render as an anchored popover instead of a bottom sheet. */
+  }
+}
+
+/* Show/hide wrappers for desktop vs mobile date picker */
+.drp-desktop-only { display: block; }
+.drp-mobile-only  { display: none;  width: 100%; }
+@media (max-width: 768px) {
+  .drp-desktop-only { display: none !important; }
+  .drp-mobile-only  { display: block !important; }
+}
