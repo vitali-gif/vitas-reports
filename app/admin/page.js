@@ -169,7 +169,7 @@ export default function AdminPage() {
     } catch (err) { setAuthError(err.message); }
   };
 
-  const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
+  const handleLogout = async () => { await supabase.auth.signOut({ scope: 'global' }); setSession(null); };
   const handleClientAccess = () => { setShowClientAccess(true); loadClientAccess(); };
   const handleExport = () => { alert('ייצוא לאקסל יהיה זמין בקרוב'); };
 
