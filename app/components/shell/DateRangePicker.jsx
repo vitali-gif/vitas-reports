@@ -227,7 +227,9 @@ export default function DateRangePicker({
       </button>
 
       {open && typeof document !== 'undefined' && createPortal(
-        <>
+        /* Wrapper: position:fixed covers full viewport, direction:ltr so left/right
+           are always physical coordinates regardless of the document's dir="rtl" */
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, direction: 'ltr' }}>
           <div className="drp-scrim" onClick={handleClose}/>
           <div
             className={`drp-sheet ${closing ? 'is-closing' : ''}`}
@@ -338,16 +340,4 @@ export default function DateRangePicker({
               </button>
               <button
                 type="button"
-                className="drp-btn drp-btn-primary"
-                onClick={handleConfirm}
-                disabled={!draftFrom || !draftTo}>
-                עדכן
-              </button>
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
-    </>
-  );
-}
+                className="drp-btn drp-btn
