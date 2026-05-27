@@ -3046,7 +3046,6 @@
   overflow-x: hidden;
   box-sizing: border-box;
   padding-bottom: max(22px, env(safe-area-inset-bottom));
-  direction: rtl;
   animation: drp-slide-up .26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 @keyframes drp-slide-up {
