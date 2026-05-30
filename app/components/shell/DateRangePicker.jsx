@@ -282,7 +282,7 @@ export default function DateRangePicker({
                   ].filter(Boolean).join(' ');
                   return (
                     <button key={i} type="button" className={cls} onClick={() => handleDayClick(date)}>
-                      {date.getDate()}
+                      <span className="drp-day-n">{date.getDate()}</span>
                     </button>
                   );
                 })}
