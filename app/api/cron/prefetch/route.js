@@ -28,8 +28,21 @@
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60   // Vercel Hobby max — must be set, default is 10s
 
+// Returns today's date as a plain local Date object, calculated in
+// Israel time (Asia/Jerusalem, UTC+2/+3). Without this, the server
+// running in UTC would compute "yesterday" / "today" wrong between
+// 00:00-03:00 Israel time, causing cache misses on the dashboard.
+function nowIsrael() {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  })
+  const [year, month, day] = fmt.format(new Date()).split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
 function monthsBack(n) {
-  const d = new Date()
+  const d = nowIsrael()
   d.setDate(1)
   d.setMonth(d.getMonth() - n)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -42,15 +55,15 @@ function toYMD(d) {
 }
 
 function sod(d) { const x = new Date(d); x.setHours(0,0,0,0); return x }
-function agoD(n) { const d = sod(new Date()); d.setDate(d.getDate() - n); return d }
+function agoD(n) { const d = nowIsrael(); d.setDate(d.getDate() - n); return d }
 
 // Matches TitleBar.jsx MOBILE_PRESETS exactly:
 //   last7  → agoD(7) → agoD(1)
 //   last14 → agoD(14) → agoD(1)
 //   last30 → agoD(30) → agoD(1)
 function daysBackRange(n) { return { since: toYMD(agoD(n)), until: toYMD(agoD(1)) } }
-function todayRange()     { const t = sod(new Date());                                 return { since: toYMD(t), until: toYMD(t) } }
-function yesterdayRange() { const t = sod(new Date()); t.setDate(t.getDate() - 1);     return { since: toYMD(t), until: toYMD(t) } }
+function todayRange()     { const t = nowIsrael();                                 return { since: toYMD(t), until: toYMD(t) } }
+function yesterdayRange() { const t = nowIsrael(); t.setDate(t.getDate() - 1);     return { since: toYMD(t), until: toYMD(t) } }
 
 export async function GET(request) {
   const startedAt = Date.now()

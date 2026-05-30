@@ -3827,3 +3827,72 @@ body.drp-no-scroll { overflow: hidden; }
     min-width: 0 !important;
   }
 }
+
+/* ============================================================
+   VITAS Reports — Mobile, Phase 7
+   Three targeted fixes:
+
+   7-A  kpi-c cards (CRM KPIs — זמני תגובה, מקורות הגעה, etc.)
+        .lbl / .val / .ic* never had mobile overrides. The desktop
+        rule .kpi-tier.primary .kpi-c .val { font-size: 36px }
+        has specificity (0,3,0) — beats everything in Phase 2.
+        Add explicit overrides with !important.
+
+   7-B  Objections duplicate: .objections-mobile.objections-dup
+        The top-5 mobile cards below the objections doughnut are a
+        duplicate — the chart-grid already collapses to 1-col on
+        mobile and shows the full <ol> list. Hide the dup.
+
+   7-C  המלצות חכמות tab hidden on mobile via .tab-reco-hide-mobile.
+   ============================================================ */
+@media (max-width: 768px) {
+
+  /* ---------------------------------------------------------------
+     7-A · kpi-c compact — .lbl / .val / .ic-wrap / .ic
+     --------------------------------------------------------------- */
+  .kpi-c .ic-wrap {
+    margin-bottom: 8px !important;
+  }
+  .kpi-c .ic {
+    width: 26px !important;
+    height: 26px !important;
+    border-radius: 7px !important;
+  }
+  .kpi-c .ic svg {
+    width: 13px !important;
+    height: 13px !important;
+  }
+  .kpi-c .lbl {
+    font-size: 9.5px !important;
+    margin-bottom: 3px !important;
+    letter-spacing: 0.05em !important;
+  }
+  .kpi-c .val {
+    font-size: 20px !important;
+    line-height: 1.05 !important;
+  }
+  /* Override .kpi-tier.primary .kpi-c .val { font-size: 36px }
+     which has specificity (0,3,0) — needs matching specificity + important */
+  .kpi-tier.primary .kpi-c .val {
+    font-size: 22px !important;
+    line-height: 1.05 !important;
+  }
+  .kpi-tier.primary .kpi-c {
+    padding: 10px 12px !important;
+    min-height: 0 !important;
+  }
+
+  /* ---------------------------------------------------------------
+     7-B · Hide duplicate top-5 objections cards in the objections tab
+     --------------------------------------------------------------- */
+  .objections-mobile.objections-dup {
+    display: none !important;
+  }
+
+  /* ---------------------------------------------------------------
+     7-C · Hide המלצות חכמות tab on mobile
+     --------------------------------------------------------------- */
+  .tab-reco-hide-mobile {
+    display: none !important;
+  }
+}

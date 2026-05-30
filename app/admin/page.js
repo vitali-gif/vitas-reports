@@ -1058,7 +1058,7 @@ const selectProject = async (client, project) => {
           </div>
         </div>
         {/* MOBILE: top-5 objections as cards. Desktop hides this via CSS. */}
-        <ul className="objections-mobile">
+        <ul className="objections-mobile objections-dup">
           {objEntries.slice(0, 5).map(([name, count], i) => {
             const pct = total > 0 ? (count / total * 100) : 0;
             const rankColors = ['rank-rose','rank-violet','rank-indigo','rank-emerald','rank-amber'];
@@ -1251,6 +1251,7 @@ const selectProject = async (client, project) => {
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, '\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5 \u05d1\u05e4\u05d5\u05e2\u05dc', _crmLeads?.meetingsCompleted)}
           {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations)}
           {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts)}
+          {_platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
           {ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
           {ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
           {(ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrencyCompact(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
@@ -1725,7 +1726,7 @@ const selectProject = async (client, project) => {
           {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}>Google PMax</button>}
             {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
             {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
-            {hasCrm && <button className={`client-tab ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
+            {hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
         </div>
 
         {dashTab === 'recommendations' ? (() => {
