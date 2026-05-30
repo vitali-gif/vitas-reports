@@ -38,6 +38,7 @@ export default function Sparkline({ values = [], width = 100, height = 28 }) {
       width={width}
       height={height}
       preserveAspectRatio="none"
+      className="kpi-spark"
       aria-hidden="true"
       style={{ marginTop: 'auto', width: '100%', height: 28, display: 'block' }}
     >

@@ -1217,7 +1217,7 @@ const selectProject = async (client, project) => {
           </div>
           <div className="kpi-label">{label}{tip ? <InfoTip text={tip} /> : null}</div>
           <div className="kpi-value">{value}</div>
-          <div style={{height:28,marginTop:'auto'}}/>
+          <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>
         </div>
       );
     };
@@ -1596,7 +1596,7 @@ const selectProject = async (client, project) => {
           </div>
           <div className="kpi-label">{label}</div>
           <div className="kpi-value">{value}</div>
-          {sparkVals ? <Sparkline values={sparkVals} /> : <div style={{height:28,marginTop:'auto'}}/>}
+          {sparkVals ? <Sparkline values={sparkVals} /> : <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>}
         </div>
       );
     };
