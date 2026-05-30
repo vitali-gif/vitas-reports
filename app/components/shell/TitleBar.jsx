@@ -56,52 +56,36 @@ export default function TitleBar({
   }
 
   return (
-    <div
-      className="title-bar"
-      style={{
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
-        gap: 24, marginBottom: 28,
-      }}
-    >
+    // NOTE: className MUST be "titlebar" (no hyphen) to match the CSS rules
+    // in globals.css for both desktop (~line 366) and mobile (~line 2611).
+    // The old className="title-bar" never matched anything → mobile rules
+    // never applied → h1 stayed at 38px on phones, controls didn't shrink, etc.
+    <div className="titlebar">
       {/* Left: breadcrumb + title */}
       <div>
         {crumb.length > 0 && (
-          <div
-            className="crumb"
-            style={{
-              fontSize: 13, fontWeight: 700, letterSpacing: '0.08em',
-              color: 'var(--text-3)', textTransform: 'uppercase',
-              marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8,
-            }}
-          >
+          <div className="crumb">
             {crumb.map((part, i) => (
               <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {i > 0 && <span style={{ color: 'var(--border)' }}>/</span>}
+                {i > 0 && <span className="sep">/</span>}
                 <span dir={/^[a-zA-Z]/.test(part) ? 'ltr' : undefined}>{part}</span>
               </span>
             ))}
           </div>
         )}
-        <h1
-          style={{
-            fontSize: 38, fontWeight: 800,
-            letterSpacing: '-0.025em', lineHeight: 0.98,
-            color: 'var(--text)', margin: 0,
-            display: 'flex', alignItems: 'baseline', gap: 14,
-          }}
-        >
+        <h1>
           {client}
           {project && (
             <>
-              <span style={{ color: 'var(--border)', fontWeight: 400 }}>/</span>
-              <span dir="ltr">{project}</span>
+              <span className="slash">/</span>
+              <span className="brand" dir="ltr">{project}</span>
             </>
           )}
         </h1>
       </div>
 
       {/* Right: date picker + comparison toggle */}
-      <div className="controls" style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+      <div className="controls">
         {onApplyPreset && (
           <>
             {/* Desktop: existing anchored popover */}
@@ -128,7 +112,7 @@ export default function TitleBar({
 
         {onToggleComparison && (
           <span
-            className={`toggle ${comparisonOn ? '' : 'off'}`}
+            className={`toggle switch-compare ${comparisonOn ? '' : 'off'}`}
             onClick={onToggleComparison}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 10,
