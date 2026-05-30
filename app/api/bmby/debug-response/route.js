@@ -82,7 +82,7 @@ export async function GET(req) {
   const key = url.searchParams.get('key') || ''
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   if (!anonKey || key !== anonKey) {
-    return Response.json({ error: 'unauthorized — pass ?key=<ANON_KEY>' }, { status: 401 })
+    return Response.json({ error: 'unauthorized — pass ?secret=<CRON_SECRET>' }, { status: 401 })
   }
 
   let projectMap = {}

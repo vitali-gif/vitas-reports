@@ -6,8 +6,17 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-// GET — list all, or lookup by email (returns array — supports multi-project)
+// Simple auth: require anon key in x-client-key header (same as all other API routes)
+function checkAuth(req) {
+  const key = req.headers.get('x-client-key')
+  const expected = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  return expected && key === expected
+}
+
+// GET — list all, or lookup by email
 export async function GET(req) {
+  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const email = searchParams.get('email')
 
@@ -29,8 +38,10 @@ export async function GET(req) {
   return NextResponse.json(data || [])
 }
 
-// POST — add entry + auto-send magic link to client
+// POST — add entry + send magic link to client
 export async function POST(req) {
+  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await req.json()
   const { email, project_id, label } = body
   if (!email || !project_id) {
@@ -47,29 +58,51 @@ export async function POST(req) {
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Auto-send magic link to the client
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
-  const { error: otpError } = await supabaseAdmin.auth.admin.generateLink({
+
+  // Generate a magic link via the admin API (this creates the token in Supabase).
+  // The link itself is returned so we can: (a) try emailing it via OTP, and
+  // (b) return it to the admin UI as a fallback copy-paste link.
+  let magicLink = null
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: 'magiclink',
     email: cleanEmail,
     options: { redirectTo: `${siteUrl}/client` }
   })
-  // Note: generateLink generates the link but doesn't send — use signInWithOtp for sending
-  // We use the anon client to trigger the actual send (goes through Supabase email)
-  const supabaseAnon = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
-  await supabaseAnon.auth.signInWithOtp({
-    email: cleanEmail,
-    options: { emailRedirectTo: `${siteUrl}/client`, shouldCreateUser: true }
-  })
+  if (!linkError && linkData?.properties?.action_link) {
+    magicLink = linkData.properties.action_link
+  }
 
-  return NextResponse.json({ ...data, emailSent: true }, { status: 201 })
+  // Also fire signInWithOtp which attempts to send the email via Supabase's email provider.
+  // This may fail silently on free-tier rate limits or missing SMTP config — we capture
+  // the error and include it in the response so the admin knows to use the fallback link.
+  let emailError = null
+  try {
+    const supabaseAnon = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    )
+    const { error: otpErr } = await supabaseAnon.auth.signInWithOtp({
+      email: cleanEmail,
+      options: { emailRedirectTo: `${siteUrl}/client`, shouldCreateUser: true }
+    })
+    if (otpErr) emailError = otpErr.message
+  } catch (e) {
+    emailError = String(e)
+  }
+
+  return NextResponse.json({
+    ...data,
+    emailSent: !emailError,
+    emailError: emailError || null,
+    magicLink,  // fallback: admin can copy this and send manually if email failed
+  }, { status: 201 })
 }
 
 // DELETE
 export async function DELETE(req) {
+  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })

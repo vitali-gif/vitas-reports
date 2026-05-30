@@ -135,19 +135,17 @@ function nonEmptyRow(row) {
 
 function isAuthorized(req) {
   const url = new URL(req.url)
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  // Restricted to CRON_SECRET only — anon key is public so allowing it
+  // would expose raw BMBY data (names, phones) to anyone.
   const cronSecret = process.env.CRON_SECRET || ''
-  const queryKey = url.searchParams.get('key') || ''
   const querySecret = url.searchParams.get('secret') || ''
-  const headerKey = req.headers.get('x-client-key') || ''
-  if (anonKey && (queryKey === anonKey || headerKey === anonKey)) return true
   if (cronSecret && querySecret === cronSecret) return true
   return false
 }
 
 export async function GET(req) {
   if (!isAuthorized(req)) {
-    return Response.json({ error: 'unauthorized — pass ?key=<ANON_KEY> or ?secret=<CRON_SECRET>' }, { status: 401 })
+    return Response.json({ error: 'unauthorized — pass ?secret=<CRON_SECRET>' }, { status: 401 })
   }
 
   const url = new URL(req.url)

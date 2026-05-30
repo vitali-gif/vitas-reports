@@ -105,7 +105,7 @@ export default function ClientPage() {
   const handleSessionReady = async (userEmail) => {
     setEmail(userEmail)
     try {
-      const res = await fetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`)
+      const res = await fetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`, { headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
       if (!res.ok) { setStep('error'); setLoading(false); return }
       const list = await res.json()
       if (!Array.isArray(list) || list.length === 0) { setStep('error'); setLoading(false); return }

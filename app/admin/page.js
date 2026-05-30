@@ -174,7 +174,7 @@ export default function AdminPage() {
   const handleExport = () => { alert('ייצוא לאקסל יהיה זמין בקרוב'); };
 
   const loadClientAccess = async () => {
-    const res = await fetch('/api/client-access')
+    const res = await fetch('/api/client-access', { headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
     const data = await res.json()
     setClientAccessList(Array.isArray(data) ? data : [])
   }
@@ -184,14 +184,26 @@ export default function AdminPage() {
     setCaSaving(true)
     const res = await fetch('/api/client-access', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
       body: JSON.stringify({ email: caEmail.trim(), project_id: caProjectId, label: caLabel.trim() || null })
     })
     setCaSaving(false)
     if (res.ok) {
+      const result = await res.json()
       setCaEmail(''); setCaProjectId(''); setCaLabel('')
       await loadClientAccess()
-      showToast('✓ גישה נוספה — קישור כניסה נשלח ללקוח במייל')
+      if (result.emailSent) {
+        showToast('✓ גישה נוספה — קישור כניסה נשלח ללקוח במייל')
+      } else {
+        // Email failed — show the magic link so admin can share manually
+        const link = result.magicLink || ''
+        if (link) {
+          navigator.clipboard?.writeText(link).catch(() => {})
+          showToast('⚠️ המייל לא נשלח. קישור כניסה הועתק ללוח — שלח ללקוח ידנית.')
+        } else {
+          showToast('✓ גישה נוספה — אך שליחת המייל נכשלה: ' + (result.emailError || 'שגיאה לא ידועה'))
+        }
+      }
     } else {
       const err = await res.json()
       showToast('שגיאה: ' + (err.error || 'unknown'))
@@ -200,7 +212,7 @@ export default function AdminPage() {
 
   const deleteClientAccess = async (id) => {
     if (!confirm('למחוק גישה זו?')) return
-    await fetch('/api/client-access?id=' + id, { method: 'DELETE' })
+    await fetch('/api/client-access?id=' + id, { method: 'DELETE', headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
     setClientAccessList(prev => prev.filter(x => x.id !== id))
     showToast('✓ גישה נמחקה')
   }

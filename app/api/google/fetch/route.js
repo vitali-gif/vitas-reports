@@ -397,6 +397,11 @@ async function runSync(opts = {}) {
 
 // ===== handlers =====
 
+
+// Validate that a value is a safe YYYY-MM-DD date string
+function isValidDate(v) {
+  return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
+}
 export async function POST(request) {
   const anon = request.headers.get('x-client-key')
   if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -404,6 +409,7 @@ export async function POST(request) {
   }
   let body = {}
   try { body = await request.json() } catch {}
+  if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) { return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 }) }
   const { status, body: responseBody } = await runSync({
     month: body.month,
     since: body.since,
