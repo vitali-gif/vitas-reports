@@ -3746,3 +3746,36 @@ body.drp-no-scroll { overflow: hidden; }
   }
   .crm-funnel .crm-farrow { display: none !important; }
 }
+
+/* ============================================================
+   VITAS Reports — Mobile, Phase 4
+   Hide orphan data tables that aren't wrapped in .table-wrapper.
+   The original mobile.css hides .tbl-wrap / .table-wrapper, but
+   several tables in admin/page.js sit directly inside a .card or
+   .card-body (no wrapper) — specifically:
+     - Demographics gender table (~L2509)
+     - Demographics age table (~L2535)
+     - Asset groups PMax table (~L2458)
+   These tables are illegible at phone width. Hide them.
+
+   IMPORTANT: cssnano-simple in this Next.js version does NOT support
+   :has() — using it breaks the CSS build (see CHAT_HANDOFF). We hide
+   the table cells but DO NOT collapse the wrapping .card itself,
+   because .card is shared with many real content cards (reco, role,
+   ad gallery). A future JSX pass should add a per-section
+   .desktop-only-msg under each orphan table.
+   ============================================================ */
+@media (max-width: 768px) {
+
+  /* Any data-table that sits inside a .card or .card-body is a
+     wide tabular view that doesn't fit a phone. Hide. */
+  .card .data-table,
+  .card-body .data-table {
+    display: none !important;
+  }
+
+  /* When the .card-body's ONLY child is a now-hidden .data-table, the
+     .card-body still takes default padding. Tighten that padding for
+     all .card-body on mobile (cheap visual fix, hurts no other use). */
+  .card-body { padding: 8px 10px !important; }
+}
