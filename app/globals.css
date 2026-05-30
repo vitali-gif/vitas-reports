@@ -3800,3 +3800,30 @@ body.drp-no-scroll { overflow: hidden; }
     display: none !important;
   }
 }
+
+/* ============================================================
+   VITAS Reports — Mobile, Phase 6
+   The original mobile.css from Claude Design targeted .layout
+   and .main — the design prototype's class names. The live JSX
+   uses .app-layout and .main-content (the design-v2 rename pass
+   left a comment "/* alias of .layout */" but didn't actually
+   add aliases inside @media). Result on a real phone (430×932):
+     - .app-layout stays at grid-template-columns: 260px 1fr
+       → 260px reserved for sidebar even though sidebar is
+         position:fixed and out of flow → main shifts 260px
+         to the start side
+     - .main-content stays at padding: 28px 36px 60px → ~72px
+       horizontal padding eaten on a 430px viewport
+   This is the same class-mismatch pattern as TitleBar
+   (commit bbd043e) and KPI specificity (Phase 3, cd400cc).
+   ============================================================ */
+@media (max-width: 768px) {
+  .app-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    min-height: calc(100vh - 52px) !important;
+  }
+  .main-content {
+    padding: 10px 12px 32px !important;
+    min-width: 0 !important;
+  }
+}
