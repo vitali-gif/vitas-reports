@@ -3779,3 +3779,24 @@ body.drp-no-scroll { overflow: hidden; }
      all .card-body on mobile (cheap visual fix, hurts no other use). */
   .card-body { padding: 8px 10px !important; }
 }
+
+/* ============================================================
+   VITAS Reports — Mobile, Phase 5
+   Hide rich-media sections that don't compress to a phone.
+   These section wrappers each get a class hook in JSX (1-line each):
+     .section-top-ads        — "המודעות הכי מובילות ב-Facebook"
+                                 image gallery (Facebook tab)
+     .section-demographics   — "פילוח דמוגרפי" gender+age tables
+                                 (already hidden via .card .data-table,
+                                  but the empty section shell remained;
+                                  hide the whole section now)
+     .section-asset-gallery  — "קמפיינים Google Search" / PMax asset
+                                 group image gallery (Google tab)
+   ============================================================ */
+@media (max-width: 768px) {
+  .section-top-ads,
+  .section-demographics,
+  .section-asset-gallery {
+    display: none !important;
+  }
+}

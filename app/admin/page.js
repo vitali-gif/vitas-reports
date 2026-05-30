@@ -2496,7 +2496,7 @@ const selectProject = async (client, project) => {
 
 {false && !isPmax && !isFb && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'} <InfoTip text="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)" /></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>}
 
-        {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section">
+        {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section section-demographics">
           <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>פילוח דמוגרפי</h2><span className="sub">חלוקת ביצועים לפי מגדר וקבוצת גיל</span></div>
         <div style={{display:'flex',gap:'20px',alignItems:'flex-start'}}>
           <div style={{flex:1,minWidth:0}}>
@@ -2565,7 +2565,7 @@ const selectProject = async (client, project) => {
             .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
             .slice(0, 5);
           return (
-            <div className="section">
+            <div className="section section-top-ads">
               <div className="section-head">
                 <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="8 6 2 6 2 12 8 12"/><polyline points="16 6 22 6 22 12 16 12"/><path d="M12 19v-7"/><path d="M8 19h8"/><path d="M8 12c0 2.21 1.79 4 4 4s4-1.79 4-4V6H8v6z"/></svg></div>
                 <h2>המודעות הכי מובילות ב-Facebook</h2>
@@ -2639,7 +2639,7 @@ const selectProject = async (client, project) => {
           const groups = gReports.flatMap(r => r.summary?.assetGroups || []);
           if (groups.length === 0) return null;
           return (
-            <div className="section">
+            <div className="section section-asset-gallery">
               <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים Google Search</h2></div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
