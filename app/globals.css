@@ -3363,3 +3363,273 @@ body.drp-no-scroll { overflow: hidden; }
   .drp-desktop-only { display: none !important; }
   .drp-mobile-only  { display: block !important; }
 }
+
+/* ============================================================
+   VITAS Reports — Mobile, Phase 2
+   Mirror the Claude Design mobile rules onto the LIVE class names
+   that admin/page.js actually renders. The original mobile.css
+   used the design's prototype class names (.tabs, .tab, .kpi,
+   .funnel, .fstep). The live page uses .client-tabs / .client-tab,
+   .kpi-c, .crm-funnel / .crm-fstep, etc. — so without these mirror
+   rules the design never applied on real phones.
+   ============================================================ */
+@media (max-width: 768px) {
+
+  /* ---------------------------------------------------------------
+     P2-1 · Tabs — live class is .client-tabs / .client-tab
+     Mirror the .tabs / .tab horizontal-scroll mobile rules.
+     --------------------------------------------------------------- */
+  .client-tabs {
+    position: sticky;
+    top: 48px;
+    z-index: 30;
+    background: var(--bg, #fff);
+    margin: 0 -12px 10px;
+    padding: 0 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+            mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+  }
+  .client-tabs::-webkit-scrollbar { display: none; }
+  .client-tab {
+    flex-shrink: 0;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    gap: 5px;
+  }
+  .client-tab svg { width: 12px; height: 12px; }
+
+  /* CRM/Reco sub-tabs row (.client-tabs.rec-subtabs).
+     Don't be sticky — drop the sticky inheritance, and tighten. */
+  .client-tabs.rec-subtabs {
+    position: static;
+    top: auto;
+    background: transparent;
+    margin: 0 -12px 10px;
+    padding: 4px 12px;
+    border-radius: 0;
+  }
+  .client-tabs.rec-subtabs .client-tab {
+    padding: 6px 10px !important;
+    font-size: 11.5px !important;
+  }
+  .subtab-badge {
+    margin-right: 4px;
+    font-size: 10px;
+    padding: 1px 6px;
+    min-width: 18px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--indigo-50, #EEF0FF);
+    color: var(--indigo, #5B5EF4);
+    font-weight: 800;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  /* ---------------------------------------------------------------
+     P2-2 · KPIs — live uses .kpi-c (not .kpi).
+     Mirror the 2-col compact rules. Use higher specificity to win
+     over inline styles inside admin/page.js KPI builders.
+     --------------------------------------------------------------- */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 8px !important;
+  }
+  .kpi-c {
+    min-height: 0 !important;
+    padding: 8px 10px !important;
+  }
+  .kpi-c .kpi-icon { width: 22px !important; height: 22px !important; border-radius: 6px !important; }
+  .kpi-c .kpi-icon svg { width: 12px !important; height: 12px !important; }
+  .kpi-c .kpi-trend {
+    font-size: 9.5px !important; padding: 1px 5px !important;
+    gap: 2px !important;
+  }
+  .kpi-c .kpi-trend svg { width: 7px !important; height: 7px !important; }
+  .kpi-c .kpi-label {
+    font-size: 9.5px !important;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px !important;
+  }
+  .kpi-c .kpi-value {
+    font-size: 19px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.1 !important;
+  }
+  .kpi-c .kpi-value .currency,
+  .kpi-c .kpi-value .unit { font-size: 11px !important; }
+  .kpi-c .kpi-spark { display: none !important; }
+  .kpi-c .kpi-top { margin-bottom: 6px !important; }
+  .kpi-c .kpi-tier { display: none; }  /* "primary" tier badge hidden on dense mobile */
+
+  /* ---------------------------------------------------------------
+     P2-3 · CRM funnel — live uses .crm-funnel / .crm-fstep / .crm-farrow.
+     Mirror the .funnel 3×2 compact layout.
+     --------------------------------------------------------------- */
+  .crm-funnel {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 4px !important;
+  }
+  .crm-fstep {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    min-height: 0 !important;
+    padding: 6px 8px 6px 6px !important;
+    gap: 1px !important;
+  }
+  .crm-fstep .flabel {
+    margin-bottom: 1px;
+    font-size: 8.5px !important;
+    letter-spacing: 0.05em;
+  }
+  .crm-fstep .fvalue {
+    font-size: 16px !important;
+    margin-bottom: 0;
+    letter-spacing: -0.02em;
+  }
+  .crm-fstep .frate {
+    margin-top: 1px;
+    font-size: 9px !important;
+    gap: 3px;
+  }
+  .crm-farrow { display: none !important; }
+
+  /* ---------------------------------------------------------------
+     P2-4 · Recommendations tab — live uses .rec-card (not .reco-card).
+     Tighten + hide the rich extras (auto-action button, ads gallery)
+     to keep the recommendations card readable on a phone.
+     --------------------------------------------------------------- */
+  .rec-card {
+    padding: 10px 12px !important;
+    margin-bottom: 8px !important;
+  }
+  .rec-card .rec-title { font-size: 12.5px !important; line-height: 1.3 !important; }
+  .rec-card .rec-body  { font-size: 11.5px !important; line-height: 1.4 !important; }
+  .rec-card .rec-icon  { width: 26px !important; height: 26px !important; }
+  .rec-card .rec-icon svg { width: 14px !important; height: 14px !important; }
+  .rec-card .rec-foot  { padding-top: 8px !important; }
+
+  /* The "best/worst ad" preview gallery inside a reco is too rich on
+     mobile (image + multi-line copy + link). Show the summary text but
+     drop the media tile. */
+  .rec-ads-preview { display: grid !important; grid-template-columns: 1fr !important; gap: 6px !important; }
+  .rec-ad-card { padding: 8px 10px !important; gap: 8px !important; }
+  .rec-ad-media { display: none !important; }
+  .rec-ad-body  { font-size: 11px !important; }
+  .rec-ad-title { font-size: 12px !important; }
+  .rec-ad-name  { font-size: 11px !important; }
+  .rec-ad-badge { font-size: 9.5px !important; padding: 1px 6px !important; }
+
+  /* Pipeline section inside the "בתוכנית" sub-tab. The full kanban-y
+     layout doesn't fit a phone — collapse to a single column. */
+  .pipeline-section { margin-bottom: 10px !important; }
+  .pipeline-section-title { font-size: 12px !important; margin-bottom: 6px !important; }
+  .pipeline-card {
+    padding: 10px 12px !important;
+    margin-bottom: 6px !important;
+  }
+  .pipeline-card-head { gap: 6px !important; }
+  .pipeline-card-title { font-size: 12.5px !important; line-height: 1.3 !important; }
+  .pipeline-card-meta { font-size: 10.5px !important; }
+  .pipeline-card-body { font-size: 11.5px !important; }
+  .pipeline-actions   { flex-wrap: wrap !important; gap: 6px !important; }
+  .pipeline-btn       { font-size: 11px !important; padding: 6px 10px !important; flex: 1; min-width: 100px; }
+
+  /* Role cards inside recommendations grouping — drop the icon+header
+     overhead a little and stack tight. */
+  .role-cards     { gap: 8px !important; }
+  .role-group     { padding: 8px 10px !important; }
+  .role-header    { gap: 8px !important; margin-bottom: 6px !important; }
+  .role-icon      { width: 26px !important; height: 26px !important; }
+  .role-label     { font-size: 12.5px !important; }
+  .role-desc      { font-size: 10.5px !important; }
+  .role-count     { font-size: 11px !important; }
+  .role-group.role-empty { padding: 14px 10px !important; font-size: 11px !important; }
+
+  /* ---------------------------------------------------------------
+     P2-5 · Section heads — tighten the "section-title" variant too
+     (the older style block in some sections uses .section-title +
+     .section-icon instead of .section-head + .ico).
+     --------------------------------------------------------------- */
+  .section-title {
+    gap: 8px !important;
+    margin-bottom: 6px !important;
+    font-size: 13px !important;
+  }
+  .section-icon { width: 22px !important; height: 22px !important; border-radius: 6px !important; }
+  .section-icon svg { width: 12px !important; height: 12px !important; }
+
+  /* ---------------------------------------------------------------
+     P2-6 · Hide overload sections on mobile.
+     The user explicitly asked to NOT cram everything onto a phone —
+     several detail sections add too much vertical scroll for little
+     value. Hide them; the KPI grid + funnel + top-5 cards carry the
+     story on a phone. (Use admin's existing class hooks where
+     possible; otherwise tag via specific section selectors.)
+     --------------------------------------------------------------- */
+
+  /* CRM details that are useful on desktop but redundant on mobile:
+     - "פילוח לפי יום בשבוע" — day-of-week breakdown
+     - "זמן מענה לפי איש מכירות" — per-rep response time table
+     - "הכי איטיים - לפי מקור" — slowest by source
+     - "נתונים לפי מקור הגעה" — source breakdown table (already a table,
+        will hit the .table-wrapper hide path)
+     - "המודעות הכי מובילות ב-Facebook" — top ads gallery
+     These all live inside .section blocks; opt them in via .mobile-hide
+     in JSX. For now, hide any .chart-grid that lives inside a section
+     marked .mobile-hide. */
+  .section.mobile-hide,
+  .section.mobile-hide ~ .section.mobile-hide { display: none !important; }
+
+  /* Demographics gender+age grid inside Facebook — hidden via
+     .demo-grid path. Already covered in original mobile.css; the
+     desktop-only-msg next to it carries the "פתח מהמחשב" notice. */
+
+  /* "המודעות הכי מובילות" gallery — uses .rec-ads-preview but inside
+     a non-reco .section. Hide the section heading + body via a
+     dedicated class hook the JSX can opt into: .section-top-ads. */
+  .section-top-ads { display: none !important; }
+
+  /* ---------------------------------------------------------------
+     P2-7 · Tooltip / InfoTip popovers — keep them compact on mobile,
+     and ensure they don't overflow the viewport.
+     --------------------------------------------------------------- */
+  .info-tip-popover {
+    max-width: calc(100vw - 32px) !important;
+    font-size: 11px !important;
+    padding: 8px 10px !important;
+  }
+
+  /* ---------------------------------------------------------------
+     P2-8 · The 60-day rolling rec-measure block inside recommendations.
+     Compact font + tight padding so it fits below a card.
+     --------------------------------------------------------------- */
+  .rec-measure { padding: 8px 10px !important; margin-top: 8px !important; }
+  .rec-measure-title { font-size: 11px !important; }
+  .rec-suggestion { font-size: 11.5px !important; padding: 8px 10px !important; }
+  .rec-prediction { font-size: 11px !important; padding: 6px 10px !important; }
+  .rec-auto-btn   { font-size: 11.5px !important; padding: 8px 12px !important; }
+
+  /* ---------------------------------------------------------------
+     P2-9 · Impact cards — used in the rec impact summary
+     --------------------------------------------------------------- */
+  .impact-indicator { padding: 8px 10px !important; }
+  .impact-icon  { width: 26px !important; height: 26px !important; }
+  .impact-label { font-size: 10.5px !important; }
+  .impact-pct   { font-size: 14px !important; }
+  .impact-sub   { font-size: 10px !important; }
+
+  /* ---------------------------------------------------------------
+     P2-10 · Main padding stays at the original mobile value
+     (already set in the original mobile.css block).
+     --------------------------------------------------------------- */
+}
