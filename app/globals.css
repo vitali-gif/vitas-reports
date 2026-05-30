@@ -3806,7 +3806,7 @@ body.drp-no-scroll { overflow: hidden; }
    The original mobile.css from Claude Design targeted .layout
    and .main — the design prototype's class names. The live JSX
    uses .app-layout and .main-content (the design-v2 rename pass
-   left a comment "/* alias of .layout */" but didn't actually
+   left a comment "alias of .layout" but didn't actually
    add aliases inside @media). Result on a real phone (430×932):
      - .app-layout stays at grid-template-columns: 260px 1fr
        → 260px reserved for sidebar even though sidebar is
