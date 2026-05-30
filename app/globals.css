@@ -3633,3 +3633,116 @@ body.drp-no-scroll { overflow: hidden; }
      (already set in the original mobile.css block).
      --------------------------------------------------------------- */
 }
+
+/* ============================================================
+   VITAS Reports — Mobile, Phase 3
+   Specificity fix. The desktop rules .kpi .kpi-value, .kpi .kpi-label,
+   .kpi .kpi-icon (and friends) have specificity 0,2,0 and override
+   the mobile .kpi-value / .kpi-label / .kpi-icon rules (specificity
+   0,1,0) regardless of @media order. Result on real phones: KPI cards
+   stayed at 38px font, 36px icon, 161-178px tall — the dense-mobile
+   compaction never took effect.
+
+   This patch re-asserts every KPI compaction rule with .kpi .x specificity
+   plus !important, inside the mobile media query, so the cascade wins.
+   ============================================================ */
+@media (max-width: 768px) {
+
+  /* Primary KPI cards (.kpi with color modifier like .indigo / .emerald) */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 8px !important;
+  }
+  .kpi {
+    min-height: 0 !important;
+    padding: 10px 12px 10px !important;
+  }
+  .kpi .kpi-top { margin-bottom: 4px !important; }
+  .kpi .kpi-icon {
+    width: 24px !important; height: 24px !important;
+    border-radius: 6px !important;
+  }
+  .kpi .kpi-icon svg { width: 13px !important; height: 13px !important; }
+  .kpi .kpi-trend {
+    font-size: 9.5px !important;
+    padding: 1px 5px !important;
+    gap: 2px !important;
+  }
+  .kpi .kpi-trend svg { width: 8px !important; height: 8px !important; }
+  .kpi .kpi-label {
+    font-size: 9.5px !important;
+    letter-spacing: 0.04em !important;
+    margin-bottom: 2px !important;
+  }
+  .kpi .kpi-value {
+    font-size: 22px !important;
+    line-height: 1.05 !important;
+    margin-bottom: 4px !important;
+  }
+  .kpi .kpi-value .currency,
+  .kpi .kpi-value .curr,
+  .kpi .kpi-value .unit {
+    font-size: 12px !important;
+  }
+  .kpi .kpi-spark { display: none !important; }
+
+  /* Funnel / fstep — same specificity-hardening, since .funnel .fstep
+     also has cascade competition with .fstep .flabel etc. */
+  .funnel {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 4px !important;
+    padding: 6px !important;
+  }
+  .funnel .fstep {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    min-height: 0 !important;
+    padding: 8px 10px !important;
+    gap: 1px !important;
+  }
+  .funnel .fstep .flabel {
+    margin-bottom: 1px !important;
+    font-size: 9px !important;
+    letter-spacing: 0.05em !important;
+  }
+  .funnel .fstep .fvalue {
+    font-size: 17px !important;
+    margin-bottom: 0 !important;
+    letter-spacing: -0.02em !important;
+    line-height: 1.1 !important;
+  }
+  .funnel .fstep .frate {
+    margin-top: 1px !important;
+    font-size: 9px !important;
+    gap: 3px !important;
+  }
+  .funnel .farrow { display: none !important; }
+
+  /* CRM funnel — same compaction, increased specificity */
+  .crm-funnel .crm-fstep {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    min-height: 0 !important;
+    padding: 8px 10px !important;
+    gap: 1px !important;
+  }
+  .crm-funnel .crm-fstep .flabel {
+    font-size: 9px !important;
+    letter-spacing: 0.05em !important;
+    margin-bottom: 1px !important;
+  }
+  .crm-funnel .crm-fstep .fvalue {
+    font-size: 17px !important;
+    line-height: 1.1 !important;
+    letter-spacing: -0.02em !important;
+  }
+  .crm-funnel .crm-fstep .frate {
+    font-size: 9px !important;
+    gap: 3px !important;
+  }
+  .crm-funnel .crm-farrow { display: none !important; }
+}
