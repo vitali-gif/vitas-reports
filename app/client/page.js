@@ -128,7 +128,7 @@ export default function ClientPage() {
   const [reports, setReports]     = useState([])
   const [refreshing, setRefreshing] = useState(false)
   const [tab, setTab]             = useState('summary')
-  const [activePreset, setActivePreset] = useState('lastMonth')
+  const [activePreset, setActivePreset] = useState('last30')
   const [since, setSince]         = useState('')
   const [until, setUntil]         = useState('')
   const [selectedMonth, setSelectedMonth] = useState('')
@@ -287,9 +287,11 @@ export default function ClientPage() {
     await triggerFetch({ since: s, until: u })
   }, [triggerFetch])
 
+  // Load data when accessInfo is set — fetch last 30 days which is always fresh
   useEffect(() => {
-    if (step === 'dashboard' && accessInfo && reports.length === 0) applyPreset('lastMonth')
-  }, [step, accessInfo])
+    if (!accessInfo) return
+    applyPreset('last30')
+  }, [accessInfo?.project_id])
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const currentReports = reports.filter(r => r.month === selectedMonth)
