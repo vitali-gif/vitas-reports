@@ -147,40 +147,49 @@ export default function ClientPage() {
   useEffect(() => {
     let handled = false
 
-    // Safety net: if nothing resolves in 5s, show email form
-    const safetyTimer = setTimeout(() => {
-      if (!handled) { handled = true; setLoading(false) }
-    }, 5000)
+    const finish = (email) => {
+      if (handled) return
+      handled = true
+      if (email) {
+        handleSessionReady(email)
+      } else {
+        setLoading(false)
+      }
+    }
 
+    // ── Step 1: Handle magic link hash (#access_token=...) ──────────────
+    // Supabase processes the hash asynchronously after client init, causing
+    // a race condition with getSession(). We parse the hash ourselves and
+    // call setSession() directly to avoid missing the SIGNED_IN event.
+    const hash = typeof window !== 'undefined' ? window.location.hash : ''
+    if (hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.slice(1))
+      const accessToken  = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+      if (accessToken && refreshToken) {
+        // Remove hash from URL so it doesn't persist across refreshes
+        window.history.replaceState(null, '', window.location.pathname)
+        supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          .then(({ data: { session } }) => finish(session?.user?.email || null))
+          .catch(() => finish(null))
+        // setSession is async — let it run, getSession below will also catch it
+      }
+    }
+
+    // ── Step 2: onAuthStateChange (catches SIGNED_IN from any source) ───
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[vitas-auth] event:', event, 'email:', session?.user?.email)
-      if (session?.user?.email && !handled) {
-        handled = true
-        clearTimeout(safetyTimer)
-        setLoading(true)
-        await handleSessionReady(session.user.email)
-      } else if (!session && !handled) {
-        handled = true
-        clearTimeout(safetyTimer)
-        setLoading(false)
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user?.email) {
+        finish(session.user.email)
       }
     })
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('[vitas-auth] getSession:', session?.user?.email)
-      if (session?.user?.email && !handled) {
-        handled = true
-        clearTimeout(safetyTimer)
-        await handleSessionReady(session.user.email)
-      } else if (!handled) {
-        handled = true
-        clearTimeout(safetyTimer)
-        setLoading(false)
-      }
-    }).catch(e => {
-      console.error('[vitas-auth] getSession error:', e)
-      if (!handled) { handled = true; setLoading(false) }
-    })
+    // ── Step 3: getSession — for existing / restored sessions ───────────
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => finish(session?.user?.email || null))
+      .catch(() => finish(null))
+
+    // ── Step 4: 6s safety net ────────────────────────────────────────────
+    const safetyTimer = setTimeout(() => finish(null), 6000)
 
     return () => { subscription.unsubscribe(); clearTimeout(safetyTimer) }
   }, [])
