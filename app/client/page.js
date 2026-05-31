@@ -146,23 +146,43 @@ export default function ClientPage() {
   // ── Auth ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     let handled = false
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+
+    // Safety net: if nothing resolves in 5s, show email form
+    const safetyTimer = setTimeout(() => {
+      if (!handled) { handled = true; setLoading(false) }
+    }, 5000)
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[vitas-auth] event:', event, 'email:', session?.user?.email)
       if (session?.user?.email && !handled) {
         handled = true
+        clearTimeout(safetyTimer)
         setLoading(true)
         await handleSessionReady(session.user.email)
-      }
-    })
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user?.email && !handled) {
+      } else if (!session && !handled) {
         handled = true
-        await handleSessionReady(session.user.email)
-      } else if (!handled) {
-        // No session (or already handled by onAuthStateChange) — show email form
+        clearTimeout(safetyTimer)
         setLoading(false)
       }
     })
-    return () => subscription.unsubscribe()
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('[vitas-auth] getSession:', session?.user?.email)
+      if (session?.user?.email && !handled) {
+        handled = true
+        clearTimeout(safetyTimer)
+        await handleSessionReady(session.user.email)
+      } else if (!handled) {
+        handled = true
+        clearTimeout(safetyTimer)
+        setLoading(false)
+      }
+    }).catch(e => {
+      console.error('[vitas-auth] getSession error:', e)
+      if (!handled) { handled = true; setLoading(false) }
+    })
+
+    return () => { subscription.unsubscribe(); clearTimeout(safetyTimer) }
   }, [])
 
   const handleSessionReady = async (userEmail) => {
