@@ -2813,7 +2813,7 @@ const selectProject = async (client, project) => {
           onAddClient={() => setShowAddClient(true)}
           onAddProject={() => setShowAddProject(true)}
           footerText="VITAS Reports v3.2"
-          lockedProjects={['ONCE', 'REHAVIA']}
+          lockedProjects={['REHAVIA']}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           onExport={handleExport}
