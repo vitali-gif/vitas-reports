@@ -171,9 +171,9 @@ export default function ClientPage() {
       const res = await fetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`, {
         headers: { 'x-client-key': ANON_KEY }
       })
-      if (!res.ok) { setStep('error'); setLoading(false); return }
+      if (!res.ok) { setStep('error'); return }
       const list = await res.json()
-      if (!Array.isArray(list) || list.length === 0) { setStep('error'); setLoading(false); return }
+      if (!Array.isArray(list) || list.length === 0) { setStep('error'); return }
       setAccessList(list)
       if (list.length === 1) {
         setAccessInfo(list[0])
@@ -181,8 +181,12 @@ export default function ClientPage() {
       } else {
         setStep('picker')
       }
-    } catch { setStep('error') }
-    setLoading(false)
+    } catch (e) {
+      console.error('[client-auth] handleSessionReady error:', e)
+      setStep('error')
+    } finally {
+      setLoading(false)  // ALWAYS called — no spinner gets stuck
+    }
   }
 
   const handleSendOTP = async () => {
