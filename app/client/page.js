@@ -146,10 +146,10 @@ export default function ClientPage() {
   // ── Auth ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     let handled = false
-    // onAuthStateChange must be set up BEFORE getSession so we don't miss the SIGNED_IN event
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user?.email && !handled) {
         handled = true
+        setLoading(true)
         await handleSessionReady(session.user.email)
       }
     })
@@ -157,8 +157,9 @@ export default function ClientPage() {
       if (session?.user?.email && !handled) {
         handled = true
         await handleSessionReady(session.user.email)
-      } else if (!session) {
-        setLoading(false)  // no session — show email form
+      } else if (!handled) {
+        // No session (or already handled by onAuthStateChange) — show email form
+        setLoading(false)
       }
     })
     return () => subscription.unsubscribe()
