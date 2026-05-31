@@ -121,7 +121,7 @@ function CampTable({ campaigns, platform }) {
 export default function ClientPage() {
   const [step, setStep]           = useState('email')
   const [emailInput, setEmailInput] = useState('')
-  const [loading, setLoading]     = useState(false)
+  const [loading, setLoading]     = useState(true)  // true until session check completes
   const [toast, setToast]         = useState('')
   const [accessList, setAccessList] = useState([])
   const [accessInfo, setAccessInfo] = useState(null)
@@ -145,11 +145,21 @@ export default function ClientPage() {
 
   // ── Auth ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user?.email) await handleSessionReady(session.user.email)
-    })
+    let handled = false
+    // onAuthStateChange must be set up BEFORE getSession so we don't miss the SIGNED_IN event
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user?.email) await handleSessionReady(session.user.email)
+      if (session?.user?.email && !handled) {
+        handled = true
+        await handleSessionReady(session.user.email)
+      }
+    })
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user?.email && !handled) {
+        handled = true
+        await handleSessionReady(session.user.email)
+      } else if (!session) {
+        setLoading(false)  // no session — show email form
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
