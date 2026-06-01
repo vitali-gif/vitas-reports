@@ -345,6 +345,7 @@ async function runSync(opts = {}) {
 
     // 2. Appointments - build per-client list of events so we can filter
     const apptStatusDebug = {} // debug: raw status → counts
+    const completedMeetingSamples = [] // debug: first 5 completed meeting tasks with details
     //    by appt date relative to the LID's start_date (post-LID logic).
     const clientApptList = new Map()  // cid → [{ date, completed, cancelled }]
     const clientsWithAppt = new Set()           // window-based (any status)
@@ -369,6 +370,18 @@ async function runSync(opts = {}) {
       if (isCanc) apptStatusDebug[rawStatus].isCanc += 1
       if (!clientApptList.has(cid)) clientApptList.set(cid, [])
       clientApptList.get(cid).push({ date: apptDate, completed: isDone, cancelled: isCanc })
+      // Collect sample of completed meetings for debug
+      if (isDone && inRangeDate(t.start_date || t.create_date) && completedMeetingSamples.length < 10) {
+        completedMeetingSamples.push({
+          date: apptDate,
+          subject: t.subject || '',
+          message: (t.message || '').toString().slice(0, 300),
+          location: t.location || '',
+          status: t.status || '',
+          client_id: cid,
+          client_name: t.client_name || '',
+        })
+      }
       // Window-only sets (for compatibility with diag)
       if (inRangeDate(t.start_date || t.create_date)) {
         clientsWithAppt.add(cid)
@@ -919,6 +932,7 @@ async function runSync(opts = {}) {
       errors: errors.length ? errors : undefined,
       debug: Object.keys(debug).length ? debug : undefined,
       apptStatusDebug,
+      completedMeetingSamples,
       diag: {
         // Compact diag for ops - keep contract attribution chain + funnel status counts
         contractAttrib: _contractAttribDebug.map(c => ({
