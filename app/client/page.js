@@ -90,12 +90,23 @@ export default function ClientPage() {
   const handleSendOTP = async () => {
     if (!emailInput.trim()) return
     setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({
-      email: emailInput.trim().toLowerCase(),
-      options: { emailRedirectTo: `${window.location.origin}/client` }
-    })
-    setLoading(false)
-    if (error) { showToast('שגיאה: ' + error.message); return }
+    try {
+      const res = await fetch('/api/client-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput.trim().toLowerCase() })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        showToast('שגיאה: ' + (err.error || 'נסה שוב'))
+        return
+      }
+    } catch {
+      showToast('שגיאת רשת — נסה שוב')
+      return
+    } finally {
+      setLoading(false)
+    }
     setStep('sent')
   }
 
