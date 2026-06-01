@@ -3914,4 +3914,17 @@ body.drp-no-scroll { overflow: hidden; }
   .tab-reco-hide-mobile {
     display: none !important;
   }
+
+  /* ---------------------------------------------------------------
+     7-D · CRM kpi-c cards (זמני תגובה) — compact on mobile
+     --------------------------------------------------------------- */
+  .kpi-tier.primary .kpi-c {
+    min-height: 0 !important;
+    padding: 10px 12px 10px !important;
+  }
+  .kpi-tier.primary .kpi-c .ic-wrap { margin-bottom: 8px !important; }
+  .kpi-tier.primary .kpi-c .ic { width: 26px !important; height: 26px !important; }
+  .kpi-tier.primary .kpi-c .ic svg { width: 13px !important; height: 13px !important; }
+  .kpi-tier.primary .kpi-c .lbl { font-size: 10px !important; margin-bottom: 3px !important; }
+  .kpi-tier.primary .kpi-c .val { font-size: 20px !important; }
 }
