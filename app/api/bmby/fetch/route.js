@@ -344,6 +344,7 @@ async function runSync(opts = {}) {
     })
 
     // 2. Appointments - build per-client list of events so we can filter
+    const apptStatusDebug = {} // debug: raw status → counts
     //    by appt date relative to the LID's start_date (post-LID logic).
     const clientApptList = new Map()  // cid → [{ date, completed, cancelled }]
     const clientsWithAppt = new Set()           // window-based (any status)
@@ -360,6 +361,12 @@ async function runSync(opts = {}) {
       const apptDate = (t.start_date || t.create_date || '').toString().slice(0, 10)
       const isDone = /done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)
       const isCanc = /cancel|בוטל/.test(status)
+      // Debug: count raw appointment status values
+      const rawStatus = (t.status || '(empty)').toString()
+      if (!apptStatusDebug[rawStatus]) apptStatusDebug[rawStatus] = { count: 0, isDone: 0, isCanc: 0, type: tyRaw }
+      apptStatusDebug[rawStatus].count += 1
+      if (isDone) apptStatusDebug[rawStatus].isDone += 1
+      if (isCanc) apptStatusDebug[rawStatus].isCanc += 1
       if (!clientApptList.has(cid)) clientApptList.set(cid, [])
       clientApptList.get(cid).push({ date: apptDate, completed: isDone, cancelled: isCanc })
       // Window-only sets (for compatibility with diag)
