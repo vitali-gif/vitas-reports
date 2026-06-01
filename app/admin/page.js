@@ -92,6 +92,8 @@ function InfoTip({ text }) {
 
 
 export default function AdminPage({ isClientView = false, allowedProjectIds = null }) {
+  const DEMO_CLIENT_NAME  = 'קבוצת אורבן'
+  const DEMO_PROJECT_NAME = 'מטרופוליס'
   const [session, setSession] = useState(null)
   const [lastMetaSync, setLastMetaSync] = useState(null)
   const [lastGoogleSync, setLastGoogleSync] = useState(null)
@@ -439,7 +441,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   };
 
 const loadClients = async () => {
-    const { data } = await supabase.from('clients').select('*, projects(*)').order('created_at');
+    const { data } = await supabase.from('clients').select('*, projects(id, name, is_demo)').order('created_at');
     if (data) setClients(data);
   };
 
@@ -1946,7 +1948,7 @@ const selectProject = async (client, project) => {
                         {rec.assets.best.videoUrl ? (
                           <video src={rec.assets.best.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={rec.assets.best.imageUrl || undefined} />
                         ) : rec.assets.best.imageUrl ? (
-                          <img src={rec.assets.best.imageUrl} className="rec-ad-media" alt={rec.assets.best.adName} loading="lazy" />
+                          <img src={rec.assets.best.imageUrl} className="rec-ad-media" alt={rec.assets.best.adName} loading="lazy" style={isDemoProject ? {filter:'blur(8px)'} : undefined} />
                         ) : (
                           <div className="rec-ad-noimg">אין תמונה זמינה</div>
                         )}
@@ -1962,7 +1964,7 @@ const selectProject = async (client, project) => {
                         {rec.assets.worst.videoUrl ? (
                           <video src={rec.assets.worst.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={rec.assets.worst.imageUrl || undefined} />
                         ) : rec.assets.worst.imageUrl ? (
-                          <img src={rec.assets.worst.imageUrl} className="rec-ad-media" alt={rec.assets.worst.adName} loading="lazy" />
+                          <img src={rec.assets.worst.imageUrl} className="rec-ad-media" alt={rec.assets.worst.adName} loading="lazy" style={isDemoProject ? {filter:'blur(8px)'} : undefined} />
                         ) : (
                           <div className="rec-ad-noimg">אין תמונה זמינה</div>
                         )}
@@ -2633,6 +2635,7 @@ const selectProject = async (client, project) => {
                   const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
                   const hasVideo = Boolean(ad.videoUrl);
                   const previewImg = ad.imageUrl || ad.thumbnailUrl;
+                  const demoBlur = isDemoProject ? {filter:'blur(8px)'} : undefined;
                   return (
                     <div key={ad.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
                       {/* Media: video if available, else image */}
@@ -2807,6 +2810,9 @@ const selectProject = async (client, project) => {
     return client?.projects || [];
   };
 
+  // ── Demo mode detection ─────────────────────────────────────────────────────
+  const isDemoProject = !!(selectedProject?.is_demo)
+
   // ── visibleClients: filter by allowedProjectIds in client view ──────────
   const visibleClients = (isClientView && allowedProjectIds)
     ? clients
@@ -2842,7 +2848,7 @@ const selectProject = async (client, project) => {
       <div className={`sidebar-overlay${sidebarOpen ? ' active' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
       <Header
         onMenuOpen={() => setSidebarOpen(true)}
-        onExport={!isClientView ? handleExport : undefined}
+        onExport={!isClientView && !isDemoProject ? handleExport : undefined}
         onClientAccess={!isClientView ? handleClientAccess : undefined}
         onSessionLogs={!isClientView ? handleSessionLogs : undefined}
         onLogout={handleLogout}
@@ -2865,9 +2871,10 @@ const selectProject = async (client, project) => {
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
           footerText="VITAS Reports v3.2"
           lockedProjects={['REHAVIA']}
+          demoProjects={clients.flatMap(c=>(c.projects||[]).filter(p=>p.is_demo).map(p=>p.name))}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          onExport={!isClientView ? handleExport : undefined}
+          onExport={!isClientView && !isDemoProject ? handleExport : undefined}
           onClientAccess={!isClientView ? handleClientAccess : undefined}
         />
 
@@ -2875,10 +2882,15 @@ const selectProject = async (client, project) => {
           {view === 'welcome' && (<div className="welcome-center"><div className="icon">{'\ud83d\udcca'}</div><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05de\u05d4\u05ea\u05e4\u05e8\u05d9\u05d8 \u05db\u05d3\u05d9 \u05dc\u05e6\u05e4\u05d5\u05ea \u05d1\u05d3\u05d5\u05d7, \u05d0\u05d5 \u05d4\u05e2\u05dc\u05d4 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd'}</p></div>)}
 
           {view === 'dashboard' && selectedProject && (<>
-                        <TitleBar
+                        {isDemoProject && (
+              <div style={{background:'linear-gradient(135deg,#4338ca,#6366f1)',color:'white',padding:'8px 20px',fontSize:13,fontWeight:700,textAlign:'center',letterSpacing:'0.04em'}}>
+                🎯 מצב הדגמה — הנתונים בדויים לצורך הצגה בלבד
+              </div>
+            )}
+            <TitleBar
               crumb={['סקירה', selectedProject?.name || '', '']}
-              client={selectedClient?.name}
-              project={selectedProject?.name}
+              client={isDemoProject ? DEMO_CLIENT_NAME : selectedClient?.name}
+              project={isDemoProject ? DEMO_PROJECT_NAME : selectedProject?.name}
               activePreset={activePreset}
               since={customSince}
               until={customUntil}

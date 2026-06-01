@@ -26,6 +26,7 @@ export default function Sidebar({
   onAddClient,
   onAddProject,
   lockedProjects = [],
+  demoProjects = [],
   footerText = 'VITAS Reports v3.2',
   isOpen = false,
   onClose,
