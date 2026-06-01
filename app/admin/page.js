@@ -91,7 +91,7 @@ function InfoTip({ text }) {
 }
 
 
-export default function AdminPage() {
+export default function AdminPage({ isClientView = false, allowedProjectIds = null }) {
   const [session, setSession] = useState(null)
   const [lastMetaSync, setLastMetaSync] = useState(null)
   const [lastGoogleSync, setLastGoogleSync] = useState(null)
@@ -564,6 +564,17 @@ const selectProject = async (client, project) => {
     await loadProjectReports(project.id);
     await loadProjectTasks(project.id);
   };
+
+  // ── CLIENT VIEW: auto-select first allowed project when clients load ──
+  useEffect(() => {
+    if (!isClientView || !allowedProjectIds || !clients.length || selectedProject) return;
+    const filtered = clients
+      .map(c => ({ ...c, projects: (c.projects || []).filter(p => allowedProjectIds.includes(p.id)) }))
+      .filter(c => c.projects.length > 0);
+    if (filtered.length > 0 && filtered[0].projects.length > 0) {
+      selectProject(filtered[0], filtered[0].projects[0]);
+    }
+  }, [clients, isClientView]); // eslint-disable-line
 
   // Tick elapsed time every 500ms while refresh is active (for the banner timer)
   useEffect(() => {
@@ -2739,9 +2750,9 @@ const selectProject = async (client, project) => {
     );
   }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources]);
 
-  if (loading) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
+  if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
-  if (!session) {
+  if (!session && !isClientView) {
     return (
       <div className="login-container">
         <h1 className="logo" style={{fontSize: '3em'}}>VITAS</h1>
@@ -2763,6 +2774,13 @@ const selectProject = async (client, project) => {
     const client = clients.find(c => c.id === clientId);
     return client?.projects || [];
   };
+
+  // ── visibleClients: filter by allowedProjectIds in client view ──────────
+  const visibleClients = (isClientView && allowedProjectIds)
+    ? clients
+        .map(c => ({ ...c, projects: (c.projects || []).filter(p => allowedProjectIds.includes(p.id)) }))
+        .filter(c => c.projects.length > 0)
+    : clients;
 
   return (
     <div dir="rtl" style={{direction:'rtl',textAlign:'right'}}>
@@ -2792,8 +2810,8 @@ const selectProject = async (client, project) => {
       <div className={`sidebar-overlay${sidebarOpen ? ' active' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
       <Header
         onMenuOpen={() => setSidebarOpen(true)}
-        onExport={handleExport}
-        onClientAccess={handleClientAccess}
+        onExport={!isClientView ? handleExport : undefined}
+        onClientAccess={!isClientView ? handleClientAccess : undefined}
         onLogout={handleLogout}
         loadingIndicator={(refreshing || refreshingCrm) ? (
           <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'6px 12px',background:'rgba(99,102,241,0.1)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:13}}>
@@ -2805,19 +2823,19 @@ const selectProject = async (client, project) => {
 
       <div className="app-layout">
         <Sidebar
-          clients={clients}
+          clients={visibleClients}
           activeClient={selectedClient?.name}
           activeProject={selectedProject?.name}
           onSelectClient={(client) => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}
           onSelectProject={(client, project) => { selectProject(client, project); setSidebarOpen(false); }}
-          onAddClient={() => setShowAddClient(true)}
-          onAddProject={() => setShowAddProject(true)}
+          onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
+          onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
           footerText="VITAS Reports v3.2"
           lockedProjects={['REHAVIA']}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          onExport={handleExport}
-          onClientAccess={handleClientAccess}
+          onExport={!isClientView ? handleExport : undefined}
+          onClientAccess={!isClientView ? handleClientAccess : undefined}
         />
 
         <div className="main-content">
