@@ -618,6 +618,7 @@ const selectProject = async (client, project) => {
   // Replaces the old manual refresh buttons - if Meta/Google/BMBY data is missing
   // for the selected period, fetch it automatically (with debounce).
   useEffect(() => {
+    if (isClientView) return; // client view: rely on cron cache, no live fetch
     if (!selectedMonth || !selectedProject) return;
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
