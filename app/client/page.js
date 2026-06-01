@@ -116,9 +116,10 @@ export default function ClientPage() {
         })
       }).then(r => r.json()).then(d => { if (d.sessionId) { setSessionId(d.sessionId); if (typeof window !== 'undefined') window.__vitasSessionId = d.sessionId } }).catch(() => {})
 
-      // Show onboarding on first visit
-      if (typeof window !== 'undefined' && !localStorage.getItem('vitas_onboarding_seen')) {
-        setShowOnboarding(true)
+      // Show onboarding — up to 10 times
+      if (typeof window !== 'undefined') {
+        const remaining = parseInt(localStorage.getItem('vitas_onboarding_remaining') ?? '10', 10)
+        if (remaining > 0) setShowOnboarding(true)
       }
     } catch {
       setStep('error')
@@ -262,8 +263,14 @@ export default function ClientPage() {
 
   // ── Dashboard — render AdminPage with client-view props ───────────────────
   const allowedProjectIds = accessList.map(a => a.project_id)
+  const onboardingRemaining = typeof window !== 'undefined'
+    ? parseInt(localStorage.getItem('vitas_onboarding_remaining') ?? '10', 10)
+    : 10
+
   const dismissOnboarding = () => {
-    if (typeof window !== 'undefined') localStorage.setItem('vitas_onboarding_seen', '1')
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('vitas_onboarding_remaining', String(Math.max(0, onboardingRemaining - 1)))
+    }
     setShowOnboarding(false)
   }
 
@@ -354,6 +361,13 @@ export default function ClientPage() {
               💡 <strong>טיפ:</strong> הנתונים מתעדכנים אוטומטית. אין צורך ללחוץ על "רענן".
             </div>
 
+            {/* Countdown */}
+            {onboardingRemaining > 1 && (
+              <p style={{ margin: '0 0 12px', textAlign: 'center', fontSize: 13, color: '#059669', fontWeight: 600 }}>
+                ההודעה הזאת תופיע עוד {onboardingRemaining - 1} פעמים
+              </p>
+            )}
+
             {/* CTA */}
             <button
               onClick={dismissOnboarding}
@@ -367,9 +381,7 @@ export default function ClientPage() {
               הבנתי, קדימה! →
             </button>
 
-            <p style={{ margin: '12px 0 0', textAlign: 'center', fontSize: 12, color: '#98A0B2' }}>
-              המדריך לא יופיע שוב בכניסות הבאות
-            </p>
+
           </div>
         </div>
       )}
