@@ -97,8 +97,7 @@ export async function POST(req) {
     .limit(1)
 
   if (!access?.length) {
-    // Return generic success to avoid email enumeration
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: false, noAccess: true })
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'

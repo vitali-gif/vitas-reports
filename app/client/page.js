@@ -96,9 +96,13 @@ export default function ClientPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailInput.trim().toLowerCase() })
       })
+      const data = await res.json().catch(() => ({}))
+      if (data.noAccess) {
+        setStep('noAccess')
+        return
+      }
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        showToast('שגיאה: ' + (err.error || 'נסה שוב'))
+        showToast('שגיאה: ' + (data.error || 'נסה שוב'))
         return
       }
     } catch {
@@ -170,6 +174,25 @@ export default function ClientPage() {
             {a.projects?.clients?.name && <div style={{fontSize:12,color:'var(--text-3)',marginTop:2}}>{a.projects.clients.name}</div>}
           </button>
         ))}
+      </div>
+    </div>
+  )
+
+  if (step === 'noAccess') return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)',fontFamily:'var(--font)'}}>
+      <div style={{textAlign:'center',maxWidth:360,padding:'0 24px'}}>
+        <div style={{fontSize:48,marginBottom:16}}>🔒</div>
+        <h2 style={{margin:'0 0 12px',fontSize:20,fontWeight:800,color:'var(--text)'}}>אין גישה לכתובת זו</h2>
+        <p style={{margin:'0 0 6px',fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>
+          לכתובת <strong style={{color:'var(--text)',direction:'ltr',display:'inline-block'}}>{emailInput}</strong> אין גישה למערכת.
+        </p>
+        <p style={{margin:'0 0 28px',fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>
+          לתמיכה וקבלת גישה צרו קשר:<br/>
+          <a href="mailto:vitali@vitas.co.il" style={{color:'var(--indigo)',fontWeight:600,textDecoration:'none'}}>vitali@vitas.co.il</a>
+        </p>
+        <button onClick={() => setStep('email')} style={{padding:'10px 28px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)'}}>
+          נסה כתובת אחרת
+        </button>
       </div>
     </div>
   )
