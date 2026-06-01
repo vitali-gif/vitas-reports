@@ -414,7 +414,6 @@ export default function ClientPage() {
     { key: 'summary', label: '📊 סיכום' },
     { key: 'leads',   label: '📣 לידים' },
     { key: 'crm',     label: '🏠 CRM' },
-    { key: 'monthly', label: '📋 סיכום חודשי' },
   ]
 
   const iconSvg = (path) => (
@@ -654,15 +653,6 @@ export default function ClientPage() {
               </div>
             )}
           </>
-        )}
-
-        {/* ── Tab: סיכום חודשי ── */}
-        {tab === 'monthly' && (
-          <div className="welcome-center" style={{padding:'60px 0'}}>
-            <div className="icon">🚀</div>
-            <h3>סיכום חודשי — בקרוב</h3>
-            <p style={{color:'var(--text-3)',fontSize:14}}>הטאב הזה יכיל סיכום ביצועים, הצלחות וכשלונות, ציר זמן אירועים והמלצות</p>
-          </div>
         )}
 
       </main>
