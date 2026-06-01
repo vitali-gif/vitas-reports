@@ -15,6 +15,14 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />
+        {/* PWA */}
+        <meta name="theme-color" content="#0B0F1E" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="VITAS Reports" />
+        <link rel="apple-touch-icon" href="/brand/icon-192.png" />
+
         {/* Microsoft Clarity */}
         <script
           type="text/javascript"
