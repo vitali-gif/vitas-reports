@@ -1168,6 +1168,7 @@ const selectProject = async (client, project) => {
       } else {
         crmData.totals.totalLeads -= (crmData.sources['Facebook'].totalLeads || 0);
         crmData.totals.totalLeads += _fbLeads;
+        crmData.sources['Facebook'].totalLeads = _fbLeads;
       }
     }
     if (_gR.length > 0) {
@@ -1181,6 +1182,7 @@ const selectProject = async (client, project) => {
       } else {
         crmData.totals.totalLeads -= (crmData.sources['Google'].totalLeads || 0);
         crmData.totals.totalLeads += _gLeads;
+        crmData.sources['Google'].totalLeads = _gLeads;
       }
     }
 
