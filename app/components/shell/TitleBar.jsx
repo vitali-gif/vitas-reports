@@ -11,7 +11,6 @@ const MOBILE_PRESETS = [
   { id: 'yesterday',    label: 'אתמול',     range: () => { const t = agoD(1); return { from: t, to: t } } },
   { id: 'last7',        label: '7 ימים',    range: () => ({ from: agoD(7),  to: agoD(1) }) },
   { id: 'last14',       label: '14 ימים',   range: () => ({ from: agoD(14), to: agoD(1) }) },
-  { id: 'last30',       label: '30 ימים',   range: () => ({ from: agoD(30), to: agoD(1) }) },
   { id: 'currentMonth', label: 'החודש',     range: () => { const t = sod(new Date()); return { from: new Date(t.getFullYear(), t.getMonth(), 1), to: t } } },
   { id: 'lastMonth',    label: 'חודש שעבר', range: () => {
     const t = sod(new Date())
@@ -19,8 +18,10 @@ const MOBILE_PRESETS = [
     const m = t.getMonth() === 0 ? 11 : t.getMonth() - 1
     return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) }
   }},
-  { id: 'last90',       label: '90 ימים',   range: () => ({ from: agoD(90), to: agoD(1) }) },
-  { id: 'currentYear',  label: 'השנה',      range: () => { const t = sod(new Date()); return { from: new Date(t.getFullYear(), 0, 1), to: t } } },
+  { id: 'q1', label: 'Q1', range: () => { const y = new Date().getFullYear(); return { from: new Date(y,0,1), to: new Date(y,2,31) } } },
+  { id: 'q2', label: 'Q2', range: () => { const y = new Date().getFullYear(); return { from: new Date(y,3,1), to: new Date(y,5,30) } } },
+  { id: 'q3', label: 'Q3', range: () => { const y = new Date().getFullYear(); return { from: new Date(y,6,1), to: new Date(y,8,30) } } },
+  { id: 'q4', label: 'Q4', range: () => { const y = new Date().getFullYear(); return { from: new Date(y,9,1), to: new Date(y,11,31) } } },
 ]
 
 const toYMD = (d) => d

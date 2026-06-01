@@ -245,10 +245,11 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     if (preset === 'currentMonth') { const start = new Date(today.getFullYear(), today.getMonth(), 1); const s = toYMD(start), e = toYMD(today); return { payload: { since: s, until: e }, key: s + '_' + e }; }
     if (preset === 'lastMonth') { const y = today.getMonth()===0 ? today.getFullYear()-1 : today.getFullYear(); const m = today.getMonth()===0 ? 12 : today.getMonth(); const mm = String(m).padStart(2,'0'); return { payload: { month: `${y}-${mm}` }, key: `${y}-${mm}` }; }
     if (preset === 'last14') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-14); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
-    if (preset === 'last28') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-28); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
-    if (preset === 'last90') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-90); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
-    if (preset === 'currentYear') { const start = new Date(today.getFullYear(), 0, 1); const s = toYMD(start), e = toYMD(today); return { payload: { since: s, until: e }, key: s + '_' + e }; }
-    if (preset === 'lastYear') { const y = today.getFullYear()-1; const s = toYMD(new Date(y,0,1)), e = toYMD(new Date(y,11,31)); return { payload: { since: s, until: e }, key: s + '_' + e }; }
+    const y = today.getFullYear()
+    if (preset === 'q1') { const s = toYMD(new Date(y,0,1)), e = toYMD(new Date(y,2,31)); return { payload: { since: s, until: e }, key: s+'_'+e }; }
+    if (preset === 'q2') { const s = toYMD(new Date(y,3,1)), e = toYMD(new Date(y,5,30)); return { payload: { since: s, until: e }, key: s+'_'+e }; }
+    if (preset === 'q3') { const s = toYMD(new Date(y,6,1)), e = toYMD(new Date(y,8,30)); return { payload: { since: s, until: e }, key: s+'_'+e }; }
+    if (preset === 'q4') { const s = toYMD(new Date(y,9,1)), e = toYMD(new Date(y,11,31)); return { payload: { since: s, until: e }, key: s+'_'+e }; }
     return null;
   };
 

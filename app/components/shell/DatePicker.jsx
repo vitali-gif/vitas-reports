@@ -7,11 +7,10 @@ const DOW = ['א','ב','ג','ד','ה','ו','ש']
 const PRESET_LABELS = {
   today: 'היום', yesterday: 'אתמול',
   last7: '7 ימים אחרונים', last14: '14 ימים אחרונים',
-  last28: '28 ימים אחרונים', last30: '30 ימים אחרונים',
-  last90: '90 ימים אחרונים',
   currentMonth: 'החודש הנוכחי', lastMonth: 'חודש שעבר',
-  currentYear: 'השנה הנוכחית', lastYear: 'השנה שעברה',
-  custom: 'טווח גמיש',
+  q1: 'Q1 — רבעון ראשון', q2: 'Q2 — רבעון שני',
+  q3: 'Q3 — רבעון שלישי', q4: 'Q4 — רבעון רביעי',
+  custom: 'טווח מותאם אישית',
 }
 
 const PRESET_LIST = [
@@ -19,13 +18,14 @@ const PRESET_LIST = [
   { key: 'yesterday',     label: 'אתמול' },
   { key: 'last7',         label: '7 ימים אחרונים' },
   { key: 'last14',        label: '14 ימים אחרונים' },
-  { key: 'last28',        label: '28 ימים אחרונים' },
-  { key: 'last30',        label: '30 ימים אחרונים' },
   { key: 'currentMonth',  label: 'החודש הנוכחי' },
   { key: 'lastMonth',     label: 'חודש שעבר' },
-  { key: 'last90',        label: '90 ימים אחרונים' },
-  { key: 'currentYear',   label: 'השנה הנוכחית' },
-  { key: 'lastYear',      label: 'השנה שעברה' },
+  { separator: true },
+  { key: 'q1',            label: 'Q1 — ינואר–מרץ' },
+  { key: 'q2',            label: 'Q2 — אפריל–יוני' },
+  { key: 'q3',            label: 'Q3 — יולי–ספטמבר' },
+  { key: 'q4',            label: 'Q4 — אוקטובר–דצמבר' },
+  { separator: true },
   { key: 'custom',        label: 'טווח מותאם אישית' },
 ]
 
@@ -50,11 +50,11 @@ function presetToRange(key) {
     const m = t.getMonth() === 0 ? 11 : t.getMonth() - 1
     return [ymd(new Date(y, m, 1)), ymd(new Date(y, m + 1, 0))]
   }
-  if (key === 'currentYear') return [ymd(new Date(t.getFullYear(), 0, 1)), ymd(t)]
-  if (key === 'lastYear') {
-    const y = t.getFullYear() - 1
-    return [ymd(new Date(y, 0, 1)), ymd(new Date(y, 11, 31))]
-  }
+  const y = t.getFullYear()
+  if (key === 'q1') return [ymd(new Date(y, 0, 1)),  ymd(new Date(y, 2, 31))]
+  if (key === 'q2') return [ymd(new Date(y, 3, 1)),  ymd(new Date(y, 5, 30))]
+  if (key === 'q3') return [ymd(new Date(y, 6, 1)),  ymd(new Date(y, 8, 30))]
+  if (key === 'q4') return [ymd(new Date(y, 9, 1)),  ymd(new Date(y, 11, 31))]
   return null
 }
 
@@ -470,7 +470,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                 gap: 6, padding: '12px 12px 8px',
                 borderBottom: '1px solid var(--border)',
               }}>
-                {PRESET_LIST.filter(p => p.key !== 'custom').map(p => (
+                {PRESET_LIST.filter(p => !p.separator && p.key !== 'custom').map(p => (
                   <button
                     key={p.key}
                     type="button"
@@ -646,7 +646,9 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                   }}>
                     תקופות
                   </div>
-                  {PRESET_LIST.map(p => (
+                  {PRESET_LIST.map((p, idx) => p.separator ? (
+                    <div key={'sep'+idx} style={{ height: 1, background: 'var(--border)', margin: '6px 12px' }} />
+                  ) : (
                     <button
                       key={p.key}
                       type="button"
