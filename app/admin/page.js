@@ -2815,9 +2815,9 @@ const selectProject = async (client, project) => {
   return (
     <div dir="rtl" style={{direction:'rtl',textAlign:'right'}}>
       {refreshing && (() => {
-        const ESTIMATED_SECONDS = 22;
-        const progress = Math.min(100, (refreshElapsed / ESTIMATED_SECONDS) * 100);
-        const remaining = Math.max(0, ESTIMATED_SECONDS - refreshElapsed);
+        // elapsed only — no estimated time
+
+
         return (
           <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'linear-gradient(135deg, rgba(59,130,246,0.95), rgba(139,92,246,0.95))',color:'white',padding:'14px 24px',boxShadow:'0 4px 20px rgba(0,0,0,0.3)',backdropFilter:'blur(10px)'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'18px',flexWrap:'wrap',maxWidth:'1200px',margin:'0 auto'}}>
@@ -2826,17 +2826,17 @@ const selectProject = async (client, project) => {
                 <div style={{fontWeight:700,fontSize:'1em'}}>{'\ud83d\udd04 \u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d9\u05d9\u05dd \u05de-Facebook \u05d5-Google...'}</div>
               </div>
               <div style={{display:'flex',alignItems:'center',gap:'14px',fontSize:'0.9em'}}>
-                <div style={{background:'rgba(255,255,255,0.2)',padding:'4px 12px',borderRadius:'20px',fontWeight:600}}>{'\u05d7\u05dc\u05e4\u05d5: '}{refreshElapsed}{'s'}</div>
-                <div style={{background:'rgba(255,255,255,0.2)',padding:'4px 12px',borderRadius:'20px'}}>{'\u2248 '}{remaining}{'s \u05e0\u05ea\u05d5\u05e2\u05e8\u05d5'}</div>
+                <div style={{background:'rgba(255,255,255,0.2)',padding:'4px 12px',borderRadius:'20px',fontWeight:600}}>{'\u05d7\u05dc\u05e3: '}{refreshElapsed}{'s'}</div>
+
               </div>
             </div>
             <div style={{marginTop:'10px',maxWidth:'600px',margin:'10px auto 0',height:'4px',background:'rgba(255,255,255,0.2)',borderRadius:'2px',overflow:'hidden'}}>
-              <div style={{width:`${progress}%`,height:'100%',background:'white',transition:'width 0.5s ease-out',boxShadow:'0 0 10px rgba(255,255,255,0.6)'}}></div>
+              <div style={{width:'40%',height:'100%',background:'white',animation:'loadingSlide 1.5s ease-in-out infinite',boxShadow:'0 0 10px rgba(255,255,255,0.6)'}}></div>
             </div>
           </div>
         );
       })()}
-      <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes loadingSlide{0%{margin-right:-40%} 100%{margin-right:100%}} @keyframes loadingSlide{0%{transform:translateX(-150%)} 100%{transform:translateX(300%)}}`}</style>
       <div className={`sidebar-overlay${sidebarOpen ? ' active' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
       <Header
         onMenuOpen={() => setSidebarOpen(true)}
