@@ -117,30 +117,44 @@ export async function GET(req) {
   return NextResponse.json(data || [])
 }
 
-// POST — add entry + send magic link via Resend directly
+// POST — add access for entire client (one row per project) + send one magic link
 export async function POST(req) {
   if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { email, project_id, label } = body
-  if (!email || !project_id) {
-    return NextResponse.json({ error: 'email and project_id required' }, { status: 400 })
+  const { email, client_id } = body
+  if (!email || !client_id) {
+    return NextResponse.json({ error: 'email and client_id required' }, { status: 400 })
   }
 
   const cleanEmail = email.toLowerCase().trim()
 
-  // Save to DB
-  const { data, error } = await supabaseAdmin
+  // Fetch all projects for this client
+  const { data: projects, error: projErr } = await supabaseAdmin
+    .from('projects')
+    .select('id, name, clients(name)')
+    .eq('client_id', client_id)
+  if (projErr || !projects?.length) {
+    return NextResponse.json({ error: projErr?.message || 'No projects found for this client' }, { status: 400 })
+  }
+
+  // Remove existing access rows for this email+client (avoid duplicates)
+  const existingProjectIds = projects.map(p => p.id)
+  await supabaseAdmin
     .from('client_access')
-    .insert({ email: cleanEmail, project_id, label: label || null })
-    .select('*, projects(name)')
-    .single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    .delete()
+    .eq('email', cleanEmail)
+    .in('project_id', existingProjectIds)
 
+  // Insert one row per project
+  const rows = projects.map(p => ({ email: cleanEmail, project_id: p.id }))
+  const { error: insertErr } = await supabaseAdmin.from('client_access').insert(rows)
+  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 })
+
+  const clientName = projects[0]?.clients?.name || ''
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
-  const projectName = data?.projects?.name || ''
 
-  // Generate magic link via Supabase admin
+  // Generate ONE magic link
   let magicLink = null
   const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: 'magiclink',
@@ -151,11 +165,11 @@ export async function POST(req) {
     magicLink = linkData.properties.action_link
   }
 
-  // Send email directly via Resend API
+  // Send ONE invite email
   let emailSent = false
   let emailError = null
   if (magicLink) {
-    const result = await sendInviteEmail(cleanEmail, magicLink, projectName)
+    const result = await sendInviteEmail(cleanEmail, magicLink, clientName)
     emailSent = result.ok
     emailError = result.error || null
   } else {
@@ -163,10 +177,12 @@ export async function POST(req) {
   }
 
   return NextResponse.json({
-    ...data,
+    client_id,
+    clientName,
+    projectCount: projects.length,
     emailSent,
     emailError,
-    magicLink: emailSent ? null : magicLink, // fallback for admin if email failed
+    magicLink: emailSent ? null : magicLink,
   }, { status: 201 })
 }
 

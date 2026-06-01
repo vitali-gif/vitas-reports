@@ -127,7 +127,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [clientAccessList, setClientAccessList] = useState([])
   const [showClientAccess, setShowClientAccess] = useState(false)
   const [caEmail, setCaEmail] = useState('')
-  const [caProjectId, setCaProjectId] = useState('')
+  const [caClientId, setCaClientId] = useState('')
   const [caLabel, setCaLabel] = useState('')
   const [caSaving, setCaSaving] = useState(false)
   const [vitasTasks, setVitasTasks] = useState([])
@@ -180,26 +180,25 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   }
 
   const addClientAccess = async () => {
-    if (!caEmail.trim() || !caProjectId) return
+    if (!caEmail.trim() || !caClientId) return
     setCaSaving(true)
     const res = await fetch('/api/client-access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
-      body: JSON.stringify({ email: caEmail.trim(), project_id: caProjectId, label: caLabel.trim() || null })
+      body: JSON.stringify({ email: caEmail.trim(), client_id: caClientId })
     })
     setCaSaving(false)
     if (res.ok) {
       const result = await res.json()
-      setCaEmail(''); setCaProjectId(''); setCaLabel('')
+      setCaEmail(''); setCaClientId('')
       await loadClientAccess()
       if (result.emailSent) {
-        showToast('✓ גישה נוספה — קישור כניסה נשלח ללקוח במייל')
+        showToast(`✓ גישה נוספה ל-${result.clientName} (${result.projectCount} פרויקטים) — קישור נשלח במייל`)
       } else {
-        // Email failed — show the magic link so admin can share manually
         const link = result.magicLink || ''
         if (link) {
           navigator.clipboard?.writeText(link).catch(() => {})
-          showToast('⚠️ המייל לא נשלח. קישור כניסה הועתק ללוח — שלח ללקוח ידנית.')
+          showToast('⚠️ המייל לא נשלח. קישור הועתק ללוח — שלח ללקוח ידנית.')
         } else {
           showToast('✓ גישה נוספה — אך שליחת המייל נכשלה: ' + (result.emailError || 'שגיאה לא ידועה'))
         }
@@ -210,11 +209,18 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     }
   }
 
-  const deleteClientAccess = async (id) => {
-    if (!confirm('למחוק גישה זו?')) return
-    await fetch('/api/client-access?id=' + id, { method: 'DELETE', headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
-    setClientAccessList(prev => prev.filter(x => x.id !== id))
-    showToast('✓ גישה נמחקה')
+  const deleteClientAccess = async (email, clientId) => {
+    const clientName = clients.find(c => c.id === clientId)?.name || clientId
+    if (!confirm(`למחוק את כל הגישות של ${email} ל-${clientName}?`)) return
+    // Find all row IDs for this email+client combo
+    const toDelete = clientAccessList.filter(ca =>
+      ca.email === email && ca.projects?.client_id === clientId
+    )
+    await Promise.all(toDelete.map(ca =>
+      fetch('/api/client-access?id=' + ca.id, { method: 'DELETE', headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
+    ))
+    setClientAccessList(prev => prev.filter(x => !toDelete.some(d => d.id === x.id)))
+    showToast(`✓ גישה נמחקה (${toDelete.length} פרויקטים)`)
   }
 
   // Compute since/until (or full month) from a preset key
@@ -2873,65 +2879,74 @@ const selectProject = async (client, project) => {
               <button onClick={() => setShowClientAccess(false)} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'#64748b'}}>&times;</button>
             </div>
             <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:16,lineHeight:1.6}}>
-              הוסף כתובת מייל של לקוח וקשר אותה לפרויקט. הלקוח יוכל להיכנס ל-<strong>reports.vitas.co.il/client</strong> עם קישור קסם שנשלח למייל שלו.
+              הוסף מייל של איש קשר וקשר אותו ללקוח. הוא יוכל להיכנס ל-<strong>reports.vitas.co.il/client</strong> עם קישור קסם ויראה את <strong>כל הפרויקטים</strong> של אותו לקוח.
             </p>
 
             {/* Add form */}
             <div style={{background:'var(--surface)',borderRadius:12,padding:'16px',marginBottom:20,display:'flex',flexDirection:'column',gap:10}}>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                 <div>
-                  <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>מייל לקוח</label>
+                  <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>מייל איש קשר</label>
                   <input className="form-input" type="email" value={caEmail} onChange={e => setCaEmail(e.target.value)}
                     placeholder="client@example.com" style={{direction:'ltr',textAlign:'left'}} />
                 </div>
                 <div>
-                  <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>פרויקט</label>
-                  <select className="form-input" value={caProjectId} onChange={e => setCaProjectId(e.target.value)}>
-                    <option value="">-- בחר פרויקט --</option>
-                    {clients.flatMap(cl => (cl.projects || []).map(pr => (
-                      <option key={pr.id} value={pr.id}>{cl.name} - {pr.name}</option>
-                    )))}
+                  <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>לקוח</label>
+                  <select className="form-input" value={caClientId} onChange={e => setCaClientId(e.target.value)}>
+                    <option value="">-- בחר לקוח --</option>
+                    {clients.map(cl => (
+                      <option key={cl.id} value={cl.id}>{cl.name} ({(cl.projects||[]).length} פרויקטים)</option>
+                    ))}
                   </select>
                 </div>
               </div>
-              <div>
-                <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>תווית (אופציונלי)</label>
-                <input className="form-input" value={caLabel} onChange={e => setCaLabel(e.target.value)} placeholder="לדוגמה: ש.ברוך - HI PARK" />
-              </div>
-              <button className="btn btn-primary" onClick={addClientAccess} disabled={caSaving || !caEmail || !caProjectId}
+              <button className="btn btn-primary" onClick={addClientAccess} disabled={caSaving || !caEmail || !caClientId}
                 style={{alignSelf:'flex-end',padding:'8px 20px'}}>
-                {caSaving ? 'שומר...' : '+ הוסף גישה'}
+                {caSaving ? 'שומר...' : '+ הוסף גישה ושלח קישור'}
               </button>
             </div>
 
-            {/* List */}
-            {clientAccessList.length === 0
-              ? <div style={{textAlign:'center',padding:'24px 0',color:'var(--text-secondary)',fontSize:13}}>אין גישות מוגדרות עדיין</div>
-              : (
+            {/* List — grouped by email + client */}
+            {(() => {
+              // Group rows: email → clientId → rows[]
+              const groups = {}
+              clientAccessList.forEach(ca => {
+                const cid = ca.projects?.client_id || 'unknown'
+                const key = ca.email + '|||' + cid
+                if (!groups[key]) groups[key] = { email: ca.email, clientId: cid, clientName: ca.projects?.clients?.name || '—', rows: [] }
+                groups[key].rows.push(ca)
+              })
+              const entries = Object.values(groups)
+              if (!entries.length) return <div style={{textAlign:'center',padding:'24px 0',color:'var(--text-secondary)',fontSize:13}}>אין גישות מוגדרות עדיין</div>
+              return (
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                   <thead>
                     <tr style={{borderBottom:'1px solid var(--border)'}}>
                       <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>מייל</th>
-                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>פרויקט</th>
-                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>תווית</th>
+                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>לקוח</th>
+                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>פרויקטים</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {clientAccessList.map(ca => (
-                      <tr key={ca.id} style={{borderBottom:'1px solid var(--surface)'}}>
-                        <td style={{padding:'10px',direction:'ltr',textAlign:'left',fontFamily:'monospace',fontSize:12}}>{ca.email}</td>
-                        <td style={{padding:'10px',fontWeight:600}}>{ca.projects?.clients?.name} - {ca.projects?.name}</td>
-                        <td style={{padding:'10px',color:'var(--text-secondary)',fontSize:12}}>{ca.label || '—'}</td>
+                    {entries.map(g => (
+                      <tr key={g.email + g.clientId} style={{borderBottom:'1px solid var(--surface)'}}>
+                        <td style={{padding:'10px',direction:'ltr',textAlign:'left',fontFamily:'monospace',fontSize:12}}>{g.email}</td>
+                        <td style={{padding:'10px',fontWeight:700,color:'var(--text)'}}>{g.clientName}</td>
+                        <td style={{padding:'10px'}}>
+                          <span style={{display:'inline-flex',alignItems:'center',gap:5,background:'var(--indigo-50,rgba(91,94,244,0.08))',color:'var(--indigo)',borderRadius:20,padding:'3px 10px',fontSize:12,fontWeight:600}}>
+                            {g.rows.length} פרויקטים
+                          </span>
+                        </td>
                         <td style={{padding:'10px',textAlign:'center'}}>
-                          <button onClick={() => deleteClientAccess(ca.id)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:16,padding:'2px 6px'}}>🗑</button>
+                          <button onClick={() => deleteClientAccess(g.email, g.clientId)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:16,padding:'2px 6px'}} title="מחק גישה">🗑</button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )
-            }
+            })()}
 
             <div style={{marginTop:20,padding:'12px',background:'#eff6ff',borderRadius:8,fontSize:12,color:'#1e40af',lineHeight:1.6}}>
               <strong>קישור לדאשבורד לקוח:</strong>{' '}
