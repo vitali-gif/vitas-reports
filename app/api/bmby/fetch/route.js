@@ -918,6 +918,7 @@ async function runSync(opts = {}) {
       sources,
       errors: errors.length ? errors : undefined,
       debug: Object.keys(debug).length ? debug : undefined,
+      apptStatusDebug,
       diag: {
         // Compact diag for ops - keep contract attribution chain + funnel status counts
         contractAttrib: _contractAttribDebug.map(c => ({
