@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import dynamic from 'next/dynamic'
 
@@ -19,6 +19,8 @@ export default function ClientPage() {
   const [accessList, setAccessList] = useState([])
   const [accessInfo, setAccessInfo] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [sessionId, setSessionId] = useState(null)
+  const sessionStart = useState(Date.now())[0]
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -81,6 +83,18 @@ export default function ClientPage() {
       } else {
         setStep('picker')
       }
+      // Log session start
+      fetch('/api/client-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'login',
+          email: userEmail,
+          clientName: list[0]?.projects?.clients?.name || '',
+          projectIds: list.map(a => a.project_id),
+        })
+      }).then(r => r.json()).then(d => { if (d.sessionId) setSessionId(d.sessionId) }).catch(() => {})
+
       // Show onboarding on first visit
       if (typeof window !== 'undefined' && !localStorage.getItem('vitas_onboarding_seen')) {
         setShowOnboarding(true)
@@ -224,6 +238,28 @@ export default function ClientPage() {
       </div>
     </div>
   )
+
+  // ── Heartbeat + logout tracking ─────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    if (!sessionId) return
+    // Heartbeat every 60s
+    const hb = setInterval(() => {
+      fetch('/api/client-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'heartbeat', sessionId })
+      }).catch(() => {})
+    }, 60000)
+    // Logout on tab close
+    const handleUnload = () => {
+      const dur = Math.round((Date.now() - sessionStart) / 1000)
+      navigator.sendBeacon('/api/client-log',
+        JSON.stringify({ event: 'logout', sessionId, durationSec: dur }))
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => { clearInterval(hb); window.removeEventListener('beforeunload', handleUnload) }
+  }, [sessionId])
 
   // ── Dashboard — render AdminPage with client-view props ───────────────────
   const allowedProjectIds = accessList.map(a => a.project_id)

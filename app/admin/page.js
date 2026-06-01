@@ -126,6 +126,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   }, [sidebarOpen])
   const [clientAccessList, setClientAccessList] = useState([])
   const [showClientAccess, setShowClientAccess] = useState(false)
+  const [showSessionLogs, setShowSessionLogs] = useState(false)
+  const [sessionLogs, setSessionLogs] = useState([])
+  const [logsLoading, setLogsLoading] = useState(false)
   const [caEmail, setCaEmail] = useState('')
   const [caClientId, setCaClientId] = useState('')
   const [caLabel, setCaLabel] = useState('')
@@ -171,6 +174,14 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
 
   const handleLogout = async () => { await supabase.auth.signOut({ scope: 'global' }); setSession(null); };
   const handleClientAccess = () => { setShowClientAccess(true); loadClientAccess(); };
+  const handleSessionLogs = async () => {
+    setShowSessionLogs(true)
+    setLogsLoading(true)
+    const res = await fetch('/api/client-log', { headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
+    const data = await res.json()
+    setSessionLogs(Array.isArray(data) ? data : [])
+    setLogsLoading(false)
+  }
   const handleExport = () => { alert('ייצוא לאקסל יהיה זמין בקרוב'); };
 
   const loadClientAccess = async () => {
@@ -2820,6 +2831,7 @@ const selectProject = async (client, project) => {
         onMenuOpen={() => setSidebarOpen(true)}
         onExport={!isClientView ? handleExport : undefined}
         onClientAccess={!isClientView ? handleClientAccess : undefined}
+        onSessionLogs={!isClientView ? handleSessionLogs : undefined}
         onLogout={handleLogout}
         loadingIndicator={(refreshing || refreshingCrm) ? (
           <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'6px 12px',background:'rgba(99,102,241,0.1)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:13}}>
@@ -2953,6 +2965,60 @@ const selectProject = async (client, project) => {
             <div style={{marginTop:20,padding:'12px',background:'#eff6ff',borderRadius:8,fontSize:12,color:'#1e40af',lineHeight:1.6}}>
               <strong>קישור לדאשבורד לקוח:</strong>{' '}
               <span style={{direction:'ltr',display:'inline-block'}}>{typeof window !== 'undefined' ? window.location.origin : ''}/client</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Session Logs Modal ── */}
+      {showSessionLogs && (
+        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setShowSessionLogs(false) }}>
+          <div className="modal" style={{maxWidth:700,width:'100%',direction:'rtl',maxHeight:'80vh',overflow:'auto'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+              <h3 style={{margin:0,fontSize:17,fontWeight:700}}>👁 לוג כניסות לקוחות</h3>
+              <button onClick={() => setShowSessionLogs(false)} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'#64748b'}}>&times;</button>
+            </div>
+            {logsLoading ? (
+              <div style={{textAlign:'center',padding:'32px 0',color:'var(--text-secondary)'}}>טוען...</div>
+            ) : sessionLogs.length === 0 ? (
+              <div style={{textAlign:'center',padding:'32px 0',color:'var(--text-secondary)',fontSize:13}}>אין כניסות מתועדות עדיין</div>
+            ) : (
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                <thead>
+                  <tr style={{borderBottom:'2px solid var(--border)'}}>
+                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>מייל</th>
+                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>לקוח</th>
+                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>כניסה</th>
+                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>זמן בדשבורד</th>
+                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>סטטוס</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionLogs.map(s => {
+                    const mins = Math.floor((s.durSec || 0) / 60)
+                    const secs = (s.durSec || 0) % 60
+                    const dur = s.durSec > 0 ? `${mins}:${String(secs).padStart(2,'0')}` : '—'
+                    const loginTime = new Date(s.logged_in_at).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})
+                    return (
+                      <tr key={s.id} style={{borderBottom:'1px solid var(--surface)'}}>
+                        <td style={{padding:'10px',direction:'ltr',textAlign:'left',fontFamily:'monospace',fontSize:12}}>{s.email}</td>
+                        <td style={{padding:'10px',fontWeight:600}}>{s.client_name || '—'}</td>
+                        <td style={{padding:'10px',color:'var(--text-secondary)',fontSize:12}}>{loginTime}</td>
+                        <td style={{padding:'10px',fontWeight:600,color:'var(--indigo,#5B5EF4)'}}>{dur}</td>
+                        <td style={{padding:'10px'}}>
+                          {s.isActive
+                            ? <span style={{background:'rgba(16,185,129,0.12)',color:'#059669',borderRadius:20,padding:'3px 10px',fontSize:12,fontWeight:600}}>● פעיל כעת</span>
+                            : <span style={{background:'var(--surface)',color:'var(--text-secondary)',borderRadius:20,padding:'3px 10px',fontSize:12}}>יצא</span>
+                          }
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+            <div style={{marginTop:16,fontSize:12,color:'var(--text-secondary)',textAlign:'center'}}>
+              מציג {sessionLogs.length} כניסות אחרונות · "פעיל" = heartbeat לפני פחות מ-3 דקות
             </div>
           </div>
         </div>

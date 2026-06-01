@@ -11,7 +11,7 @@
 //   onLogout         — Logout button handler
 //   loadingIndicator — optional JSX (spinner while fetching)
 
-export default function Header({ onMenuOpen, onExport, onClientAccess, onLogout, loadingIndicator = null }) {
+export default function Header({ onMenuOpen, onExport, onClientAccess, onSessionLogs, onLogout, loadingIndicator = null }) {
   return (
     <header className="header">
 
@@ -54,6 +54,13 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onLogout,
         {onClientAccess && (
           <button className="btn btn-client-access" onClick={onClientAccess} title="ניהול גישת לקוחות">
             🔗 גישת לקוחות
+          </button>
+        )}
+
+        {/* Session Logs */}
+        {onSessionLogs && (
+          <button className="btn btn-outline" onClick={onSessionLogs} title="לוג כניסות לקוחות">
+            👁 לוג לקוחות
           </button>
         )}
 
