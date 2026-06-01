@@ -479,7 +479,7 @@ async function runSync(opts = {}) {
       //   "בוטלו" = LIDs whose client has a cancelled appointment in the window
       const lidDate = (lid.start_date || lid.create_date || '').toString().slice(0, 10)
       const apptList = clientApptList.get(cid) || []
-      const postLidAppts = apptList.filter(a => !a.date || (a.date >= lidDate && a.date <= until))
+      const postLidAppts = apptList.filter(a => !a.date || a.date >= lidDate)
       const scheduledHit = postLidAppts.length > 0 && postLidAppts.some(a => !a.cancelled)
       const completedHit = postLidAppts.some(a => a.completed)
       const cancelledHit = clientsWithCancelledAppt.has(cid)
