@@ -307,7 +307,7 @@ async function runSync(opts = {}) {
           count: res.value.rows.length,
           foundRows: res.value.foundRows,
           lastUniqID: res.value.lastUniqID,
-          firstRowKeys: res.value.rows.length > 0 ? Object.keys(res.value.rows[0] || {}).slice(0, 10) : undefined,
+          firstRowKeys: res.value.rows.length > 0 ? Object.keys(res.value.rows[0] || {}) : undefined,
           rawSnippet: res.value.rows.length === 0 ? res.value.rawSnippet : undefined,
         }
       }
