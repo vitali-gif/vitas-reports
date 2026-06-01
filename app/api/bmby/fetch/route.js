@@ -346,6 +346,7 @@ async function runSync(opts = {}) {
     // 2. Appointments - build per-client list of events so we can filter
     const apptStatusDebug = {} // debug: raw status → counts
     const completedMeetingSamples = [] // debug: first 5 completed meeting tasks with details
+    const clientProfileSamples = [] // debug: first 10 client profiles with apartment preferences
     //    by appt date relative to the LID's start_date (post-LID logic).
     const clientApptList = new Map()  // cid → [{ date, completed, cancelled }]
     const clientsWithAppt = new Set()           // window-based (any status)
@@ -409,6 +410,24 @@ async function runSync(opts = {}) {
       if (normAddr) clientAddress.set(cid, normAddr)
       const obj = (c.objection || '').toString().trim()
       if (obj) clientObjection.set(cid, obj)
+      // Collect client profile samples for debug
+      if (clientProfileSamples.length < 10) {
+        clientProfileSamples.push({
+          client_id: String(c.client_id || ''),
+          appartment_type: c.appartment_type || '',
+          model_name: c.model_name || '',
+          min_rooms: c.min_rooms || '',
+          max_rooms: c.max_rooms || '',
+          min_size: c.min_size || '',
+          max_size: c.max_size || '',
+          budget: c.budget || '',
+          seriousness: c.seriousness || '',
+          entitlement: c.entitlement || '',
+          property_city: c.property_city || '',
+          property_neighborhood: c.property_neighborhood || '',
+          remark: (c.remark || '').toString().slice(0, 100),
+        })
+      }
     }
 
     // 4. Per-media aggregation from LIDs
@@ -933,6 +952,7 @@ async function runSync(opts = {}) {
       debug: Object.keys(debug).length ? debug : undefined,
       apptStatusDebug,
       completedMeetingSamples,
+      clientProfileSamples,
       diag: {
         // Compact diag for ops - keep contract attribution chain + funnel status counts
         contractAttrib: _contractAttribDebug.map(c => ({
