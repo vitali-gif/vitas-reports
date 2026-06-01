@@ -37,6 +37,15 @@ export async function POST(req) {
     return NextResponse.json({ ok: true })
   }
 
+  if (event === 'project_select') {
+    if (!sessionId) return NextResponse.json({ ok: true })
+    await supabaseAdmin
+      .from('client_sessions')
+      .update({ selected_project: body.projectName || null })
+      .eq('id', sessionId)
+    return NextResponse.json({ ok: true })
+  }
+
   if (event === 'logout') {
     if (!sessionId) return NextResponse.json({ ok: true })
     await supabaseAdmin

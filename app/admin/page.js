@@ -580,6 +580,17 @@ const selectProject = async (client, project) => {
     setVitasTasks([]); setRecSubTab('new');
     await loadProjectReports(project.id);
     await loadProjectTasks(project.id);
+    // Log project selection for client view
+    if (isClientView) {
+      const sid = typeof window !== 'undefined' ? window.__vitasSessionId : null
+      if (sid) {
+        fetch('/api/client-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'project_select', sessionId: sid, projectName: project.name })
+        }).catch(() => {})
+      }
+    }
   };
 
   // ── CLIENT VIEW: auto-select first allowed project when clients load ──
@@ -3005,6 +3016,7 @@ const selectProject = async (client, project) => {
                         <td style={{padding:'10px',fontWeight:600}}>{s.client_name || '—'}</td>
                         <td style={{padding:'10px',color:'var(--text-secondary)',fontSize:12}}>{loginTime}</td>
                         <td style={{padding:'10px',fontWeight:600,color:'var(--indigo,#5B5EF4)'}}>{dur}</td>
+                        <td style={{padding:'10px',fontSize:12,color:'var(--text-secondary)'}}>{s.selected_project || '—'}</td>
                         <td style={{padding:'10px'}}>
                           {s.isActive
                             ? <span style={{background:'rgba(16,185,129,0.12)',color:'#059669',borderRadius:20,padding:'3px 10px',fontSize:12,fontWeight:600}}>● פעיל כעת</span>

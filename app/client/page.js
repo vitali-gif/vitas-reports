@@ -114,7 +114,7 @@ export default function ClientPage() {
           clientName: list[0]?.projects?.clients?.name || '',
           projectIds: list.map(a => a.project_id),
         })
-      }).then(r => r.json()).then(d => { if (d.sessionId) setSessionId(d.sessionId) }).catch(() => {})
+      }).then(r => r.json()).then(d => { if (d.sessionId) { setSessionId(d.sessionId); if (typeof window !== 'undefined') window.__vitasSessionId = d.sessionId } }).catch(() => {})
 
       // Show onboarding on first visit
       if (typeof window !== 'undefined' && !localStorage.getItem('vitas_onboarding_seen')) {
