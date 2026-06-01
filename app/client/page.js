@@ -18,6 +18,7 @@ export default function ClientPage() {
   const [toast, setToast]           = useState('')
   const [accessList, setAccessList] = useState([])
   const [accessInfo, setAccessInfo] = useState(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -79,6 +80,10 @@ export default function ClientPage() {
         setStep('dashboard')
       } else {
         setStep('picker')
+      }
+      // Show onboarding on first visit
+      if (typeof window !== 'undefined' && !localStorage.getItem('vitas_onboarding_seen')) {
+        setShowOnboarding(true)
       }
     } catch {
       setStep('error')
@@ -222,5 +227,117 @@ export default function ClientPage() {
 
   // ── Dashboard — render AdminPage with client-view props ───────────────────
   const allowedProjectIds = accessList.map(a => a.project_id)
-  return <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} />
+  const dismissOnboarding = () => {
+    if (typeof window !== 'undefined') localStorage.setItem('vitas_onboarding_seen', '1')
+    setShowOnboarding(false)
+  }
+
+  const STEPS = [
+    {
+      icon: '📂',
+      title: 'בחר פרויקט',
+      desc: 'בסרגל הצד הימני תמצא את הפרויקטים שלך. לחץ על שם הפרויקט כדי לפתוח את הדוח.',
+    },
+    {
+      icon: '📅',
+      title: 'בחר תקופה',
+      desc: 'בחר חודש, שבוע אחרון, או טווח תאריכים מותאם דרך בורר התאריכים בראש המסך.',
+    },
+    {
+      icon: '🗂',
+      title: 'טאבים',
+      desc: '"הכל" — סיכום כולל. "CRM" — לידים ופגישות. "Facebook" ו-"Google" — פירוט לפי פלטפורמה.',
+    },
+    {
+      icon: '📊',
+      title: 'מדדים מרכזיים',
+      desc: 'כרטיסיות ה-KPI בראש הדוח מציגות: תקציב, לידים, עלות לליד, פגישות וחוזים.',
+    },
+  ]
+
+  return (
+    <>
+      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} />
+
+      {showOnboarding && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(11,15,30,0.7)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '16px', fontFamily: 'var(--font, Heebo, sans-serif)',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 20, maxWidth: 520, width: '100%',
+            padding: '36px 32px 28px', direction: 'rtl', textAlign: 'right',
+            boxShadow: '0 24px 60px rgba(11,15,30,0.3)',
+            maxHeight: '90vh', overflowY: 'auto',
+          }}>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <img src="/brand/vitas-logo-black.png" alt="VITAS" style={{ height: 24, marginBottom: 14 }} />
+              <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: '#0B0F1E', letterSpacing: '-0.02em' }}>
+                ברוכים הבאים לדוח הביצועים 👋
+              </h2>
+              <p style={{ margin: 0, fontSize: 14, color: '#5E6478', lineHeight: 1.6 }}>
+                מדריך קצר שיעזור לך להתמצא במערכת
+              </p>
+            </div>
+
+            {/* Steps */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 28 }}>
+              {STEPS.map((s, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 14,
+                  background: '#F8F9FF', borderRadius: 12, padding: '14px 16px',
+                  border: '1px solid #E8EAFB',
+                }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                    background: 'rgba(91,94,244,0.1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 20,
+                  }}>{s.icon}</div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0B0F1E', marginBottom: 3 }}>
+                      {s.title}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#5E6478', lineHeight: 1.6 }}>
+                      {s.desc}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tip */}
+            <div style={{
+              background: 'rgba(91,94,244,0.06)', border: '1px solid rgba(91,94,244,0.2)',
+              borderRadius: 10, padding: '11px 14px', marginBottom: 24,
+              fontSize: 13, color: '#3B3ECC', lineHeight: 1.6,
+            }}>
+              💡 <strong>טיפ:</strong> הנתונים מתעדכנים אוטומטית. אין צורך ללחוץ על "רענן".
+            </div>
+
+            {/* CTA */}
+            <button
+              onClick={dismissOnboarding}
+              style={{
+                display: 'block', width: '100%', padding: '13px',
+                background: '#5B5EF4', color: '#fff', border: 'none',
+                borderRadius: 10, fontSize: 15, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+                boxShadow: '0 6px 20px rgba(91,94,244,0.35)',
+              }}>
+              הבנתי, קדימה! →
+            </button>
+
+            <p style={{ margin: '12px 0 0', textAlign: 'center', fontSize: 12, color: '#98A0B2' }}>
+              המדריך לא יופיע שוב בכניסות הבאות
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  )
 }
