@@ -76,12 +76,23 @@ export async function GET(request) {
   }
 
   const months = [0, 1, 2].map(monthsBack)
+  // Quarterly ranges for current year
+  const yr = nowIsrael().getFullYear()
+  const q = (m0, d0, m1, d1) => ({
+    since: `${yr}-${String(m0).padStart(2,'0')}-${String(d0).padStart(2,'0')}`,
+    until: `${yr}-${String(m1).padStart(2,'0')}-${String(d1).padStart(2,'0')}`,
+  })
+
   const rangePresets = [
     { id: 'today',     ...todayRange() },
     { id: 'yesterday', ...yesterdayRange() },
     { id: 'last7',     ...daysBackRange(7) },
     { id: 'last14',    ...daysBackRange(14) },
     { id: 'last30',    ...daysBackRange(30) },
+    { id: 'q1',        ...q(1,1,3,31) },
+    { id: 'q2',        ...q(4,1,6,30) },
+    { id: 'q3',        ...q(7,1,9,30) },
+    { id: 'q4',        ...q(10,1,12,31) },
   ]
   const sources = ['meta', 'google', 'bmby']
 
