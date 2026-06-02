@@ -96,14 +96,37 @@ export async function GET(request) {
   ]
   const sources = ['meta', 'google', 'bmby']
 
-  // Build the job list: months + range presets, for each source.
+  // Build the job list — PRIORITY ORDER so the most volatile data runs first.
+  // Vercel Hobby cap: 60s. Each batch of CONCURRENCY takes ~15-20s.
+  // Priority: daily presets (change every day) > current month > past months > quarterly.
+  // Past quarters / old months may time out — that is acceptable since they rarely change.
   const jobs = []
+
+  const DAILY_IDS = ['today', 'yesterday', 'last7', 'last14', 'last30']
+  const dailyPresets = rangePresets.filter(r => DAILY_IDS.includes(r.id))
+  const otherPresets = rangePresets.filter(r => !DAILY_IDS.includes(r.id))  // q1-q4
+
+  // 1. Daily range presets (15 jobs — 3 batches of 5, ~45s, always completes)
+  for (const r of dailyPresets) {
+    for (const source of sources) {
+      jobs.push({
+        kind: 'range',
+        label: `${r.id} (${r.since}..${r.until})`,
+        source,
+        payload: { since: r.since, until: r.until },
+      })
+    }
+  }
+
+  // 2. Monthly data: current month first, then older (9 jobs)
   for (const month of months) {
     for (const source of sources) {
       jobs.push({ kind: 'month', label: month, source, payload: { month } })
     }
   }
-  for (const r of rangePresets) {
+
+  // 3. Quarterly presets (12 jobs — lower priority, may be skipped by timeout)
+  for (const r of otherPresets) {
     for (const source of sources) {
       jobs.push({
         kind: 'range',
