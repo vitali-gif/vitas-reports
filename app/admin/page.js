@@ -369,6 +369,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     if (!r) return;
     // Set the target selection BEFORE triggering fetch so loadProjectReports keeps it
     setSelectedMonth(r.key);
+    // Client view: presets are always cache-only (cron pre-warms them).
+    // Skip triggerFetch — the auto-fetch useEffect already guards against live
+    // fetches for client+preset (returns early). Avoids 160s live fetches.
+    if (isClientView) return;
     const ok = await triggerFetch(r.payload);
     // Reaffirm in case loadProjectReports raced and reset it
     if (ok) setSelectedMonth(r.key);
@@ -452,7 +456,19 @@ const loadClients = async () => {
   };
 
   const loadProjectReports = async (projectId) => {
-    const { data } = await supabase.from('reports').select('*').eq('project_id', projectId).order('month', { ascending: false });
+    let data = null;
+    if (isClientView) {
+      // Client view: reports table has RLS blocking anon reads.
+      // Use the service-role API endpoint instead.
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+      const res = await fetch(`/api/reports/by-project?projectId=${projectId}`, {
+        headers: { 'x-client-key': anonKey },
+      }).catch(() => null);
+      if (res && res.ok) data = await res.json().catch(() => null);
+    } else {
+      const { data: d } = await supabase.from('reports').select('*').eq('project_id', projectId).order('month', { ascending: false });
+      data = d;
+    }
     if (data) {
       setReports(data);
       // Preserve current selectedMonth if it still exists in the new data;
