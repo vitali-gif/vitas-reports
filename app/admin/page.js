@@ -141,6 +141,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [ruleDialog, setRuleDialog] = useState(null)  // {recRef, ruleType, params}
   const [creatingRule, setCreatingRule] = useState(false)
   const chartsRef = useRef([])
+  const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
   const [showAddClient, setShowAddClient] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
   const [newClientName, setNewClientName] = useState('')
@@ -672,7 +673,14 @@ const selectProject = async (client, project) => {
     return () => clearTimeout(tm);
   }, [selectedMonth, selectedProject?.id, reports.length]);
 
-  const destroyCharts = () => { chartsRef.current.forEach(c => c.destroy()); chartsRef.current = []; };
+  const destroyCharts = () => {
+    // Cancel any pending chart-creation timeouts (prevents stale charts from
+    // a previous selectedMonth rendering on top of the new period's canvases)
+    pendingChartsRef.current.forEach(clearTimeout);
+    pendingChartsRef.current = [];
+    chartsRef.current.forEach(c => c.destroy());
+    chartsRef.current = [];
+  };
 
 
   const arcLabelsPlugin = {
@@ -795,7 +803,7 @@ const selectProject = async (client, project) => {
     const cityNames = cityEntries.map(([n]) => n);
     const cityCounts = cityEntries.map(([, c]) => c[metricKey] || 0);
 
-    setTimeout(() => {
+    pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
       if (cityNames.length > 0) {
         createChart('crmRepCityChart', 'bar', cityNames, [{
@@ -807,7 +815,7 @@ const selectProject = async (client, project) => {
           indexAxis: 'y',
         });
       }
-    }, 200);
+    }, 200));
 
     if (cityEntries.length === 0) {
       return <div className="welcome-center"><div className="icon">🏘️</div><h3>אין נתוני יישובים לתקופה זו</h3></div>;
@@ -921,7 +929,7 @@ const selectProject = async (client, project) => {
     const bucketHumanLabels = ['פחות מ-15 דק׳', '15 דק׳-שעה', '1-4 שעות', '4-8 שעות', '8-24 שעות', '1-3 ימים', 'יותר מ-3 ימים'];
     const bucketValues = bucketLabels.map(k => bucketsTotal[k] || 0);
 
-    setTimeout(() => {
+    pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
       const bucketBusinessValues = bucketLabels.map(k => bucketsBusiness[k] || 0);
       const bucketMeetingValues = bucketLabels.map(k => bucketMeetingWith[k] || 0);
@@ -945,13 +953,13 @@ const selectProject = async (client, project) => {
               title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
               ticks: { callback: v => v + '%' }, grid: { drawOnChartArea: false } },
       });
-    }, 200);
+    }, 200));
 
     // Day-of-week chart data prep
     const dowOrder = ['0','1','2','3','4','5','6'];
     const dowHasData = dowOrder.some(k => dowMerged[k] && dowMerged[k].leads > 0);
     if (dowHasData) {
-      setTimeout(() => {
+      pendingChartsRef.current.push(setTimeout(() => {
         const labels = dowOrder.map(k => (dowMerged[k] && dowMerged[k].name) || k);
         const leadsData = dowOrder.map(k => (dowMerged[k] && dowMerged[k].leads) || 0);
         const schedData = dowOrder.map(k => (dowMerged[k] && dowMerged[k].scheduled) || 0);
@@ -976,7 +984,7 @@ const selectProject = async (client, project) => {
                 title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
                 ticks: { callback: v => v + '%' }, grid: { drawOnChartArea: false } },
         });
-      }, 300);
+      }, 300));
     }
 
     const fmt = (mn) => {
@@ -1113,13 +1121,13 @@ const selectProject = async (client, project) => {
     const topNames = objEntries.map(([n]) => n);
     const topCounts = objEntries.map(([, c]) => c);
 
-    setTimeout(() => {
+    pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
       createChart('crmObjChart', 'doughnut', topNames, [{
         data: topCounts,
         backgroundColor: COLORS.slice(0, topNames.length),
       }]);
-    }, 200);
+    }, 200));
 
     return (
       <div className="section">
@@ -1313,7 +1321,7 @@ const selectProject = async (client, project) => {
     const sourceEntries = Object.entries(crmData.sources).sort((a, b) => b[1].totalLeads - a[1].totalLeads);
     const sourceNames = sourceEntries.map(([name]) => name);
 
-    setTimeout(() => {
+    pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
       if (sourceNames.length > 0) {
         createChart('crmPieChart', 'doughnut', sourceNames, [{
@@ -1321,7 +1329,7 @@ const selectProject = async (client, project) => {
           backgroundColor: COLORS.slice(0, sourceNames.length)
         }]);
       }
-    }, 200);
+    }, 200));
 
     const crmSchemaVersion = crmReports[0]?.summary?.schemaVersion || 0;
     return (
@@ -1715,7 +1723,7 @@ const selectProject = async (client, project) => {
     };
 
 
-    setTimeout(() => {
+    pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
       // monthly trend charts removed
       const campNames2 = Object.keys(data.campaigns);
@@ -1768,7 +1776,7 @@ const selectProject = async (client, project) => {
             backgroundColor: '#8B5CF6', maxBarThickness: 40 }]);
         createChart('ageCPM', 'bar', an, [{ label: 'CPM (\u20aa)', data: an.map(a => data.ages[a].impressions > 0 ? (data.ages[a].spend / data.ages[a].impressions * 1000) : 0), backgroundColor: '#F59E0B', maxBarThickness: 48 }]);
       }
-    }, 200);
+    }, 200));
 
     const campNames = Object.keys(data.campaigns);
     const adEntries = Object.entries(data.ads).sort((a, b) => b[1].spend - a[1].spend).slice(0, 10);
