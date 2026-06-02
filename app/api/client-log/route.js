@@ -62,6 +62,17 @@ export async function POST(req) {
   return NextResponse.json({ error: 'unknown event' }, { status: 400 })
 }
 
+// DELETE — clear all session logs (protected by anon key header)
+export async function DELETE(req) {
+  const key = req.headers.get('x-client-key')
+  if (!key || key !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const { error } = await supabaseAdmin.from('client_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
 // GET — fetch logs for admin (protected by anon key header)
 export async function GET(req) {
   const key = req.headers.get('x-client-key')

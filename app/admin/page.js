@@ -3040,7 +3040,25 @@ const selectProject = async (client, project) => {
           <div className="modal" style={{maxWidth:700,width:'100%',direction:'rtl',maxHeight:'80vh',overflow:'auto'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
               <h3 style={{margin:0,fontSize:17,fontWeight:700}}>👁 לוג כניסות לקוחות</h3>
-              <button onClick={() => setShowSessionLogs(false)} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'#64748b'}}>&times;</button>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <button
+                  onClick={handleSessionLogs}
+                  title="רענן לוג"
+                  style={{display:'flex',alignItems:'center',gap:5,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',color:'var(--text-2)'}}>
+                  🔄 רענן
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!confirm('למחוק את כל הלוגים?')) return
+                    await fetch('/api/client-log', { method:'DELETE', headers:{'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||''} })
+                    setSessionLogs([])
+                  }}
+                  title="מחק את כל הלוגים"
+                  style={{display:'flex',alignItems:'center',gap:5,background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',color:'#ef4444'}}>
+                  🗑️ אפס
+                </button>
+                <button onClick={() => setShowSessionLogs(false)} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'#64748b',lineHeight:1}}>&times;</button>
+              </div>
             </div>
             {logsLoading ? (
               <div style={{textAlign:'center',padding:'32px 0',color:'var(--text-secondary)'}}>טוען...</div>
