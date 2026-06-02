@@ -11,6 +11,19 @@ const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 // ═══════════════════════════════════════════════════════════════════════════
 // ClientPage — handles magic-link auth, then renders AdminPage (client view)
 // ═══════════════════════════════════════════════════════════════════════════
+// Build clients[] shape for AdminPage from accessList (from /api/client-access)
+function buildClients(accessList) {
+  const map = new Map();
+  for (const a of accessList) {
+    const cName  = a.projects?.clients?.name  || 'לקוח';
+    const cColor = a.projects?.clients?.color || '#5B5EF4';
+    const cId    = a.projects?.client_id;
+    if (!map.has(cName)) map.set(cName, { id: cId, name: cName, color: cColor, projects: [] });
+    map.get(cName).projects.push({ id: a.project_id, name: a.projects?.name, is_demo: false });
+  }
+  return Array.from(map.values());
+}
+
 export default function ClientPage() {
   const [step, setStep]             = useState('email')
   const [emailInput, setEmailInput] = useState('')
@@ -20,8 +33,22 @@ export default function ClientPage() {
   const [accessInfo, setAccessInfo] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [sessionId, setSessionId] = useState(null)
+  const [installPrompt, setInstallPrompt] = useState(null)
   const sessionStartRef = useRef(Date.now())
   const sessionStart = sessionStartRef.current
+
+  // ── PWA: register service worker + capture install prompt ──────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Register SW
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+    // Capture native install prompt
+    const handleInstall = (e) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handleInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleInstall);
+  }, []);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -299,7 +326,29 @@ export default function ClientPage() {
 
   return (
     <>
-      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} />
+      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} />
+
+      {installPrompt && (
+        <div style={{
+          position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9998, background: '#0B0F1E', color: '#fff', borderRadius: 14,
+          padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12,
+          boxShadow: '0 8px 28px rgba(11,15,30,0.45)', fontFamily: 'var(--font, Heebo, sans-serif)',
+          whiteSpace: 'nowrap',
+        }}>
+          <span style={{ fontSize: 20 }}>📲</span>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>הוסף לסרגל הבית</span>
+          <button
+            onClick={() => { installPrompt.prompt(); installPrompt.userChoice.then(() => setInstallPrompt(null)); }}
+            style={{ background: '#5B5EF4', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            התקן
+          </button>
+          <button onClick={() => setInstallPrompt(null)}
+            style={{ background: 'none', border: 'none', color: '#98A0B2', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px' }}>
+            ×
+          </button>
+        </div>
+      )}
 
       {showOnboarding && (
         <div style={{

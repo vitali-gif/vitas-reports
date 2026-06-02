@@ -91,7 +91,7 @@ function InfoTip({ text }) {
 }
 
 
-export default function AdminPage({ isClientView = false, allowedProjectIds = null }) {
+export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null }) {
   const DEMO_CLIENT_NAME  = 'קבוצת אורבן'
   const DEMO_PROJECT_NAME = 'מטרופוליס'
   const [session, setSession] = useState(null)
@@ -162,7 +162,13 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => { if (session) loadClients(); }, [session]);
+  useEffect(() => {
+    if (isClientView) {
+      if (initialClients?.length) setClients(initialClients);
+      return;
+    }
+    if (session) loadClients();
+  }, [session, isClientView]); // eslint-disable-line
 
   const handleAuth = async (e) => {
     e.preventDefault(); setAuthError('');
