@@ -34,6 +34,7 @@ export default function ClientPage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [sessionId, setSessionId] = useState(null)
   const [installPrompt, setInstallPrompt] = useState(null)
+  const [initialProjectId, setInitialProjectId] = useState(null)
   const sessionStartRef = useRef(Date.now())
   const sessionStart = sessionStartRef.current
 
@@ -233,7 +234,7 @@ export default function ClientPage() {
           <p style={{margin:0,fontSize:14,color:'var(--text-3)'}}>יש לך גישה למספר פרויקטים</p>
         </div>
         {accessList.map(a => (
-          <button key={a.id} onClick={() => { setAccessInfo(a); setStep('dashboard') }}
+          <button key={a.id} onClick={() => { setAccessInfo(a); setInitialProjectId(a.project_id); setStep('dashboard') }}
             style={{display:'block',width:'100%',background:'var(--card)',border:'1px solid var(--border)',borderRadius:12,padding:'16px 20px',marginBottom:10,cursor:'pointer',fontFamily:'var(--font)',textAlign:'right',transition:'all .15s'}}
             onMouseEnter={e => e.currentTarget.style.borderColor='var(--indigo)'}
             onMouseLeave={e => e.currentTarget.style.borderColor='var(--border)'}
@@ -326,7 +327,7 @@ export default function ClientPage() {
 
   return (
     <>
-      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} />
+      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} />
 
       {installPrompt && (
         <div style={{

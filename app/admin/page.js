@@ -91,7 +91,7 @@ function InfoTip({ text }) {
 }
 
 
-export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null }) {
+export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null }) {
   const DEMO_CLIENT_NAME  = 'קבוצת אורבן'
   const DEMO_PROJECT_NAME = 'מטרופוליס'
   const [session, setSession] = useState(null)
@@ -372,7 +372,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     // Client view: presets are always cache-only (cron pre-warms them).
     // Skip triggerFetch — the auto-fetch useEffect already guards against live
     // fetches for client+preset (returns early). Avoids 160s live fetches.
-    if (isClientView) return;
+    if (isClientView) {
+      showToast('✓ טוען...');  // ✓ טוען...
+      return;
+    }
     const ok = await triggerFetch(r.payload);
     // Reaffirm in case loadProjectReports raced and reset it
     if (ok) setSelectedMonth(r.key);
@@ -624,9 +627,15 @@ const selectProject = async (client, project) => {
     const filtered = clients
       .map(c => ({ ...c, projects: (c.projects || []).filter(p => allowedProjectIds.includes(p.id)) }))
       .filter(c => c.projects.length > 0);
-    if (filtered.length > 0 && filtered[0].projects.length > 0) {
-      selectProject(filtered[0], filtered[0].projects[0]);
+    // If user picked a specific project in the picker, honour it; else first
+    let targetClient = filtered[0], targetProject = filtered[0]?.projects?.[0];
+    if (initialProjectId) {
+      for (const c of filtered) {
+        const p = c.projects.find(p => p.id === initialProjectId);
+        if (p) { targetClient = c; targetProject = p; break; }
+      }
     }
+    if (targetClient && targetProject) selectProject(targetClient, targetProject);
   }, [clients, isClientView]); // eslint-disable-line
 
   // Tick elapsed time every 500ms while refresh is active (for the banner timer)

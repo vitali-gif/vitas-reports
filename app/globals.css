@@ -3893,11 +3893,14 @@ body.drp-no-scroll { overflow: hidden; }
   /* Override .kpi-tier.primary .kpi-c .val { font-size: 36px }
      which has specificity (0,3,0) — needs matching specificity + important */
   .kpi-tier.primary .kpi-c .val {
-    font-size: 22px !important;
-    line-height: 1.05 !important;
+    font-size: 15px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .kpi-tier.primary .kpi-c {
-    padding: 10px 12px !important;
+    padding: 10px 10px !important;
     min-height: 0 !important;
   }
 
