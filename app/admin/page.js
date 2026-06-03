@@ -374,7 +374,15 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     // Skip triggerFetch — the auto-fetch useEffect already guards against live
     // fetches for client+preset (returns early). Avoids 160s live fetches.
     if (isClientView) {
-      showToast('✓ טוען...');  // ✓ טוען...
+      // Cache hit → render instantly from already-loaded reports
+      const hasCachedData = reports.some(rep => rep.month === r.key);
+      if (hasCachedData) {
+        showToast('✓ מוצג ממטמון');
+        return;
+      }
+      // Cache miss → live fetch so client always sees data
+      const ok = await triggerFetch(r.payload);
+      if (ok) setSelectedMonth(r.key);
       return;
     }
     const ok = await triggerFetch(r.payload);
