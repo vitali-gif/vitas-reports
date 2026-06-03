@@ -374,13 +374,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     // Skip triggerFetch — the auto-fetch useEffect already guards against live
     // fetches for client+preset (returns early). Avoids 160s live fetches.
     if (isClientView) {
-      // Cache hit → render instantly from already-loaded reports
-      const hasCachedData = reports.some(rep => rep.month === r.key);
-      if (hasCachedData) {
-        showToast('✓ מוצג ממטמון');
-      } else {
-        showToast('אין נתונים לטווח זה — נתונים יטענו בעדכון הבא');
-      }
+      // Reload reports from DB on every preset switch — picks up CRM data
+      // saved by admin refresh or cron since page load. Cheap read, no live API fetch.
+      if (selectedProject) await loadProjectReports(selectedProject.id);
+      showToast('✓ טוען...');
       return;
     }
     const ok = await triggerFetch(r.payload);
