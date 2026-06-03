@@ -106,7 +106,14 @@ export async function GET(request) {
   const dailyPresets = rangePresets.filter(r => DAILY_IDS.includes(r.id))
   const otherPresets = rangePresets.filter(r => !DAILY_IDS.includes(r.id))  // q1-q4
 
-  // 1. Daily range presets (15 jobs — 3 batches of 5, ~45s, always completes)
+  // 1. Monthly data FIRST (9 jobs, ~15s) — clients depend on these most; must complete before timeout
+  for (const month of months) {
+    for (const source of sources) {
+      jobs.push({ kind: 'month', label: month, source, payload: { month } })
+    }
+  }
+
+  // 2. Daily range presets (15 jobs — always complete, ~25s after monthly)
   for (const r of dailyPresets) {
     for (const source of sources) {
       jobs.push({
@@ -115,13 +122,6 @@ export async function GET(request) {
         source,
         payload: { since: r.since, until: r.until },
       })
-    }
-  }
-
-  // 2. Monthly data: current month first, then older (9 jobs)
-  for (const month of months) {
-    for (const source of sources) {
-      jobs.push({ kind: 'month', label: month, source, payload: { month } })
     }
   }
 
