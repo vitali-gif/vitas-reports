@@ -161,8 +161,9 @@ export async function POST(req) {
     email: cleanEmail,
     options: { redirectTo: `${siteUrl}/client` }
   })
-  if (!linkError && linkData?.properties?.action_link) {
-    magicLink = linkData.properties.action_link
+  if (!linkError && linkData?.properties?.hashed_token) {
+    const hashedToken = linkData.properties.hashed_token
+    magicLink = `${siteUrl}/api/auth/confirm?token=${hashedToken}&type=magiclink`
   }
 
   // Send ONE invite email
