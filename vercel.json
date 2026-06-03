@@ -1,12 +1,8 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/prefetch",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/prefetch",
-      "schedule": "0 11 * * *"
-    }
+    { "path": "/api/cron/prefetch-ads", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/prefetch-ads", "schedule": "0 11 * * *" },
+    { "path": "/api/cron/prefetch-crm", "schedule": "10 4 * * *" },
+    { "path": "/api/cron/prefetch-crm", "schedule": "10 11 * * *" }
   ]
 }
