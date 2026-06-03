@@ -378,11 +378,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       const hasCachedData = reports.some(rep => rep.month === r.key);
       if (hasCachedData) {
         showToast('✓ מוצג ממטמון');
-        return;
+      } else {
+        showToast('אין נתונים לטווח זה — נתונים יטענו בעדכון הבא');
       }
-      // Cache miss → live fetch so client always sees data
-      const ok = await triggerFetch(r.payload);
-      if (ok) setSelectedMonth(r.key);
       return;
     }
     const ok = await triggerFetch(r.payload);
