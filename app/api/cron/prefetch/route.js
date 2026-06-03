@@ -137,9 +137,7 @@ export async function GET(request) {
     }
   }
 
-  const base = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000'
+  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
 
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   const results = []
