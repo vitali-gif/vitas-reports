@@ -5,7 +5,7 @@
  * Jobs: 3 months + 2 ranges = 5 total, concurrency 2, ~25-35s
  */
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300
 
 function nowIsrael() {
   const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -30,11 +30,21 @@ export async function GET(request) {
   const last7Since = toYMD(agoD(7))
   const last7Until = toYMD(agoD(1))
 
-  // 5 jobs total: 3 months + today + last7
+  // All ranges: 3 months + 9 range presets = 12 jobs total (Pro plan: 300s timeout)
+  const yr = nowIsrael().getFullYear()
+  const q = (m0, d0, m1, d1) => ({ since: `${yr}-${String(m0).padStart(2,'0')}-${String(d0).padStart(2,'0')}`, until: `${yr}-${String(m1).padStart(2,'0')}-${String(d1).padStart(2,'0')}` })
+  const rangePresets = [
+    { id: 'today',     since: todayStr, until: todayStr },
+    { id: 'yesterday', since: toYMD(agoD(1)), until: toYMD(agoD(1)) },
+    { id: 'last7',     since: last7Since, until: last7Until },
+    { id: 'last14',    since: toYMD(agoD(14)), until: last7Until },
+    { id: 'last30',    since: toYMD(agoD(30)), until: last7Until },
+    { id: 'q1', ...q(1,1,3,31) }, { id: 'q2', ...q(4,1,6,30) },
+    { id: 'q3', ...q(7,1,9,30) }, { id: 'q4', ...q(10,1,12,31) },
+  ]
   const jobs = [
     ...months.map(month => ({ kind: 'month', label: month, payload: { month } })),
-    { kind: 'range', label: `today (${todayStr})`, payload: { since: todayStr, until: todayStr } },
-    { kind: 'range', label: `last7 (${last7Since}..${last7Until})`, payload: { since: last7Since, until: last7Until } },
+    ...rangePresets.map(r => ({ kind: 'range', label: `${r.id} (${r.since}..${r.until})`, payload: { since: r.since, until: r.until } })),
   ]
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
