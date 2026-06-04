@@ -89,24 +89,40 @@ async function fetchLeadsPaginated(accessToken, since, until) {
   const baseUrl = `${apiDomain}/crm/v7/Leads`
 
   const allLeads = []
-  let pageToken = null   // cursor returned by Zoho after each page
+  let pageToken = null
   let page = 1
-  let hasMore = true
-  const MAX_PAGES = 50   // safety cap: up to 10,000 records
+  const MAX_PAGES = 50
+  const PER_PAGE = 200
 
-  while (hasMore && page <= MAX_PAGES) {
-    // page_token replaces the page number but all other params must stay identical
+  // Zoho quirk: `more_records` is unreliable when using criteria filters —
+  // it can return true even when no more matching records exist, causing subsequent
+  // pages to return unfiltered data. We use two stop conditions:
+  //   1. fewer than PER_PAGE records returned (real end of filtered set)
+  //   2. page_token cursor (reliable stop signal when available)
+  while (page <= MAX_PAGES) {
     const url = pageToken
       ? `${baseUrl}?${baseParams}&page_token=${encodeURIComponent(pageToken)}`
       : `${baseUrl}?${baseParams}&page=${page}`
 
     const json = await zohoGet(accessToken, url)
     const records = json.data || []
-    allLeads.push(...records)
+
+    // Client-side validation: only keep records that truly match our filters
+    const sinceMs = new Date(since).getTime()
+    const untilMs = new Date(until).getTime() + 86399999 // end of day
+    const valid = records.filter(r => {
+      if ((r.segment || '').toLowerCase() !== 'bcurelaser') return false
+      const createdMs = r.Created_Time ? new Date(r.Created_Time).getTime() : 0
+      return createdMs >= sinceMs && createdMs <= untilMs
+    })
+    allLeads.push(...valid)
 
     const info = json.info || {}
-    hasMore = info.more_records === true
     pageToken = info.next_page_token || null
+
+    // Stop if: partial page (end of filtered data) OR got records that don't match our filter
+    if (records.length < PER_PAGE) break
+    if (valid.length === 0 && records.length > 0) break  // page returned only unfiltered data
     page++
   }
 
