@@ -276,7 +276,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const callList = [];
     if (fb)  callList.push({ key: 'fb',  url: '/api/meta/fetch' });
     if (gg)  callList.push({ key: 'gg',  url: '/api/google/fetch' });
-    if (crm) callList.push({ key: 'crm', url: '/api/bmby/fetch' });
+    if (crm) {
+      callList.push({ key: 'crm',  url: '/api/bmby/fetch' });
+      callList.push({ key: 'zoho', url: '/api/zoho/fetch' });
+    }
     if (callList.length === 0) {
       if (!isBackground) setRefreshing(false);
       return true;
@@ -292,6 +295,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
         if (c.key === 'fb')  metaOk = ok;
         if (c.key === 'gg')  googleOk = ok;
         if (c.key === 'crm') crmOk = ok;
+        if (c.key === 'zoho') crmOk = crmOk || ok;
       });
       if (metaOk) setLastMetaSync(new Date());
       if (googleOk) setLastGoogleSync(new Date());
@@ -2309,15 +2313,173 @@ const selectProject = async (client, project) => {
               )}
             </div>
           );
-        })() : dashTab === 'crm' ? (<>
-          <div className="client-tabs" style={{marginBottom: 15}}>
-            <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
-            <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
-            <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
-            <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
-          </div>
-          {crmSubTab === 'sources' ? renderCrmDashboard() : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : renderCrmReportDashboard()}
-        </>) : (displayReports.length === 0 && dashTab !== 'all') ? (
+        })() : dashTab === 'crm' ? (() => {
+          // BCureLaser / Zoho CRM detection
+          const _zohoRep = currentReports.find(r => r.source === 'crm')
+          const _isZoho = _zohoRep?.summary?.crmType === 'zoho'
+
+          if (_isZoho) {
+            const _zs = _zohoRep.summary
+            const _rt = _zs.responseTime || {}
+            const _dl = _zs.deals || {}
+            const _byStatus = Object.entries(_zs.byStatus || {}).sort((a,b) => b[1]-a[1])
+            const _bySrc    = Object.entries(_zs.bySource || {}).sort((a,b) => b[1]-a[1])
+            const _objList  = Object.entries(_zs.objections || {}).sort((a,b) => b[1]-a[1])
+            const _devList  = Object.entries(_zs.devices || {}).sort((a,b) => b[1]-a[1])
+            const _agentList = (_rt.byAgent || []).slice(0, 8)
+            const _totalLeads = _zs.totalLeads || 0
+
+            // Schedule Zoho charts after render
+            const _zohoChartKey = `zoho_${crmSubTab}_${selectedMonth}`
+            if (crmSubTab === 'sources') {
+              pendingChartsRef.current.push(setTimeout(() => {
+                destroyCharts()
+                if (_bySrc.length > 0) createChart('zohoPieSource','doughnut',_bySrc.map(([k])=>k),[{data:_bySrc.map(([,v])=>v),backgroundColor:COLORS.slice(0,_bySrc.length)}])
+                if (_byStatus.length > 0) createChart('zohoPieStatus','doughnut',_byStatus.map(([k])=>k),[{data:_byStatus.map(([,v])=>v),backgroundColor:COLORS.slice(0,_byStatus.length)}])
+              }, 200))
+            } else if (crmSubTab === 'statuses') {
+              pendingChartsRef.current.push(setTimeout(() => {
+                destroyCharts()
+                if (_objList.length > 0) createChart('zohoBarObj','bar',_objList.map(([k])=>k),[{label:'לידים',data:_objList.map(([,v])=>v),backgroundColor:'rgba(244,63,94,0.7)',borderRadius:6}],{y:{beginAtZero:true,position:'right'},x:{grid:{display:false}}})
+              }, 200))
+            } else if (crmSubTab === 'deals') {
+              pendingChartsRef.current.push(setTimeout(() => {
+                destroyCharts()
+                if (_devList.length > 0) createChart('zohoBarDevice','bar',_devList.map(([k])=>k),[{label:'לידים',data:_devList.map(([,v])=>v),backgroundColor:'rgba(99,102,241,0.7)',borderRadius:6}],{y:{beginAtZero:true,position:'right'},x:{grid:{display:false}}})
+              }, 200))
+            }
+
+            const _kpiZ = (lbl, val, cls) => (
+              <div key={lbl} className={`kpi ${cls||'indigo'}`}>
+                <div className="kpi-top"><div className="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></svg></div></div>
+                <div className="kpi-label">{lbl}</div>
+                <div className="kpi-value">{val}</div>
+              </div>
+            )
+
+            return (<>
+              <div className="client-tabs" style={{marginBottom: 15}}>
+                <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
+                <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
+                <button className={`client-tab ${crmSubTab === 'statuses' ? 'active' : ''}`} onClick={() => setCrmSubTab('statuses')}>📊 סטטוסי לידים</button>
+                <button className={`client-tab ${crmSubTab === 'deals' ? 'active' : ''}`} onClick={() => setCrmSubTab('deals')}>💰 עסקאות</button>
+              </div>
+
+              {crmSubTab === 'sources' && (<>
+                <div className="kpi-grid">
+                  {_kpiZ('סה"כ לידים', formatNum(_totalLeads), 'sky')}
+                  {_kpiZ('רלוונטיים', formatNum(_zs.relevantLeads||0), 'emerald')}
+                  {_kpiZ('לא רלוונטיים', formatNum(_zs.irrelevantLeads||0), 'rose')}
+                  {_kpiZ('זמן תגובה ממוצע', (_rt.avgHours||0) < 1 ? Math.round((_rt.avgHours||0)*60)+'m' : (_rt.avgHours||0).toFixed(1)+'h', 'amber')}
+                </div>
+                <div className="section">
+                  <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>לידים לפי מקור הגעה</h2></div>
+                  <div className="chart-grid" style={{gridTemplateColumns:'1fr 1fr'}}>
+                    <div className="chart-card"><h4>מקור הגעה</h4><div className="chart-container"><canvas id="zohoPieSource"></canvas></div></div>
+                    <div className="chart-card"><h4>סטטוס ליד</h4><div className="chart-container"><canvas id="zohoPieStatus"></canvas></div></div>
+                  </div>
+                  <div className="table-wrapper" style={{marginTop:16}}>
+                    <table className="data-table">
+                      <thead><tr><th>מקור</th><th>לידים</th><th>%</th></tr></thead>
+                      <tbody>
+                        {_bySrc.map(([src, cnt]) => (
+                          <tr key={src}><td style={{fontWeight:600}}>{src}</td><td>{formatNum(cnt)}</td><td>{_totalLeads>0?(cnt/_totalLeads*100).toFixed(1)+'%':'-'}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>)}
+
+              {crmSubTab === 'response' && (<>
+                <div className="kpi-grid">
+                  {_kpiZ('זמן תגובה ממוצע', (_rt.avgHours||0) < 1 ? Math.round((_rt.avgHours||0)*60)+' דק' : (_rt.avgHours||0).toFixed(1)+' שעות', 'amber')}
+                  {_kpiZ('מענה תוך שעה', (_rt.respondedWithin1h||0)+'%', (_rt.respondedWithin1h||0) >= 50 ? 'emerald' : 'rose')}
+                  {_kpiZ('ללא מענה', formatNum(_rt.noResponseCount||0), 'rose')}
+                  {_kpiZ('קיבלו מענה', formatNum(_rt.respondedCount||0), 'sky')}
+                </div>
+                <div className="section">
+                  <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>זמני תגובה לפי נציג</h2></div>
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead><tr><th>נציג</th><th>לידים</th><th>זמן תגובה ממוצע</th><th>ללא מענה</th></tr></thead>
+                      <tbody>
+                        {_agentList.map(ag => (
+                          <tr key={ag.name}>
+                            <td style={{fontWeight:600}}>{ag.name}</td>
+                            <td>{formatNum(ag.count)}</td>
+                            <td>{ag.avgHours!=null ? (ag.avgHours<1?Math.round(ag.avgHours*60)+' דק':ag.avgHours.toFixed(1)+' שעות') : '—'}</td>
+                            <td style={{color:ag.noResponse>0?'var(--rose)':'inherit'}}>{formatNum(ag.noResponse||0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>)}
+
+              {crmSubTab === 'statuses' && (<>
+                <div className="section">
+                  <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><h2>סטטוסי לידים</h2></div>
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead><tr><th>סטטוס</th><th>לידים</th><th>%</th></tr></thead>
+                      <tbody>
+                        {_byStatus.map(([st, cnt]) => (
+                          <tr key={st}><td style={{fontWeight:600}}>{st}</td><td>{formatNum(cnt)}</td><td>{_totalLeads>0?(cnt/_totalLeads*100).toFixed(1)+'%':'-'}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {_objList.length > 0 && (<div className="section">
+                  <div className="section-head"><div className="ico rose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><h2>סיבות אי-עניין</h2></div>
+                  <div className="chart-card" style={{marginBottom:16}}><div className="chart-container" style={{height:220}}><canvas id="zohoBarObj"></canvas></div></div>
+                  <ul className="objections-mobile">
+                    {_objList.slice(0,6).map(([obj, cnt], i) => {
+                      const rankColors=['rank-indigo','rank-emerald','rank-violet','rank-amber','rank-sky','rank-rose']
+                      return <li key={obj}><div className={`rank ${rankColors[i]||'rank-indigo'}`}>{i+1}</div><div className="lbl">{obj}</div><div className="count">{cnt}</div></li>
+                    })}
+                  </ul>
+                </div>)}
+              </>)}
+
+              {crmSubTab === 'deals' && (<>
+                <div className="kpi-grid">
+                  {_kpiZ('עסקאות נסגרו', formatNum(_dl.closed||0), 'emerald')}
+                  {_kpiZ('הכנסה כוללת', formatCurrency(_dl.revenue||0), 'sky')}
+                  {_kpiZ('ערך ממוצע לעסקה', formatCurrency(_dl.avgDealValue||0), 'indigo')}
+                  {_kpiZ('בצנרת', formatNum(_dl.pending||0), 'amber')}
+                </div>
+                {_devList.length > 0 && (<div className="section">
+                  <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><h2>מכשיר שהוצע</h2></div>
+                  <div className="chart-card" style={{marginBottom:16}}><div className="chart-container" style={{height:200}}><canvas id="zohoBarDevice"></canvas></div></div>
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead><tr><th>מכשיר</th><th>לידים</th><th>%</th></tr></thead>
+                      <tbody>
+                        {_devList.map(([dev, cnt]) => (
+                          <tr key={dev}><td style={{fontWeight:600}}>{dev}</td><td>{formatNum(cnt)}</td><td>{_totalLeads>0?(cnt/_totalLeads*100).toFixed(1)+'%':'-'}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>)}
+              </>)}
+            </>)
+          }
+
+          // BMBY CRM (existing behavior — unchanged)
+          return (<>
+            <div className="client-tabs" style={{marginBottom: 15}}>
+              <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
+              <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
+              <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
+              <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
+            </div>
+            {crmSubTab === 'sources' ? renderCrmDashboard() : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : renderCrmReportDashboard()}
+          </>)
+        })() : (displayReports.length === 0 && dashTab !== 'all') ? (
           <div className="welcome-center" style={{padding:'60px 20px',textAlign:'center'}}>
             <div className="icon" style={{fontSize:'4em',marginBottom:'10px'}}>{'\ud83d\udced'}</div>
             <h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05d8\u05d5\u05d5\u05d7 \u05d4\u05ea\u05d0\u05e8\u05d9\u05db\u05d9\u05dd \u05e9\u05e0\u05d1\u05d7\u05e8'}</h3>

@@ -53,6 +53,9 @@ export async function GET(request) {
 
   async function run(job) {
     const t0 = Date.now()
+    // Fire Zoho CRM (BCureLaser) in parallel — it only writes to BCureLaser project
+    const zohoPromise = fetch(`${base}/api/zoho/fetch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
+      .then(r => r.json()).catch(() => ({}))
     try {
       const res = await fetch(`${base}/api/bmby/fetch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
       const data = await res.json().catch(() => ({}))
@@ -60,6 +63,11 @@ export async function GET(request) {
     } catch (err) {
       results.push({ kind: job.kind, label: job.label, source: 'bmby', ok: false, ms: Date.now()-t0, error: String(err) })
     }
+    // Wait for Zoho and record result (non-fatal if it fails)
+    try {
+      const zohoData = await zohoPromise
+      results.push({ kind: job.kind, label: job.label, source: 'zoho', ok: zohoData.ok ?? false, ms: Date.now()-t0, ...zohoData })
+    } catch {}
   }
 
   // Concurrency 2 — gentle on BMBY SOAP
