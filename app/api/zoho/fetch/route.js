@@ -91,14 +91,11 @@ async function fetchLeadsPaginated(accessToken, since, until) {
   const allLeads = []
   let pageToken = null
   let page = 1
-  const MAX_PAGES = 50
+  const MAX_PAGES = 30
   const PER_PAGE = 200
 
-  // Zoho quirk: `more_records` is unreliable when using criteria filters —
-  // it can return true even when no more matching records exist, causing subsequent
-  // pages to return unfiltered data. We use two stop conditions:
-  //   1. fewer than PER_PAGE records returned (real end of filtered set)
-  //   2. page_token cursor (reliable stop signal when available)
+  // Zoho quirk: `more_records` can be true even at end of filtered set,
+  // causing page N+1 to return unrelated records. We stop on partial page.
   while (page <= MAX_PAGES) {
     const url = pageToken
       ? `${baseUrl}?${baseParams}&page_token=${encodeURIComponent(pageToken)}`
@@ -107,22 +104,15 @@ async function fetchLeadsPaginated(accessToken, since, until) {
     const json = await zohoGet(accessToken, url)
     const records = json.data || []
 
-    // Client-side validation: only keep records that truly match our filters
-    const sinceMs = new Date(since).getTime()
-    const untilMs = new Date(until).getTime() + 86399999 // end of day
-    const valid = records.filter(r => {
-      if ((r.segment || '').toLowerCase() !== 'bcurelaser') return false
-      const createdMs = r.Created_Time ? new Date(r.Created_Time).getTime() : 0
-      return createdMs >= sinceMs && createdMs <= untilMs
-    })
-    allLeads.push(...valid)
+    if (records.length === 0) break   // explicit empty response
+
+    allLeads.push(...records)
 
     const info = json.info || {}
     pageToken = info.next_page_token || null
 
-    // Stop if: partial page (end of filtered data) OR got records that don't match our filter
+    // Stop when we get fewer than a full page — real end of filtered results
     if (records.length < PER_PAGE) break
-    if (valid.length === 0 && records.length > 0) break  // page returned only unfiltered data
     page++
   }
 
