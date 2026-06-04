@@ -69,8 +69,9 @@ async function zohoGet(accessToken, url) {
   return res.json()
 }
 
-// Fetch all leads for BCureLaser in the given date range (cursor-paginated)
-// Uses page_token (cursor) to go beyond Zoho's 2000-record page limit
+// Fetch BCureLaser leads — Zoho criteria filters are unreliable for custom picklist fields.
+// Strategy: sort Created_Time DESC (newest first), no criteria, client-side filter,
+// stop early when records go older than `since`.
 async function fetchLeadsPaginated(accessToken, since, until) {
   const apiDomain = process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com'
   const fields = [
@@ -79,23 +80,17 @@ async function fetchLeadsPaginated(accessToken, since, until) {
     'field9', 'field20', 'segment', 'Owner', 'City1',
   ].join(',')
 
-  const sinceISO = `${since}T00:00:00+03:00`
-  const untilISO = `${until}T23:59:59+03:00`
-  const criteria = encodeURIComponent(
-    `((segment:equals:bcurelaser)and(Created_Time:between:${sinceISO},${untilISO}))`
-  )
-  // Base params used for ALL pages — page_token must see identical params
-  const baseParams = `fields=${fields}&criteria=${criteria}&per_page=200&sort_by=Created_Time&sort_order=asc`
+  const sinceMs = new Date(`${since}T00:00:00+03:00`).getTime()
+  const untilMs = new Date(`${until}T23:59:59+03:00`).getTime()
+
   const baseUrl = `${apiDomain}/crm/v7/Leads`
+  const baseParams = `fields=${fields}&per_page=200&sort_by=Created_Time&sort_order=desc`
 
   const allLeads = []
   let pageToken = null
   let page = 1
-  const MAX_PAGES = 30
-  const PER_PAGE = 200
+  const MAX_PAGES = 50
 
-  // Zoho quirk: `more_records` can be true even at end of filtered set,
-  // causing page N+1 to return unrelated records. We stop on partial page.
   while (page <= MAX_PAGES) {
     const url = pageToken
       ? `${baseUrl}?${baseParams}&page_token=${encodeURIComponent(pageToken)}`
@@ -103,16 +98,21 @@ async function fetchLeadsPaginated(accessToken, since, until) {
 
     const json = await zohoGet(accessToken, url)
     const records = json.data || []
+    if (records.length === 0) break
 
-    if (records.length === 0) break   // explicit empty response
+    let reachedBeforeSince = false
+    for (const r of records) {
+      const ct = r.Created_Time ? r.Created_Time.replace(' ', 'T') : ''
+      const createdMs = ct ? new Date(ct).getTime() : 0
+      if (createdMs < sinceMs) { reachedBeforeSince = true; break }
+      const seg = (r.segment || '').toLowerCase()
+      if (seg === 'bcurelaser' && createdMs <= untilMs) allLeads.push(r)
+    }
 
-    allLeads.push(...records)
-
+    if (reachedBeforeSince) break
     const info = json.info || {}
     pageToken = info.next_page_token || null
-
-    // Stop when we get fewer than a full page — real end of filtered results
-    if (records.length < PER_PAGE) break
+    if (records.length < 200) break
     page++
   }
 
