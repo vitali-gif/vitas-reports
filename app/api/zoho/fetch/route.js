@@ -84,19 +84,21 @@ async function fetchLeadsPaginated(accessToken, since, until) {
   const criteria = encodeURIComponent(
     `((segment:equals:bcurelaser)and(Created_Time:between:${sinceISO},${untilISO}))`
   )
-  const baseUrl = `${apiDomain}/crm/v7/Leads?fields=${fields}&criteria=${criteria}&per_page=200`
+  // Base params used for ALL pages — page_token must see identical params
+  const baseParams = `fields=${fields}&criteria=${criteria}&per_page=200&sort_by=Created_Time&sort_order=asc`
+  const baseUrl = `${apiDomain}/crm/v7/Leads`
 
   const allLeads = []
-  let pageToken = null   // cursor for pages beyond the 2000-record limit
+  let pageToken = null   // cursor returned by Zoho after each page
   let page = 1
   let hasMore = true
   const MAX_PAGES = 50   // safety cap: up to 10,000 records
 
   while (hasMore && page <= MAX_PAGES) {
-    // First pages use simple pagination; beyond ~2000 records switch to page_token
+    // page_token replaces the page number but all other params must stay identical
     const url = pageToken
-      ? `${baseUrl}&page_token=${encodeURIComponent(pageToken)}`
-      : `${baseUrl}&page=${page}&sort_by=Created_Time&sort_order=asc`
+      ? `${baseUrl}?${baseParams}&page_token=${encodeURIComponent(pageToken)}`
+      : `${baseUrl}?${baseParams}&page=${page}`
 
     const json = await zohoGet(accessToken, url)
     const records = json.data || []
