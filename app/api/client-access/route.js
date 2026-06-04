@@ -12,75 +12,89 @@ function checkAuth(req) {
   return expected && key === expected
 }
 
-// Send invite email directly via Resend API (bypasses Supabase SMTP)
-async function sendInviteEmail(toEmail, magicLink, projectName) {
+// Generate a readable temporary password: XXXX-XXXX-XXXX
+function generateTempPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  return `${seg()}-${seg()}-${seg()}`
+}
+
+// Create or update Supabase auth user with the given password
+async function upsertAuthUser(email, password) {
+  // Try creating first
+  const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+  if (!createErr) return { ok: true, userId: created.user?.id }
+
+  // User exists — find and update password
+  const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+  const existing = users?.find(u => u.email === email)
+  if (!existing) return { ok: false, error: createErr.message }
+  const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(existing.id, { password })
+  if (updateErr) return { ok: false, error: updateErr.message }
+  return { ok: true, userId: existing.id }
+}
+
+// Send welcome email with temp password via Resend
+async function sendPasswordEmail(toEmail, tempPassword, clientName) {
   const resendKey = process.env.RESEND_API_KEY
   if (!resendKey) return { ok: false, error: 'RESEND_API_KEY not set' }
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
 
   const html = `
 <!DOCTYPE html>
 <html dir="rtl" lang="he">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#F5F7FB;font-family:'Heebo',Arial,sans-serif;direction:rtl">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F7FB;padding:40px 16px">
-    <tr><td align="center">
-      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(11,15,30,0.08)">
-
-        <!-- Header -->
-        <tr><td style="background:#0B0F1E;padding:28px 36px;text-align:right">
-          <span style="color:#fff;font-size:20px;font-weight:800;letter-spacing:-0.03em">VITAS</span>
-          <span style="color:#5B5EF4;font-size:20px;font-weight:800"> Reports</span>
-        </td></tr>
-
-        <!-- Body -->
-        <tr><td style="padding:36px 36px 28px">
-          <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#0B0F1E;letter-spacing:-0.02em">
-            הוזמנת לצפות בדוח הפרויקט
-          </h1>
-          <p style="margin:0 0 24px;font-size:15px;color:#5E6478;line-height:1.6">
-            ${projectName ? `ניתנה לך גישה לדוח הביצועים של <strong style="color:#0B0F1E">${projectName}</strong>.` : 'ניתנה לך גישה לדוח הביצועים של הפרויקט שלך.'}
-            <br>לחץ על הכפתור כדי להיכנס:
-          </p>
-
-          <div style="text-align:center;margin:28px 0">
-            <a href="${magicLink}"
-               style="display:inline-block;background:#5B5EF4;color:#fff;font-size:15px;font-weight:700;
-                      text-decoration:none;padding:14px 36px;border-radius:10px;
-                      box-shadow:0 6px 20px rgba(91,94,244,0.35)">
-              כניסה לדוח &rarr;
-            </a>
-          </div>
-
-          <p style="margin:20px 0 0;font-size:12px;color:#98A0B2;line-height:1.6;text-align:center">
-            הקישור בתוקף ל-24 שעות.<br>
-            אם לא ביקשת גישה — ניתן להתעלם ממייל זה.
-          </p>
-        </td></tr>
-
-        <!-- Footer -->
-        <tr><td style="background:#F5F7FB;padding:18px 36px;border-top:1px solid #DDE2EC">
-          <p style="margin:0;font-size:11px;color:#98A0B2;text-align:center">
-            VITAS Digital Marketing &bull; vitas.co.il
-          </p>
-        </td></tr>
-
-      </table>
-    </td></tr>
-  </table>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F7FB;padding:40px 16px">
+<tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(11,15,30,0.08)">
+<tr><td style="background:#0B0F1E;padding:28px 36px;text-align:right">
+  <span style="color:#fff;font-size:20px;font-weight:800">VITAS</span>
+  <span style="color:#5B5EF4;font-size:20px;font-weight:800"> Reports</span>
+</td></tr>
+<tr><td style="padding:36px 36px 28px">
+  <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#0B0F1E">הוזמנת לצפות בדוח הפרויקט</h1>
+  <p style="margin:0 0 24px;font-size:15px;color:#5E6478;line-height:1.6">
+    ${clientName ? `ניתנה לך גישה לדוח הביצועים של <strong style="color:#0B0F1E">${clientName}</strong>.` : 'ניתנה לך גישה לדוח הביצועים.'}
+  </p>
+  <div style="background:#F5F7FB;border-radius:12px;padding:20px 24px;margin:0 0 24px;border:1px solid #DDE2EC">
+    <p style="margin:0 0 12px;font-size:13px;color:#98A0B2;font-weight:600">פרטי כניסה:</p>
+    <p style="margin:0 0 6px;font-size:14px;color:#0B0F1E">
+      <strong>אתר:</strong> <a href="${siteUrl}/client" style="color:#5B5EF4">${siteUrl}/client</a>
+    </p>
+    <p style="margin:0 0 6px;font-size:14px;color:#0B0F1E">
+      <strong>מייל:</strong> ${toEmail}
+    </p>
+    <p style="margin:0;font-size:14px;color:#0B0F1E">
+      <strong>סיסמה:</strong> <code style="background:#fff;border:1px solid #DDE2EC;padding:2px 8px;border-radius:6px;font-size:15px;letter-spacing:0.05em">${tempPassword}</code>
+    </p>
+  </div>
+  <p style="margin:0;font-size:12px;color:#98A0B2;line-height:1.6;text-align:center">
+    אם לא ביקשת גישה — ניתן להתעלם ממייל זה.
+  </p>
+</td></tr>
+<tr><td style="background:#F5F7FB;padding:18px 36px;border-top:1px solid #DDE2EC">
+  <p style="margin:0;font-size:11px;color:#98A0B2;text-align:center">VITAS Digital Marketing &bull; vitas.co.il</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
 </body>
 </html>`
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: 'VITAS Reports <noreply@vitas.co.il>',
         to: [toEmail],
-        subject: `הוזמנת לצפות בדוח${projectName ? ` — ${projectName}` : ''}`,
+        subject: `גישה לדוח${clientName ? ` — ${clientName}` : ''}`,
         html,
       }),
     })
@@ -92,13 +106,10 @@ async function sendInviteEmail(toEmail, magicLink, projectName) {
   }
 }
 
-// GET — list all, or lookup by email
 export async function GET(req) {
   if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const { searchParams } = new URL(req.url)
   const email = searchParams.get('email')
-
   if (email) {
     const { data, error } = await supabaseAdmin
       .from('client_access')
@@ -108,7 +119,6 @@ export async function GET(req) {
     if (error) return NextResponse.json({ error: error.message }, { status: 404 })
     return NextResponse.json(data || [])
   }
-
   const { data, error } = await supabaseAdmin
     .from('client_access')
     .select('*, projects(id, name, client_id, clients(name, color))')
@@ -117,80 +127,48 @@ export async function GET(req) {
   return NextResponse.json(data || [])
 }
 
-// POST — add access for entire client (one row per project) + send one magic link
 export async function POST(req) {
   if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const body = await req.json()
   const { email, client_id } = body
-  if (!email || !client_id) {
-    return NextResponse.json({ error: 'email and client_id required' }, { status: 400 })
-  }
+  if (!email || !client_id) return NextResponse.json({ error: 'email and client_id required' }, { status: 400 })
 
   const cleanEmail = email.toLowerCase().trim()
 
-  // Fetch all projects for this client
   const { data: projects, error: projErr } = await supabaseAdmin
-    .from('projects')
-    .select('id, name, clients(name)')
-    .eq('client_id', client_id)
-  if (projErr || !projects?.length) {
-    return NextResponse.json({ error: projErr?.message || 'No projects found for this client' }, { status: 400 })
-  }
+    .from('projects').select('id, name, clients(name)').eq('client_id', client_id)
+  if (projErr || !projects?.length)
+    return NextResponse.json({ error: projErr?.message || 'No projects found' }, { status: 400 })
 
-  // Remove existing access rows for this email+client (avoid duplicates)
   const existingProjectIds = projects.map(p => p.id)
-  await supabaseAdmin
-    .from('client_access')
-    .delete()
-    .eq('email', cleanEmail)
-    .in('project_id', existingProjectIds)
+  await supabaseAdmin.from('client_access').delete().eq('email', cleanEmail).in('project_id', existingProjectIds)
 
-  // Insert one row per project
   const rows = projects.map(p => ({ email: cleanEmail, project_id: p.id }))
   const { error: insertErr } = await supabaseAdmin.from('client_access').insert(rows)
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 })
 
   const clientName = projects[0]?.clients?.name || ''
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
+  const tempPassword = generateTempPassword()
 
-  // Generate ONE magic link
-  let magicLink = null
-  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: cleanEmail,
-    options: { redirectTo: `${siteUrl}/client` }
-  })
-  if (!linkError && linkData?.properties?.hashed_token) {
-    const hashedToken = linkData.properties.hashed_token
-    magicLink = `${siteUrl}/api/auth/confirm?token=${hashedToken}&type=magiclink`
-  }
+  // Create or update Supabase auth user
+  const authResult = await upsertAuthUser(cleanEmail, tempPassword)
 
-  // Send ONE invite email
+  // Send email with password
   let emailSent = false
   let emailError = null
-  if (magicLink) {
-    const result = await sendInviteEmail(cleanEmail, magicLink, clientName)
+  if (authResult.ok) {
+    const result = await sendPasswordEmail(cleanEmail, tempPassword, clientName)
     emailSent = result.ok
     emailError = result.error || null
   } else {
-    emailError = linkError?.message || 'Failed to generate magic link'
+    emailError = authResult.error
   }
 
-  return NextResponse.json({
-    client_id,
-    clientName,
-    projectCount: projects.length,
-    emailSent,
-    emailError,
-    magicLink: emailSent ? null : magicLink,
-  }, { status: 201 })
+  return NextResponse.json({ client_id, clientName, projectCount: projects.length, emailSent, emailError }, { status: 201 })
 }
 
-// DELETE
 export async function DELETE(req) {
   if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
