@@ -119,27 +119,38 @@ async function fetchLeadsPaginated(accessToken, since, until) {
   return allLeads
 }
 
-// Fetch deals in the given date range
+// Fetch deals — same strategy as leads: sort DESC, client-side date filter, early stop
 async function fetchDealsPaginated(accessToken, since, until) {
   const apiDomain = process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com'
   const fields = 'Deal_Name,Stage,Amount,Created_Time,Closing_Date,Owner'
-  const sinceISO = `${since}T00:00:00+03:00`
-  const untilISO = `${until}T23:59:59+03:00`
-  const criteria = encodeURIComponent(
-    `(Created_Time:between:${sinceISO},${untilISO})`
-  )
+  const sinceMs = new Date(`${since}T00:00:00+03:00`).getTime()
+  const untilMs = new Date(`${until}T23:59:59+03:00`).getTime()
 
   const allDeals = []
+  let pageToken = null
   let page = 1
-  let hasMore = true
-  const MAX_PAGES = 5
+  const MAX_PAGES = 20
+  const baseParams = `fields=${fields}&per_page=200&sort_by=Created_Time&sort_order=desc`
 
-  while (hasMore && page <= MAX_PAGES) {
-    const url = `${apiDomain}/crm/v7/Deals?fields=${fields}&criteria=${criteria}&page=${page}&per_page=200`
+  while (page <= MAX_PAGES) {
+    const url = pageToken
+      ? `${apiDomain}/crm/v7/Deals?${baseParams}&page_token=${encodeURIComponent(pageToken)}`
+      : `${apiDomain}/crm/v7/Deals?${baseParams}&page=${page}`
     const json = await zohoGet(accessToken, url)
     const records = json.data || []
-    allDeals.push(...records)
-    hasMore = json.info?.more_records === true
+    if (records.length === 0) break
+
+    let reachedBeforeSince = false
+    for (const r of records) {
+      const ct = r.Created_Time ? r.Created_Time.replace(' ', 'T') : ''
+      const createdMs = ct ? new Date(ct).getTime() : 0
+      if (createdMs < sinceMs) { reachedBeforeSince = true; break }
+      if (createdMs <= untilMs) allDeals.push(r)
+    }
+    if (reachedBeforeSince) break
+    const info = json.info || {}
+    pageToken = info.next_page_token || null
+    if (records.length < 200) break
     page++
   }
 
