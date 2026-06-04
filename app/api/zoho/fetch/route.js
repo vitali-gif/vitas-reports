@@ -69,7 +69,8 @@ async function zohoGet(accessToken, url) {
   return res.json()
 }
 
-// Fetch all leads for BCureLaser in the given date range (paginated, max 200/page)
+// Fetch all leads for BCureLaser in the given date range (cursor-paginated)
+// Uses page_token (cursor) to go beyond Zoho's 2000-record page limit
 async function fetchLeadsPaginated(accessToken, since, until) {
   const apiDomain = process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com'
   const fields = [
@@ -78,24 +79,32 @@ async function fetchLeadsPaginated(accessToken, since, until) {
     'field9', 'field20', 'segment', 'Owner', 'City1',
   ].join(',')
 
-  // Zoho criteria format: combine segment filter with date range
   const sinceISO = `${since}T00:00:00+03:00`
   const untilISO = `${until}T23:59:59+03:00`
   const criteria = encodeURIComponent(
     `((segment:equals:bcurelaser)and(Created_Time:between:${sinceISO},${untilISO}))`
   )
+  const baseUrl = `${apiDomain}/crm/v7/Leads?fields=${fields}&criteria=${criteria}&per_page=200`
 
   const allLeads = []
+  let pageToken = null   // cursor for pages beyond the 2000-record limit
   let page = 1
   let hasMore = true
-  const MAX_PAGES = 20
+  const MAX_PAGES = 50   // safety cap: up to 10,000 records
 
   while (hasMore && page <= MAX_PAGES) {
-    const url = `${apiDomain}/crm/v7/Leads?fields=${fields}&criteria=${criteria}&page=${page}&per_page=200&sort_by=Created_Time&sort_order=asc`
+    // First pages use simple pagination; beyond ~2000 records switch to page_token
+    const url = pageToken
+      ? `${baseUrl}&page_token=${encodeURIComponent(pageToken)}`
+      : `${baseUrl}&page=${page}&sort_by=Created_Time&sort_order=asc`
+
     const json = await zohoGet(accessToken, url)
     const records = json.data || []
     allLeads.push(...records)
-    hasMore = json.info?.more_records === true
+
+    const info = json.info || {}
+    hasMore = info.more_records === true
+    pageToken = info.next_page_token || null
     page++
   }
 
