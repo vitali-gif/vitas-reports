@@ -900,6 +900,9 @@ async function runSync(opts = {}) {
         .filter(lid => _noResponseCids.has(String(lid.client_id || '')))
         .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
         .filter(Boolean),
+      allLeads: lids
+        .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
+        .filter(Boolean),
     })
 
     const _fbLids  = aprilLids.filter(_isFbLid)
