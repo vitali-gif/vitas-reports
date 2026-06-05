@@ -1019,7 +1019,7 @@ const selectProject = async (client, project) => {
     return (
       <>
                 <div className="kpi-tier primary" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:'36px'}}>
-          <div className="kpi-c indigo">
+          <div className="kpi-c indigo" style={_crmLeads?.allLeads?.length > 0 ? {cursor:'pointer'} : undefined} onClick={_crmLeads?.allLeads?.length > 0 ? () => setNamedLeadsModal({title: 'סה"כ לידים', names: _crmLeads.allLeads}) : undefined}>
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
             </div>
@@ -1348,7 +1348,7 @@ const selectProject = async (client, project) => {
           </button>
         </div>
         <div className="kpi-grid">
-          {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads)}
+          {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, '\u05de\u05e1\u05e4\u05e8 \u05d4\u05dc\u05d9\u05d3\u05d9\u05dd \u05e9\u05e7\u05d1\u05e2\u05d5 \u05e4\u05d2\u05d9\u05e9\u05d4', _crmLeads?.meetingsScheduled)}
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, '\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5 \u05d1\u05e4\u05d5\u05e2\u05dc', _crmLeads?.meetingsCompleted)}
@@ -2650,7 +2650,7 @@ const selectProject = async (client, project) => {
                   {name}
                   {level === 0 && data.source ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
                 </td>
-                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : st === 'REMOVED' ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
+                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
                 <td style={{fontSize}}>{formatNum(data.impressions)}</td>
                 <td style={{fontSize}}>{formatCurrency(cpc)}</td>
@@ -2740,7 +2740,7 @@ const selectProject = async (client, project) => {
                       <tr key={ag.id || i}>
                         <td style={{fontWeight:600,unicodeBidi:'plaintext',textAlign:'right'}}>{ag.name || '-'}</td>
                         <td style={{fontSize:'0.85em',color:'#64748b',unicodeBidi:'plaintext'}}>{ag.campaign || '-'}</td>
-                        <td>{(() => { const st = ag.status || ''; const isA = st==='ENABLED'; const isP = st==='PAUSED'; const bg = isA ? 'rgba(16,185,129,0.12)' : isP ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isA ? '#059669' : isP ? '#d97706' : '#64748b'; const lbl = isA ? 'פעיל' : isP ? 'מושהה' : st==='REMOVED' ? 'הוסר' : st || '-'; return <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{lbl}</span>; })()}</td>
+                        <td>{(() => { const st = ag.status || ''; const isA = st==='ENABLED' || st==='ACTIVE'; const isP = st==='PAUSED'; const bg = isA ? 'rgba(16,185,129,0.12)' : isP ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isA ? '#059669' : isP ? '#d97706' : '#64748b'; const lbl = isA ? 'פעיל' : isP ? 'מושהה' : (st==='REMOVED'||st==='DELETED'||st==='ARCHIVED') ? 'הוסר' : st || '-'; return <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{lbl}</span>; })()}</td>
                         <td>{formatNum(clicks)}</td>
                         <td>{formatNum(imps)}</td>
                         <td>{ctr.toFixed(2)}%</td>
@@ -2935,7 +2935,7 @@ const selectProject = async (client, project) => {
                         <div style={{width:'100%',aspectRatio:'16/9',background:'linear-gradient(135deg,#dbeafe,#cffafe)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5em',color:'#64748b'}}>{'\ud83c\udfaf'}</div>
                       )}
                       <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'10px'}}>
-                        <div style={{fontSize:'0.75em',color:'#059669',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {'\u05e4\u05e2\u05d9\u05dc'}</div>
+                        {(() => { const agSt = ag.status || ''; const isAgA = agSt === 'ENABLED'; const isAgP = agSt === 'PAUSED'; const agC = isAgA ? '#059669' : isAgP ? '#d97706' : '#64748b'; const agL = isAgA ? 'פעיל' : isAgP ? 'מושהה' : agSt || 'לא ידוע'; return <div style={{fontSize:'0.75em',color:agC,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {agL}</div>; })()}
                         <div style={{fontWeight:700,fontSize:'1em',color:'#0f172a'}}>{ag.name}</div>
                         <div style={{fontSize:'0.72em',color:'#94a3b8',unicodeBidi:'plaintext'}}>{'\ud83d\udcca'} {ag.campaign || '-'}</div>
                         {headlines.length > 0 && (
