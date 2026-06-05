@@ -181,36 +181,23 @@ async function runSync(opts = {}) {
 
   const isBCLDeal = (r) => (r.segment || '').toLowerCase() === 'bcurelaser'
 
-  // ONE deals fetch: lookback 12 months, split client-side by date dimension.
-  // Closing_Date is not reliably sortable in Zoho — we sort by Created_Time DESC
-  // and scan all BCureLaser deals back 1 year to capture cross-period closes.
-  const lookbackMs = sinceMs - 365 * 24 * 60 * 60 * 1000  // 1 year before since
-  const allBCLDeals = []
-  let dealPageToken = null, dealPage = 1
-  const dealFields2 = dealFields  // same fields
-  while (dealPage <= 60) {
-    const dUrl = dealPageToken
-      ? `${(process.env.ZOHO_API_DOMAIN||'https://www.zohoapis.com')}/crm/v7/Deals?${dealFields2.split(',').length > 0 ? 'fields='+dealFields2 : ''}&per_page=200&sort_by=Created_Time&sort_order=desc&page_token=${encodeURIComponent(dealPageToken)}`
-      : `${(process.env.ZOHO_API_DOMAIN||'https://www.zohoapis.com')}/crm/v7/Deals?fields=${dealFields2}&per_page=200&sort_by=Created_Time&sort_order=desc&page=${dealPage}`
-    const dJson = await zohoGet(accessToken, dUrl)
-    const dRecs = dJson.data || []
-    if (dRecs.length === 0) break
-    let stopEarly = false
-    for (const r of dRecs) {
-      if (!isBCLDeal(r)) continue
-      const ctRaw = (r.Created_Time || '').replace(' ', 'T')
-      const ctMs = ctRaw ? new Date(ctRaw).getTime() : 0
-      if (ctMs < lookbackMs) { stopEarly = true; break }
-      allBCLDeals.push(r)
-    }
-    if (stopEarly) break
-    const dInfo = dJson.info || {}
-    dealPageToken = dInfo.next_page_token || null
-    if (dRecs.length < 200) break
-    dealPage++
+  // Run leads + deals in PARALLEL to stay within 60s Vercel limit.
+  // Deals: 3-month lookback (captures cross-period closes without scanning too much).
+  const lookbackMs = sinceMs - 90 * 24 * 60 * 60 * 1000  // 3 months before since
+
+  let leads = [], allBCLDeals = []
+  try {
+    const [leadsRes, dealsRes] = await Promise.all([
+      fetchPaginated(accessToken, 'Leads', leadFields, 'Created_Time', sinceMs, untilMs, isDigitalBCL, 50),
+      fetchPaginated(accessToken, 'Deals', dealFields, 'Created_Time', lookbackMs, untilMs, isBCLDeal, 25),
+    ])
+    leads = leadsRes
+    allBCLDeals = dealsRes
+  } catch (err) {
+    return { status: 500, body: { error: err.message || String(err) } }
   }
 
-  // Split by date dimension client-side
+  // Split deals by date dimension client-side
   const dealsCreated = allBCLDeals.filter(r => {
     const ms = new Date((r.Created_Time||'').replace(' ','T')).getTime()
     const stage = r.Stage || ''
@@ -219,21 +206,12 @@ async function runSync(opts = {}) {
   const dealsClosed = allBCLDeals.filter(r => {
     const stage = r.Stage || ''
     if (!CLOSED_STAGES.has(stage)) return false
-    if (r.cancellation_date) return false  // exclude cancelled
-    // Prefer Stage_Modified_Time (actual close date) over Closing_Date (target date)
+    if (r.cancellation_date) return false
     const closedAtRaw = (r.Stage_Modified_Time || r.Closing_Date || '').replace(' ', 'T')
     if (!closedAtRaw) return false
     const ms = new Date(closedAtRaw).getTime()
     return ms >= sinceMs && ms <= untilMs
   })
-
-  let leads = []
-  try {
-    const leadsRes = await fetchPaginated(accessToken, 'Leads', leadFields, 'Created_Time', sinceMs, untilMs, isDigitalBCL, 50)
-    leads = leadsRes
-  } catch (err) {
-    return { status: 500, body: { error: err.message || String(err) } }
-  }
 
   // ===== Compute lead stats =====
   const IRRELEVANT_STATUSES = new Set(['כפול', 'לא תקין', 'לא מעוניין', 'מטופל על ידי נציג אחר/ליד כפול'])
