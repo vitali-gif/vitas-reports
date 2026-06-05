@@ -96,8 +96,9 @@ async function fetchPaginated(accessToken, module, fields, sortField, sinceMs, u
     let reachedBeforeSince = false
     for (const r of records) {
       const raw = (r[sortField] || '').replace(' ', 'T')
-      const ms = raw ? new Date(raw).getTime() : 0
-      if (ms < sinceMs) { reachedBeforeSince = true; break }
+      if (!raw) continue  // skip records with NULL sort field (e.g. no Closing_Date yet)
+      const ms = new Date(raw).getTime()
+      if (isNaN(ms) || ms < sinceMs) { reachedBeforeSince = true; break }
       if (ms <= untilMs && matchFn(r)) results.push(r)
     }
 
@@ -173,12 +174,15 @@ async function runSync(opts = {}) {
   const dealFields = 'Deal_Name,Stage,Amount,Closing_Date,Created_Time,device_quantity,cancellation_date,segment'
 
   const isBCLDeal = (r) => (r.segment || '').toLowerCase() === 'bcurelaser'
+  // Opportunities = pending deals (not yet closed, not cancelled)
+  const PENDING_STAGES = new Set(['ממתין להזמנה', 'הצעת מחיר', 'in progress', 'pending', 'open'])
+  const isBCLPending = (r) => isBCLDeal(r) && !CLOSED_STAGES.has((r.Stage || '').toLowerCase()) && !CLOSED_STAGES.has(r.Stage || '') && !r.cancellation_date
 
   let leads = [], dealsCreated = [], dealsClosed = []
   try {
     const [leadsRes, dealsCreatedRes, dealsClosedRes] = await Promise.allSettled([
       fetchPaginated(accessToken, 'Leads', leadFields, 'Created_Time', sinceMs, untilMs, isDigitalBCL, 50),
-      fetchPaginated(accessToken, 'Deals', dealFields, 'Created_Time', sinceMs, untilMs, isBCLDeal, 30),
+      fetchPaginated(accessToken, 'Deals', dealFields, 'Created_Time', sinceMs, untilMs, isBCLPending, 30),
       fetchPaginated(accessToken, 'Deals', dealFields, 'Closing_Date', sinceMs, untilMs, isBCLDeal, 30),
     ])
     if (leadsRes.status === 'fulfilled') leads = leadsRes.value
