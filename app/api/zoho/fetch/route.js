@@ -265,6 +265,27 @@ async function runSync(opts = {}) {
   const totalLeads = leads.length
   const closingRate = totalLeads > 0 ? Math.round((purchased / totalLeads) * 1000) / 10 : 0
 
+  // ===== Funnel + drop-off (where leads/deals fall off) =====
+  const oppLeadIds = new Set(linkedDeals.map(d => d.LidID))
+  // Leads that never became an opportunity — broken down by Lead_Status (why they died)
+  const notConvertedLeads = leads.filter(l => !oppLeadIds.has(l.id))
+  const leadStatusDrop = {}
+  for (const l of notConvertedLeads) {
+    const st = (l.Lead_Status || 'לא ידוע').trim() || 'לא ידוע'
+    leadStatusDrop[st] = (leadStatusDrop[st] || 0) + 1
+  }
+  // Opportunities that did not purchase (no Closing_Date) — broken down by deal Stage
+  const openDeals = linkedDeals.filter(d => !d.Closing_Date)
+  const openStageDrop = {}
+  for (const d of openDeals) {
+    const st = (d.Stage || 'לא ידוע').trim() || 'לא ידוע'
+    openStageDrop[st] = (openStageDrop[st] || 0) + 1
+  }
+  const cancellations = closedWithCancellation.length
+  const cancelledValue = closedWithCancellation.reduce((acc, d) => acc + num(d.Amount || 0), 0)
+  const netPurchases = purchased - cancellations
+  const conversionRate = closingRate
+
   // ===== Build xlsxRows for aggregateCrmRows compatibility =====
   const sourcesMap = {}
   for (const lead of leads) {
@@ -316,6 +337,23 @@ async function runSync(opts = {}) {
         pending: Math.max(0, opportunities - purchased),
         closed: purchased,
       },
+    },
+    // ===== BCureLaser medical funnel (phone-sales): leads -> opportunities -> purchased -> net =====
+    funnel: {
+      leads: totalLeads,
+      opportunities,                       // leads that became a deal
+      purchased,                           // linked deals with a Closing_Date
+      cancellations,                       // of the purchased, how many cancelled
+      netPurchases,                        // purchased minus cancellations
+      conversionRate,                      // purchased / leads  (אחוז המרה לעסקה)
+      netRevenue: Math.round(netRevenue),  // revenue after cancellations
+      grossRevenue: Math.round(grandTotal),
+      cancelledValue: Math.round(cancelledValue),
+      avgDealValue,
+      // drop-off detail
+      leadsNotConverted: notConvertedLeads.length,
+      leadStatusDrop,                      // why leads never became opportunities
+      openStageDrop,                       // why opportunities have not purchased yet
     },
     schemaVersion: ZOHO_SCHEMA_VERSION,
   }
