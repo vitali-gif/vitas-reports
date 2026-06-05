@@ -2326,6 +2326,7 @@ const selectProject = async (client, project) => {
             const _rt = _zs.responseTime || {}
             const _dl = _zs.deals || {}
             const _fn = _zs.funnel || {}
+            const _ch = _fn.byChannel || []
             const _byStatus = Object.entries(_zs.byStatus || {}).sort((a,b) => b[1]-a[1])
             const _bySrc    = Object.entries(_zs.bySource || {}).sort((a,b) => b[1]-a[1])
             const _objList  = Object.entries(_zs.objections || {}).sort((a,b) => b[1]-a[1])
@@ -2335,13 +2336,7 @@ const selectProject = async (client, project) => {
 
             // Schedule Zoho charts after render
             const _zohoChartKey = `zoho_${crmSubTab}_${selectedMonth}`
-            if (crmSubTab === 'sources') {
-              pendingChartsRef.current.push(setTimeout(() => {
-                destroyCharts()
-                if (_bySrc.length > 0) createChart('zohoPieSource','doughnut',_bySrc.map(([k])=>k),[{data:_bySrc.map(([,v])=>v),backgroundColor:COLORS.slice(0,_bySrc.length)}])
-                if (_byStatus.length > 0) createChart('zohoPieStatus','doughnut',_byStatus.map(([k])=>k),[{data:_byStatus.map(([,v])=>v),backgroundColor:COLORS.slice(0,_byStatus.length)}])
-              }, 200))
-            } else if (crmSubTab === 'statuses') {
+            if (crmSubTab === 'statuses') {
               pendingChartsRef.current.push(setTimeout(() => {
                 destroyCharts()
                 if (_objList.length > 0) createChart('zohoBarObj','bar',_objList.map(([k])=>k),[{label:'לידים',data:_objList.map(([,v])=>v),backgroundColor:'rgba(244,63,94,0.7)',borderRadius:6}],{y:{beginAtZero:true,position:'right'},x:{grid:{display:false}}})
@@ -2376,17 +2371,13 @@ const selectProject = async (client, project) => {
                   {_kpiZ('אחוז המרה לעסקה', (_fn.conversionRate||0)+'%', 'violet')}
                 </div>
                 <div className="section">
-                  <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>לידים לפי מקור הגעה</h2></div>
-                  <div className="chart-grid" style={{gridTemplateColumns:'1fr 1fr'}}>
-                    <div className="chart-card"><h4>מקור הגעה</h4><div className="chart-container"><canvas id="zohoPieSource"></canvas></div></div>
-                    <div className="chart-card"><h4>סטטוס ליד</h4><div className="chart-container"><canvas id="zohoPieStatus"></canvas></div></div>
-                  </div>
-                  <div className="table-wrapper" style={{marginTop:16}}>
+                  <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2></div>
+                  <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th>מקור</th><th>לידים</th><th>%</th></tr></thead>
+                      <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th></tr></thead>
                       <tbody>
-                        {_bySrc.map(([src, cnt]) => (
-                          <tr key={src}><td style={{fontWeight:600}}>{src}</td><td>{formatNum(cnt)}</td><td>{_totalLeads>0?(cnt/_totalLeads*100).toFixed(1)+'%':'-'}</td></tr>
+                        {_ch.map(c => (
+                          <tr key={c.channel}><td style={{fontWeight:600}}>{c.channel}</td><td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td></tr>
                         ))}
                       </tbody>
                     </table>

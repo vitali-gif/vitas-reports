@@ -284,6 +284,31 @@ async function runSync(opts = {}) {
   const cancellations = closedWithCancellation.length
   const cancelledValue = closedWithCancellation.reduce((acc, d) => acc + num(d.Amount || 0), 0)
   const netPurchases = purchased - cancellations
+
+  // ===== Per-channel funnel (which channel converts/earns best) =====
+  const leadById = {}
+  for (const l of leads) leadById[l.id] = l
+  const normChan = (l) => ((l && l.Sub_Lead_Source) || 'אחר').trim() || 'אחר'
+  const byChannel = {}
+  const ensureChan = (c) => (byChannel[c] || (byChannel[c] = { leads: 0, opportunities: 0, purchased: 0, netRevenue: 0, _oppLeads: new Set() }))
+  for (const l of leads) ensureChan(normChan(l)).leads++
+  for (const d of linkedDeals) {
+    const l = leadById[d.LidID]; if (!l) continue
+    const c = ensureChan(normChan(l))
+    c._oppLeads.add(d.LidID)
+    if (d.Closing_Date) {
+      c.purchased++
+      if (!d.cancellation_date) c.netRevenue += num(d.Amount || 0)
+    }
+  }
+  const channelFunnel = Object.entries(byChannel).map(([channel, c]) => ({
+    channel,
+    leads: c.leads,
+    opportunities: c._oppLeads.size,
+    purchased: c.purchased,
+    netRevenue: Math.round(c.netRevenue),
+    conversionRate: c.leads > 0 ? Math.round((c.purchased / c.leads) * 1000) / 10 : 0,
+  })).sort((a, b) => b.leads - a.leads)
   const conversionRate = closingRate
 
   // ===== Build xlsxRows for aggregateCrmRows compatibility =====
@@ -354,6 +379,7 @@ async function runSync(opts = {}) {
       leadsNotConverted: notConvertedLeads.length,
       leadStatusDrop,                      // why leads never became opportunities
       openStageDrop,                       // why opportunities have not purchased yet
+      byChannel: channelFunnel,            // per-channel funnel (leads/opps/purchased/conv/revenue)
     },
     schemaVersion: ZOHO_SCHEMA_VERSION,
   }
