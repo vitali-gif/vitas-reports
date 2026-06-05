@@ -871,13 +871,22 @@ async function runSync(opts = {}) {
     }
 
     // Helper: build one namedLeads group from a subset of lids/registrations/contracts
+    // Per-LID meeting logic — MUST mirror totals.meetingsScheduled/Completed (post-LID, non-cancelled)
+    const _postLidAppts = (lid) => {
+      const cid = String(lid.client_id || '')
+      const lidDate = (lid.start_date || lid.create_date || '').toString().slice(0, 10)
+      const apptList = clientApptList.get(cid) || []
+      return apptList.filter(a => !a.date || a.date >= lidDate)
+    }
+    const _lidScheduled = (lid) => { const ps = _postLidAppts(lid); return ps.length > 0 && ps.some(a => !a.cancelled) }
+    const _lidCompleted = (lid) => _postLidAppts(lid).some(a => a.completed)
     const _buildGroup = (lids, regs, conts) => ({
       meetingsScheduled: lids
-        .filter(lid => clientsWithAppt.has(String(lid.client_id || '')))
+        .filter(_lidScheduled)
         .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
         .filter(Boolean),
       meetingsCompleted: lids
-        .filter(lid => clientsWithDoneAppt.has(String(lid.client_id || '')))
+        .filter(_lidCompleted)
         .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
         .filter(Boolean),
       registrations: regs
@@ -922,7 +931,7 @@ async function runSync(opts = {}) {
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
-    const CRM_SCHEMA_VERSION = 5  // v5: namedLeads split by platform { all, facebook, google }
+    const CRM_SCHEMA_VERSION = 6  // v6: named meeting lists mirror per-LID count logic (post-LID, non-cancelled)
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',

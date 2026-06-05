@@ -664,7 +664,7 @@ const selectProject = async (client, project) => {
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
     const hasGoogle = reports.some(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-    const CRM_SCHEMA_VERSION = 5  // must match server-side route in api/bmby/fetch
+    const CRM_SCHEMA_VERSION = 6  // must match server-side route in api/bmby/fetch
     const crmRow = reports.find(r => r.month === selectedMonth && r.source === 'crm')
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
     const hasCrm = !!crmRow && cachedCrmVersion >= CRM_SCHEMA_VERSION;
