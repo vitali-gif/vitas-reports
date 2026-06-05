@@ -75,6 +75,8 @@ async function zohoGet(accessToken, url) {
 
 // Generic paginator: sort DESC by sortField, stop when records go before sinceMs.
 // matchFn(record) → true to include in output.
+// Stop strategy: stop pagination only when the LAST record in a page is before sinceMs.
+// This handles Zoho's imperfect sort stability (records within a day may arrive out of order).
 async function fetchPaginated(accessToken, module, fields, sortField, sinceMs, untilMs, matchFn, maxPages = 40) {
   const apiDomain = process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com'
   const baseParams = `fields=${fields}&per_page=200&sort_by=${sortField}&sort_order=desc`
@@ -93,16 +95,20 @@ async function fetchPaginated(accessToken, module, fields, sortField, sinceMs, u
     const records = json.data || []
     if (records.length === 0) break
 
-    let reachedBeforeSince = false
+    // Collect all matching records from this page (don't stop mid-page)
+    let lastValidMs = null
     for (const r of records) {
       const raw = (r[sortField] || '').replace(' ', 'T')
-      if (!raw) continue  // skip records with NULL sort field (e.g. no Closing_Date yet)
+      if (!raw) continue
       const ms = new Date(raw).getTime()
-      if (isNaN(ms) || ms < sinceMs) { reachedBeforeSince = true; break }
-      if (ms <= untilMs && matchFn(r)) results.push(r)
+      if (isNaN(ms)) continue
+      if (!lastValidMs || ms < lastValidMs) lastValidMs = ms  // track minimum (oldest) in page
+      if (ms >= sinceMs && ms <= untilMs && matchFn(r)) results.push(r)
     }
 
-    if (reachedBeforeSince) break
+    // Stop pagination only when the oldest record in this page is before sinceMs
+    // (meaning next page has nothing newer)
+    if (lastValidMs !== null && lastValidMs < sinceMs) break
     const info = json.info || {}
     pageToken = info.next_page_token || null
     if (records.length < 200) break
