@@ -4,6 +4,15 @@
 //
 // Pulls BCureLaser leads + deals from Zoho CRM, writes to Supabase.
 //
+// Definitions (verified against the Zoho Analytics report, 2026-06-05):
+//   Leads        = segment=bcurelaser AND Lead_Source=דיגיטל AND
+//                  Sub_Lead_Source ∈ {facebook, google, אתר חברה, וואטסאפ},
+//                  created in the period. MUST include converted leads (converted=both),
+//                  otherwise Zoho returns only non-converted leads (~half are missed).
+//   Opportunities (Id Count)        = leads that have a linked deal (deal.LidID = lead.id).
+//   Purchased    (Closing Date Cnt) = linked deals that have a Closing_Date set.
+//   Closing rate (אחוז המרה)        = purchased / leads.
+//
 // Env vars required:
 //   ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN
 //   ZOHO_API_DOMAIN  (default: https://www.zohoapis.com)
@@ -16,12 +25,11 @@ export const maxDuration = 60
 const ZOHO_TOKEN_URL = 'https://accounts.zoho.com/oauth/v2/token'
 const ZOHO_SCHEMA_VERSION = 2
 
-// BCureLaser: only count digital sub-sources
+// BCureLaser: only count these digital sub-sources
 const DIGITAL_SUBSOURCES = new Set([
   'facebook', 'google', 'אתר חברה', 'וואטסאפ', 'whatsapp',
   'גוגל', 'פייסבוק', // Hebrew variants
 ])
-const CLOSED_STAGES = new Set(['עסקה נסגרה', 'closed won', 'won', 'נסגרה', 'נסגר'])
 
 // ===== helpers =====
 
@@ -62,10 +70,13 @@ async function getZohoAccessToken() {
 
 // ===== Zoho API =====
 
-async function zohoGet(accessToken, url) {
+const ZOHO_API_DOMAIN = process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com'
+
+async function zohoFetch(accessToken, url) {
   const res = await fetch(url, {
     headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
   })
+  if (res.status === 204) return { data: [], info: {} }
   if (!res.ok) {
     const txt = await res.text()
     throw new Error(`Zoho GET ${res.status}: ${txt.slice(0, 400)}`)
@@ -73,49 +84,41 @@ async function zohoGet(accessToken, url) {
   return res.json()
 }
 
-// Generic paginator: sort DESC by sortField, stop when records go before sinceMs.
-// matchFn(record) → true to include in output.
-// Stop strategy: stop pagination only when the LAST record in a page is before sinceMs.
-// This handles Zoho's imperfect sort stability (records within a day may arrive out of order).
-async function fetchPaginated(accessToken, module, fields, sortField, sinceMs, untilMs, matchFn, maxPages = 40) {
-  const apiDomain = process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com'
-  const baseParams = `fields=${fields}&per_page=200&sort_by=${sortField}&sort_order=desc`
-  const baseUrl = `${apiDomain}/crm/v7/${module}`
-
-  const results = []
-  let pageToken = null
+// Search a module by criteria (page-based pagination).
+// `converted` is 'both' | 'true' | 'false' (Leads only) — needed to include converted leads.
+async function searchPaginated(accessToken, module, criteria, fields, converted = null, maxPages = 20) {
+  const out = []
   let page = 1
-
   while (page <= maxPages) {
-    const url = pageToken
-      ? `${baseUrl}?${baseParams}&page_token=${encodeURIComponent(pageToken)}`
-      : `${baseUrl}?${baseParams}&page=${page}`
-
-    const json = await zohoGet(accessToken, url)
-    const records = json.data || []
-    if (records.length === 0) break
-
-    // Collect all matching records from this page (don't stop mid-page)
-    let lastValidMs = null
-    for (const r of records) {
-      const raw = (r[sortField] || '').replace(' ', 'T')
-      if (!raw) continue
-      const ms = new Date(raw).getTime()
-      if (isNaN(ms)) continue
-      if (!lastValidMs || ms < lastValidMs) lastValidMs = ms  // track minimum (oldest) in page
-      if (ms >= sinceMs && ms <= untilMs && matchFn(r)) results.push(r)
-    }
-
-    // Stop pagination only when the oldest record in this page is before sinceMs
-    // (meaning next page has nothing newer)
-    if (lastValidMs !== null && lastValidMs < sinceMs) break
-    const info = json.info || {}
-    pageToken = info.next_page_token || null
-    if (records.length < 200) break
-    page++
+    const params = new URLSearchParams({ criteria, fields, per_page: '200', page: String(page) })
+    if (converted) params.set('converted', converted)
+    const url = `${ZOHO_API_DOMAIN}/crm/v3/${module}/search?${params.toString()}`
+    const json = await zohoFetch(accessToken, url)
+    const recs = json.data || []
+    out.push(...recs)
+    if (json.info && json.info.more_records) page++
+    else break
   }
+  return out
+}
 
-  return results
+// Fetch all deals linked to the given lead ids (deal.LidID = lead.id), chunked by criteria length.
+async function fetchDealsByLeadIds(accessToken, leadIds, fields, chunkSize = 15) {
+  const byId = {}
+  for (let i = 0; i < leadIds.length; i += chunkSize) {
+    const chunk = leadIds.slice(i, i + chunkSize)
+    const criteria = '(' + chunk.map(id => `(LidID:equals:${id})`).join('or') + ')'
+    let page = 1
+    while (page <= 5) {
+      const params = new URLSearchParams({ criteria, fields, per_page: '200', page: String(page) })
+      const url = `${ZOHO_API_DOMAIN}/crm/v3/Deals/search?${params.toString()}`
+      const json = await zohoFetch(accessToken, url)
+      for (const d of (json.data || [])) byId[d.id] = d
+      if (json.info && json.info.more_records) page++
+      else break
+    }
+  }
+  return Object.values(byId)
 }
 
 // ===== main sync =====
@@ -144,9 +147,6 @@ async function runSync(opts = {}) {
     m = mArg
   }
 
-  const sinceMs = new Date(`${since}T00:00:00+03:00`).getTime()
-  const untilMs = new Date(`${until}T23:59:59+03:00`).getTime()
-
   const { data: projects, error: projectsError } = await supabase.from('projects').select('id, name, client_id')
   if (projectsError) return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
 
@@ -162,56 +162,39 @@ async function runSync(opts = {}) {
   try { accessToken = await getZohoAccessToken() }
   catch (err) { return { status: 500, body: { error: 'Zoho OAuth failed: ' + (err.message || String(err)) } } }
 
-  // ===== Fetch leads: BCureLaser + digital sub-sources only =====
+  // ===== Fetch leads: BCureLaser + digital, INCLUDING converted leads =====
   const leadFields = [
     'Lead_Status', 'Lead_Source', 'Sub_Lead_Source', 'Created_Time',
     'timeOfLastCall', 'sumCalls', 'sumAnswerCalls',
     'field9', 'field20', 'segment', 'Owner', 'City1',
   ].join(',')
 
-  const isDigitalBCL = (r) => {
-    if ((r.segment || '').toLowerCase() !== 'bcurelaser') return false
-    if (r.Lead_Source !== 'דיגיטל') return false
-    const sub = (r.Sub_Lead_Source || '').toLowerCase()
-    return DIGITAL_SUBSOURCES.has(sub)
-  }
+  const leadCriteria =
+    `((segment:equals:bcurelaser)and(Lead_Source:equals:דיגיטל)` +
+    `and(Created_Time:between:${since}T00:00:00+03:00,${until}T23:59:59+03:00))`
 
-  // ===== Fetch deals: BCureLaser only, two date dimensions =====
-  const dealFields = 'Deal_Name,Stage,Amount,Closing_Date,Created_Time,Stage_Modified_Time,device_quantity,cancellation_date,segment'
-
-  const isBCLDeal = (r) => (r.segment || '').toLowerCase() === 'bcurelaser'
-
-  // Run leads + deals in PARALLEL to stay within 60s Vercel limit.
-  // Deals: 3-month lookback (captures cross-period closes without scanning too much).
-  const lookbackMs = sinceMs - 90 * 24 * 60 * 60 * 1000  // 3 months before since
-
-  let leads = [], allBCLDeals = []
+  let rawLeads = []
   try {
-    const [leadsRes, dealsRes] = await Promise.all([
-      fetchPaginated(accessToken, 'Leads', leadFields, 'Created_Time', sinceMs, untilMs, isDigitalBCL, 50),
-      fetchPaginated(accessToken, 'Deals', dealFields, 'Created_Time', lookbackMs, untilMs, isBCLDeal, 25),
-    ])
-    leads = leadsRes
-    allBCLDeals = dealsRes
+    rawLeads = await searchPaginated(accessToken, 'Leads', leadCriteria, leadFields, 'both')
   } catch (err) {
-    return { status: 500, body: { error: err.message || String(err) } }
+    return { status: 500, body: { error: 'Leads fetch failed: ' + (err.message || String(err)) } }
   }
+  // Keep only the approved digital sub-sources
+  const leads = rawLeads.filter(r => DIGITAL_SUBSOURCES.has((r.Sub_Lead_Source || '').toLowerCase()))
+  const leadIds = leads.map(l => l.id)
+  const leadIdSet = new Set(leadIds)
 
-  // Split deals by date dimension client-side
-  const dealsCreated = allBCLDeals.filter(r => {
-    const ms = new Date((r.Created_Time||'').replace(' ','T')).getTime()
-    const stage = r.Stage || ''
-    return ms >= sinceMs && ms <= untilMs && !CLOSED_STAGES.has(stage) && !r.cancellation_date
-  })
-  const dealsClosed = allBCLDeals.filter(r => {
-    const stage = r.Stage || ''
-    if (!CLOSED_STAGES.has(stage)) return false
-    if (r.cancellation_date) return false
-    const closedAtRaw = (r.Stage_Modified_Time || r.Closing_Date || '').replace(' ', 'T')
-    if (!closedAtRaw) return false
-    const ms = new Date(closedAtRaw).getTime()
-    return ms >= sinceMs && ms <= untilMs
-  })
+  // ===== Fetch deals linked to those leads (deal.LidID = lead.id) =====
+  const dealFields = 'Deal_Name,Stage,Amount,Closing_Date,Created_Time,Stage_Modified_Time,device_quantity,cancellation_date,LidID,segment'
+  let linkedDeals = []
+  try {
+    if (leadIds.length > 0) {
+      linkedDeals = await fetchDealsByLeadIds(accessToken, leadIds, dealFields)
+    }
+  } catch (err) {
+    return { status: 500, body: { error: 'Deals fetch failed: ' + (err.message || String(err)) } }
+  }
+  linkedDeals = linkedDeals.filter(d => leadIdSet.has(d.LidID))
 
   // ===== Compute lead stats =====
   const IRRELEVANT_STATUSES = new Set(['כפול', 'לא תקין', 'לא מעוניין', 'מטופל על ידי נציג אחר/ליד כפול'])
@@ -265,9 +248,11 @@ async function runSync(opts = {}) {
     avgHours: s.count > s.noResponse ? Math.round((s.totalHours / (s.count - s.noResponse)) * 10) / 10 : null,
   })).sort((a, b) => b.count - a.count)
 
-  // ===== Compute deal stats =====
-  // CLOSING DATE COUNT: deals closed in period (by Closing_Date)
-  const closedDeals = dealsClosed.filter(d => CLOSED_STAGES.has((d.Stage || '').toLowerCase()) || CLOSED_STAGES.has(d.Stage || ''))
+  // ===== Compute deal stats (lead-centric via LidID) =====
+  // Opportunities (Id Count): distinct leads that have a linked deal.
+  const opportunities = new Set(linkedDeals.map(d => d.LidID)).size
+  // Purchased (Closing Date Count): linked deals that have a Closing_Date.
+  const closedDeals = linkedDeals.filter(d => d.Closing_Date)
   const closedWithCancellation = closedDeals.filter(d => d.cancellation_date)
   const closedNoCancellation = closedDeals.filter(d => !d.cancellation_date)
 
@@ -276,8 +261,9 @@ async function runSync(opts = {}) {
   const devicesSold = closedNoCancellation.reduce((s, d) => s + num(d.device_quantity || 1), 0)
   const avgDealValue = closedNoCancellation.length > 0 ? Math.round(netRevenue / closedNoCancellation.length) : 0
 
+  const purchased = closedDeals.length
   const totalLeads = leads.length
-  const closingRate = totalLeads > 0 ? Math.round((closedDeals.length / totalLeads) * 1000) / 10 : 0
+  const closingRate = totalLeads > 0 ? Math.round((purchased / totalLeads) * 1000) / 10 : 0
 
   // ===== Build xlsxRows for aggregateCrmRows compatibility =====
   const sourcesMap = {}
@@ -313,10 +299,11 @@ async function runSync(opts = {}) {
       byAgent: agentStats,
     },
     deals: {
-      // ID COUNT — opportunities created in period
-      opportunities: dealsCreated.length,
-      // CLOSING DATE COUNT — deals actually closed this period
-      closed: closedDeals.length,
+      // ID COUNT — leads that became an opportunity (have a linked deal)
+      opportunities,
+      // CLOSING DATE COUNT — linked deals that have a Closing_Date (purchased)
+      closed: purchased,
+      // אחוז המרה — purchased / leads
       closingRate,
       // Revenue
       grandTotal: Math.round(grandTotal),
@@ -326,8 +313,8 @@ async function runSync(opts = {}) {
       cancellations: closedWithCancellation.length,
       // Pipeline breakdown
       pipeline: {
-        pending: dealsCreated.filter(d => !CLOSED_STAGES.has(d.Stage || '')).length,
-        closed: closedDeals.length,
+        pending: Math.max(0, opportunities - purchased),
+        closed: purchased,
       },
     },
     schemaVersion: ZOHO_SCHEMA_VERSION,
@@ -346,10 +333,10 @@ async function runSync(opts = {}) {
     }, { onConflict: 'project_id,source,month' })
 
     if (upsertErr) results.push({ project: p.name, error: upsertErr.message })
-    else results.push({ project: p.name, leads: leads.length, dealsCreated: dealsCreated.length, dealsClosed: closedDeals.length, ok: true })
+    else results.push({ project: p.name, leads: leads.length, opportunities, purchased, ok: true })
   }
 
-  return { status: 200, body: { ok: true, month: m, totalLeads: leads.length, dealsCreated: dealsCreated.length, dealsClosed: closedDeals.length, projects: results } }
+  return { status: 200, body: { ok: true, month: m, totalLeads: leads.length, opportunities, purchased, projects: results } }
 }
 
 // ===== handlers =====
