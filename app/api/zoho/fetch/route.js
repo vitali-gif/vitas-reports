@@ -171,7 +171,7 @@ async function runSync(opts = {}) {
   }
 
   // ===== Fetch deals: BCureLaser only, two date dimensions =====
-  const dealFields = 'Deal_Name,Stage,Amount,Closing_Date,Created_Time,device_quantity,cancellation_date,segment'
+  const dealFields = 'Deal_Name,Stage,Amount,Closing_Date,Created_Time,Stage_Modified_Time,device_quantity,cancellation_date,segment'
 
   const isBCLDeal = (r) => (r.segment || '').toLowerCase() === 'bcurelaser'
 
@@ -211,11 +211,14 @@ async function runSync(opts = {}) {
     return ms >= sinceMs && ms <= untilMs && !CLOSED_STAGES.has(stage) && !r.cancellation_date
   })
   const dealsClosed = allBCLDeals.filter(r => {
-    const cdRaw = (r.Closing_Date || '').replace(' ','T')
-    if (!cdRaw) return false
-    const ms = new Date(cdRaw).getTime()
     const stage = r.Stage || ''
-    return ms >= sinceMs && ms <= untilMs && CLOSED_STAGES.has(stage)
+    if (!CLOSED_STAGES.has(stage)) return false
+    if (r.cancellation_date) return false  // exclude cancelled
+    // Prefer Stage_Modified_Time (actual close date) over Closing_Date (target date)
+    const closedAtRaw = (r.Stage_Modified_Time || r.Closing_Date || '').replace(' ', 'T')
+    if (!closedAtRaw) return false
+    const ms = new Date(closedAtRaw).getTime()
+    return ms >= sinceMs && ms <= untilMs
   })
 
   let leads = []
