@@ -2,14 +2,11 @@
 //   POST — from the admin UI (auth via x-client-key header = anon key)
 //   GET  — from Vercel Cron (auth via Authorization: Bearer <CRON_SECRET>)
 //
-// Pulls BCureLaser leads + deals from Zoho CRM (segment=bcurelaser)
-// and writes one `reports` row per month with source='crm', crmType='zoho'.
+// Pulls BCureLaser leads + deals from Zoho CRM, writes to Supabase.
 //
 // Env vars required:
-//   ZOHO_CLIENT_ID
-//   ZOHO_CLIENT_SECRET
-//   ZOHO_REFRESH_TOKEN
-//   ZOHO_API_DOMAIN   (default: https://www.zohoapis.com)
+//   ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN
+//   ZOHO_API_DOMAIN  (default: https://www.zohoapis.com)
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -17,7 +14,14 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const ZOHO_TOKEN_URL = 'https://accounts.zoho.com/oauth/v2/token'
-const ZOHO_SCHEMA_VERSION = 1
+const ZOHO_SCHEMA_VERSION = 2
+
+// BCureLaser: only count digital sub-sources
+const DIGITAL_SUBSOURCES = new Set([
+  'facebook', 'google', 'אתר חברה', 'וואטסאפ', 'whatsapp',
+  'גוגל', 'פייסבוק', // Hebrew variants
+])
+const CLOSED_STAGES = new Set(['עסקה נסגרה', 'closed won', 'won', 'נסגרה', 'נסגר'])
 
 // ===== helpers =====
 
@@ -56,7 +60,7 @@ async function getZohoAccessToken() {
   return json.access_token
 }
 
-// ===== Zoho API helpers =====
+// ===== Zoho API =====
 
 async function zohoGet(accessToken, url) {
   const res = await fetch(url, {
@@ -69,29 +73,18 @@ async function zohoGet(accessToken, url) {
   return res.json()
 }
 
-// Fetch BCureLaser leads — Zoho criteria filters are unreliable for custom picklist fields.
-// Strategy: sort Created_Time DESC (newest first), no criteria, client-side filter,
-// stop early when records go older than `since`.
-async function fetchLeadsPaginated(accessToken, since, until) {
+// Generic paginator: sort DESC by sortField, stop when records go before sinceMs.
+// matchFn(record) → true to include in output.
+async function fetchPaginated(accessToken, module, fields, sortField, sinceMs, untilMs, matchFn, maxPages = 40) {
   const apiDomain = process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com'
-  const fields = [
-    'Lead_Status', 'Lead_Source', 'Created_Time', 'Modified_Time',
-    'timeOfLastCall', 'sumCalls', 'sumAnswerCalls',
-    'field9', 'field20', 'segment', 'Owner', 'City1',
-  ].join(',')
+  const baseParams = `fields=${fields}&per_page=200&sort_by=${sortField}&sort_order=desc`
+  const baseUrl = `${apiDomain}/crm/v7/${module}`
 
-  const sinceMs = new Date(`${since}T00:00:00+03:00`).getTime()
-  const untilMs = new Date(`${until}T23:59:59+03:00`).getTime()
-
-  const baseUrl = `${apiDomain}/crm/v7/Leads`
-  const baseParams = `fields=${fields}&per_page=200&sort_by=Created_Time&sort_order=desc`
-
-  const allLeads = []
+  const results = []
   let pageToken = null
   let page = 1
-  const MAX_PAGES = 50
 
-  while (page <= MAX_PAGES) {
+  while (page <= maxPages) {
     const url = pageToken
       ? `${baseUrl}?${baseParams}&page_token=${encodeURIComponent(pageToken)}`
       : `${baseUrl}?${baseParams}&page=${page}`
@@ -102,11 +95,10 @@ async function fetchLeadsPaginated(accessToken, since, until) {
 
     let reachedBeforeSince = false
     for (const r of records) {
-      const ct = r.Created_Time ? r.Created_Time.replace(' ', 'T') : ''
-      const createdMs = ct ? new Date(ct).getTime() : 0
-      if (createdMs < sinceMs) { reachedBeforeSince = true; break }
-      const seg = (r.segment || '').toLowerCase()
-      if (seg === 'bcurelaser' && createdMs <= untilMs) allLeads.push(r)
+      const raw = (r[sortField] || '').replace(' ', 'T')
+      const ms = raw ? new Date(raw).getTime() : 0
+      if (ms < sinceMs) { reachedBeforeSince = true; break }
+      if (ms <= untilMs && matchFn(r)) results.push(r)
     }
 
     if (reachedBeforeSince) break
@@ -116,76 +108,26 @@ async function fetchLeadsPaginated(accessToken, since, until) {
     page++
   }
 
-  return allLeads
+  return results
 }
 
-// Fetch deals — same strategy as leads: sort DESC, client-side date filter, early stop
-async function fetchDealsPaginated(accessToken, since, until) {
-  const apiDomain = process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com'
-  const fields = 'Deal_Name,Stage,Amount,Created_Time,Closing_Date,Owner'
-  const sinceMs = new Date(`${since}T00:00:00+03:00`).getTime()
-  const untilMs = new Date(`${until}T23:59:59+03:00`).getTime()
-
-  const allDeals = []
-  let pageToken = null
-  let page = 1
-  const MAX_PAGES = 20
-  const baseParams = `fields=${fields}&per_page=200&sort_by=Created_Time&sort_order=desc`
-
-  while (page <= MAX_PAGES) {
-    const url = pageToken
-      ? `${apiDomain}/crm/v7/Deals?${baseParams}&page_token=${encodeURIComponent(pageToken)}`
-      : `${apiDomain}/crm/v7/Deals?${baseParams}&page=${page}`
-    const json = await zohoGet(accessToken, url)
-    const records = json.data || []
-    if (records.length === 0) break
-
-    let reachedBeforeSince = false
-    for (const r of records) {
-      const ct = r.Created_Time ? r.Created_Time.replace(' ', 'T') : ''
-      const createdMs = ct ? new Date(ct).getTime() : 0
-      if (createdMs < sinceMs) { reachedBeforeSince = true; break }
-      if (createdMs <= untilMs) allDeals.push(r)
-    }
-    if (reachedBeforeSince) break
-    const info = json.info || {}
-    pageToken = info.next_page_token || null
-    if (records.length < 200) break
-    page++
-  }
-
-  return allDeals
-}
-
-// ===== main sync logic =====
+// ===== main sync =====
 
 async function runSync(opts = {}) {
   const { month, since: sinceOpt, until: untilOpt } = opts
 
-  // Check env vars
   if (!process.env.ZOHO_CLIENT_ID || !process.env.ZOHO_CLIENT_SECRET || !process.env.ZOHO_REFRESH_TOKEN) {
-    return {
-      status: 200,
-      body: {
-        ok: false,
-        pending: true,
-        message: 'Zoho credentials not configured. Set ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN in Vercel.',
-      },
-    }
+    return { status: 200, body: { ok: false, pending: true, message: 'Zoho credentials not configured.' } }
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !supabaseKey) {
-    return { status: 500, body: { error: 'Missing Supabase credentials' } }
-  }
+  if (!supabaseUrl || !supabaseKey) return { status: 500, body: { error: 'Missing Supabase credentials' } }
   const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 
-  // Build date range
   let since, until, m
   if (sinceOpt && untilOpt) {
-    since = sinceOpt; until = untilOpt
-    m = `${since}_${until}`
+    since = sinceOpt; until = untilOpt; m = `${since}_${until}`
   } else {
     const mArg = month || currentMonth()
     const [y, mm] = mArg.split('-').map(Number)
@@ -195,10 +137,10 @@ async function runSync(opts = {}) {
     m = mArg
   }
 
-  // Load projects from Supabase — find BCureLaser
-  const { data: projects, error: projectsError } = await supabase
-    .from('projects')
-    .select('id, name, client_id')
+  const sinceMs = new Date(`${since}T00:00:00+03:00`).getTime()
+  const untilMs = new Date(`${until}T23:59:59+03:00`).getTime()
+
+  const { data: projects, error: projectsError } = await supabase.from('projects').select('id, name, client_id')
   if (projectsError) return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
 
   const projectsList = opts.projectId
@@ -206,136 +148,117 @@ async function runSync(opts = {}) {
     : (projects || []).filter(p => (p.name || '').toLowerCase().includes('bcurelaser'))
 
   if (projectsList.length === 0) {
-    return {
-      status: 200,
-      body: { ok: false, message: 'No BCureLaser project found in Supabase. Add it via the admin panel or SQL INSERT.' },
-    }
+    return { status: 200, body: { ok: false, message: 'No BCureLaser project found in Supabase.' } }
   }
 
-  // Get Zoho access token
   let accessToken
-  try {
-    accessToken = await getZohoAccessToken()
-  } catch (err) {
-    return { status: 500, body: { error: 'Zoho OAuth failed: ' + (err.message || String(err)) } }
+  try { accessToken = await getZohoAccessToken() }
+  catch (err) { return { status: 500, body: { error: 'Zoho OAuth failed: ' + (err.message || String(err)) } } }
+
+  // ===== Fetch leads: BCureLaser + digital sub-sources only =====
+  const leadFields = [
+    'Lead_Status', 'Lead_Source', 'Sub_Lead_Source', 'Created_Time',
+    'timeOfLastCall', 'sumCalls', 'sumAnswerCalls',
+    'field9', 'field20', 'segment', 'Owner', 'City1',
+  ].join(',')
+
+  const isDigitalBCL = (r) => {
+    if ((r.segment || '').toLowerCase() !== 'bcurelaser') return false
+    if (r.Lead_Source !== 'דיגיטל') return false
+    const sub = (r.Sub_Lead_Source || '').toLowerCase()
+    return DIGITAL_SUBSOURCES.has(sub)
   }
 
-  // Fetch leads + deals in parallel
-  let leads = [], deals = []
+  // ===== Fetch deals: BCureLaser only, two date dimensions =====
+  const dealFields = 'Deal_Name,Stage,Amount,Closing_Date,Created_Time,device_quantity,cancellation_date,segment'
+
+  const isBCLDeal = (r) => (r.segment || '').toLowerCase() === 'bcurelaser'
+
+  let leads = [], dealsCreated = [], dealsClosed = []
   try {
-    const [leadsRes, dealsRes] = await Promise.allSettled([
-      fetchLeadsPaginated(accessToken, since, until),
-      fetchDealsPaginated(accessToken, since, until),
+    const [leadsRes, dealsCreatedRes, dealsClosedRes] = await Promise.allSettled([
+      fetchPaginated(accessToken, 'Leads', leadFields, 'Created_Time', sinceMs, untilMs, isDigitalBCL, 50),
+      fetchPaginated(accessToken, 'Deals', dealFields, 'Created_Time', sinceMs, untilMs, isBCLDeal, 30),
+      fetchPaginated(accessToken, 'Deals', dealFields, 'Closing_Date', sinceMs, untilMs, isBCLDeal, 30),
     ])
     if (leadsRes.status === 'fulfilled') leads = leadsRes.value
-    else throw new Error('Leads fetch failed: ' + (leadsRes.reason?.message || leadsRes.reason))
-    if (dealsRes.status === 'fulfilled') deals = dealsRes.value
-    // deals failure is non-fatal
+    else throw new Error('Leads fetch failed: ' + leadsRes.reason?.message)
+    if (dealsCreatedRes.status === 'fulfilled') dealsCreated = dealsCreatedRes.value
+    if (dealsClosedRes.status === 'fulfilled') dealsClosed = dealsClosedRes.value
   } catch (err) {
     return { status: 500, body: { error: err.message || String(err) } }
   }
 
-  // ===== Compute stats =====
-
-  // Irrelevant statuses (כפול, לא תקין, לא מעוניין, ...)
-  const IRRELEVANT_STATUSES = new Set(['כפול', 'לא תקין', 'לא מעוניין'])
-
-  // 1. By status
+  // ===== Compute lead stats =====
+  const IRRELEVANT_STATUSES = new Set(['כפול', 'לא תקין', 'לא מעוניין', 'מטופל על ידי נציג אחר/ליד כפול'])
   const byStatus = {}
+  const bySource = {}
+  const objections = {}
+  const devices = {}
+
   for (const lead of leads) {
     const status = (lead.Lead_Status || 'לא ידוע').trim()
     byStatus[status] = (byStatus[status] || 0) + 1
-  }
 
-  // 2. By source (Lead_Source)
-  const bySource = {}
-  for (const lead of leads) {
-    const source = (lead.Lead_Source || 'לא ידוע').trim()
-    bySource[source] = (bySource[source] || 0) + 1
-  }
+    const sub = (lead.Sub_Lead_Source || 'לא ידוע').trim()
+    bySource[sub] = (bySource[sub] || 0) + 1
 
-  // 3. Objections (field9)
-  const objections = {}
-  for (const lead of leads) {
     const obj = (lead.field9 || '').trim()
     if (obj) objections[obj] = (objections[obj] || 0) + 1
-  }
 
-  // 4. Device offered (field20)
-  const devices = {}
-  for (const lead of leads) {
     const dev = (lead.field20 || 'לא הוצע').trim() || 'לא הוצע'
     devices[dev] = (devices[dev] || 0) + 1
   }
 
-  // 5. Response time: Created_Time → timeOfLastCall (approximation)
-  // Note: Zoho provides timeOfLastCall (last), not first. Used as approximation.
+  // ===== Response time =====
   const responseTimes = []
   const byAgent = {}
 
   for (const lead of leads) {
-    const createdStr = lead.Created_Time || ''
-    const lastCallStr = lead.timeOfLastCall || ''
     const agentName = (typeof lead.Owner === 'object' ? lead.Owner?.name : lead.Owner) || 'לא ידוע'
     const answered = num(lead.sumAnswerCalls || 0)
+    const createdStr = (lead.Created_Time || '').replace(' ', 'T')
+    const lastCallStr = (lead.timeOfLastCall || '').replace(' ', 'T')
 
     if (!answered || !lastCallStr || !createdStr) {
-      responseTimes.push({ agentName, responseHours: null, noResponse: true })
       if (!byAgent[agentName]) byAgent[agentName] = { count: 0, totalHours: 0, noResponse: 0 }
-      byAgent[agentName].count++
-      byAgent[agentName].noResponse++
-      continue
-    }
-
-    const createdMs = new Date(createdStr).getTime()
-    const lastCallMs = new Date(lastCallStr).getTime()
-    if (isNaN(createdMs) || isNaN(lastCallMs)) {
+      byAgent[agentName].count++; byAgent[agentName].noResponse++
       responseTimes.push({ agentName, responseHours: null, noResponse: true })
       continue
     }
 
-    const responseHours = Math.max(0, (lastCallMs - createdMs) / (1000 * 60 * 60))
-    responseTimes.push({ agentName, responseHours, noResponse: false })
-
+    const responseHours = Math.max(0, (new Date(lastCallStr) - new Date(createdStr)) / 3600000)
     if (!byAgent[agentName]) byAgent[agentName] = { count: 0, totalHours: 0, noResponse: 0 }
-    byAgent[agentName].count++
-    byAgent[agentName].totalHours += responseHours
+    byAgent[agentName].count++; byAgent[agentName].totalHours += responseHours
+    responseTimes.push({ agentName, responseHours, noResponse: false })
   }
 
   const responded = responseTimes.filter(r => !r.noResponse)
-  const noResponseCount = responseTimes.length - responded.length
-  const avgHours = responded.length
-    ? responded.reduce((s, r) => s + r.responseHours, 0) / responded.length
-    : 0
-  const respondedWithin1h = responded.length
-    ? Math.round((responded.filter(r => r.responseHours <= 1).length / responded.length) * 100)
-    : 0
-
+  const avgHours = responded.length ? responded.reduce((s, r) => s + r.responseHours, 0) / responded.length : 0
+  const respondedWithin1h = responded.length ? Math.round(responded.filter(r => r.responseHours <= 1).length / responded.length * 100) : 0
   const agentStats = Object.entries(byAgent).map(([name, s]) => ({
-    name,
-    count: s.count,
+    name, count: s.count, noResponse: s.noResponse,
     avgHours: s.count > s.noResponse ? Math.round((s.totalHours / (s.count - s.noResponse)) * 10) / 10 : null,
-    noResponse: s.noResponse,
   })).sort((a, b) => b.count - a.count)
 
-  // 6. Deals analysis
-  const CLOSED_STAGES = new Set(['Closed Won', 'נסגרה', 'נסגר', 'Won', 'סגור'])
-  let dealsClosed = 0, dealsPending = 0, totalRevenue = 0
-  for (const deal of deals) {
-    const stage = (deal.Stage || '').trim()
-    const amount = num(deal.Amount || 0)
-    if (CLOSED_STAGES.has(stage)) {
-      dealsClosed++
-      totalRevenue += amount
-    } else {
-      dealsPending++
-    }
-  }
+  // ===== Compute deal stats =====
+  // CLOSING DATE COUNT: deals closed in period (by Closing_Date)
+  const closedDeals = dealsClosed.filter(d => CLOSED_STAGES.has((d.Stage || '').toLowerCase()) || CLOSED_STAGES.has(d.Stage || ''))
+  const closedWithCancellation = closedDeals.filter(d => d.cancellation_date)
+  const closedNoCancellation = closedDeals.filter(d => !d.cancellation_date)
 
-  // 7. Build per-source xlsxRows (for aggregateCrmRows compatibility in admin/page.js)
+  const grandTotal = closedDeals.reduce((s, d) => s + num(d.Amount || 0), 0)
+  const netRevenue = closedNoCancellation.reduce((s, d) => s + num(d.Amount || 0), 0)
+  const devicesSold = closedNoCancellation.reduce((s, d) => s + num(d.device_quantity || 1), 0)
+  const avgDealValue = closedNoCancellation.length > 0 ? Math.round(netRevenue / closedNoCancellation.length) : 0
+
+  const totalLeads = leads.length
+  const closingRate = totalLeads > 0 ? Math.round((closedDeals.length / totalLeads) * 1000) / 10 : 0
+
+  // ===== Build xlsxRows for aggregateCrmRows compatibility =====
   const sourcesMap = {}
   for (const lead of leads) {
-    const src = (lead.Lead_Source || 'לא ידוע').trim() || 'לא ידוע'
+    const src = (lead.Sub_Lead_Source || 'לא ידוע').trim() || 'לא ידוע'
     const status = (lead.Lead_Status || '').trim()
     const isIrrelevant = IRRELEVANT_STATUSES.has(status)
     if (!sourcesMap[src]) sourcesMap[src] = {
@@ -347,20 +270,13 @@ async function runSync(opts = {}) {
     if (isIrrelevant) sourcesMap[src].irrelevantLeads++
     else sourcesMap[src].relevantLeads++
   }
-
   const xlsxRows = Object.entries(sourcesMap).map(([source, s]) => ({ source, ...s }))
 
-  // Aggregate totals
-  const totalLeads = leads.length
-  const totalIrrelevant = leads.filter(l => IRRELEVANT_STATUSES.has((l.Lead_Status || '').trim())).length
-  const totalRelevant = totalLeads - totalIrrelevant
-
-  // Summary object
   const summary = {
     crmType: 'zoho',
     totalLeads,
-    relevantLeads: totalRelevant,
-    irrelevantLeads: totalIrrelevant,
+    relevantLeads: leads.filter(l => !IRRELEVANT_STATUSES.has((l.Lead_Status || '').trim())).length,
+    irrelevantLeads: leads.filter(l => IRRELEVANT_STATUSES.has((l.Lead_Status || '').trim())).length,
     byStatus,
     bySource,
     objections,
@@ -368,22 +284,31 @@ async function runSync(opts = {}) {
     responseTime: {
       avgHours: Math.round(avgHours * 10) / 10,
       respondedWithin1h,
-      noResponseCount,
+      noResponseCount: responseTimes.length - responded.length,
       respondedCount: responded.length,
       byAgent: agentStats,
     },
     deals: {
-      total: deals.length,
-      closed: dealsClosed,
-      pending: dealsPending,
-      revenue: totalRevenue,
-      avgDealValue: dealsClosed > 0 ? Math.round(totalRevenue / dealsClosed) : 0,
-      pipeline: { pending: dealsPending, closed: dealsClosed },
+      // ID COUNT — opportunities created in period
+      opportunities: dealsCreated.length,
+      // CLOSING DATE COUNT — deals actually closed this period
+      closed: closedDeals.length,
+      closingRate,
+      // Revenue
+      grandTotal: Math.round(grandTotal),
+      revenue: Math.round(netRevenue),
+      avgDealValue,
+      devicesSold,
+      cancellations: closedWithCancellation.length,
+      // Pipeline breakdown
+      pipeline: {
+        pending: dealsCreated.filter(d => !CLOSED_STAGES.has(d.Stage || '')).length,
+        closed: closedDeals.length,
+      },
     },
     schemaVersion: ZOHO_SCHEMA_VERSION,
   }
 
-  // Upsert to all matching BCureLaser projects
   const results = []
   for (const p of projectsList) {
     const { error: upsertErr } = await supabase.from('reports').upsert({
@@ -396,30 +321,16 @@ async function runSync(opts = {}) {
       row_count: leads.length,
     }, { onConflict: 'project_id,source,month' })
 
-    if (upsertErr) {
-      results.push({ project: p.name, error: upsertErr.message })
-    } else {
-      results.push({ project: p.name, leads: leads.length, deals: deals.length, ok: true })
-    }
+    if (upsertErr) results.push({ project: p.name, error: upsertErr.message })
+    else results.push({ project: p.name, leads: leads.length, dealsCreated: dealsCreated.length, dealsClosed: closedDeals.length, ok: true })
   }
 
-  return {
-    status: 200,
-    body: {
-      ok: true,
-      month: m,
-      totalLeads: leads.length,
-      totalDeals: deals.length,
-      projects: results,
-    },
-  }
+  return { status: 200, body: { ok: true, month: m, totalLeads: leads.length, dealsCreated: dealsCreated.length, dealsClosed: closedDeals.length, projects: results } }
 }
 
 // ===== handlers =====
 
-function isValidDate(v) {
-  return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
-}
+function isValidDate(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }
 
 export async function POST(request) {
   const anon = request.headers.get('x-client-key')
@@ -432,12 +343,7 @@ export async function POST(request) {
     return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
   }
   try {
-    const { status, body: responseBody } = await runSync({
-      month: body.month,
-      since: body.since,
-      until: body.until,
-      projectId: body.projectId,
-    })
+    const { status, body: responseBody } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId })
     return Response.json(responseBody, { status })
   } catch (err) {
     return Response.json({ error: 'runSync threw: ' + (err.message || String(err)) }, { status: 500 })
@@ -452,8 +358,5 @@ export async function GET(request) {
     const { status, body: responseBody } = await runSync()
     return Response.json(responseBody, { status })
   }
-  return Response.json({
-    ok: true,
-    configured: Boolean(process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET && process.env.ZOHO_REFRESH_TOKEN),
-  })
+  return Response.json({ ok: true, configured: Boolean(process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET && process.env.ZOHO_REFRESH_TOKEN) })
 }
