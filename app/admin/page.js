@@ -1225,7 +1225,7 @@ const selectProject = async (client, project) => {
     }
 
     // Add platform leads to CRM totals (only if CRM doesn't already have that source)
-    let _platformSpend = 0;
+    let _platformSpend = 0, _fbSpend = 0, _gSpend = 0;
     const _fbR = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
     const _gR = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
     const _emptySource = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
@@ -1233,6 +1233,7 @@ const selectProject = async (client, project) => {
       let _fbRows = []; _fbR.forEach(r => { if (r.data) _fbRows = _fbRows.concat(r.data); });
       const _fbAgg = aggregateRows(_fbRows);
       _platformSpend += _fbAgg.totals.spend || 0;
+      _fbSpend = _fbAgg.totals.spend || 0;
       const _fbLeads = _fbAgg.totals.leads || 0;
       if (!crmData.sources['Facebook']) {
         crmData.totals.totalLeads += _fbLeads;
@@ -1247,6 +1248,7 @@ const selectProject = async (client, project) => {
       let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data); });
       const _gAgg = aggregateRows(_gRows);
       _platformSpend += _gAgg.totals.spend || 0;
+      _gSpend = _gAgg.totals.spend || 0;
       const _gLeads = _gAgg.totals.leads || 0;
       if (!crmData.sources['Google']) {
         crmData.totals.totalLeads += _gLeads;
@@ -1339,6 +1341,79 @@ const selectProject = async (client, project) => {
     }, 200));
 
     const crmSchemaVersion = crmReports[0]?.summary?.schemaVersion || 0;
+    const _zohoOverview = crmReports[0]?.summary?.crmType === 'zoho';
+    if (_zohoOverview) {
+      const _zfn = ((crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {}).funnel || {};
+      const _byCh = _zfn.byChannel || [];
+      const totalSpend = _platformSpend;
+      const totalRev = _zfn.netRevenue || 0;
+      const roas = totalSpend > 0 ? (totalRev / totalSpend) : 0;
+      const cpl = (_zfn.leads || 0) > 0 && totalSpend > 0 ? totalSpend / _zfn.leads : 0;
+      const spendFor = (ch) => ch === 'facebook' ? _fbSpend : ch === 'google' ? _gSpend : 0;
+      const L = _zfn.leads || 0, O = _zfn.opportunities || 0, P = _zfn.purchased || 0, N = _zfn.netPurchases || 0;
+      const fstep = (cls, val, lbl, pct) => (
+        <div className={`crm-fstep ${cls}`}><div className="v">{formatNum(val)}</div><div className="l">{lbl}</div><div className="pct">{pct}</div></div>
+      );
+      const farrow = (<div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>);
+      return (
+        <>
+          <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
+            <button onClick={refreshFromBmby} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
+              {refreshingCrm ? '⏳' : '🔄'} {refreshingCrm ? 'מושך...' : 'רענן CRM'}
+              {!refreshingCrm && crmSchemaVersion > 0 && <span style={{fontSize:10,color:'var(--text-muted)',marginRight:2}}>v{crmSchemaVersion}</span>}
+            </button>
+          </div>
+          <div className="kpi-grid">
+            {crmKpi('סה"כ לידים', formatNum(L), 'cyan', L, null)}
+            {totalSpend > 0 ? crmKpi('הוצאת מדיה', formatCurrency(totalSpend), 'cyan', totalSpend, null, true) : null}
+            {crmKpi('הזדמנויות', formatNum(O), 'purple', O, null)}
+            {crmKpi('רכשו', formatNum(P), 'green', P, null)}
+            {crmKpi('שווי רכישות נטו', formatCurrencyCompact(_zfn.netRevenue || 0), 'green', _zfn.netRevenue || 0, null)}
+            {crmKpi('אחוז המרה לעסקה', (_zfn.conversionRate || 0) + '%', 'purple', _zfn.conversionRate || 0, null)}
+            {totalSpend > 0 ? crmKpi('ROAS', roas.toFixed(2) + 'x', 'green', roas, null) : null}
+            {totalSpend > 0 ? crmKpi('עלות לליד', formatCurrency(cpl), 'red', cpl, null, true) : null}
+          </div>
+
+          <div className="section">
+            <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><h2>{'משפך מכירה'}</h2><span className="sub">{'ליד → רכישה'}</span></div>
+            <div className="crm-funnel">
+              {fstep('sky', L, 'לידים', '100%')}
+              {farrow}
+              {fstep('', O, 'הזדמנויות', L>0?(O/L*100).toFixed(0)+'%':'-')}
+              {farrow}
+              {fstep('emerald', P, 'רכשו', O>0?(P/O*100).toFixed(0)+'%':'-')}
+              {farrow}
+              {fstep('amber', N, 'רכישות נטו', P>0?(N/P*100).toFixed(0)+'%':'-')}
+            </div>
+          </div>
+
+          <div className="section">
+            <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>{'ביצועים לפי ערוץ'}</h2><span className="sub">{'הוצאה מול הכנסה'}</span></div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead><tr><th>ערוץ</th><th>הוצאה</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>שווי נטו</th><th>אחוז המרה</th><th>ROAS</th></tr></thead>
+                <tbody>
+                  {_byCh.map(c => {
+                    const sp = spendFor(c.channel);
+                    const r = sp > 0 ? (c.netRevenue / sp) : 0;
+                    return (<tr key={c.channel}>
+                      <td style={{fontWeight:600}}>{c.channel}</td>
+                      <td>{sp > 0 ? formatCurrency(sp) : '—'}</td>
+                      <td>{formatNum(c.leads)}</td>
+                      <td>{formatNum(c.opportunities)}</td>
+                      <td>{formatNum(c.purchased)}</td>
+                      <td>{formatCurrency(c.netRevenue || 0)}</td>
+                      <td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate || 0) + '%'}</td>
+                      <td style={{fontWeight:600, color: r >= 1 ? 'var(--emerald)' : sp > 0 ? 'var(--rose)' : 'inherit'}}>{sp > 0 ? r.toFixed(2) + 'x' : '—'}</td>
+                    </tr>);
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      );
+    }
     return (
       <>
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
