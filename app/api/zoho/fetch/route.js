@@ -174,21 +174,54 @@ async function runSync(opts = {}) {
   const dealFields = 'Deal_Name,Stage,Amount,Closing_Date,Created_Time,device_quantity,cancellation_date,segment'
 
   const isBCLDeal = (r) => (r.segment || '').toLowerCase() === 'bcurelaser'
-  // Opportunities = pending deals (not yet closed, not cancelled)
-  const PENDING_STAGES = new Set(['ממתין להזמנה', 'הצעת מחיר', 'in progress', 'pending', 'open'])
-  const isBCLPending = (r) => isBCLDeal(r) && !CLOSED_STAGES.has((r.Stage || '').toLowerCase()) && !CLOSED_STAGES.has(r.Stage || '') && !r.cancellation_date
 
-  let leads = [], dealsCreated = [], dealsClosed = []
+  // ONE deals fetch: lookback 12 months, split client-side by date dimension.
+  // Closing_Date is not reliably sortable in Zoho — we sort by Created_Time DESC
+  // and scan all BCureLaser deals back 1 year to capture cross-period closes.
+  const lookbackMs = sinceMs - 365 * 24 * 60 * 60 * 1000  // 1 year before since
+  const allBCLDeals = []
+  let dealPageToken = null, dealPage = 1
+  const dealFields2 = dealFields  // same fields
+  while (dealPage <= 60) {
+    const dUrl = dealPageToken
+      ? `${(process.env.ZOHO_API_DOMAIN||'https://www.zohoapis.com')}/crm/v7/Deals?${dealFields2.split(',').length > 0 ? 'fields='+dealFields2 : ''}&per_page=200&sort_by=Created_Time&sort_order=desc&page_token=${encodeURIComponent(dealPageToken)}`
+      : `${(process.env.ZOHO_API_DOMAIN||'https://www.zohoapis.com')}/crm/v7/Deals?fields=${dealFields2}&per_page=200&sort_by=Created_Time&sort_order=desc&page=${dealPage}`
+    const dJson = await zohoGet(accessToken, dUrl)
+    const dRecs = dJson.data || []
+    if (dRecs.length === 0) break
+    let stopEarly = false
+    for (const r of dRecs) {
+      if (!isBCLDeal(r)) continue
+      const ctRaw = (r.Created_Time || '').replace(' ', 'T')
+      const ctMs = ctRaw ? new Date(ctRaw).getTime() : 0
+      if (ctMs < lookbackMs) { stopEarly = true; break }
+      allBCLDeals.push(r)
+    }
+    if (stopEarly) break
+    const dInfo = dJson.info || {}
+    dealPageToken = dInfo.next_page_token || null
+    if (dRecs.length < 200) break
+    dealPage++
+  }
+
+  // Split by date dimension client-side
+  const dealsCreated = allBCLDeals.filter(r => {
+    const ms = new Date((r.Created_Time||'').replace(' ','T')).getTime()
+    const stage = r.Stage || ''
+    return ms >= sinceMs && ms <= untilMs && !CLOSED_STAGES.has(stage) && !r.cancellation_date
+  })
+  const dealsClosed = allBCLDeals.filter(r => {
+    const cdRaw = (r.Closing_Date || '').replace(' ','T')
+    if (!cdRaw) return false
+    const ms = new Date(cdRaw).getTime()
+    const stage = r.Stage || ''
+    return ms >= sinceMs && ms <= untilMs && CLOSED_STAGES.has(stage)
+  })
+
+  let leads = []
   try {
-    const [leadsRes, dealsCreatedRes, dealsClosedRes] = await Promise.allSettled([
-      fetchPaginated(accessToken, 'Leads', leadFields, 'Created_Time', sinceMs, untilMs, isDigitalBCL, 50),
-      fetchPaginated(accessToken, 'Deals', dealFields, 'Created_Time', sinceMs, untilMs, isBCLPending, 30),
-      fetchPaginated(accessToken, 'Deals', dealFields, 'Closing_Date', sinceMs, untilMs, isBCLDeal, 30),
-    ])
-    if (leadsRes.status === 'fulfilled') leads = leadsRes.value
-    else throw new Error('Leads fetch failed: ' + leadsRes.reason?.message)
-    if (dealsCreatedRes.status === 'fulfilled') dealsCreated = dealsCreatedRes.value
-    if (dealsClosedRes.status === 'fulfilled') dealsClosed = dealsClosedRes.value
+    const leadsRes = await fetchPaginated(accessToken, 'Leads', leadFields, 'Created_Time', sinceMs, untilMs, isDigitalBCL, 50)
+    leads = leadsRes
   } catch (err) {
     return { status: 500, body: { error: err.message || String(err) } }
   }
