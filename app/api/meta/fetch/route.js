@@ -463,6 +463,19 @@ export async function GET(request) {
   if (!token || !adAccountId) {
     return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
   }
+  // TEMP diagnostic (gated): reveal which token identity / ad accounts this server token can see.
+  if (new URL(request.url).searchParams.get('whoami') === '1') {
+    try {
+      const meRes = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me?fields=id,name&access_token=${encodeURIComponent(token)}`)
+      const me = await meRes.json()
+      const accRes = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me/adaccounts?fields=account_id,name&limit=500&access_token=${encodeURIComponent(token)}`)
+      const accJson = await accRes.json()
+      const accounts = (accJson.data || []).map((a) => ({ id: a.account_id, name: a.name }))
+      return Response.json({ ok: true, identity: me, adAccountsCount: accounts.length, hasLaser: accounts.some((a) => a.id === '929034545061247'), accounts })
+    } catch (e) {
+      return Response.json({ ok: false, error: String(e.message || e) }, { status: 500 })
+    }
+  }
   try {
     const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}?fields=name,account_status,currency,timezone_name&access_token=${encodeURIComponent(token)}`
     const res = await fetch(url)
