@@ -150,9 +150,15 @@ async function runSync(opts = {}) {
   const { data: projects, error: projectsError } = await supabase.from('projects').select('id, name, client_id')
   if (projectsError) return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
 
-  const projectsList = opts.projectId
-    ? (projects || []).filter(p => p.id === opts.projectId)
-    : (projects || []).filter(p => (p.name || '').toLowerCase().includes('bcurelaser'))
+  // SAFETY: Zoho data must ONLY ever be written to BCureLaser-named projects.
+  // The dashboard live-fetch calls this route with the currently-open projectId for ALL
+  // clients (alongside bmby/fetch); without this guard a Zoho report would be upserted onto
+  // BMBY projects (ONCE/REHAVIA), racing the BMBY write on the same (project,crm,month) key
+  // and rendering the Zoho layout. Always require the bcurelaser name, then optionally narrow by projectId.
+  const projectsList = (projects || []).filter(p =>
+    (p.name || '').toLowerCase().includes('bcurelaser') &&
+    (!opts.projectId || p.id === opts.projectId)
+  )
 
   if (projectsList.length === 0) {
     return { status: 200, body: { ok: false, message: 'No BCureLaser project found in Supabase.' } }
