@@ -74,9 +74,14 @@ async function metaFetchAll(url, token) {
 async function runSync(opts = {}) {
   const { month, since: sinceOpt, until: untilOpt } = opts
   const token = process.env.META_ACCESS_TOKEN
-  const adAccountId = process.env.META_AD_ACCOUNT_ID
-  if (!token || !adAccountId) {
-    return { status: 500, body: { error: 'Missing META_ACCESS_TOKEN or META_AD_ACCOUNT_ID env vars' } }
+  // Multi-account support: META_AD_ACCOUNT_IDS = comma-separated list of ad accounts
+  // (e.g. Vitas + BCureLaser). Falls back to the legacy single META_AD_ACCOUNT_ID.
+  // Rows from every account are merged, then routed to projects by the existing
+  // campaign-name substring match — so each client's account only feeds its own project.
+  const adAccountIds = (process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || '')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+  if (!token || adAccountIds.length === 0) {
+    return { status: 500, body: { error: 'Missing META_ACCESS_TOKEN or META_AD_ACCOUNT_ID(S) env vars' } }
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -110,6 +115,12 @@ async function runSync(opts = {}) {
     'actions',
   ].join(',')
 
+  // ===== per-account fetch loop — merge rows/ads across all ad accounts =====
+  const _allRowsMerged = []
+  const _activeAdsMerged = []
+  const _accountDiag = []
+  const _mergedTotals = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 }
+  for (const adAccountId of adAccountIds) {
   const breakdownUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/insights?level=ad&breakdowns=age,gender&fields=${fields}&time_range=${timeRange}&use_unified_attribution_setting=true&limit=500`
 
   // Fetch ad creative details (body, title, images) + status
@@ -135,7 +146,7 @@ async function runSync(opts = {}) {
     if (brRes.status === 'fulfilled') {
       breakdownRows = brRes.value
     } else {
-      return { status: 500, body: { error: String(brRes.reason?.message || brRes.reason) } }
+      _accountDiag.push({ account: adAccountId, error: String(brRes.reason?.message || brRes.reason) }); continue
     }
     if (adsRes.status === 'fulfilled') {
       adsRaw = adsRes.value
@@ -143,7 +154,7 @@ async function runSync(opts = {}) {
       adsFetchError = String(adsRes.reason?.message || adsRes.reason)
     }
   } catch (err) {
-    return { status: 500, body: { error: String(err.message || err) } }
+    _accountDiag.push({ account: adAccountId, error: String(err.message || err) }); continue
   }
 
   // Fetch campaign + adset effective_status maps (for status column in UI)
@@ -307,6 +318,24 @@ async function runSync(opts = {}) {
   totals.convRate = totals.clicks > 0 ? (totals.leads / totals.clicks) * 100 : 0
   totals.frequency = totals.reach > 0 ? totals.impressions / totals.reach : 0
 
+    // accumulate this account's results into the merged set, then close the per-account loop
+    for (const r of allRows) _allRowsMerged.push(r)
+    for (const a of activeAdsAll) _activeAdsMerged.push(a)
+    _mergedTotals.spend += totals.spend; _mergedTotals.impressions += totals.impressions
+    _mergedTotals.reach += totals.reach; _mergedTotals.clicks += totals.clicks; _mergedTotals.leads += totals.leads
+    _accountDiag.push({ account: adAccountId, rows: allRows.length, activeAds: activeAdsAll.length, adsIndexed: adsRaw.length, adsFetchError, videosResolved: Object.keys(videoUrlById).length, postsResolved: Object.keys(fullPictureByPost).length })
+  } // ===== end per-account loop =====
+
+  const allRows = _allRowsMerged
+  const activeAdsAll = _activeAdsMerged
+  const totals = _mergedTotals
+  totals.cpl = totals.leads > 0 ? totals.spend / totals.leads : 0
+  totals.cpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0
+  totals.cpm = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0
+  totals.ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0
+  totals.convRate = totals.clicks > 0 ? (totals.leads / totals.clicks) * 100 : 0
+  totals.frequency = totals.reach > 0 ? totals.impressions / totals.reach : 0
+
   const { data: projects, error: projectsError } = await supabase
     .from('projects')
     .select('id, name, client_id')
@@ -379,11 +408,9 @@ async function runSync(opts = {}) {
       ok: true,
       month: m,
       totalRows: allRows.length,
-      adsIndexed: adsRaw.length,
+      accountsQueried: adAccountIds,
       activeAdsCount: activeAdsAll.length,
-      adsFetchError: adsFetchError,
-      videosResolved: Object.keys(videoUrlById).length,
-      postsResolved: Object.keys(fullPictureByPost).length,
+      accounts: _accountDiag,
       totals,
       projects: results,
     },
@@ -428,7 +455,7 @@ export async function GET(request) {
 
   // Otherwise: health check (public, safe to expose ad account name)
   const token = process.env.META_ACCESS_TOKEN
-  const adAccountId = process.env.META_AD_ACCOUNT_ID
+  const adAccountId = (process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || '').split(',').map((s) => s.trim()).filter(Boolean)[0]
   if (!token || !adAccountId) {
     return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
   }

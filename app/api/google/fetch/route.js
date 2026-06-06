@@ -115,10 +115,16 @@ function computeTotals(rows) {
 
 async function runSync(opts = {}) {
   const { month, since: sinceOpt, until: untilOpt } = opts
-  const required = ['GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET', 'GOOGLE_ADS_REFRESH_TOKEN', 'GOOGLE_ADS_CUSTOMER_ID']
+  const required = ['GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET', 'GOOGLE_ADS_REFRESH_TOKEN']
   for (const e of required) {
     if (!process.env[e]) return { status: 500, body: { error: `Missing env var: ${e}` } }
   }
+  // Multi-account: GOOGLE_ADS_CUSTOMER_IDS = comma-separated customer IDs under the same MCC
+  // (shares one OAuth + login-customer-id). Falls back to the legacy single GOOGLE_ADS_CUSTOMER_ID.
+  // Rows from every customer are merged, then routed to projects by campaign-name substring match.
+  const customerIds = (process.env.GOOGLE_ADS_CUSTOMER_IDS || process.env.GOOGLE_ADS_CUSTOMER_ID || '')
+    .split(',').map((s) => s.trim().replace(/-/g, '')).filter(Boolean)
+  if (customerIds.length === 0) return { status: 500, body: { error: 'Missing GOOGLE_ADS_CUSTOMER_ID(S) env var' } }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -139,14 +145,18 @@ async function runSync(opts = {}) {
     m = mArg
   }
 
-  const customerId = process.env.GOOGLE_ADS_CUSTOMER_ID
-
   let accessToken
   try {
     accessToken = await getAccessToken()
   } catch (err) {
     return { status: 500, body: { error: 'OAuth failed: ' + (err.message || String(err)) } }
   }
+
+  // ===== per-customer fetch loop — merge rows/asset-groups across all customer IDs =====
+  const _allRowsMerged = []
+  const _assetGroupsMerged = {}
+  const _custDiag = []
+  for (const customerId of customerIds) {
 
   // Main query — ad-level metrics
   const query = `
@@ -174,7 +184,7 @@ async function runSync(opts = {}) {
   try {
     rawRows = await gaqlSearch(accessToken, customerId, query)
   } catch (err) {
-    return { status: 500, body: { error: err.message } }
+    _custDiag.push({ customer: customerId, error: err.message }); continue
   }
 
   // Transform ad_group_ad rows (Search/Display ad-level metrics)
@@ -333,6 +343,19 @@ async function runSync(opts = {}) {
     console.log('asset_group query failed:', err.message || err)
   }
 
+    // accumulate this customer's results into the merged set, then close the per-customer loop
+    for (const r of allRows) _allRowsMerged.push(r)
+    for (const [k, arr] of Object.entries(assetGroupsByCampaign)) {
+      if (!_assetGroupsMerged[k]) _assetGroupsMerged[k] = []
+      for (const ag of arr) _assetGroupsMerged[k].push(ag)
+    }
+    _custDiag.push({ customer: customerId, rows: allRows.length })
+  } // ===== end per-customer loop =====
+
+  const allRows = _allRowsMerged
+  const assetGroupsByCampaign = _assetGroupsMerged
+  const totals = computeTotals(allRows)
+
   // Split rows per project by campaign-name-contains match
   const { data: projects, error: projectsError } = await supabase
     .from('projects')
@@ -389,6 +412,8 @@ async function runSync(opts = {}) {
       ok: true,
       month: m,
       totalRows: allRows.length,
+      customersQueried: customerIds,
+      customers: _custDiag,
       totals,
       projects: results,
     },
@@ -434,7 +459,7 @@ export async function GET(request) {
     const token = await getAccessToken()
     return Response.json({
       ok: true,
-      customerId: process.env.GOOGLE_ADS_CUSTOMER_ID,
+      customerIds: (process.env.GOOGLE_ADS_CUSTOMER_IDS || process.env.GOOGLE_ADS_CUSTOMER_ID || ''),
       loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || null,
       hasDeveloperToken: !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
       accessTokenPreview: token ? token.slice(0, 20) + '...' : null,
