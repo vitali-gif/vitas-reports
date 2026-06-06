@@ -1462,6 +1462,7 @@ const selectProject = async (client, project) => {
           {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations)}
           {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts)}
           {_platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
+          {ct.totalLeads > 0 && _platformSpend > 0 ? crmKpi('עלות לליד', formatCurrency(_platformSpend / ct.totalLeads), 'purple', _platformSpend / ct.totalLeads, null, true) : null}
           {ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
           {ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
           {(ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrencyCompact(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
@@ -2608,7 +2609,7 @@ const selectProject = async (client, project) => {
         <div className="kpi-grid">
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(totalLeadsWithCrm)), 'green', totalLeadsWithCrm, activeP != null ? (activeP.leads + prevCrmTotalLeads) : null, false, _tabCrmLeads?.allLeads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(activeT.leads)), 'green', activeT.leads, activeP?.leads, false, _tabCrmLeads?.allLeads)}
-          {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
+          {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(dashTab === 'all' ? (totalLeadsWithCrm > 0 ? activeT.spend / totalLeadsWithCrm : 0) : activeT.cpl), 'purple', (dashTab === 'all' ? (totalLeadsWithCrm > 0 ? activeT.spend / totalLeadsWithCrm : 0) : activeT.cpl), (dashTab === 'all' ? (activeP ? ((activeP.leads + prevCrmTotalLeads) > 0 ? activeP.spend / (activeP.leads + prevCrmTotalLeads) : 0) : null) : (activeP?.cpl ?? null)), true)}
           {crmReports[0]?.summary?.crmType === 'zoho' ? kpi('עלות ממוצעת לקליק', formatCurrency(activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0), 'amber', activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0, (activeP && activeP.clicks > 0 ? activeP.spend / activeP.clicks : null), true) : null}
           {crmReports[0]?.summary?.crmType === 'zoho' ? kpi('אחוז המרה', (activeT.convRate || 0).toFixed(2) + '%', 'cyan', activeT.convRate || 0, activeP?.convRate || null) : null}
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled) : null}
