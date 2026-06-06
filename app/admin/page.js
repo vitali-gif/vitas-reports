@@ -2540,7 +2540,7 @@ const selectProject = async (client, project) => {
                     </table>
                   </div>
                 </div>
-              </>) : (<div className="section" style={{textAlign:'center',padding:'40px',color:'var(--text-muted)'}}>אין נתוני GA4 לתקופה הנבחרת — נסה לרענן או לבחור תקופה אחרת.</div>))}
+              </>) : (<div className="section" style={{textAlign:'center',padding:'40px',color:'var(--text-muted)'}}><div style={{marginBottom:14}}>אין נתוני GA4 לתקופה הנבחרת.</div><button onClick={async () => { try { const _pl = selectedMonth.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }; _pl.projectId = selectedProject?.id; await fetch('/api/ga4/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }, body: JSON.stringify(_pl) }); if (selectedProject) await loadProjectReports(selectedProject.id); } catch (e) {} }} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:13,color:'#fff',background:'var(--violet)',border:'none',borderRadius:8,padding:'8px 16px',cursor:'pointer'}}>🔄 משוך נתוני GA4</button></div>))}
 
               {crmSubTab === 'sources' && (<>
                 <div className="kpi-grid">
