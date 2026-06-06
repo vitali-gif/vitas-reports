@@ -2859,6 +2859,31 @@
   .rank-list.objections,
   .crm-objections-table { display: none !important; }
 
+  .src-metric-toggle {
+    display: flex !important;
+    gap: 8px;
+    margin: 0 0 10px;
+    justify-content: center;
+  }
+  .src-metric-toggle button {
+    flex: 1;
+    max-width: 160px;
+    padding: 8px 0;
+    border-radius: 999px;
+    border: 1.5px solid var(--border, #DDE2EC);
+    background: transparent;
+    color: var(--text-2, #64748b);
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .src-metric-toggle button.active {
+    border-color: var(--indigo, #6366f1);
+    background: var(--indigo-50, rgba(99,102,241,0.1));
+    color: var(--indigo, #6366f1);
+  }
   .objections-mobile {
     display: grid !important;
     grid-template-columns: 1fr;
@@ -2933,6 +2958,7 @@
 .side-close,
 .side-mobile-actions,
 .desktop-only-msg,
+.src-metric-toggle,
 .objections-mobile { display: none; }
 
 /* Overlay hidden on desktop, shown inside media query */

@@ -119,6 +119,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [dashTab, setDashTab] = useState('all')
   const [crmSubTab, setCrmSubTab] = useState('sources')
   const [cityMetric, setCityMetric] = useState('leads')
+  const [srcMobileMetric, setSrcMobileMetric] = useState('leads')  // mobile sources sub-tab: leads|meetings
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Lock page scroll while the mobile drawer is open
@@ -679,6 +680,26 @@ const selectProject = async (client, project) => {
     }, 800);
     return () => clearTimeout(tm);
   }, [selectedMonth, selectedProject?.id, reports.length]);
+
+  // ── Mobile: browser/hardware back navigates one internal step, never closes the dashboard ──
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isMobile = () => !!(window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+    if (!isMobile()) return;
+    if (!window.__vitasNavArmed) {
+      window.history.pushState({ vitasNav: true }, '');
+      window.__vitasNavArmed = true;
+    }
+    const onPop = () => {
+      if (!isMobile()) { window.__vitasNavArmed = false; return; }
+      if (dashTab === 'crm' && crmSubTab !== 'sources') setCrmSubTab('sources');
+      else if (dashTab !== 'all') setDashTab('all');
+      // re-arm so the next back is also handled internally (never leaves the dashboard)
+      window.history.pushState({ vitasNav: true }, '');
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [dashTab, crmSubTab]);
 
   const destroyCharts = () => {
     // Cancel any pending chart-creation timeouts (prevents stale charts from
@@ -1334,7 +1355,8 @@ const selectProject = async (client, project) => {
       destroyCharts();
       if (sourceNames.length > 0) {
         createChart('crmPieChart', 'doughnut', sourceNames, [{
-          data: sourceNames.map(n => crmData.sources[n].totalLeads),
+          label: srcMobileMetric === 'meetings' ? 'פגישות' : 'לידים',
+          data: sourceNames.map(n => srcMobileMetric === 'meetings' ? (crmData.sources[n].meetingsScheduled || 0) : crmData.sources[n].totalLeads),
           backgroundColor: COLORS.slice(0, sourceNames.length)
         }]);
       }
@@ -1573,15 +1595,23 @@ const selectProject = async (client, project) => {
             </table>
           </div>
           <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div>
+          {/* MOBILE: leads/meetings toggle (mobile only via CSS) */}
+          <div className="src-metric-toggle">
+            {[['leads','לידים'],['meetings','פגישות']].map(([k,l]) => (
+              <button key={k} className={srcMobileMetric === k ? 'active' : ''} onClick={() => setSrcMobileMetric(k)}>{l}</button>
+            ))}
+          </div>
           {/* MOBILE: top-5 sources as cards */}
           <ul className="objections-mobile">
-            {sourceEntries.slice(0, 5).map(([name, d], i) => {
+            {[...sourceEntries].sort((a,b) => (srcMobileMetric === 'meetings' ? (b[1].meetingsScheduled||0) : b[1].totalLeads) - (srcMobileMetric === 'meetings' ? (a[1].meetingsScheduled||0) : a[1].totalLeads)).slice(0, 5).map(([name, d], i) => {
               const rankColors = ['rank-indigo','rank-emerald','rank-violet','rank-amber','rank-sky'];
+              const _v = srcMobileMetric === 'meetings' ? (d.meetingsScheduled || 0) : d.totalLeads;
+              const _unit = srcMobileMetric === 'meetings' ? ' פגישות' : ' ליד';
               return (
                 <li key={name}>
                   <div className={`rank ${rankColors[i] || 'rank-indigo'}`}>{i + 1}</div>
                   <div className="lbl">{name}</div>
-                  <div className="count">{d.totalLeads}<span className="pct" style={{marginRight:4,marginLeft:0}}> ליד</span></div>
+                  <div className="count">{_v}<span className="pct" style={{marginRight:4,marginLeft:0}}>{_unit}</span></div>
                 </li>
               );
             })}
@@ -1597,7 +1627,7 @@ const selectProject = async (client, project) => {
         </div>
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, expandedCrmSources]);
+  }, [selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric]);
 
   const renderDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
@@ -2571,9 +2601,9 @@ const selectProject = async (client, project) => {
           {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted) : null}
           {crmTotals ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
           {crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
-          {crmTotals && crmTotals.meetingsCompleted > 0 ? kpi('עלות לפגישה שבוצעה', formatCurrency(activeT.spend / crmTotals.meetingsCompleted), 'purple', activeT.spend / crmTotals.meetingsCompleted, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
-          {crmTotals && crmTotals.contracts > 0 ? kpi('עלות לחוזה', formatCurrency(activeT.spend / crmTotals.contracts), 'red', activeT.spend / crmTotals.contracts, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
-          {crmTotals && (crmTotals.contractValue || 0) > 0 ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals.contractValue), 'green', crmTotals.contractValue, prevCrmTotals?.contractValue || null) : null}
+          {activeT.spend > 0 ? kpi('עלות לפגישה שבוצעה', (crmTotals?.meetingsCompleted > 0) ? formatCurrency(activeT.spend / crmTotals.meetingsCompleted) : '—', 'purple', (crmTotals?.meetingsCompleted > 0) ? activeT.spend / crmTotals.meetingsCompleted : 0, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
+          {activeT.spend > 0 ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          {activeT.spend > 0 ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
         </div>
 
         {/* FUNNEL */}
