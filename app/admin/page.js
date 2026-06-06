@@ -2600,8 +2600,8 @@ const selectProject = async (client, project) => {
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(totalLeadsWithCrm)), 'green', totalLeadsWithCrm, activeP != null ? (activeP.leads + prevCrmTotalLeads) : null, false, _tabCrmLeads?.allLeads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(activeT.leads)), 'green', activeT.leads, activeP?.leads, false, _tabCrmLeads?.allLeads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
-          {activeT.clicks > 0 ? kpi('עלות ממוצעת לקליק', formatCurrency(activeT.spend / activeT.clicks), 'amber', activeT.spend / activeT.clicks, (activeP && activeP.clicks > 0 ? activeP.spend / activeP.clicks : null), true) : null}
-          {activeT.clicks > 0 ? kpi('אחוז המרה', (activeT.convRate || 0).toFixed(2) + '%', 'cyan', activeT.convRate || 0, activeP?.convRate || null) : null}
+          {kpi('עלות ממוצעת לקליק', formatCurrency(activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0), 'amber', activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0, (activeP && activeP.clicks > 0 ? activeP.spend / activeP.clicks : null), true)}
+          {kpi('אחוז המרה', (activeT.convRate || 0).toFixed(2) + '%', 'cyan', activeT.convRate || 0, activeP?.convRate || null)}
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled) : null}
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted) : null}
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
@@ -3009,13 +3009,44 @@ const selectProject = async (client, project) => {
           );
         })()}
 
+        {/* GOOGLE SEARCH ADS (Top 5 text ads) */}
+        {(dashTab === 'google' || dashTab === 'google_search' || dashTab === 'all') && (() => {
+          const rows = gReports.flatMap(r => (r.data || []));
+          const byAd = {};
+          for (const r of rows) {
+            const txt = (r.adText || '').trim();
+            if (!txt) continue;
+            const key = (r.adName || '') + '||' + txt.slice(0, 60);
+            if (!byAd[key]) byAd[key] = { adName: r.adName || '', adText: txt, campaign: r.campaign || '', spend: 0, clicks: 0, impressions: 0, leads: 0 };
+            byAd[key].spend += Number(r.spend) || 0;
+            byAd[key].clicks += Number(r.clicks) || 0;
+            byAd[key].impressions += Number(r.impressions) || 0;
+            byAd[key].leads += Number(r.leads) || 0;
+          }
+          const top = Object.values(byAd).sort((a, b) => b.spend - a.spend).slice(0, 5);
+          if (top.length === 0) return null;
+          return (
+            <div className="section">
+              <div className="section-head"><div className="ico rose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><h2>מודעות Google Search</h2><span className="sub">Top 5 לפי הוצאה</span></div>
+              <div className="table-wrapper"><table className="data-table"><thead><tr><th>מודעה</th><th>קמפיין</th><th>קליקים</th><th>חשיפות</th><th>CTR</th><th>עלות לקליק</th><th>לידים</th><th>עלות לליד</th><th>הוצאה</th></tr></thead><tbody>
+                {top.map((a, i) => {
+                  const ctr = a.impressions > 0 ? (a.clicks / a.impressions * 100) : 0;
+                  const cpc = a.clicks > 0 ? a.spend / a.clicks : 0;
+                  const cpl = a.leads > 0 ? a.spend / a.leads : 0;
+                  return (<tr key={i}><td style={{maxWidth:340,unicodeBidi:'plaintext'}}><div style={{fontWeight:600,fontSize:'0.85em',color:'#0f172a',whiteSpace:'normal'}}>{a.adText}</div>{a.adName ? <div style={{fontSize:'0.72em',color:'#94a3b8'}}>{a.adName}</div> : null}</td><td style={{fontSize:'0.78em',color:'#64748b',unicodeBidi:'plaintext'}}>{a.campaign}</td><td>{formatNum(a.clicks)}</td><td>{formatNum(a.impressions)}</td><td>{ctr.toFixed(2)}%</td><td>{formatCurrency(cpc)}</td><td>{formatNum(Math.round(a.leads))}</td><td>{formatCurrency(cpl)}</td><td>{formatCurrency(a.spend)}</td></tr>);
+                })}
+              </tbody></table></div>
+            </div>
+          );
+        })()}
+
         {/* ASSET GROUPS SECTION (Google PMax) */}
         {(dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'all') && (() => {
           const groups = gReports.flatMap(r => r.summary?.assetGroups || []);
           if (groups.length === 0) return null;
           return (
             <div className="section section-asset-gallery">
-              <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים Google Search</h2></div>
+              <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קריאייטיב Google PMax</h2></div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
                   // Handle both old field names (imageUrl, type) and new GAQL names (image_url, field_type)
