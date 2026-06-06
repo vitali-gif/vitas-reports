@@ -619,6 +619,7 @@ const loadClients = async () => {
 
 const selectProject = async (client, project) => {
     setSelectedClient(client); setSelectedProject(project); setView('dashboard'); setCompareEnabled(false);
+    if (typeof window !== 'undefined' && project?.id) { try { localStorage.setItem('vitas_last_project', project.id) } catch {} }
     setVitasTasks([]); setRecSubTab('new');
     await loadProjectReports(project.id);
     await loadProjectTasks(project.id);
@@ -643,9 +644,13 @@ const selectProject = async (client, project) => {
       .filter(c => c.projects.length > 0);
     // If user picked a specific project in the picker, honour it; else first
     let targetClient = filtered[0], targetProject = filtered[0]?.projects?.[0];
-    if (initialProjectId) {
+    // Restore the last project the user was on (survives PWA refresh), else honour the
+    // picker's initialProjectId, else default to the first allowed project.
+    const savedId = (typeof window !== 'undefined') ? (() => { try { return localStorage.getItem('vitas_last_project') } catch { return null } })() : null;
+    const wantedId = initialProjectId || savedId;
+    if (wantedId) {
       for (const c of filtered) {
-        const p = c.projects.find(p => p.id === initialProjectId);
+        const p = c.projects.find(p => p.id === wantedId);
         if (p) { targetClient = c; targetProject = p; break; }
       }
     }
