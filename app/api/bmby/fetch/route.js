@@ -541,69 +541,62 @@ async function runSync(opts = {}) {
       }
     })
 
-    // 5. Contracts: include if EITHER agreement_date OR contract_date is in window.
-    // BMBY's report categorizes contracts as:
-    //   הסכמים נסגרו = filtered by agreement_date (preliminary bookings)
-    //   חוזים נחתמו  = filtered by contract_date (final paperwork)
-    // We combine both into a single "contracts" count.
-    const contractsInRange = contracts.filter(k =>
-      inRangeDate(k.agreement_date) || inRangeDate(k.contract_date) || inRangeDate(k.signed_date)
-    )
+    // 5. Split BMBY's two deal milestones into SEPARATE metrics (were wrongly merged before):
+    //   הרשמות (registrations) = deal CLOSED → filter by agreement_date ("הסכמים נסגרו")
+    //   חוזים  (contracts)     = deal SIGNED → filter by contract_date / signed_date ("הסכמים נחתמו")
+    // A deal closed AND signed inside the same window counts in both (mirrors BMBY's separate report rows).
+    const _dealVal = (k) => num(k.price_agreement_inc_vat || k.final_price_inc_vat || k.list_price || k.price_agreement || k.final_price)
+    // Attribute a client to a media bucket: window LID → historical LID → client.media → "ללא מקור"
+    const _attributeMedia = (cid) => {
+      for (const [media, ids] of mediaClientIds.entries()) { if (ids.has(cid)) return media }
+      if (clientToAnyLidMedia.has(cid)) return clientToAnyLidMedia.get(cid)
+      if (clientMedia.has(cid)) return clientMedia.get(cid)
+      return 'ללא מקור'
+    }
+    const registrationsInRange   = contracts.filter(k => inRangeDate(k.agreement_date))
+    const contractsSignedInRange = contracts.filter(k => inRangeDate(k.contract_date) || inRangeDate(k.signed_date))
     const _contractAttribDebug = []
-    for (const k of contractsInRange) {
+    // הרשמות — closed deals (by agreement_date)
+    for (const k of registrationsInRange) {
       const cid = String(k.client_id || '')
-      // BMBY's "סכום העסקאות" matches price_agreement_inc_vat (with VAT) - gives ~95% of report total
-      const val = num(k.price_agreement_inc_vat || k.final_price_inc_vat || k.list_price || k.price_agreement || k.final_price)
-      // Fallback chain: window LIDs → any historical LID → client.media → "ללא מקור"
-      let attributedMedia = null
-      let attribSource = null
-      for (const [media, ids] of mediaClientIds.entries()) {
-        if (ids.has(cid)) { attributedMedia = media; attribSource = 'window_lid'; break }
-      }
-      if (!attributedMedia && clientToAnyLidMedia.has(cid)) {
-        attributedMedia = clientToAnyLidMedia.get(cid); attribSource = 'historical_lid'
-      }
-      if (!attributedMedia && clientMedia.has(cid)) {
-        attributedMedia = clientMedia.get(cid); attribSource = 'client_media'
-      }
-      if (!attributedMedia) { attributedMedia = 'ללא מקור'; attribSource = 'none' }
+      const val = _dealVal(k)
+      const attributedMedia = _attributeMedia(cid)
+      const bucket = ensureSrc(attributedMedia)
+      totals.registrations += 1
+      bucket.registrations += 1
+      totals.registrationValue += val
+      bucket.registrationValue += val
       const _allFields = {}
-      for (const [fk, fv] of Object.entries(k)) {
-        if (fv !== '' && fv !== null && fv !== undefined) _allFields[fk] = fv
-      }
+      for (const [fk, fv] of Object.entries(k)) { if (fv !== '' && fv !== null && fv !== undefined) _allFields[fk] = fv }
       _contractAttribDebug.push({
-        client_id: cid,
+        kind: 'registration', client_id: cid,
         client_name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim() || undefined,
-        agreement_date: k.agreement_date,
-        used_val: val,
-        list_price: num(k.list_price),
-        price_agreement_inc_vat: num(k.price_agreement_inc_vat),
-        attribSource,
-        attributedMedia,
-        allFields: _allFields,
+        agreement_date: k.agreement_date, contract_date: k.contract_date,
+        used_val: val, list_price: num(k.list_price), attributedMedia, allFields: _allFields,
       })
+    }
+    // חוזים — signed deals (by contract_date / signed_date)
+    for (const k of contractsSignedInRange) {
+      const cid = String(k.client_id || '')
+      const val = _dealVal(k)
+      const attributedMedia = _attributeMedia(cid)
       const bucket = ensureSrc(attributedMedia)
       totals.contracts += 1
       bucket.contracts += 1
       totals.contractValue += val
       bucket.contractValue += val
+      _contractAttribDebug.push({
+        kind: 'contract', client_id: cid,
+        client_name: ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim() || undefined,
+        agreement_date: k.agreement_date, contract_date: k.contract_date, signed_date: k.signed_date,
+        used_val: val, attributedMedia,
+      })
     }
-    // Build set of client_ids with contracts in window (for per-city breakdown)
-    const contractClientSet = new Set(contractsInRange.map(k => String(k.client_id || '')).filter(Boolean))
+    // Set of client_ids with SIGNED contracts in window (for per-city "חוזים" breakdown)
+    const contractClientSet = new Set(contractsSignedInRange.map(k => String(k.client_id || '')).filter(Boolean))
 
-    // 6. Price offers (currently unused for ש.ברוך - kept for future)
+    // 6. Price offers (kept for row_count / diagnostics; registrations now come from closed deals above)
     const pricesInRange = prices.filter(po => inRangeDate(po.offer_date || po.create_date))
-    for (const po of pricesInRange) {
-      const cid = String(po.client_id || '')
-      let attributedMedia = null
-      for (const [media, ids] of mediaClientIds.entries()) {
-        if (ids.has(cid)) { attributedMedia = media; break }
-      }
-      if (!attributedMedia) continue
-      const bucket = ensureSrc(attributedMedia)
-      totals.registrations += 1
-      bucket.registrations += 1
-    }
 
     // Build xlsx-shape rows (one row per source) so the dashboard's aggregateCrmRows works as-is
     const xlsxRows = Object.entries(sources).map(([sourceName, s]) => ({
@@ -916,13 +909,13 @@ async function runSync(opts = {}) {
 
     const _fbLids  = aprilLids.filter(_isFbLid)
     const _glLids  = aprilLids.filter(_isGlLid)
-    const _fbRegs  = pricesInRange.filter(po => _cidSource.get(String(po.client_id || '')) === 'facebook')
-    const _glRegs  = pricesInRange.filter(po => _cidSource.get(String(po.client_id || '')) === 'google')
-    const _fbConts = contractsInRange.filter(k => _cidSource.get(String(k.client_id || '')) === 'facebook')
-    const _glConts = contractsInRange.filter(k => _cidSource.get(String(k.client_id || '')) === 'google')
+    const _fbRegs  = registrationsInRange.filter(k => _cidSource.get(String(k.client_id || '')) === 'facebook')
+    const _glRegs  = registrationsInRange.filter(k => _cidSource.get(String(k.client_id || '')) === 'google')
+    const _fbConts = contractsSignedInRange.filter(k => _cidSource.get(String(k.client_id || '')) === 'facebook')
+    const _glConts = contractsSignedInRange.filter(k => _cidSource.get(String(k.client_id || '')) === 'google')
 
     const namedLeads = {
-      all:      _buildGroup(aprilLids, pricesInRange, contractsInRange),
+      all:      _buildGroup(aprilLids, registrationsInRange, contractsSignedInRange),
       facebook: _buildGroup(_fbLids, _fbRegs, _fbConts),
       google:   _buildGroup(_glLids, _glRegs, _glConts),
     }
@@ -931,7 +924,7 @@ async function runSync(opts = {}) {
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
-    const CRM_SCHEMA_VERSION = 6  // v6: named meeting lists mirror per-LID count logic (post-LID, non-cancelled)
+    const CRM_SCHEMA_VERSION = 7  // v7: registrations=closed deals (agreement_date), contracts=signed deals (contract_date); +registrationValue
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
@@ -939,7 +932,7 @@ async function runSync(opts = {}) {
       data: xlsxRows,
       summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, namedLeads, schemaVersion: CRM_SCHEMA_VERSION },
       file_name: 'BMBY API (live)',
-      row_count: aprilLids.length + contractsInRange.length + pricesInRange.length,
+      row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
     }, { onConflict: 'project_id,source,month' })
 
     if (upsertErr) errors.push('upsert: ' + upsertErr.message)
@@ -949,7 +942,8 @@ async function runSync(opts = {}) {
       bmbyProjectId: bmbyPid,
       counts: {
         leads: aprilLids.length,
-        contracts: contractsInRange.length,
+        registrations: registrationsInRange.length,
+        contracts: contractsSignedInRange.length,
         prices: pricesInRange.length,
       },
       totalRaw: {

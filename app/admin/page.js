@@ -333,7 +333,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
     const GOOGLE_SCHEMA_VERSION = 2;  // keep in sync with google route.js
     const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google') && (r.summary?.schemaVersion || 0) >= GOOGLE_SCHEMA_VERSION);
-    const CRM_SCHEMA_VERSION = 5;  // keep in sync with route.js + useEffect below
+    const CRM_SCHEMA_VERSION = 7;  // keep in sync with route.js + useEffect below
     const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
     const haveCrm = !!crmRow && (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION;
     const haveAll = haveFb && haveGoog && haveCrm;
@@ -668,7 +668,7 @@ const selectProject = async (client, project) => {
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
     const hasGoogle = reports.some(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-    const CRM_SCHEMA_VERSION = 6  // must match server-side route in api/bmby/fetch
+    const CRM_SCHEMA_VERSION = 7  // must match server-side route in api/bmby/fetch
     const crmRow = reports.find(r => r.month === selectedMonth && r.source === 'crm')
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
     const hasCrm = !!crmRow && cachedCrmVersion >= CRM_SCHEMA_VERSION;
@@ -1458,6 +1458,8 @@ const selectProject = async (client, project) => {
           {ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
           {ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
           {(ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrencyCompact(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
+          {ct.registrations > 0 && _platformSpend > 0 ? crmKpi('עלות להרשמה', formatCurrency(_platformSpend / ct.registrations), 'red', _platformSpend / ct.registrations, null, true) : null}
+          {(ct.registrationValue || 0) > 0 ? crmKpi('שווי הרשמות', formatCurrencyCompact(ct.registrationValue), 'green', ct.registrationValue, cp?.registrationValue || null) : null}
         </div>
 
 
@@ -2609,6 +2611,8 @@ const selectProject = async (client, project) => {
           {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לפגישה שבוצעה', (crmTotals?.meetingsCompleted > 0) ? formatCurrency(activeT.spend / crmTotals.meetingsCompleted) : '—', 'purple', (crmTotals?.meetingsCompleted > 0) ? activeT.spend / crmTotals.meetingsCompleted : 0, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
           {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
           {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
+          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות להרשמה', (crmTotals?.registrations > 0) ? formatCurrency(activeT.spend / crmTotals.registrations) : '—', 'red', (crmTotals?.registrations > 0) ? activeT.spend / crmTotals.registrations : 0, (prevCrmTotals?.registrations > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.registrations : null, true) : null}
+          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
         </div>
 
         {/* FUNNEL */}
