@@ -924,7 +924,7 @@ async function runSync(opts = {}) {
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
-    const CRM_SCHEMA_VERSION = 7  // v7: registrations=closed deals (agreement_date), contracts=signed deals (contract_date); +registrationValue
+    const CRM_SCHEMA_VERSION = 8  // v8: registrationValue now stored per-source in xlsxRows (was hardcoded 0)
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',

@@ -333,7 +333,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
     const GOOGLE_SCHEMA_VERSION = 2;  // keep in sync with google route.js
     const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google') && (r.summary?.schemaVersion || 0) >= GOOGLE_SCHEMA_VERSION);
-    const CRM_SCHEMA_VERSION = 7;  // keep in sync with route.js + useEffect below
+    const CRM_SCHEMA_VERSION = 8;  // keep in sync with route.js + useEffect below
     const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
     const haveCrm = !!crmRow && (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION;
     const haveAll = haveFb && haveGoog && haveCrm;
@@ -668,7 +668,7 @@ const selectProject = async (client, project) => {
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
     const hasGoogle = reports.some(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-    const CRM_SCHEMA_VERSION = 7  // must match server-side route in api/bmby/fetch
+    const CRM_SCHEMA_VERSION = 8  // must match server-side route in api/bmby/fetch
     const crmRow = reports.find(r => r.month === selectedMonth && r.source === 'crm')
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
     const hasCrm = !!crmRow && cachedCrmVersion >= CRM_SCHEMA_VERSION;
