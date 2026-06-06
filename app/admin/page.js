@@ -958,7 +958,6 @@ const selectProject = async (client, project) => {
     const bucketValues = bucketLabels.map(k => bucketsTotal[k] || 0);
 
     pendingChartsRef.current.push(setTimeout(() => {
-      destroyCharts();
       const bucketBusinessValues = bucketLabels.map(k => bucketsBusiness[k] || 0);
       const bucketMeetingValues = bucketLabels.map(k => bucketMeetingWith[k] || 0);
       const conversionRates = bucketLabels.map(k => {
@@ -1039,7 +1038,7 @@ const selectProject = async (client, project) => {
 
     return (
       <>
-                <div className="kpi-tier primary" style={{gridTemplateColumns:'repeat(4,1fr)',marginBottom:'36px'}}>
+                <div className="kpi-tier primary" style={{marginBottom:'36px'}}>
           <div className="kpi-c indigo" style={_crmRespLeads?.allLeads?.length > 0 ? {cursor:'pointer'} : undefined} onClick={_crmRespLeads?.allLeads?.length > 0 ? () => setNamedLeadsModal({title: 'סה"כ לידים', names: _crmRespLeads.allLeads}) : undefined}>
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
