@@ -2614,13 +2614,12 @@ const selectProject = async (client, project) => {
           {crmReports[0]?.summary?.crmType === 'zoho' ? kpi('אחוז המרה', (activeT.convRate || 0).toFixed(2) + '%', 'cyan', activeT.convRate || 0, activeP?.convRate || null) : null}
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled) : null}
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted) : null}
-          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
-          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
           {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לפגישה שבוצעה', (crmTotals?.meetingsCompleted > 0) ? formatCurrency(activeT.spend / crmTotals.meetingsCompleted) : '—', 'purple', (crmTotals?.meetingsCompleted > 0) ? activeT.spend / crmTotals.meetingsCompleted : 0, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
-          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
-          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
-          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות להרשמה', (crmTotals?.registrations > 0) ? formatCurrency(activeT.spend / crmTotals.registrations) : '—', 'red', (crmTotals?.registrations > 0) ? activeT.spend / crmTotals.registrations : 0, (prevCrmTotals?.registrations > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.registrations : null, true) : null}
+          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
           {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
+          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
+          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
+          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
         </div>
 
         {/* FUNNEL */}
@@ -2654,7 +2653,7 @@ const selectProject = async (client, project) => {
               <div className="fstep">
                 <div className="flabel">חשיפות</div>
                 <div className="fvalue">{formatNum(activeT.impressions)}</div>
-                <div className="frate"><span className="pct">100%</span> מצטבר</div>
+                <div className="frate"><span className="pct">{activeT.impressions > 0 ? formatCurrency(activeT.spend / activeT.impressions * 1000) : '-'}</span> CPM</div>
                 {fCh(activeT.impressions, p?.impressions)}
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
