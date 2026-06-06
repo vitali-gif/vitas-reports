@@ -1466,7 +1466,6 @@ const selectProject = async (client, project) => {
           {ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
           {ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
           {(ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrencyCompact(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
-          {ct.registrations > 0 && _platformSpend > 0 ? crmKpi('עלות להרשמה', formatCurrency(_platformSpend / ct.registrations), 'red', _platformSpend / ct.registrations, null, true) : null}
           {(ct.registrationValue || 0) > 0 ? crmKpi('שווי הרשמות', formatCurrencyCompact(ct.registrationValue), 'green', ct.registrationValue, cp?.registrationValue || null) : null}
         </div>
 
