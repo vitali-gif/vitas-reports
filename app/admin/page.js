@@ -3184,7 +3184,7 @@ const selectProject = async (client, project) => {
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
           footerText="VITAS Reports v3.2"
-          lockedProjects={['REHAVIA']}
+          lockedProjects={[]}
           demoProjects={clients.flatMap(c=>(c.projects||[]).filter(p=>p.is_demo).map(p=>p.name))}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
