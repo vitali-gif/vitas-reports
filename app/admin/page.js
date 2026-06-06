@@ -335,7 +335,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google') && (r.summary?.schemaVersion || 0) >= GOOGLE_SCHEMA_VERSION);
     const CRM_SCHEMA_VERSION = 8;  // keep in sync with route.js + useEffect below
     const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
-    const haveCrm = !!crmRow && (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION;
+    const haveCrm = !!crmRow && (isClientView || (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION); // client: don't force re-fetch on version bump (cron re-warms)
     const haveAll = haveFb && haveGoog && haveCrm;
 
     // Is this an "open" period (today still updating) or a closed/finalized one?
@@ -494,7 +494,9 @@ const loadClients = async () => {
         });
       }
     }
-    else { setReports([]); }
+    // data === null ⇒ the read FAILED. Keep whatever is already on screen instead of
+    // blanking the dashboard to [] (which also hid the loading overlay, since it requires
+    // reports.length > 0). A genuinely-empty project returns [] (truthy) → handled above.
     setPeriodLoading(false);
   };
 
@@ -671,7 +673,7 @@ const selectProject = async (client, project) => {
     const CRM_SCHEMA_VERSION = 8  // must match server-side route in api/bmby/fetch
     const crmRow = reports.find(r => r.month === selectedMonth && r.source === 'crm')
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
-    const hasCrm = !!crmRow && cachedCrmVersion >= CRM_SCHEMA_VERSION;
+    const hasCrm = !!crmRow && (isClientView || cachedCrmVersion >= CRM_SCHEMA_VERSION); // client: cached CRM of any version counts (avoids heavy client live-fetch + clobber)
     if (hasMeta && hasGoogle && hasCrm) return; // fully cached
     const tm = setTimeout(() => {
       // Unified: triggerFetch handles whichever sources are missing, in PARALLEL.
