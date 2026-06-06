@@ -608,7 +608,7 @@ async function runSync(opts = {}) {
       meetingsCompleted: s.meetingsCompleted,
       meetingsCancelled: s.meetingsCancelled,
       registrations: s.registrations,
-      registrationValue: 0,
+      registrationValue: s.registrationValue,
       contracts: s.contracts,
       contractValue: s.contractValue,
     }))
