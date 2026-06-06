@@ -2598,15 +2598,17 @@ const selectProject = async (client, project) => {
         ) : (<>
         <div className="kpi-grid">
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
-          {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(totalLeadsWithCrm), 'green', totalLeadsWithCrm, activeP != null ? (activeP.leads + prevCrmTotalLeads) : null, false, _tabCrmLeads?.allLeads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(activeT.leads), 'green', activeT.leads, activeP?.leads, false, _tabCrmLeads?.allLeads)}
+          {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(totalLeadsWithCrm)), 'green', totalLeadsWithCrm, activeP != null ? (activeP.leads + prevCrmTotalLeads) : null, false, _tabCrmLeads?.allLeads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(activeT.leads)), 'green', activeT.leads, activeP?.leads, false, _tabCrmLeads?.allLeads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
-          {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled) : null}
-          {crmTotals ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted) : null}
-          {crmTotals ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
-          {crmTotals ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
-          {activeT.spend > 0 ? kpi('עלות לפגישה שבוצעה', (crmTotals?.meetingsCompleted > 0) ? formatCurrency(activeT.spend / crmTotals.meetingsCompleted) : '—', 'purple', (crmTotals?.meetingsCompleted > 0) ? activeT.spend / crmTotals.meetingsCompleted : 0, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
-          {activeT.spend > 0 ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
-          {activeT.spend > 0 ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
+          {activeT.clicks > 0 ? kpi('עלות ממוצעת לקליק', formatCurrency(activeT.spend / activeT.clicks), 'amber', activeT.spend / activeT.clicks, (activeP && activeP.clicks > 0 ? activeP.spend / activeP.clicks : null), true) : null}
+          {activeT.clicks > 0 ? kpi('אחוז המרה', (activeT.convRate || 0).toFixed(2) + '%', 'cyan', activeT.convRate || 0, activeP?.convRate || null) : null}
+          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled) : null}
+          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted) : null}
+          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
+          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
+          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לפגישה שבוצעה', (crmTotals?.meetingsCompleted > 0) ? formatCurrency(activeT.spend / crmTotals.meetingsCompleted) : '—', 'purple', (crmTotals?.meetingsCompleted > 0) ? activeT.spend / crmTotals.meetingsCompleted : 0, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
+          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
         </div>
 
         {/* FUNNEL */}
@@ -2628,7 +2630,7 @@ const selectProject = async (client, project) => {
               const isFlat = delta === 0;
               return <span className={`kpi-trend${isFlat ? ' flat' : ''}`} style={{fontSize:10,padding:'2px 6px',marginTop:4,display:'inline-block'}}>{arrow} {sign}{absDelta} ({isFlat ? '0%' : (delta > 0 ? '+' : '-') + pctStr})</span>;
             };
-            return crmTotals ? (
+            return (crmTotals && crmReports[0]?.summary?.crmType !== 'zoho') ? (
             <div className="funnel">
               <div className="fstep sky">
                 <div className="flabel">קליקים</div>
@@ -2676,7 +2678,7 @@ const selectProject = async (client, project) => {
             <div className="funnel" style={{gridTemplateColumns:'1fr 14px 1fr 14px 1fr'}}>
               <div className="fstep rose">
                 <div className="flabel">לידים</div>
-                <div className="fvalue">{formatNum(activeT.leads)}</div>
+                <div className="fvalue">{formatNum(Math.round(activeT.leads))}</div>
                 <div className="frate"><span className="pct">{activeT.convRate.toFixed(2)}%</span> המרה</div>
               </div>
               <div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
