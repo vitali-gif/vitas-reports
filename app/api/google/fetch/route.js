@@ -122,8 +122,12 @@ async function runSync(opts = {}) {
   // Multi-account: GOOGLE_ADS_CUSTOMER_IDS = comma-separated customer IDs under the same MCC
   // (shares one OAuth + login-customer-id). Falls back to the legacy single GOOGLE_ADS_CUSTOMER_ID.
   // Rows from every customer are merged, then routed to projects by campaign-name substring match.
-  const customerIds = (process.env.GOOGLE_ADS_CUSTOMER_IDS || process.env.GOOGLE_ADS_CUSTOMER_ID || '')
-    .split(',').map((s) => s.trim().replace(/-/g, '')).filter(Boolean)
+  // Additive merge: legacy single var (existing clients) + new comma-separated list, de-duped.
+  // Setting GOOGLE_ADS_CUSTOMER_IDS to just the new customer is enough — the legacy one keeps working.
+  const customerIds = [...new Set([
+    ...(process.env.GOOGLE_ADS_CUSTOMER_ID || '').split(','),
+    ...(process.env.GOOGLE_ADS_CUSTOMER_IDS || '').split(','),
+  ].map((s) => s.trim().replace(/-/g, '')).filter(Boolean))]
   if (customerIds.length === 0) return { status: 500, body: { error: 'Missing GOOGLE_ADS_CUSTOMER_ID(S) env var' } }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

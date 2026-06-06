@@ -78,8 +78,12 @@ async function runSync(opts = {}) {
   // (e.g. Vitas + BCureLaser). Falls back to the legacy single META_AD_ACCOUNT_ID.
   // Rows from every account are merged, then routed to projects by the existing
   // campaign-name substring match — so each client's account only feeds its own project.
-  const adAccountIds = (process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || '')
-    .split(',').map((s) => s.trim()).filter(Boolean)
+  // Additive merge: legacy single var (existing clients) + new comma-separated list, de-duped.
+  // Setting META_AD_ACCOUNT_IDS to just the new account is enough — the legacy one keeps working.
+  const adAccountIds = [...new Set([
+    ...(process.env.META_AD_ACCOUNT_ID || '').split(','),
+    ...(process.env.META_AD_ACCOUNT_IDS || '').split(','),
+  ].map((s) => s.trim()).filter(Boolean))]
   if (!token || adAccountIds.length === 0) {
     return { status: 500, body: { error: 'Missing META_ACCESS_TOKEN or META_AD_ACCOUNT_ID(S) env vars' } }
   }
