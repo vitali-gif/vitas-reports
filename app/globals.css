@@ -2300,11 +2300,11 @@
 .kpi-tier.compact { grid-template-columns: repeat(5, 1fr); margin-bottom: 12px; }
 .kpi-tier.compact:last-of-type { margin-bottom: 36px; }
 @media (max-width: 900px) {
-  .kpi-tier.primary { grid-template-columns: repeat(2, 1fr); }
-  .kpi-tier.compact { grid-template-columns: repeat(3, 1fr); }
+  .kpi-tier.primary { grid-template-columns: repeat(2, 1fr) !important; }
+  .kpi-tier.compact { grid-template-columns: repeat(3, 1fr) !important; }
 }
 @media (max-width: 560px) {
-  .kpi-tier.primary, .kpi-tier.compact { grid-template-columns: repeat(2, 1fr); }
+  .kpi-tier.primary, .kpi-tier.compact { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
 /* Compact sizing overrides */
