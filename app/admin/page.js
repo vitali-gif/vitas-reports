@@ -2479,6 +2479,7 @@ const selectProject = async (client, project) => {
             const _devList  = Object.entries(_zs.devices || {}).sort((a,b) => b[1]-a[1])
             const _agentList = (_rt.byAgent || []).slice(0, 8)
             const _totalLeads = _zs.totalLeads || 0
+            const _ga4 = (currentReports.find(r => r.source === 'ga4') || {}).summary || null
 
             // Schedule Zoho charts after render
             const _zohoChartKey = `zoho_${crmSubTab}_${selectedMonth}`
@@ -2507,7 +2508,39 @@ const selectProject = async (client, project) => {
                 <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
                 <button className={`client-tab ${crmSubTab === 'statuses' ? 'active' : ''}`} onClick={() => setCrmSubTab('statuses')}>📊 סטטוסי לידים</button>
                 <button className={`client-tab ${crmSubTab === 'deals' ? 'active' : ''}`} onClick={() => setCrmSubTab('deals')}>💰 משפך ומכירות</button>
+                <button className={`client-tab ${crmSubTab === 'ga4' ? 'active' : ''}`} onClick={() => setCrmSubTab('ga4')}>🌐 אתר (GA4)</button>
               </div>
+
+              {crmSubTab === 'ga4' && (_ga4 ? (<>
+                <div className="kpi-grid">
+                  {_kpiZ('משתמשים', formatNum(_ga4.users?.total || 0), 'sky')}
+                  {_kpiZ('חדשים', formatNum(_ga4.users?.new || 0) + ' (' + (_ga4.users?.newPct || 0) + '%)', 'emerald')}
+                  {_kpiZ('חוזרים', formatNum(_ga4.users?.returning || 0), 'violet')}
+                  {_kpiZ('לידים ממיני-סייט', formatNum(_ga4.leads?.minisite || 0), 'sky')}
+                  {_kpiZ('לידים מאתר החברה', formatNum(_ga4.leads?.website || 0), 'emerald')}
+                </div>
+                <div className="section">
+                  <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><h2>משפך אתר</h2><span className="sub">מיני-סייט → שאלון → עמוד תודה</span></div>
+                  <div className="crm-funnel">
+                    <div className="crm-fstep sky"><div className="v">{formatNum(_ga4.funnel?.minisiteUsers||0)}</div><div className="l">מיני-סייט</div><div className="pct">100%</div></div>
+                    <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+                    <div className="crm-fstep"><div className="v">{formatNum(_ga4.funnel?.surveyUsers||0)}</div><div className="l">שאלון</div><div className="pct">{((_ga4.funnel?.minisiteUsers||0)>0?(_ga4.funnel.surveyUsers/_ga4.funnel.minisiteUsers*100).toFixed(0):'-')+'%'}</div></div>
+                    <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+                    <div className="crm-fstep emerald"><div className="v">{formatNum(_ga4.funnel?.thankYouUsers||0)}</div><div className="l">עמוד תודה</div><div className="pct">{((_ga4.funnel?.surveyUsers||0)>0?(_ga4.funnel.thankYouUsers/_ga4.funnel.surveyUsers*100).toFixed(0):'-')+'%'}</div></div>
+                  </div>
+                </div>
+                <div className="section">
+                  <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><h2>חדש מול חוזר לפי ערוץ</h2></div>
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead><tr><th>ערוץ</th><th>חדשים</th><th>חוזרים</th><th>% חדשים</th><th>סשנים</th></tr></thead>
+                      <tbody>
+                        {Object.entries(_ga4.byChannel||{}).sort((a,b)=>((b[1].newUsers||0)+(b[1].returningUsers||0))-((a[1].newUsers||0)+(a[1].returningUsers||0))).slice(0,10).map(([ch,d])=>{const tot=(d.newUsers||0)+(d.returningUsers||0);return (<tr key={ch}><td style={{fontWeight:600}}>{ch}</td><td>{formatNum(d.newUsers||0)}</td><td>{formatNum(d.returningUsers||0)}</td><td style={{color:'var(--emerald)',fontWeight:600}}>{(tot>0?Math.round((d.newUsers||0)/tot*100):0)+'%'}</td><td>{formatNum(d.sessions||0)}</td></tr>);})}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>) : (<div className="section" style={{textAlign:'center',padding:'40px',color:'var(--text-muted)'}}>אין נתוני GA4 לתקופה הנבחרת — נסה לרענן או לבחור תקופה אחרת.</div>)}
 
               {crmSubTab === 'sources' && (<>
                 <div className="kpi-grid">
