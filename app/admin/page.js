@@ -2540,7 +2540,7 @@ const selectProject = async (client, project) => {
                     </table>
                   </div>
                 </div>
-              </>) : (<div className="section" style={{textAlign:'center',padding:'40px',color:'var(--text-muted)'}}>אין נתוני GA4 לתקופה הנבחרת — נסה לרענן או לבחור תקופה אחרת.</div>)}
+              </>) : (<div className="section" style={{textAlign:'center',padding:'40px',color:'var(--text-muted)'}}>אין נתוני GA4 לתקופה הנבחרת — נסה לרענן או לבחור תקופה אחרת.</div>))}
 
               {crmSubTab === 'sources' && (<>
                 <div className="kpi-grid">
