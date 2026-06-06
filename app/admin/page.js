@@ -2602,8 +2602,8 @@ const selectProject = async (client, project) => {
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(totalLeadsWithCrm)), 'green', totalLeadsWithCrm, activeP != null ? (activeP.leads + prevCrmTotalLeads) : null, false, _tabCrmLeads?.allLeads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(activeT.leads)), 'green', activeT.leads, activeP?.leads, false, _tabCrmLeads?.allLeads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(activeT.cpl), 'purple', activeT.cpl, activeP?.cpl, true)}
-          {kpi('עלות ממוצעת לקליק', formatCurrency(activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0), 'amber', activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0, (activeP && activeP.clicks > 0 ? activeP.spend / activeP.clicks : null), true)}
-          {kpi('אחוז המרה', (activeT.convRate || 0).toFixed(2) + '%', 'cyan', activeT.convRate || 0, activeP?.convRate || null)}
+          {crmReports[0]?.summary?.crmType === 'zoho' ? kpi('עלות ממוצעת לקליק', formatCurrency(activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0), 'amber', activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0, (activeP && activeP.clicks > 0 ? activeP.spend / activeP.clicks : null), true) : null}
+          {crmReports[0]?.summary?.crmType === 'zoho' ? kpi('אחוז המרה', (activeT.convRate || 0).toFixed(2) + '%', 'cyan', activeT.convRate || 0, activeP?.convRate || null) : null}
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled) : null}
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted) : null}
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
@@ -3014,7 +3014,7 @@ const selectProject = async (client, project) => {
         })()}
 
         {/* GOOGLE SEARCH ADS (Top 5 text ads) */}
-        {(dashTab === 'google' || dashTab === 'google_search' || dashTab === 'all') && (() => {
+        {(crmReports[0]?.summary?.crmType === 'zoho') && (dashTab === 'google' || dashTab === 'google_search' || dashTab === 'all') && (() => {
           const rows = gReports.flatMap(r => (r.data || []));
           const byAd = {};
           for (const r of rows) {
