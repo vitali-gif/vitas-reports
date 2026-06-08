@@ -347,6 +347,9 @@ async function runSync(opts = {}) {
     const apptStatusDebug = {} // debug: raw status → counts
     const completedMeetingSamples = [] // debug: first 5 completed meeting tasks with details
     const clientProfileSamples = [] // debug: first 10 client profiles with apartment preferences
+    const hourlyApptStats = Array.from({ length: 24 }, () => 0) // meetings COORDINATED, bucketed by hour-of-day (0-23) from create_date
+    const _apptTimeSamples = [] // TEMP: verify create_date format + timezone
+    const _hourOfDay = (str) => { const m = String(str || '').match(/[ T](\d{2}):/); return m ? parseInt(m[1], 10) : null }
     //    by appt date relative to the LID's start_date (post-LID logic).
     const clientApptList = new Map()  // cid → [{ date, completed, cancelled }]
     const clientsWithAppt = new Set()           // window-based (any status)
@@ -371,6 +374,13 @@ async function runSync(opts = {}) {
       if (isCanc) apptStatusDebug[rawStatus].isCanc += 1
       if (!clientApptList.has(cid)) clientApptList.set(cid, [])
       clientApptList.get(cid).push({ date: apptDate, completed: isDone, cancelled: isCanc })
+      // Hour-of-day when the meeting was COORDINATED (create_date). BMBY returns Israel-local naive strings,
+      // so we read the hour straight from the string (no Date()/UTC conversion).
+      if (inRangeDate(t.create_date)) {
+        const _h = _hourOfDay(t.create_date)
+        if (_h !== null && _h >= 0 && _h <= 23) hourlyApptStats[_h]++
+        if (_apptTimeSamples.length < 6) _apptTimeSamples.push({ create_date: t.create_date, start_date: t.start_date, status: t.status })
+      }
       // Collect sample of completed meetings for debug
       if (isDone && inRangeDate(t.start_date || t.create_date) && completedMeetingSamples.length < 10) {
         completedMeetingSamples.push({
@@ -924,13 +934,13 @@ async function runSync(opts = {}) {
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
-    const CRM_SCHEMA_VERSION = 8  // v8: registrationValue now stored per-source in xlsxRows (was hardcoded 0)
+    const CRM_SCHEMA_VERSION = 9  // v9: + hourlyApptStats (meetings coordinated by hour-of-day)
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
       month: m,
       data: xlsxRows,
-      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, namedLeads, schemaVersion: CRM_SCHEMA_VERSION },
+      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, namedLeads, schemaVersion: CRM_SCHEMA_VERSION },
       file_name: 'BMBY API (live)',
       row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
     }, { onConflict: 'project_id,source,month' })
@@ -972,6 +982,7 @@ async function runSync(opts = {}) {
         })),
         aprilLidStatusCounts: _aprilLidStatusCounts,
         allRecentContracts: _allRecentContracts,
+        apptTimeSamples: _apptTimeSamples,
         apptCounts: {
           inWindow: clientsWithAppt.size,
           inWindowDone: clientsWithDoneAppt.size,
