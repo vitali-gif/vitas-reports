@@ -125,6 +125,9 @@ async function runSync(opts = {}) {
   const _accountDiag = []
   const _mergedTotals = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 }
   for (const adAccountId of adAccountIds) {
+  // Per-account token override: META_ACCESS_TOKEN_<accountId> beats the default META_ACCESS_TOKEN.
+  // Lets an ad account that lives in a different Business Manager use its own system-user token.
+  const token = process.env['META_ACCESS_TOKEN_' + adAccountId] || process.env.META_ACCESS_TOKEN
   const breakdownUrl = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/insights?level=ad&breakdowns=age,gender&fields=${fields}&time_range=${timeRange}&use_unified_attribution_setting=true&limit=500`
 
   // Fetch ad creative details (body, title, images) + status
