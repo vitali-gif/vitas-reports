@@ -914,6 +914,7 @@ const selectProject = async (client, project) => {
     const byUserMerged = {};
     const dowMerged = {};
     const bySourceMerged = {};
+    const hourMerged = Array.from({ length: 24 }, () => 0);
     for (const r of crmRows) {
       const rt = r.summary && r.summary.responseTimeStats;
       if (!rt) continue;
@@ -938,6 +939,8 @@ const selectProject = async (client, project) => {
           dowMerged[k].scheduled += dow[k].scheduled || 0;
         }
       }
+      const _hrs = r.summary && r.summary.hourlyApptStats;
+      if (Array.isArray(_hrs)) for (let _i = 0; _i < 24; _i++) hourMerged[_i] += _hrs[_i] || 0;
       const bUser = (rt.business && rt.business.byUser) || {};
       const bSource = (rt.business && rt.business.bySource) || {};
       for (const [k, v] of Object.entries(rt.byUser || {})) {
@@ -1026,6 +1029,22 @@ const selectProject = async (client, project) => {
       }, 300));
     }
 
+    // Hour-of-day: when meetings were COORDINATED (create_date), Israel time
+    const hourTotal = hourMerged.reduce((a, b) => a + b, 0);
+    const hourHasData = hourTotal > 0;
+    if (hourHasData) {
+      pendingChartsRef.current.push(setTimeout(() => {
+        const hLabels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
+        createChart('apptHourChart', 'bar', hLabels, [
+          { label: 'פגישות שתואמו', type: 'bar', data: hourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
+        ], {
+          x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' }, maxRotation: 0, autoSkip: false } },
+          y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
+               title: { display: true, text: 'מספר פגישות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+        });
+      }, 350));
+    }
+
     const fmt = (mn) => {
       if (mn == null) return '-';
       if (mn < 1) return 'מיידי';
@@ -1090,6 +1109,13 @@ const selectProject = async (client, project) => {
           <div className="section">
             <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>פילוח לפי יום בשבוע</h2><span className="sub">לידים ו-% המרה לפי יום</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
+          </div>
+        )}
+
+        {hourHasData && (
+          <div className="section">
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות</h2><span className="sub">באיזו שעה (שעון ישראל) תואמו הפגישות</span></div>
+            <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="apptHourChart"></canvas></div></div>
           </div>
         )}
 

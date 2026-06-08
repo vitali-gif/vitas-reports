@@ -348,7 +348,6 @@ async function runSync(opts = {}) {
     const completedMeetingSamples = [] // debug: first 5 completed meeting tasks with details
     const clientProfileSamples = [] // debug: first 10 client profiles with apartment preferences
     const hourlyApptStats = Array.from({ length: 24 }, () => 0) // meetings COORDINATED, bucketed by hour-of-day (0-23) from create_date
-    const _apptTimeSamples = [] // TEMP: verify create_date format + timezone
     const _hourOfDay = (str) => { const m = String(str || '').match(/[ T](\d{2}):/); return m ? parseInt(m[1], 10) : null }
     //    by appt date relative to the LID's start_date (post-LID logic).
     const clientApptList = new Map()  // cid → [{ date, completed, cancelled }]
@@ -379,7 +378,6 @@ async function runSync(opts = {}) {
       if (inRangeDate(t.create_date)) {
         const _h = _hourOfDay(t.create_date)
         if (_h !== null && _h >= 0 && _h <= 23) hourlyApptStats[_h]++
-        if (_apptTimeSamples.length < 6) _apptTimeSamples.push({ create_date: t.create_date, start_date: t.start_date, status: t.status })
       }
       // Collect sample of completed meetings for debug
       if (isDone && inRangeDate(t.start_date || t.create_date) && completedMeetingSamples.length < 10) {
@@ -982,7 +980,6 @@ async function runSync(opts = {}) {
         })),
         aprilLidStatusCounts: _aprilLidStatusCounts,
         allRecentContracts: _allRecentContracts,
-        apptTimeSamples: _apptTimeSamples,
         apptCounts: {
           inWindow: clientsWithAppt.size,
           inWindowDone: clientsWithDoneAppt.size,
