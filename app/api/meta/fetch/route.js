@@ -35,16 +35,19 @@ function extractLeads(actions) {
     }
     return null
   }
-  // Priority 1: onsite_conversion.lead_grouped = Meta Lead Ads / Instant Forms (what Ads Manager "Results" shows for lead-gen campaigns)
-  let v = getByType('onsite_conversion.lead_grouped')
+  // Each ad's "result" = the conversion its campaign optimizes for (matches Ads Manager "Results"):
+  //   lead-form campaigns  -> onsite_conversion.lead_grouped (on-Facebook Instant Forms)
+  //   conversion campaigns -> custom conversion "LEAD | 2025" (offsite_conversion.custom.1586162569238898)
+  // An ad belongs to one campaign type, so max() picks its real result with no double-counting.
+  // Accounts without that custom conversion (e.g. ש.ברוך) -> lead2025 is null -> behaves like lead_grouped.
+  const leadGrouped = getByType('onsite_conversion.lead_grouped')
+  const lead2025 = getByType('offsite_conversion.custom.1586162569238898')
+  if (leadGrouped !== null || lead2025 !== null) return Math.max(leadGrouped || 0, lead2025 || 0)
+  // Fallbacks for rows/accounts without either of the above
+  let v = getByType('offsite_conversion.fb_pixel_lead')
   if (v !== null) return v
-  // Priority 2: pixel-tracked leads on external site
-  v = getByType('offsite_conversion.fb_pixel_lead')
-  if (v !== null) return v
-  // Priority 3: leadgen.other (older lead gen)
   v = getByType('leadgen.other')
   if (v !== null) return v
-  // Last resort: the aggregate 'lead' field
   v = getByType('lead')
   return v !== null ? v : 0
 }
