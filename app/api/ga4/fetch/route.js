@@ -205,5 +205,11 @@ export async function GET(request) {
       return Response.json({ ok: false, error: String(err.message || err) }, { status: 500 })
     }
   }
+  // TEMP gated diagnostic: /api/ga4/fetch?run=1[&month=YYYY-MM | &since=&until=] — runs full sync (writes) and returns result.
+  if (new URL(request.url).searchParams.get('run') === '1') {
+    const sp = new URL(request.url).searchParams
+    const { status, body: resp } = await runSync({ month: sp.get('month') || undefined, since: sp.get('since') || undefined, until: sp.get('until') || undefined })
+    return Response.json(resp, { status })
+  }
   return Response.json({ ok: true, info: 'GA4 fetch route. Use ?test=1 to verify (after env vars set), POST to sync.' })
 }
