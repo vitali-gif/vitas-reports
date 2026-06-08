@@ -2694,6 +2694,25 @@ const selectProject = async (client, project) => {
           </div>
         ) : (<>
         <div className="kpi-grid">
+          {crmReports[0]?.summary?.crmType === 'zoho' ? (() => {
+            const _zr = (crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {};
+            const _zf = _zr.funnel || {};
+            const _ch = _zf.byChannel || [];
+            const _row = dashTab === 'facebook' ? (_ch.find(c => c.channel === 'facebook') || {}) : dashTab === 'google' ? (_ch.find(c => c.channel === 'google') || {}) : null;
+            const zLeads = _row ? (_row.leads || 0) : (_zf.leads || 0);
+            const zSales = _row ? (_row.purchased || 0) : (_zf.purchased || 0);
+            const zRev = _row ? (_row.netRevenue || 0) : (_zf.netRevenue || 0);
+            const zSpend = activeT.spend || 0;
+            const zRoas = zSpend > 0 ? zRev / zSpend : 0;
+            return (<>
+              {kpi('תקציב', formatCurrency(zSpend), '', zSpend, activeP?.spend, true)}
+              {kpi('לידים', formatNum(zLeads), 'green', zLeads, null)}
+              {kpi('מכירות', formatNum(zSales), 'cyan', zSales, null)}
+              {kpi('שווי מכירות', formatCurrencyCompact(zRev), 'pink', zRev, null)}
+              {kpi('ROAS', zRoas.toFixed(2) + 'x', 'orange', zRoas, null)}
+            </>);
+          })() : null}
+          {crmReports[0]?.summary?.crmType !== 'zoho' && (<>
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(totalLeadsWithCrm)), 'green', totalLeadsWithCrm, activeP != null ? (activeP.leads + prevCrmTotalLeads) : null, false, _tabCrmLeads?.allLeads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(activeT.leads)), 'green', activeT.leads, activeP?.leads, false, _tabCrmLeads?.allLeads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(dashTab === 'all' ? (totalLeadsWithCrm > 0 ? activeT.spend / totalLeadsWithCrm : 0) : activeT.cpl), 'purple', (dashTab === 'all' ? (totalLeadsWithCrm > 0 ? activeT.spend / totalLeadsWithCrm : 0) : activeT.cpl), (dashTab === 'all' ? (activeP ? ((activeP.leads + prevCrmTotalLeads) > 0 ? activeP.spend / (activeP.leads + prevCrmTotalLeads) : 0) : null) : (activeP?.cpl ?? null)), true)}
@@ -2707,6 +2726,7 @@ const selectProject = async (client, project) => {
           {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
           {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
           {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          </>)}
         </div>
 
         {/* FUNNEL */}
@@ -2728,6 +2748,29 @@ const selectProject = async (client, project) => {
               const isFlat = delta === 0;
               return <span className={`kpi-trend${isFlat ? ' flat' : ''}`} style={{fontSize:10,padding:'2px 6px',marginTop:4,display:'inline-block'}}>{arrow} {sign}{absDelta} ({isFlat ? '0%' : (delta > 0 ? '+' : '-') + pctStr})</span>;
             };
+            if (crmReports[0]?.summary?.crmType === 'zoho') {
+              const _zr = (crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {};
+              const _zf = _zr.funnel || {};
+              const _ch = _zf.byChannel || [];
+              const _row = dashTab === 'facebook' ? (_ch.find(c => c.channel === 'facebook') || {}) : dashTab === 'google' ? (_ch.find(c => c.channel === 'google') || {}) : null;
+              const zLeads = _row ? (_row.leads || 0) : (_zf.leads || 0);
+              const zOpp = _row ? (_row.opportunities || 0) : (_zf.opportunities || 0);
+              const zSales = _row ? (_row.purchased || 0) : (_zf.purchased || 0);
+              const AR = (<div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>);
+              return (
+                <div className="funnel" style={{gridTemplateColumns:'1fr 14px 1fr 14px 1fr 14px 1fr 14px 1fr'}}>
+                  <div className="fstep sky"><div className="flabel">קליקים</div><div className="fvalue">{formatNum(activeT.clicks)}</div><div className="frate"><span className="pct">{activeT.impressions > 0 ? (activeT.clicks / activeT.impressions * 100).toFixed(2) + '%' : '-'}</span> CTR</div></div>
+                  {AR}
+                  <div className="fstep"><div className="flabel">חשיפות</div><div className="fvalue">{formatNum(activeT.impressions)}</div><div className="frate"><span className="pct">100%</span> מצטבר</div></div>
+                  {AR}
+                  <div className="fstep terra"><div className="flabel">לידים</div><div className="fvalue">{formatNum(zLeads)}</div><div className="frate"><span className="pct">{activeT.clicks > 0 ? (zLeads / activeT.clicks * 100).toFixed(1) + '%' : '-'}</span> מקליקים</div></div>
+                  {AR}
+                  <div className="fstep emerald"><div className="flabel">הזדמנויות</div><div className="fvalue">{formatNum(zOpp)}</div><div className="frate"><span className="pct">{zLeads > 0 ? (zOpp / zLeads * 100).toFixed(0) + '%' : '-'}</span> מלידים</div></div>
+                  {AR}
+                  <div className="fstep rose"><div className="flabel">מכירות</div><div className="fvalue">{formatNum(zSales)}</div><div className="frate"><span className="pct">{zOpp > 0 ? (zSales / zOpp * 100).toFixed(0) + '%' : '-'}</span> מהזדמנויות</div></div>
+                </div>
+              );
+            }
             return (crmTotals && crmReports[0]?.summary?.crmType !== 'zoho') ? (
             <div className="funnel">
               <div className="fstep sky">
