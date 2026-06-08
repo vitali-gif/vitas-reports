@@ -31,6 +31,7 @@ export async function GET(request) {
 
   const rangePresets = [
     { id: 'today',     ...todayRange() },
+    { id: 'currentMonth', since: `${yr}-${String(nowIsrael().getMonth()+1).padStart(2,'0')}-01`, until: toYMD(nowIsrael()) }, // 1→today — matches app 'החודש הנוכחי' preset
     { id: 'yesterday', ...yesterdayRange() },
     { id: 'last7',     ...daysBackRange(7) },
     { id: 'last14',    ...daysBackRange(14) },
