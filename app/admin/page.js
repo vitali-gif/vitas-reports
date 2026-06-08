@@ -253,7 +253,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     if (preset === 'yesterday') { const d = new Date(today); d.setDate(d.getDate()-1); const s = toYMD(d); return { payload: { since: s, until: s }, key: s + '_' + s }; }
     if (preset === 'last7') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-7); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
     if (preset === 'last30') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-30); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
-    if (preset === 'currentMonth') { const y = today.getFullYear(); const mm = String(today.getMonth()+1).padStart(2,'0'); const k = y+'-'+mm; return { payload: { month: k }, key: k }; }
+    if (preset === 'currentMonth') { const y = today.getFullYear(); const mm = String(today.getMonth()+1).padStart(2,'0'); const dd = String(today.getDate()).padStart(2,'0'); const since = y+'-'+mm+'-01'; const until = y+'-'+mm+'-'+dd; const k = since+'_'+until; return { payload: { since, until }, key: k }; }
     if (preset === 'lastMonth') { const y = today.getMonth()===0 ? today.getFullYear()-1 : today.getFullYear(); const m = today.getMonth()===0 ? 12 : today.getMonth(); const mm = String(m).padStart(2,'0'); return { payload: { month: `${y}-${mm}` }, key: `${y}-${mm}` }; }
     if (preset === 'last14') { const end = new Date(today); end.setDate(end.getDate()-1); const start = new Date(today); start.setDate(start.getDate()-14); const s = toYMD(start), e = toYMD(end); return { payload: { since: s, until: e }, key: s + '_' + e }; }
     const y = today.getFullYear()
@@ -2703,7 +2703,7 @@ const selectProject = async (client, project) => {
             const zSales = _row ? (_row.purchased || 0) : (_zf.purchased || 0);
             const zRev = _row ? (_row.netRevenue || 0) : (_zf.netRevenue || 0);
             const zSpend = activeT.spend || 0;
-            const zRoas = zSpend > 0 ? zRev / zSpend : 0;
+            const zRoas = zSpend > 0 ? (zRev / 1.18) / zSpend : 0; // ROAS ללא מע"מ: הכנסות/1.18 חלקי תקציב
             return (<>
               {kpi('תקציב', formatCurrency(zSpend), '', zSpend, activeP?.spend, true)}
               {kpi('לידים', formatNum(zLeads), 'green', zLeads, null)}
