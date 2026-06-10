@@ -2507,20 +2507,6 @@ const selectProject = async (client, project) => {
             const _totalLeads = _zs.totalLeads || 0
             const _ga4 = (currentReports.find(r => r.source === 'ga4') || {}).summary || null
 
-            // Schedule Zoho charts after render
-            const _zohoChartKey = `zoho_${crmSubTab}_${selectedMonth}`
-            if (crmSubTab === 'statuses') {
-              pendingChartsRef.current.push(setTimeout(() => {
-                destroyCharts()
-                if (_objList.length > 0) createChart('zohoBarObj','bar',_objList.map(([k])=>k),[{label:'לידים',data:_objList.map(([,v])=>v),backgroundColor:'rgba(244,63,94,0.7)',borderRadius:6}],{y:{beginAtZero:true,position:'right'},x:{grid:{display:false}}})
-              }, 200))
-            } else if (crmSubTab === 'deals') {
-              pendingChartsRef.current.push(setTimeout(() => {
-                destroyCharts()
-                if (_devList.length > 0) createChart('zohoBarDevice','bar',_devList.map(([k])=>k),[{label:'לידים',data:_devList.map(([,v])=>v),backgroundColor:'rgba(99,102,241,0.7)',borderRadius:6}],{y:{beginAtZero:true,position:'right'},x:{grid:{display:false}}})
-              }, 200))
-            }
-
             const _kpiZ = (lbl, val, cls) => (
               <div key={lbl} className={`kpi ${cls||'indigo'}`}>
                 <div className="kpi-top"><div className="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></svg></div></div>
@@ -2531,10 +2517,8 @@ const selectProject = async (client, project) => {
 
             return (<>
               <div className="client-tabs" style={{marginBottom: 15}}>
-                <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
-                <button className={`client-tab ${crmSubTab === 'statuses' ? 'active' : ''}`} onClick={() => setCrmSubTab('statuses')}>📊 סטטוסי לידים</button>
-                <button className={`client-tab ${crmSubTab === 'deals' ? 'active' : ''}`} onClick={() => setCrmSubTab('deals')}>💰 משפך ומכירות</button>
-                <button className={`client-tab ${crmSubTab === 'ga4' ? 'active' : ''}`} onClick={() => setCrmSubTab('ga4')}>🌐 אתר (GA4)</button>
+                <button className={`client-tab ${crmSubTab !== 'ga4' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📊 סיכום כללי</button>
+                <button className={`client-tab ${crmSubTab === 'ga4' ? 'active' : ''}`} onClick={() => setCrmSubTab('ga4')}>🌐 GA4</button>
               </div>
 
               {crmSubTab === 'ga4' && (_ga4 ? (<>
@@ -2568,12 +2552,18 @@ const selectProject = async (client, project) => {
                 </div>
               </>) : (<div className="section" style={{textAlign:'center',padding:'40px',color:'var(--text-muted)'}}><div style={{marginBottom:14}}>אין נתוני GA4 לתקופה הנבחרת.</div><button onClick={async (e) => { const _b = e.currentTarget; _b.textContent = '⏳ מושך GA4...'; _b.disabled = true; try { const _pl = selectedMonth.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }; _pl.projectId = selectedProject?.id; const _r = await fetch('/api/ga4/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }, body: JSON.stringify(_pl) }); const _j = await _r.json().catch(() => ({})); if (!_r.ok || _j.error) { alert('GA4 שגיאה: ' + (_j.error || ('HTTP ' + _r.status))); _b.textContent = '🔄 משוך נתוני GA4'; _b.disabled = false; return; } if (selectedProject) await loadProjectReports(selectedProject.id); } catch (err) { alert('GA4 שגיאה: ' + (err && err.message ? err.message : err)); _b.textContent = '🔄 משוך נתוני GA4'; _b.disabled = false; } }} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:13,color:'#fff',background:'var(--violet)',border:'none',borderRadius:8,padding:'8px 16px',cursor:'pointer'}}>🔄 משוך נתוני GA4</button></div>))}
 
-              {crmSubTab === 'sources' && (<>
+              {crmSubTab !== 'ga4' && (<>
                 <div className="kpi-grid">
-                  {_kpiZ('סה"כ לידים', formatNum(_totalLeads), 'sky')}
+                  {_kpiZ('סה"כ לידים', formatNum(_fn.leads||_totalLeads), 'sky')}
                   {_kpiZ('רלוונטיים', formatNum(_zs.relevantLeads||0), 'emerald')}
                   {_kpiZ('לא רלוונטיים', formatNum(_zs.irrelevantLeads||0), 'rose')}
+                  {_kpiZ('הזדמנויות', formatNum(_fn.opportunities||0), 'indigo')}
+                  {_kpiZ('רכשו', formatNum(_fn.purchased||0), 'emerald')}
                   {_kpiZ('אחוז המרה לעסקה', (_fn.conversionRate||0)+'%', 'violet')}
+                  {_kpiZ('רכישות נטו', formatNum(_fn.netPurchases||0), 'emerald')}
+                  {_kpiZ('שווי רכישות (נטו)', formatCurrency(_fn.netRevenue||0), 'sky')}
+                  {_kpiZ('ערך ממוצע לעסקה', formatCurrency(_fn.avgDealValue||0), 'indigo')}
+                  {_kpiZ('ביטולים', formatNum(_fn.cancellations||0), 'rose')}
                 </div>
                 <div className="section">
                   <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2></div>
@@ -2588,89 +2578,38 @@ const selectProject = async (client, project) => {
                     </table>
                   </div>
                 </div>
-              </>)}
-
-              {crmSubTab === 'statuses' && (<>
                 <div className="section">
-                  <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><h2>סטטוסי לידים</h2></div>
-                  <div className="table-wrapper">
+                  <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>זמני תגובה לטיפול בלידים</h2><span className="sub">מרגע יצירת הליד ועד מענה ראשון</span></div>
+                  <div className="kpi-grid">
+                    {_kpiZ('זמן תגובה ממוצע', (_rt.avgHours||0)+' שע׳', 'amber')}
+                    {_kpiZ('מענה תוך שעה', (_rt.respondedWithin1h||0)+'%', 'emerald')}
+                    {_kpiZ('נענו', formatNum(_rt.respondedCount||0), 'sky')}
+                    {_kpiZ('ללא מענה', formatNum(_rt.noResponseCount||0), 'rose')}
+                  </div>
+                  <div className="table-wrapper" style={{marginTop:12}}>
                     <table className="data-table">
-                      <thead><tr><th>סטטוס</th><th>לידים</th><th>%</th></tr></thead>
+                      <thead><tr><th>טווח זמן תגובה</th><th>כמות</th><th>%</th></tr></thead>
                       <tbody>
-                        {_byStatus.map(([st, cnt]) => (
-                          <tr key={st}><td style={{fontWeight:600}}>{st}</td><td>{formatNum(cnt)}</td><td>{_totalLeads>0?(cnt/_totalLeads*100).toFixed(1)+'%':'-'}</td></tr>
-                        ))}
+                        {(() => { const lbl={'0-15m':'0–15 דק׳','15m-1h':'15 דק׳ – שעה','1h-4h':'1–4 שעות','4h-8h':'4–8 שעות','8h-24h':'8–24 שעות','1d-3d':'1–3 ימים','3d+':'3+ ימים'}; const ord=_rt.bucketOrder||[]; const bk=_rt.buckets||{}; const tot=(_rt.respondedCount||0); return ord.map(k=>(<tr key={k}><td style={{fontWeight:600}}>{lbl[k]||k}</td><td>{formatNum(bk[k]||0)}</td><td>{tot>0?((bk[k]||0)/tot*100).toFixed(1)+'%':'-'}</td></tr>)); })()}
                       </tbody>
                     </table>
                   </div>
-                </div>
-                {_objList.length > 0 && (<div className="section">
-                  <div className="section-head"><div className="ico rose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><h2>סיבות אי-עניין</h2></div>
-                  <div className="chart-card" style={{marginBottom:16}}><div className="chart-container" style={{height:220}}><canvas id="zohoBarObj"></canvas></div></div>
-                  <ul className="objections-mobile">
-                    {_objList.slice(0,6).map(([obj, cnt], i) => {
-                      const rankColors=['rank-indigo','rank-emerald','rank-violet','rank-amber','rank-sky','rank-rose']
-                      return <li key={obj}><div className={`rank ${rankColors[i]||'rank-indigo'}`}>{i+1}</div><div className="lbl">{obj}</div><div className="count">{cnt}</div></li>
-                    })}
-                  </ul>
-                </div>)}
-              </>)}
-
-              {crmSubTab === 'deals' && (<>
-                <div className="kpi-grid">
-                  {_kpiZ('סה"כ לידים', formatNum(_fn.leads||0), 'sky')}
-                  {_kpiZ('הזדמנויות', formatNum(_fn.opportunities||0), 'indigo')}
-                  {_kpiZ('רכשו', formatNum(_fn.purchased||0), 'emerald')}
-                  {_kpiZ('אחוז המרה לעסקה', (_fn.conversionRate||0)+'%', 'violet')}
-                  {_kpiZ('רכישות נטו', formatNum(_fn.netPurchases||0), 'emerald')}
-                  {_kpiZ('שווי רכישות (נטו)', formatCurrency(_fn.netRevenue||0), 'sky')}
-                  {_kpiZ('ערך ממוצע לעסקה', formatCurrency(_fn.avgDealValue||0), 'indigo')}
-                  {_kpiZ('ביטולים', formatNum(_fn.cancellations||0), 'rose')}
-                </div>
-
-                <div className="section">
-                  <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3h18l-7 8v7l-4 2v-9z"/></svg></div><h2>משפך מכירה</h2></div>
-                  <div className="table-wrapper">
+                  <div className="table-wrapper" style={{marginTop:12}}>
                     <table className="data-table">
-                      <thead><tr><th>שלב</th><th>כמות</th><th>% מהלידים</th><th>המרה מהשלב הקודם</th></tr></thead>
+                      <thead><tr><th>נציג</th><th>לידים</th><th>ללא מענה</th><th>זמן תגובה ממוצע</th></tr></thead>
                       <tbody>
-                        {(() => {
-                          const L=_fn.leads||0, O=_fn.opportunities||0, P=_fn.purchased||0, N=_fn.netPurchases||0
-                          const pct=(x,b)=> b>0 ? (x/b*100).toFixed(1)+'%' : '-'
-                          const rows=[['לידים',L,L],['הזדמנויות',O,L],['רכשו',P,O],['רכישות נטו (אחרי ביטול)',N,P]]
-                          return rows.map((r,i)=>(<tr key={r[0]}><td style={{fontWeight:600}}>{r[0]}</td><td>{formatNum(r[1])}</td><td>{pct(r[1],L)}</td><td style={{color:'var(--indigo)'}}>{pct(r[1],r[2])}</td></tr>))
-                        })()}
+                        {(_rt.byAgent||[]).map(a=>(<tr key={a.name}><td style={{fontWeight:600}}>{a.name}</td><td>{formatNum(a.count)}</td><td>{formatNum(a.noResponse)}</td><td>{a.avgHours!=null?a.avgHours+' שע׳':'-'}</td></tr>))}
                       </tbody>
                     </table>
                   </div>
-                </div>
-
-                <div className="section">
-                  <div className="section-head"><div className="ico rose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M5 9l7-7 7 7"/></svg></div><h2>לידים שלא הפכו להזדמנות ({formatNum(_fn.leadsNotConverted||0)})</h2></div>
-                  <div className="table-wrapper">
+                  {(_rt.bySource||[]).length > 0 && (<div className="table-wrapper" style={{marginTop:12}}>
                     <table className="data-table">
-                      <thead><tr><th>סטטוס ליד</th><th>כמות</th><th>%</th></tr></thead>
+                      <thead><tr><th>מקור</th><th>נענו</th><th>זמן תגובה ממוצע</th></tr></thead>
                       <tbody>
-                        {Object.entries(_fn.leadStatusDrop||{}).sort((a,b)=>b[1]-a[1]).map(([st,cnt])=>(
-                          <tr key={st}><td style={{fontWeight:600}}>{st}</td><td>{formatNum(cnt)}</td><td>{(_fn.leadsNotConverted||0)>0?(cnt/(_fn.leadsNotConverted)*100).toFixed(1)+'%':'-'}</td></tr>
-                        ))}
+                        {(_rt.bySource||[]).map(sr=>(<tr key={sr.source}><td style={{fontWeight:600}}>{sr.source}</td><td>{formatNum(sr.count)}</td><td>{sr.avgHours+' שע׳'}</td></tr>))}
                       </tbody>
                     </table>
-                  </div>
-                </div>
-
-                <div className="section">
-                  <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>הזדמנויות שעדיין לא רכשו</h2></div>
-                  <div className="table-wrapper">
-                    <table className="data-table">
-                      <thead><tr><th>שלב עסקה</th><th>כמות</th></tr></thead>
-                      <tbody>
-                        {Object.entries(_fn.openStageDrop||{}).sort((a,b)=>b[1]-a[1]).map(([st,cnt])=>(
-                          <tr key={st}><td style={{fontWeight:600}}>{st}</td><td>{formatNum(cnt)}</td></tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  </div>)}
                 </div>
               </>)}
             </>)

@@ -236,14 +236,14 @@ async function runSync(opts = {}) {
     if (!answered || !lastCallStr || !createdStr) {
       if (!byAgent[agentName]) byAgent[agentName] = { count: 0, totalHours: 0, noResponse: 0 }
       byAgent[agentName].count++; byAgent[agentName].noResponse++
-      responseTimes.push({ agentName, responseHours: null, noResponse: true })
+      responseTimes.push({ agentName, responseHours: null, noResponse: true, source: (lead.Sub_Lead_Source || 'אחר').trim() || 'אחר' })
       continue
     }
 
     const responseHours = Math.max(0, (new Date(lastCallStr) - new Date(createdStr)) / 3600000)
     if (!byAgent[agentName]) byAgent[agentName] = { count: 0, totalHours: 0, noResponse: 0 }
     byAgent[agentName].count++; byAgent[agentName].totalHours += responseHours
-    responseTimes.push({ agentName, responseHours, noResponse: false })
+    responseTimes.push({ agentName, responseHours, noResponse: false, source: (lead.Sub_Lead_Source || 'אחר').trim() || 'אחר' })
   }
 
   const responded = responseTimes.filter(r => !r.noResponse)
@@ -253,6 +253,20 @@ async function runSync(opts = {}) {
     name, count: s.count, noResponse: s.noResponse,
     avgHours: s.count > s.noResponse ? Math.round((s.totalHours / (s.count - s.noResponse)) * 10) / 10 : null,
   })).sort((a, b) => b.count - a.count)
+
+  // Response-time distribution buckets + per-source averages (for the response report)
+  const RT_BUCKETS = ['0-15m', '15m-1h', '1h-4h', '4h-8h', '8h-24h', '1d-3d', '3d+']
+  const rtBucketOf = (h) => h <= 0.25 ? '0-15m' : h <= 1 ? '15m-1h' : h <= 4 ? '1h-4h' : h <= 8 ? '4h-8h' : h <= 24 ? '8h-24h' : h <= 72 ? '1d-3d' : '3d+'
+  const rtBuckets = Object.fromEntries(RT_BUCKETS.map(b => [b, 0]))
+  const rtBySourceMap = {}
+  for (const r of responded) {
+    rtBuckets[rtBucketOf(r.responseHours)]++
+    if (!rtBySourceMap[r.source]) rtBySourceMap[r.source] = { count: 0, sumHours: 0 }
+    rtBySourceMap[r.source].count++; rtBySourceMap[r.source].sumHours += r.responseHours
+  }
+  const rtBySource = Object.entries(rtBySourceMap)
+    .map(([source, x]) => ({ source, count: x.count, avgHours: Math.round((x.sumHours / x.count) * 10) / 10 }))
+    .sort((a, b) => b.count - a.count)
 
   // ===== Compute deal stats (lead-centric via LidID) =====
   // Opportunities (Id Count): distinct leads that have a linked deal.
@@ -349,6 +363,9 @@ async function runSync(opts = {}) {
       noResponseCount: responseTimes.length - responded.length,
       respondedCount: responded.length,
       byAgent: agentStats,
+      buckets: rtBuckets,
+      bucketOrder: RT_BUCKETS,
+      bySource: rtBySource,
     },
     deals: {
       // ID COUNT — leads that became an opportunity (have a linked deal)
