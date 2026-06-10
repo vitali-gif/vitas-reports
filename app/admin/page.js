@@ -2732,7 +2732,7 @@ const selectProject = async (client, project) => {
                 <div className="funnel" style={{gridTemplateColumns:'1fr 14px 1fr 14px 1fr 14px 1fr 14px 1fr'}}>
                   <div className="fstep sky"><div className="flabel">קליקים</div><div className="fvalue">{formatNum(activeT.clicks)}</div><div className="frate"><span className="pct">{activeT.impressions > 0 ? (activeT.clicks / activeT.impressions * 100).toFixed(2) + '%' : '-'}</span> CTR</div></div>
                   {AR}
-                  <div className="fstep"><div className="flabel">חשיפות</div><div className="fvalue">{formatNum(activeT.impressions)}</div><div className="frate"><span className="pct">100%</span> מצטבר</div></div>
+                  <div className="fstep"><div className="flabel">חשיפות</div><div className="fvalue">{formatNum(activeT.impressions)}</div><div className="frate"><span className="pct">{formatNum(activeT.reach||0)}</span> תפוצה</div></div>
                   {AR}
                   <div className="fstep terra"><div className="flabel">לידים</div><div className="fvalue">{formatNum(zLeads)}</div><div className="frate"><span className="pct">{activeT.clicks > 0 ? (zLeads / activeT.clicks * 100).toFixed(1) + '%' : '-'}</span> מקליקים</div></div>
                   {AR}
