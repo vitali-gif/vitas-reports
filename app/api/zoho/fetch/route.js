@@ -358,6 +358,35 @@ async function runSync(opts = {}) {
   }
   for (const ch in campsByChannel) campsByChannel[ch].sort((a, b) => b.leads - a.leads)
 
+  // ===== Per-agent performance (Owner), with per-source breakdown =====
+  const _agentName = (l) => (l && (typeof l.Owner === 'object' ? (l.Owner && l.Owner.name) : l.Owner)) || 'לא ידוע'
+  const agentAgg = {}
+  const ensureAgent = (ag) => agentAgg[ag] || (agentAgg[ag] = { agent: ag, leads: 0, purchased: 0, netRevenue: 0, _opp: new Set(), bySrc: {} })
+  const ensureAgentSrc = (a, src) => a.bySrc[src] || (a.bySrc[src] = { source: src, leads: 0, purchased: 0, netRevenue: 0, _opp: new Set() })
+  for (const l of leads) {
+    const a = ensureAgent(_agentName(l)); a.leads++
+    ensureAgentSrc(a, normChan(l)).leads++
+  }
+  for (const d of linkedDeals) {
+    const l = leadById[d.LidID]; if (!l) continue
+    const a = ensureAgent(_agentName(l)); const sa = ensureAgentSrc(a, normChan(l))
+    a._opp.add(d.LidID); sa._opp.add(d.LidID)
+    if (d.Closing_Date) {
+      a.purchased++; sa.purchased++
+      if (!d.cancellation_date) { const amt = num(d.Amount || 0); a.netRevenue += amt; sa.netRevenue += amt }
+    }
+  }
+  const agentPerformance = Object.values(agentAgg).map(a => ({
+    agent: a.agent, leads: a.leads, opportunities: a._opp.size, purchased: a.purchased,
+    netRevenue: Math.round(a.netRevenue),
+    conversionRate: a.leads > 0 ? Math.round((a.purchased / a.leads) * 1000) / 10 : 0,
+    bySource: Object.values(a.bySrc).map(s => ({
+      source: s.source, leads: s.leads, opportunities: s._opp.size, purchased: s.purchased,
+      netRevenue: Math.round(s.netRevenue),
+      conversionRate: s.leads > 0 ? Math.round((s.purchased / s.leads) * 1000) / 10 : 0,
+    })).sort((x, y) => y.leads - x.leads),
+  })).sort((a, b) => b.leads - a.leads)
+
   const channelFunnel = Object.entries(byChannel).map(([channel, c]) => ({
     channel,
     leads: c.leads,
@@ -443,6 +472,7 @@ async function runSync(opts = {}) {
       openStageDrop,                       // why opportunities have not purchased yet
       byChannel: channelFunnel,            // per-channel funnel (leads/opps/purchased/conv/revenue)
     },
+    agentPerformance,
     schemaVersion: ZOHO_SCHEMA_VERSION,
   }
 

@@ -157,6 +157,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
   const [expandedCrmSources, setExpandedCrmSources] = useState(new Set());
   const [expandedFunnelCh, setExpandedFunnelCh] = useState(new Set());
+  const [expandedAgents, setExpandedAgents] = useState(new Set());
   const handleSort = (tableId, key) => { setSortConfig(prev => { const cur = prev[tableId]; if (cur && cur.key === key) return {...prev, [tableId]: {key, dir: cur.dir === 'desc' ? 'asc' : 'desc'}}; return {...prev, [tableId]: {key, dir: 'desc'}}; }); };
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -2523,6 +2524,8 @@ const selectProject = async (client, project) => {
             const _fn = _zs.funnel || {}
             const _ch = _fn.byChannel || []
             const toggleFunnelCh = (ch) => setExpandedFunnelCh(prev => { const n = new Set(prev); if (n.has(ch)) n.delete(ch); else n.add(ch); return n; })
+            const _agents = _zs.agentPerformance || []
+            const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
             const _byStatus = Object.entries(_zs.byStatus || {}).sort((a,b) => b[1]-a[1])
             const _bySrc    = Object.entries(_zs.bySource || {}).sort((a,b) => b[1]-a[1])
             const _objList  = Object.entries(_zs.objections || {}).sort((a,b) => b[1]-a[1])
@@ -2615,6 +2618,34 @@ const selectProject = async (client, project) => {
                           <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td>
                         </tr>
                       </tfoot>
+                    </table>
+                  </div>
+                </div>
+                <div className="section">
+                  <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>ביצועי אנשי מכירות</h2></div>
+                  <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:10,textAlign:'right'}}>💡 לחץ על נציג כדי לראות פילוח לפי מקור ליד</div>
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead><tr><th>נציג</th><th>לידים</th><th>הזדמנויות</th><th>מכירות</th><th>שווי מכירות</th><th>אחוז המרה</th></tr></thead>
+                      <tbody>
+                        {_agents.map(ag => {
+                          const srcs = ag.bySource || [];
+                          const isOpen = expandedAgents.has(ag.agent);
+                          const rows = [
+                            <tr key={ag.agent} style={{fontWeight:600, cursor: srcs.length ? 'pointer' : 'default'}} onClick={srcs.length ? () => toggleAgent(ag.agent) : undefined}>
+                              <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{srcs.length ? (isOpen ? '\u25bc' : '\u25c0') : ''}</span>{ag.agent}</td>
+                              <td>{formatNum(ag.leads)}</td><td>{formatNum(ag.opportunities)}</td><td>{formatNum(ag.purchased)}</td><td>{formatCurrency(ag.netRevenue||0)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(ag.conversionRate||0)+'%'}</td>
+                            </tr>
+                          ];
+                          if (isOpen) srcs.forEach(sr => rows.push(
+                            <tr key={ag.agent+'|'+sr.source} style={{background:'rgba(16,185,129,0.05)'}}>
+                              <td style={{paddingRight:30,fontSize:'0.9em'}}>{sr.source}</td>
+                              <td style={{fontSize:'0.9em'}}>{formatNum(sr.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(sr.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(sr.purchased)}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(sr.netRevenue||0)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(sr.conversionRate||0)+'%'}</td>
+                            </tr>
+                          ));
+                          return rows;
+                        })}
+                      </tbody>
                     </table>
                   </div>
                 </div>
@@ -3247,7 +3278,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
