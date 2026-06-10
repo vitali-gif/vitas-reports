@@ -2618,39 +2618,6 @@ const selectProject = async (client, project) => {
                     </table>
                   </div>
                 </div>
-                <div className="section">
-                  <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>זמני תגובה לטיפול בלידים</h2><span className="sub">מרגע יצירת הליד ועד מענה ראשון</span></div>
-                  <div className="kpi-grid">
-                    {_kpiZ('זמן תגובה ממוצע', (_rt.avgHours||0)+' שע׳', 'amber')}
-                    {_kpiZ('מענה תוך שעה', (_rt.respondedWithin1h||0)+'%', 'emerald')}
-                    {_kpiZ('נענו', formatNum(_rt.respondedCount||0), 'sky')}
-                    {_kpiZ('ללא מענה', formatNum(_rt.noResponseCount||0), 'rose')}
-                  </div>
-                  <div className="table-wrapper" style={{marginTop:12}}>
-                    <table className="data-table">
-                      <thead><tr><th>טווח זמן תגובה</th><th>כמות</th><th>%</th></tr></thead>
-                      <tbody>
-                        {(() => { const lbl={'0-15m':'0–15 דק׳','15m-1h':'15 דק׳ – שעה','1h-4h':'1–4 שעות','4h-8h':'4–8 שעות','8h-24h':'8–24 שעות','1d-3d':'1–3 ימים','3d+':'3+ ימים'}; const ord=_rt.bucketOrder||[]; const bk=_rt.buckets||{}; const tot=(_rt.respondedCount||0); return ord.map(k=>(<tr key={k}><td style={{fontWeight:600}}>{lbl[k]||k}</td><td>{formatNum(bk[k]||0)}</td><td>{tot>0?((bk[k]||0)/tot*100).toFixed(1)+'%':'-'}</td></tr>)); })()}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="table-wrapper" style={{marginTop:12}}>
-                    <table className="data-table">
-                      <thead><tr><th>נציג</th><th>לידים</th><th>ללא מענה</th><th>זמן תגובה ממוצע</th></tr></thead>
-                      <tbody>
-                        {(_rt.byAgent||[]).map(a=>(<tr key={a.name}><td style={{fontWeight:600}}>{a.name}</td><td>{formatNum(a.count)}</td><td>{formatNum(a.noResponse)}</td><td>{a.avgHours!=null?a.avgHours+' שע׳':'-'}</td></tr>))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {(_rt.bySource||[]).length > 0 && (<div className="table-wrapper" style={{marginTop:12}}>
-                    <table className="data-table">
-                      <thead><tr><th>מקור</th><th>נענו</th><th>זמן תגובה ממוצע</th></tr></thead>
-                      <tbody>
-                        {(_rt.bySource||[]).map(sr=>(<tr key={sr.source}><td style={{fontWeight:600}}>{sr.source}</td><td>{formatNum(sr.count)}</td><td>{sr.avgHours+' שע׳'}</td></tr>))}
-                      </tbody>
-                    </table>
-                  </div>)}
-                </div>
               </>)}
             </>)
           }
