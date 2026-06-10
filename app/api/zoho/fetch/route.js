@@ -45,6 +45,15 @@ function num(v) {
   return isNaN(n) ? 0 : n
 }
 
+// Normalize a UTM_Campaign value to a clean campaign name: strip bidi/directional
+// control chars and the constant 'Geek-' prefix the agency template injects, then trim.
+function normUtm(v) {
+  if (v === null || v === undefined) return ''
+  let x = String(v).replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\u00ad\u200b\ufeff]/g, '').trim()
+  x = x.replace(/^geek[-_\s]+/i, '')
+  return x.trim()
+}
+
 // ===== Zoho OAuth =====
 
 async function getZohoAccessToken() {
@@ -173,6 +182,7 @@ async function runSync(opts = {}) {
     'Lead_Status', 'Lead_Source', 'Sub_Lead_Source', 'Created_Time',
     'timeOfLastCall', 'sumCalls', 'sumAnswerCalls',
     'field9', 'field20', 'segment', 'Owner', 'City1',
+    'UTM_Campaign',
   ].join(',')
 
   const leadCriteria =
@@ -322,6 +332,32 @@ async function runSync(opts = {}) {
       else c.netRevenue += num(d.Amount || 0)
     }
   }
+  // ===== Per-channel campaign breakdown (CRM-side, grouped by normalized UTM_Campaign) =====
+  const campAgg = {}
+  const NO_CAMP = '(ללא קמפיין)'
+  const ensureCamp = (ch, cmp) => { const k = ch + '||' + cmp; return campAgg[k] || (campAgg[k] = { channel: ch, campaign: cmp, leads: 0, purchased: 0, cancellations: 0, netRevenue: 0, _oppLeads: new Set() }) }
+  for (const l of leads) ensureCamp(normChan(l), normUtm(l.UTM_Campaign) || NO_CAMP).leads++
+  for (const d of linkedDeals) {
+    const l = leadById[d.LidID]; if (!l) continue
+    const e = ensureCamp(normChan(l), normUtm(l.UTM_Campaign) || NO_CAMP)
+    e._oppLeads.add(d.LidID)
+    if (d.Closing_Date) {
+      e.purchased++
+      if (d.cancellation_date) e.cancellations++
+      else e.netRevenue += num(d.Amount || 0)
+    }
+  }
+  const campsByChannel = {}
+  for (const k in campAgg) {
+    const e = campAgg[k]
+    ;(campsByChannel[e.channel] || (campsByChannel[e.channel] = [])).push({
+      campaign: e.campaign, leads: e.leads, opportunities: e._oppLeads.size, purchased: e.purchased,
+      cancellations: e.cancellations, netRevenue: Math.round(e.netRevenue),
+      conversionRate: e.leads > 0 ? Math.round((e.purchased / e.leads) * 1000) / 10 : 0,
+    })
+  }
+  for (const ch in campsByChannel) campsByChannel[ch].sort((a, b) => b.leads - a.leads)
+
   const channelFunnel = Object.entries(byChannel).map(([channel, c]) => ({
     channel,
     leads: c.leads,
@@ -330,6 +366,7 @@ async function runSync(opts = {}) {
     cancellations: c.cancellations,
     netRevenue: Math.round(c.netRevenue),
     conversionRate: c.leads > 0 ? Math.round((c.purchased / c.leads) * 1000) / 10 : 0,
+    campaigns: campsByChannel[channel] || [],
   })).sort((a, b) => b.leads - a.leads)
   const conversionRate = closingRate
 

@@ -156,6 +156,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [expandedCampaigns, setExpandedCampaigns] = useState(new Set());
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
   const [expandedCrmSources, setExpandedCrmSources] = useState(new Set());
+  const [expandedFunnelCh, setExpandedFunnelCh] = useState(new Set());
   const handleSort = (tableId, key) => { setSortConfig(prev => { const cur = prev[tableId]; if (cur && cur.key === key) return {...prev, [tableId]: {key, dir: cur.dir === 'desc' ? 'asc' : 'desc'}}; return {...prev, [tableId]: {key, dir: 'desc'}}; }); };
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -2521,6 +2522,7 @@ const selectProject = async (client, project) => {
             const _dl = _zs.deals || {}
             const _fn = _zs.funnel || {}
             const _ch = _fn.byChannel || []
+            const toggleFunnelCh = (ch) => setExpandedFunnelCh(prev => { const n = new Set(prev); if (n.has(ch)) n.delete(ch); else n.add(ch); return n; })
             const _byStatus = Object.entries(_zs.byStatus || {}).sort((a,b) => b[1]-a[1])
             const _bySrc    = Object.entries(_zs.bySource || {}).sort((a,b) => b[1]-a[1])
             const _objList  = Object.entries(_zs.objections || {}).sort((a,b) => b[1]-a[1])
@@ -2580,13 +2582,28 @@ const selectProject = async (client, project) => {
                 </div>
                 <div className="section">
                   <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2></div>
+                  <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:10,textAlign:'right'}}>💡 לחץ על ערוץ כדי לראות אילו קמפיינים הביאו לידים והמרות</div>
                   <div className="table-wrapper">
                     <table className="data-table">
                       <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th></tr></thead>
                       <tbody>
-                        {_ch.map(c => (
-                          <tr key={c.channel}><td style={{fontWeight:600}}>{c.channel}</td><td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td></tr>
-                        ))}
+                        {_ch.flatMap(c => {
+                          const camps = c.campaigns || [];
+                          const isOpen = expandedFunnelCh.has(c.channel);
+                          const rows = [
+                            <tr key={c.channel} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
+                              <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{camps.length ? (isOpen ? '\u25bc' : '\u25c0') : ''}</span>{c.channel}</td>
+                              <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>
+                            </tr>
+                          ];
+                          if (isOpen) camps.forEach(cm => rows.push(
+                            <tr key={c.channel+'|'+cm.campaign} style={{background:'rgba(59,130,246,0.05)'}}>
+                              <td style={{paddingRight:30,fontSize:'0.9em',unicodeBidi:'plaintext',textAlign:'right'}}>{cm.campaign}</td>
+                              <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>
+                            </tr>
+                          ));
+                          return rows;
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -3215,7 +3232,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
