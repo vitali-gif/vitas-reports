@@ -3047,9 +3047,27 @@ const selectProject = async (client, project) => {
           const activeAdsList = fbReports.flatMap(r => r.summary?.activeAds || []);
           if (activeAdsList.length === 0) return null;
           // activeAds are already sorted + trimmed to top 5 by the API, but re-sort defensively
-          const topAds = [...activeAdsList]
+          const _isZohoClient = crmReports[0]?.summary?.crmType === 'zoho';
+          let _adsPool = activeAdsList;
+          if (_isZohoClient) {
+            // Dedupe the same creative shown across multiple campaigns/adsets — group by normalized name, sum metrics
+            const _normAdName = (n) => (n || '').replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\ufeff]/g, '').replace(/\s*[-\u2013]\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/,'').replace(/\s*#\d+$/,'').trim();
+            const _byName = {};
+            for (const ad of activeAdsList) {
+              const key = _normAdName(ad.name) || ad.id;
+              if (!_byName[key]) { _byName[key] = { ...ad, name: _normAdName(ad.name) || ad.name, metrics: { ...(ad.metrics || {}) } }; }
+              else {
+                const m = _byName[key].metrics, am = ad.metrics || {};
+                m.leads = (m.leads||0)+(am.leads||0); m.spend = (m.spend||0)+(am.spend||0); m.impressions = (m.impressions||0)+(am.impressions||0); m.clicks = (m.clicks||0)+(am.clicks||0);
+                if (!_byName[key].videoUrl && ad.videoUrl) _byName[key].videoUrl = ad.videoUrl;
+                if (!_byName[key].imageUrl && ad.imageUrl) _byName[key].imageUrl = ad.imageUrl;
+              }
+            }
+            _adsPool = Object.values(_byName);
+          }
+          const topAds = [..._adsPool]
             .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
-            .slice(0, (crmReports[0]?.summary?.crmType === 'zoho') ? 10 : 5);
+            .slice(0, _isZohoClient ? 10 : 5);
           return (
             <div className="section section-top-ads">
               <div className="section-head">
