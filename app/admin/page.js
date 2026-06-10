@@ -1880,6 +1880,28 @@ const selectProject = async (client, project) => {
       );
     };
 
+    // Unified BCureLaser (Zoho) KPI cards — identical across All / CRM / Facebook / Google tabs
+    const zohoKpiCards = (scope, spend, prevSpend) => {
+      const leads = scope.leads || 0, opp = scope.opportunities || 0, purchased = scope.purchased || 0;
+      const cancellations = scope.cancellations || 0, netRev = scope.netRevenue || 0, convRate = scope.conversionRate || 0;
+      const netP = Math.max(0, purchased - cancellations);
+      const avgDeal = netP > 0 ? netRev / netP : 0;
+      const costPerSale = netP > 0 ? spend / netP : 0;
+      const roas = spend > 0 ? (netRev / 1.18) / spend : 0;
+      return (<>
+        {kpi('תקציב שנוצל', formatCurrency(spend), '', spend, prevSpend, true)}
+        {kpi('לידים', formatNum(leads), 'green', leads, null)}
+        {kpi('עברו להזדמנות', formatNum(opp), 'cyan', opp, null)}
+        {kpi('רכשו', formatNum(purchased), 'purple', purchased, null)}
+        {kpi('אחוז המרה לעסקה', (convRate || 0) + '%', 'orange', convRate, null)}
+        {kpi('שווי מכירות', formatCurrencyCompact(netRev), 'pink', netRev, null)}
+        {kpi('ביטולים', formatNum(cancellations), 'red', cancellations, null)}
+        {kpi('ערך ממוצע לעסקה', formatCurrency(Math.round(avgDeal)), '', avgDeal, null)}
+        {kpi('עלות מכירת מכשיר', formatCurrency(Math.round(costPerSale)), 'orange', costPerSale, null, true)}
+        {kpi('ROAS לא כולל מע"מ', roas.toFixed(2) + 'x', 'green', roas, null)}
+      </>);
+    };
+
     const buildTable = (items, prevItems, labelName, tableId, source = '') => {
       if (!items || Object.keys(items).length === 0) return null;
       const cols = [{key:'name',label:labelName,get:(_,n)=>n},{key:'clicks',label:'קליקים',get:d=>d.clicks,higher:true},{key:'impressions',label:'חשיפות',get:d=>d.impressions,higher:true},{key:'cpc',label:'עלות לקליק',get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},{key:'ctr',label:'CTR',get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},{key:'cpm',label:'CPM',get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},{key:'leads',label:'לידים',get:d=>d.leads,higher:true},{key:'cpl',label:'עלות לליד',get:d=>d.leads>0?d.spend/d.leads:0,higher:false},{key:'spend',label:'תקציב שנוצל',get:d=>d.spend}];
@@ -2554,16 +2576,7 @@ const selectProject = async (client, project) => {
 
               {crmSubTab !== 'ga4' && (<>
                 <div className="kpi-grid">
-                  {_kpiZ('סה"כ לידים', formatNum(_fn.leads||_totalLeads), 'sky')}
-                  {_kpiZ('רלוונטיים', formatNum(_zs.relevantLeads||0), 'emerald')}
-                  {_kpiZ('לא רלוונטיים', formatNum(_zs.irrelevantLeads||0), 'rose')}
-                  {_kpiZ('הזדמנויות', formatNum(_fn.opportunities||0), 'indigo')}
-                  {_kpiZ('רכשו', formatNum(_fn.purchased||0), 'emerald')}
-                  {_kpiZ('אחוז המרה לעסקה', (_fn.conversionRate||0)+'%', 'violet')}
-                  {_kpiZ('רכישות נטו', formatNum(_fn.netPurchases||0), 'emerald')}
-                  {_kpiZ('שווי רכישות (נטו)', formatCurrency(_fn.netRevenue||0), 'sky')}
-                  {_kpiZ('ערך ממוצע לעסקה', formatCurrency(_fn.avgDealValue||0), 'indigo')}
-                  {_kpiZ('ביטולים', formatNum(_fn.cancellations||0), 'rose')}
+                  {zohoKpiCards({ leads:_fn.leads, opportunities:_fn.opportunities, purchased:_fn.purchased, cancellations:_fn.cancellations, netRevenue:_fn.netRevenue, conversionRate:_fn.conversionRate }, ((fbTotals && fbTotals.spend) || 0) + ((gTotals && gTotals.spend) || 0), null)}
                 </div>
                 <div className="section">
                   <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2></div>
@@ -2638,18 +2651,10 @@ const selectProject = async (client, project) => {
             const _zf = _zr.funnel || {};
             const _ch = _zf.byChannel || [];
             const _row = dashTab === 'facebook' ? (_ch.find(c => c.channel === 'facebook') || {}) : dashTab === 'google' ? (_ch.find(c => c.channel === 'google') || {}) : null;
-            const zLeads = _row ? (_row.leads || 0) : (_zf.leads || 0);
-            const zSales = _row ? (_row.purchased || 0) : (_zf.purchased || 0);
-            const zRev = _row ? (_row.netRevenue || 0) : (_zf.netRevenue || 0);
-            const zSpend = activeT.spend || 0;
-            const zRoas = zSpend > 0 ? (zRev / 1.18) / zSpend : 0; // ROAS ללא מע"מ: הכנסות/1.18 חלקי תקציב
-            return (<>
-              {kpi('תקציב', formatCurrency(zSpend), '', zSpend, activeP?.spend, true)}
-              {kpi('לידים', formatNum(zLeads), 'green', zLeads, null)}
-              {kpi('מכירות', formatNum(zSales), 'cyan', zSales, null)}
-              {kpi('שווי מכירות', formatCurrencyCompact(zRev), 'pink', zRev, null)}
-              {kpi('ROAS', zRoas.toFixed(2) + 'x', 'orange', zRoas, null)}
-            </>);
+            const _scope = _row
+              ? { leads:_row.leads, opportunities:_row.opportunities, purchased:_row.purchased, cancellations:_row.cancellations, netRevenue:_row.netRevenue, conversionRate:_row.conversionRate }
+              : { leads:_zf.leads, opportunities:_zf.opportunities, purchased:_zf.purchased, cancellations:_zf.cancellations, netRevenue:_zf.netRevenue, conversionRate:_zf.conversionRate };
+            return zohoKpiCards(_scope, activeT.spend || 0, activeP?.spend);
           })() : null}
           {crmReports[0]?.summary?.crmType !== 'zoho' && (<>
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}

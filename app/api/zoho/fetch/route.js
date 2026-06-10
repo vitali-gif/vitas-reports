@@ -310,7 +310,7 @@ async function runSync(opts = {}) {
   for (const l of leads) leadById[l.id] = l
   const normChan = (l) => ((l && l.Sub_Lead_Source) || 'אחר').trim() || 'אחר'
   const byChannel = {}
-  const ensureChan = (c) => (byChannel[c] || (byChannel[c] = { leads: 0, opportunities: 0, purchased: 0, netRevenue: 0, _oppLeads: new Set() }))
+  const ensureChan = (c) => (byChannel[c] || (byChannel[c] = { leads: 0, opportunities: 0, purchased: 0, netRevenue: 0, cancellations: 0, _oppLeads: new Set() }))
   for (const l of leads) ensureChan(normChan(l)).leads++
   for (const d of linkedDeals) {
     const l = leadById[d.LidID]; if (!l) continue
@@ -318,7 +318,8 @@ async function runSync(opts = {}) {
     c._oppLeads.add(d.LidID)
     if (d.Closing_Date) {
       c.purchased++
-      if (!d.cancellation_date) c.netRevenue += num(d.Amount || 0)
+      if (d.cancellation_date) c.cancellations++
+      else c.netRevenue += num(d.Amount || 0)
     }
   }
   const channelFunnel = Object.entries(byChannel).map(([channel, c]) => ({
@@ -326,6 +327,7 @@ async function runSync(opts = {}) {
     leads: c.leads,
     opportunities: c._oppLeads.size,
     purchased: c.purchased,
+    cancellations: c.cancellations,
     netRevenue: Math.round(c.netRevenue),
     conversionRate: c.leads > 0 ? Math.round((c.purchased / c.leads) * 1000) / 10 : 0,
   })).sort((a, b) => b.leads - a.leads)
