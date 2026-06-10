@@ -2605,6 +2605,16 @@ const selectProject = async (client, project) => {
                           return rows;
                         })}
                       </tbody>
+                      <tfoot>
+                        <tr style={{fontWeight:700, borderTop:'2px solid rgba(99,102,241,0.35)', background:'rgba(99,102,241,0.06)'}}>
+                          <td style={{fontWeight:700}}>סה"כ</td>
+                          <td style={{fontWeight:700}}>{formatNum(_fn.leads||0)}</td>
+                          <td style={{fontWeight:700}}>{formatNum(_fn.opportunities||0)}</td>
+                          <td style={{fontWeight:700}}>{formatNum(_fn.purchased||0)}</td>
+                          <td style={{fontWeight:700,color:'var(--violet)'}}>{(_fn.conversionRate||0)+'%'}</td>
+                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 </div>
