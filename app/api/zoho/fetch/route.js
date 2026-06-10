@@ -23,7 +23,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const ZOHO_TOKEN_URL = 'https://accounts.zoho.com/oauth/v2/token'
-const ZOHO_SCHEMA_VERSION = 3
+const ZOHO_SCHEMA_VERSION = 2
 
 // BCureLaser: only count these digital sub-sources
 const DIGITAL_SUBSOURCES = new Set([
@@ -43,18 +43,6 @@ function num(v) {
   if (!v) return 0
   const n = parseFloat(String(v))
   return isNaN(n) ? 0 : n
-}
-
-// Normalize a UTM value so it matches the real Meta/Google entity name:
-// strip bidi/directional control chars (the agency template injects them),
-// remove the constant dynamic prefix "Geek-" the agency prepends, and trim.
-function normUtm(v) {
-  if (v === null || v === undefined) return ''
-  let x = String(v)
-    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\u00ad\u200b\ufeff]/g, '')
-    .trim()
-  x = x.replace(/^geek[-_\s]+/i, '')
-  return x.trim()
 }
 
 // ===== Zoho OAuth =====
@@ -185,7 +173,6 @@ async function runSync(opts = {}) {
     'Lead_Status', 'Lead_Source', 'Sub_Lead_Source', 'Created_Time',
     'timeOfLastCall', 'sumCalls', 'sumAnswerCalls',
     'field9', 'field20', 'segment', 'Owner', 'City1',
-    'UTM_Campaign', 'UTM_Term', 'UTM_Content',
   ].join(',')
 
   const leadCriteria =
@@ -330,32 +317,6 @@ async function runSync(opts = {}) {
   })).sort((a, b) => b.leads - a.leads)
   const conversionRate = closingRate
 
-  // ===== Sales attribution by UTM (campaign / adset / ad) =====
-  // Each lead carries UTM_Campaign (campaign), UTM_Term (adset), UTM_Content (ad).
-  // Attribute NET sales (closed, non-cancelled deals) to the source entity so the
-  // dashboard table can show מכירות / שווי מכירות / ROAS per campaign, adset, and ad.
-  const salesByUtm = { campaign: {}, adset: {}, ad: {} }
-  const bumpAttr = (map, key, amount) => {
-    if (!key) return
-    const e = map[key] || (map[key] = { sales: 0, value: 0 })
-    e.sales += 1
-    e.value += amount
-  }
-  for (const d of closedNoCancellation) {
-    const l = leadById[d.LidID]; if (!l) continue
-    const amount = num(d.Amount || 0)
-    const camp = normUtm(l.UTM_Campaign)
-    const adset = normUtm(l.UTM_Term)
-    const ad = normUtm(l.UTM_Content)
-    if (!camp) continue
-    bumpAttr(salesByUtm.campaign, camp, amount)
-    if (adset) bumpAttr(salesByUtm.adset, camp + '||' + adset, amount)
-    if (adset && ad) bumpAttr(salesByUtm.ad, camp + '||' + adset + '||' + ad, amount)
-  }
-  for (const lvl of ['campaign', 'adset', 'ad']) {
-    for (const k in salesByUtm[lvl]) salesByUtm[lvl][k].value = Math.round(salesByUtm[lvl][k].value)
-  }
-
   // ===== Build xlsxRows for aggregateCrmRows compatibility =====
   const sourcesMap = {}
   for (const lead of leads) {
@@ -426,7 +387,6 @@ async function runSync(opts = {}) {
       openStageDrop,                       // why opportunities have not purchased yet
       byChannel: channelFunnel,            // per-channel funnel (leads/opps/purchased/conv/revenue)
     },
-    salesByUtm,
     schemaVersion: ZOHO_SCHEMA_VERSION,
   }
 
@@ -446,12 +406,7 @@ async function runSync(opts = {}) {
     else results.push({ project: p.name, leads: leads.length, opportunities, purchased, ok: true })
   }
 
-  const _utmSample = leads.slice(0, 8).map(l => ({
-    sub: l.Sub_Lead_Source,
-    rawCampaign: l.UTM_Campaign, rawTerm: l.UTM_Term, rawContent: l.UTM_Content,
-    normCampaign: normUtm(l.UTM_Campaign), normTerm: normUtm(l.UTM_Term), normContent: normUtm(l.UTM_Content),
-  }))
-  return { status: 200, body: { ok: true, month: m, totalLeads: leads.length, opportunities, purchased, projects: results, _diag: { utmSample: _utmSample, salesByUtm } } }
+  return { status: 200, body: { ok: true, month: m, totalLeads: leads.length, opportunities, purchased, projects: results } }
 }
 
 // ===== handlers =====

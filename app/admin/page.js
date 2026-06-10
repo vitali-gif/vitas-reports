@@ -2869,39 +2869,6 @@ const selectProject = async (client, project) => {
             if (r.adText) tree[c].adSets[a].ads[ad].text = r.adText;
           });
           const campaignNames = Object.keys(tree).sort((a,b) => tree[b].spend - tree[a].spend);
-          // ===== Sales / ROAS attribution by UTM (BCureLaser / Zoho only) =====
-          const _crmZoho = crmReports.find(r => r.summary && r.summary.crmType === 'zoho');
-          const _salesByUtm = (_crmZoho && _crmZoho.summary && _crmZoho.summary.salesByUtm) || null;
-          const showSales = !!_salesByUtm;
-          const normName = (v) => {
-            if (v === null || v === undefined) return '';
-            let x = String(v).replace(/[‎‏‪-‮⁦-⁩­​﻿]/g, '').trim();
-            x = x.replace(/^geek[-_\s]+/i, '');
-            return x.trim();
-          };
-          if (showSales) {
-            // geel_remarketing UTM belongs to the FB questionnaire campaign — alias it.
-            const _qCamp = campaignNames.find(n => /questionnaire|שאלון/i.test(normName(n)));
-            for (const cName of Object.keys(tree)) {
-              const cNode = tree[cName];
-              let cAttr = _salesByUtm.campaign[normName(cName)] || { sales: 0, value: 0 };
-              if (cName === _qCamp && _salesByUtm.campaign['geel_remarketing']) {
-                const g = _salesByUtm.campaign['geel_remarketing'];
-                cAttr = { sales: cAttr.sales + g.sales, value: cAttr.value + g.value };
-              }
-              cNode.sales = cAttr.sales; cNode.salesValue = cAttr.value;
-              for (const aName of Object.keys(cNode.adSets)) {
-                const aNode = cNode.adSets[aName];
-                const aAttr = _salesByUtm.adset[normName(cName) + '||' + normName(aName)] || { sales: 0, value: 0 };
-                aNode.sales = aAttr.sales; aNode.salesValue = aAttr.value;
-                for (const adName of Object.keys(aNode.ads)) {
-                  const adNode = aNode.ads[adName];
-                  const adAttr = _salesByUtm.ad[normName(cName) + '||' + normName(aName) + '||' + normName(adName)] || { sales: 0, value: 0 };
-                  adNode.sales = adAttr.sales; adNode.salesValue = adAttr.value;
-                }
-              }
-            }
-          }
           const toggleCampaign = (c) => setExpandedCampaigns(prev => { const next = new Set(prev); if (next.has(c)) next.delete(c); else next.add(c); return next; });
           const toggleAdSet = (k) => setExpandedAdSets(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
           const cols = [
@@ -2916,11 +2883,6 @@ const selectProject = async (client, project) => {
             { key:'cpl', label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3' },
             { key:'spend', label:'\u05ea\u05e7\u05e6\u05d9\u05d1 \u05e9\u05e0\u05d5\u05e6\u05dc' },
           ];
-          if (showSales) cols.push(
-            { key:'sales', label:'\u05de\u05db\u05d9\u05e8\u05d5\u05ea' },
-            { key:'salesValue', label:'\u05e9\u05d5\u05d5\u05d9 \u05de\u05db\u05d9\u05e8\u05d5\u05ea' },
-            { key:'roas', label:'ROAS' },
-          );
           const renderRow = (name, data, level, isExpanded, hasChildren, onToggle, key) => {
             const cpl = data.leads > 0 ? data.spend/data.leads : 0;
             const cpc = data.clicks > 0 ? data.spend/data.clicks : 0;
@@ -2950,11 +2912,6 @@ const selectProject = async (client, project) => {
                 <td style={{fontSize}}>{data.leads}</td>
                 <td style={{fontSize}}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td>
                 <td style={{fontSize, fontWeight: 600}}>{formatCurrency(data.spend)}</td>
-                {showSales ? (() => { const sv = data.salesValue || 0; const sc = data.sales || 0; const roas = (sv > 0 && data.spend > 0) ? (sv / 1.18) / data.spend : 0; const roasCol = roas >= 3 ? '#059669' : roas >= 1.5 ? '#2563eb' : roas > 0 ? '#d97706' : '#94a3b8'; return (<>
-                  <td style={{fontSize, fontWeight: 600}}>{sc > 0 ? formatNum(sc) : <span style={{color:'#cbd5e1'}}>-</span>}</td>
-                  <td style={{fontSize}}>{sv > 0 ? formatCurrency(sv) : <span style={{color:'#cbd5e1'}}>-</span>}</td>
-                  <td style={{fontSize, fontWeight: 700, color: roasCol}}>{roas > 0 ? '\u00d7' + roas.toFixed(2) : <span style={{color:'#cbd5e1'}}>-</span>}</td>
-                </>); })() : null}
               </tr>
             );
           };
