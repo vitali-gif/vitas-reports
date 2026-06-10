@@ -138,7 +138,7 @@ async function runSync(opts = {}) {
   // instead we use the breakdownRows below (which already contain campaign_name and adset_name keyed by ad_id).
   const adsFields = [
     'id', 'name', 'effective_status', 'status',
-    'creative{body,title,image_url,thumbnail_url,object_story_spec,asset_feed_spec,video_id,effective_object_story_id}',
+    'creative{body,title,image_url,thumbnail_url,image_hash,object_story_spec,asset_feed_spec,video_id,effective_object_story_id}',
   ].join(',')
   // Filter server-side to ACTIVE ads only; Meta's ?fields=creative{...} is expensive so we need effective_status filter + small limit
   const effectiveStatusFilter = encodeURIComponent(JSON.stringify(['ACTIVE']))
@@ -199,7 +199,8 @@ async function runSync(opts = {}) {
     if (!title && feed.titles?.length) title = feed.titles.map(t => t.text).filter(Boolean).join(' / ')
     if (!imageUrl && feed.images?.length) imageUrl = feed.images[0].url || ''
     if (!videoId && feed.videos?.length) videoId = feed.videos[0].video_id || ''
-    return { body, title, imageUrl: imageUrl || thumb, thumbnailUrl: thumb || imageUrl, videoId, postId: cr.effective_object_story_id || '' }
+    const imageHash = cr.image_hash || spec.link_data?.image_hash || spec.photo_data?.image_hash || (feed.images && feed.images[0] && feed.images[0].hash) || ''
+    return { body, title, imageUrl: imageUrl || thumb, thumbnailUrl: thumb || imageUrl, videoId, postId: cr.effective_object_story_id || '', imageHash }
   }
 
   const adBodyById = {}         // ad_id -> body (for breakdownRows)
@@ -221,6 +222,7 @@ async function runSync(opts = {}) {
       videoId: c.videoId || (cr.video_id || ''),
       videoUrl: '',  // resolved later via /videos/{id}?fields=source
       postId: c.postId || '',
+      imageHash: c.imageHash || '',
       metrics: { spend: 0, impressions: 0, clicks: 0, leads: 0 },
     }
   }
@@ -295,6 +297,29 @@ async function runSync(opts = {}) {
     }
   }
 
+  // Resolve high-res images via image_hash for active image ads that lack a usable post full_picture
+  const hashesToFetch = new Set()
+  for (const a of Object.values(adDetailsById)) {
+    if (a.status === 'ACTIVE' && !a.videoId && a.imageHash && !(a.postId && fullPictureByPost[a.postId]?.full)) hashesToFetch.add(a.imageHash)
+  }
+  const urlByHash = {}
+  if (hashesToFetch.size > 0) {
+    const hashArr = [...hashesToFetch]
+    for (let i = 0; i < hashArr.length; i += 50) {
+      const chunk = hashArr.slice(i, i + 50)
+      try {
+        const iu = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/adimages?hashes=${encodeURIComponent(JSON.stringify(chunk))}&fields=hash,url,permalink_url,width,height&access_token=${encodeURIComponent(token)}`
+        const ires = await fetch(iu)
+        if (ires.ok) {
+          const ijson = await ires.json()
+          for (const img of (ijson.data || [])) if (img.hash && img.url) urlByHash[img.hash] = img.url
+        }
+      } catch {}
+    }
+  }
+  for (const a of Object.values(adDetailsById)) {
+    if (a.imageHash && urlByHash[a.imageHash]) { a.imageUrl = urlByHash[a.imageHash]; if (!a.thumbnailUrl) a.thumbnailUrl = urlByHash[a.imageHash] }
+  }
   const activeAdsAll = Object.values(adDetailsById).filter(a => a.status === 'ACTIVE')
 
   const buildRow = (r) => ({

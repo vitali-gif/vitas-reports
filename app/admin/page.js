@@ -3049,7 +3049,7 @@ const selectProject = async (client, project) => {
           // activeAds are already sorted + trimmed to top 5 by the API, but re-sort defensively
           const topAds = [...activeAdsList]
             .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
-            .slice(0, 5);
+            .slice(0, (crmReports[0]?.summary?.crmType === 'zoho') ? 10 : 5);
           return (
             <div className="section section-top-ads">
               <div className="section-head">
