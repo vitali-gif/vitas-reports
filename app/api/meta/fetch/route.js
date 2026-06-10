@@ -297,10 +297,11 @@ async function runSync(opts = {}) {
     }
   }
 
-  // Resolve high-res images via image_hash for active image ads that lack a usable post full_picture
+  // Resolve original full-resolution images via image_hash for all active image ads
+  // (preferred over the post full_picture, which Meta returns at medium resolution)
   const hashesToFetch = new Set()
   for (const a of Object.values(adDetailsById)) {
-    if (a.status === 'ACTIVE' && !a.videoId && a.imageHash && !(a.postId && fullPictureByPost[a.postId]?.full)) hashesToFetch.add(a.imageHash)
+    if (a.status === 'ACTIVE' && !a.videoId && a.imageHash) hashesToFetch.add(a.imageHash)
   }
   const urlByHash = {}
   if (hashesToFetch.size > 0) {
