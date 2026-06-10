@@ -423,6 +423,8 @@ async function runSync(opts = {}) {
         clientProfileSamples.push({
           client_id: String(c.client_id || ''),
           appartment_type: c.appartment_type || '',
+          living_status: c.living_status || '',
+          family_status: c.family_status || '',
           model_name: c.model_name || '',
           min_rooms: c.min_rooms || '',
           max_rooms: c.max_rooms || '',
