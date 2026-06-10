@@ -2839,7 +2839,27 @@ const selectProject = async (client, project) => {
             if (r.adStatus) tree[c].adSets[a].ads[ad].status = r.adStatus;
             if (r.adText) tree[c].adSets[a].ads[ad].text = r.adText;
           });
-          const campaignNames = Object.keys(tree).sort((a,b) => tree[b].spend - tree[a].spend);
+          const treeSort = sortConfig['campTree'] || { key: 'spend', dir: 'desc' };
+          const treeSortVal = (d, key) => {
+            switch (key) {
+              case 'clicks': return d.clicks || 0;
+              case 'impressions': return d.impressions || 0;
+              case 'cpc': return d.clicks > 0 ? d.spend / d.clicks : 0;
+              case 'ctr': return d.impressions > 0 ? d.clicks / d.impressions : 0;
+              case 'cpm': return d.impressions > 0 ? d.spend / d.impressions : 0;
+              case 'leads': return d.leads || 0;
+              case 'cpl': return d.leads > 0 ? d.spend / d.leads : 0;
+              case 'spend': return d.spend || 0;
+              default: return d.spend || 0;
+            }
+          };
+          const treeCmp = (na, nb, get) => {
+            if (treeSort.key === 'name') return treeSort.dir === 'asc' ? na.localeCompare(nb) : nb.localeCompare(na);
+            if (treeSort.key === 'status') { const sa = (get(na).status || ''), sb = (get(nb).status || ''); return treeSort.dir === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa); }
+            const va = treeSortVal(get(na), treeSort.key), vb = treeSortVal(get(nb), treeSort.key);
+            return treeSort.dir === 'asc' ? va - vb : vb - va;
+          };
+          const campaignNames = Object.keys(tree).sort((a,b) => treeCmp(a, b, n => tree[n]));
           const toggleCampaign = (c) => setExpandedCampaigns(prev => { const next = new Set(prev); if (next.has(c)) next.delete(c); else next.add(c); return next; });
           const toggleAdSet = (k) => setExpandedAdSets(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
           const cols = [
@@ -2892,19 +2912,19 @@ const selectProject = async (client, project) => {
               <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:'12px',textAlign:'right'}}>{'\ud83d\udca1 \u05dc\u05d7\u05e5 \u05e2\u05dc \u05e7\u05de\u05e4\u05d9\u05d9\u05df \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea, \u05d5\u05e2\u05dc \u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>
               <div className="table-wrapper">
                 <table className="data-table">
-                  <thead><tr>{cols.map(c => <th key={c.key} style={{whiteSpace:'nowrap'}}>{c.label}</th>)}</tr></thead>
+                  <thead><tr>{cols.map(c => <th key={c.key} style={{whiteSpace:'nowrap',cursor:'pointer',userSelect:'none'}} onClick={() => handleSort('campTree', c.key)}>{c.label}{treeSort.key === c.key ? (treeSort.dir === 'desc' ? ' \u25bc' : ' \u25b2') : ' \u21c5'}</th>)}</tr></thead>
                   <tbody>
                     {campaignNames.flatMap(cName => {
                       const cData = tree[cName];
                       const isCExpanded = expandedCampaigns.has(cName);
-                      const adSetNames = Object.keys(cData.adSets).sort((a,b) => cData.adSets[b].spend - cData.adSets[a].spend);
+                      const adSetNames = Object.keys(cData.adSets).sort((a,b) => treeCmp(a, b, n => cData.adSets[n]));
                       const rows = [renderRow(cName, cData, 0, isCExpanded, adSetNames.length > 0, () => toggleCampaign(cName), `c-${cName}`)];
                       if (isCExpanded) {
                         adSetNames.forEach(aName => {
                           const aData = cData.adSets[aName];
                           const asKey = `${cName}|${aName}`;
                           const isAExpanded = expandedAdSets.has(asKey);
-                          const adNames = Object.keys(aData.ads).sort((x,y) => aData.ads[y].spend - aData.ads[x].spend);
+                          const adNames = Object.keys(aData.ads).sort((x,y) => treeCmp(x, y, n => aData.ads[n]));
                           rows.push(renderRow(aName, aData, 1, isAExpanded, adNames.length > 0, () => toggleAdSet(asKey), `as-${asKey}`));
                           if (isAExpanded) {
                             adNames.forEach(adName => { rows.push(renderRow(adName, aData.ads[adName], 2, false, false, null, `ad-${asKey}|${adName}`)); });
