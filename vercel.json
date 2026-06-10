@@ -1,10 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/prefetch-ads", "schedule": "0 4 * * *" },
-    { "path": "/api/cron/prefetch-ads", "schedule": "0 11 * * *" },
-    { "path": "/api/cron/prefetch-ads", "schedule": "0 16 * * *" },
-    { "path": "/api/cron/prefetch-crm", "schedule": "10 4 * * *" },
-    { "path": "/api/cron/prefetch-crm", "schedule": "10 11 * * *" },
-    { "path": "/api/cron/prefetch-crm", "schedule": "10 16 * * *" }
+    { "path": "/api/cron/prefetch-ads", "schedule": "30 4,6,8,10,12,14,16,18 * * *" },
+    { "path": "/api/cron/prefetch-crm", "schedule": "40 4,6,8,10,12,14,16,18 * * *" }
   ]
 }
