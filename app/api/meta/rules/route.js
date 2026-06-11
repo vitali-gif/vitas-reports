@@ -144,7 +144,6 @@ function buildRulePayload(ruleType, params, projectName, campaignIds, notifyUser
           execution_type: 'NOTIFICATION',
           execution_options: [
             { field: 'user_ids', value: [notifyUserId], operator: 'EQUAL' },
-            { field: 'trigger_type', value: 'INACTIONABLE_RULE_NOTIFICATIONS', operator: 'EQUAL' },
           ],
         },
         schedule_spec: { schedule_type: 'DAILY' },
