@@ -348,6 +348,7 @@ async function runSync(opts = {}) {
     const completedMeetingSamples = [] // debug: first 5 completed meeting tasks with details
     const clientProfileSamples = [] // debug: first 10 client profiles with apartment preferences
     const hourlyApptStats = Array.from({ length: 24 }, () => 0) // meetings COORDINATED, bucketed by hour-of-day (0-23) from create_date
+    const hourlyLeadStats = Array.from({ length: 24 }, () => 0) // LEADS (LIDs) bucketed by hour-of-day from create_date
     const _hourOfDay = (str) => { const m = String(str || '').match(/[ T](\d{2}):/); return m ? parseInt(m[1], 10) : null }
     //    by appt date relative to the LID's start_date (post-LID logic).
     const clientApptList = new Map()  // cid → [{ date, completed, cancelled }]
@@ -828,6 +829,7 @@ async function runSync(opts = {}) {
       if (isNaN(d.getTime())) continue
       const dow = d.getDay()
       dayOfWeekStats[dow].leads++
+      { const _lh = _hourOfDay(lid.create_date); if (_lh !== null && _lh >= 0 && _lh <= 23) hourlyLeadStats[_lh]++ }
       // Did this client get any scheduled (non-cancelled) appointment post-LID?
       const lidDateOnly = (lid.start_date || lid.create_date || '').toString().slice(0, 10)
       const apptList = clientApptList.get(cid) || []
@@ -934,13 +936,13 @@ async function runSync(opts = {}) {
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
-    const CRM_SCHEMA_VERSION = 9  // v9: + hourlyApptStats (meetings coordinated by hour-of-day)
+    const CRM_SCHEMA_VERSION = 10  // v10: + hourlyLeadStats (leads by hour-of-day)
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
       source: 'crm',
       month: m,
       data: xlsxRows,
-      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, namedLeads, schemaVersion: CRM_SCHEMA_VERSION },
+      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, namedLeads, schemaVersion: CRM_SCHEMA_VERSION },
       file_name: 'BMBY API (live)',
       row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
     }, { onConflict: 'project_id,source,month' })

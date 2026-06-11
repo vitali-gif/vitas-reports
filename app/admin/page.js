@@ -336,7 +336,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
     const GOOGLE_SCHEMA_VERSION = 2;  // keep in sync with google route.js
     const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google') && (r.summary?.schemaVersion || 0) >= GOOGLE_SCHEMA_VERSION);
-    const CRM_SCHEMA_VERSION = 9;  // keep in sync with route.js + useEffect below
+    const CRM_SCHEMA_VERSION = 10;  // keep in sync with route.js + useEffect below
     const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
     const haveCrm = !!crmRow && (isClientView || (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION); // client: don't force re-fetch on version bump (cron re-warms)
     const haveAll = haveFb && haveGoog && haveCrm;
@@ -678,7 +678,7 @@ const selectProject = async (client, project) => {
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
     const hasGoogle = reports.some(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-    const CRM_SCHEMA_VERSION = 9  // must match server-side route in api/bmby/fetch
+    const CRM_SCHEMA_VERSION = 10  // must match server-side route in api/bmby/fetch
     const crmRow = reports.find(r => r.month === selectedMonth && r.source === 'crm')
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
     const hasCrm = !!crmRow && (isClientView || cachedCrmVersion >= CRM_SCHEMA_VERSION); // client: cached CRM of any version counts (avoids heavy client live-fetch + clobber)
@@ -917,6 +917,7 @@ const selectProject = async (client, project) => {
     const dowMerged = {};
     const bySourceMerged = {};
     const hourMerged = Array.from({ length: 24 }, () => 0);
+    const leadHourMerged = Array.from({ length: 24 }, () => 0);
     for (const r of crmRows) {
       const rt = r.summary && r.summary.responseTimeStats;
       if (!rt) continue;
@@ -943,6 +944,8 @@ const selectProject = async (client, project) => {
       }
       const _hrs = r.summary && r.summary.hourlyApptStats;
       if (Array.isArray(_hrs)) for (let _i = 0; _i < 24; _i++) hourMerged[_i] += _hrs[_i] || 0;
+      const _lhrs = r.summary && r.summary.hourlyLeadStats;
+      if (Array.isArray(_lhrs)) for (let _j = 0; _j < 24; _j++) leadHourMerged[_j] += _lhrs[_j] || 0;
       const bUser = (rt.business && rt.business.byUser) || {};
       const bSource = (rt.business && rt.business.bySource) || {};
       for (const [k, v] of Object.entries(rt.byUser || {})) {
@@ -1033,12 +1036,14 @@ const selectProject = async (client, project) => {
 
     // Hour-of-day: when meetings were COORDINATED (create_date), Israel time
     const hourTotal = hourMerged.reduce((a, b) => a + b, 0);
-    const hourHasData = hourTotal > 0;
+    const leadHourTotal = leadHourMerged.reduce((a, b) => a + b, 0);
+    const hourHasData = hourTotal > 0 || leadHourTotal > 0;
     if (hourHasData) {
       pendingChartsRef.current.push(setTimeout(() => {
         const hLabels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
         createChart('apptHourChart', 'bar', hLabels, [
-          { label: 'פגישות שתואמו', type: 'bar', data: hourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
+          { label: 'לידים', type: 'bar', data: leadHourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 2 },
+          { label: 'פגישות שתואמו', type: 'bar', data: hourMerged.slice(), backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
         ], {
           x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' }, maxRotation: 0, autoSkip: false } },
           y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
@@ -1116,7 +1121,7 @@ const selectProject = async (client, project) => {
 
         {hourHasData && (
           <div className="section">
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות</h2><span className="sub">באיזו שעה (שעון ישראל) תואמו הפגישות</span></div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2><span className="sub">באיזו שעה ביום (שעון ישראל) נכנסו לידים ותואמו פגישות</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="apptHourChart"></canvas></div></div>
           </div>
         )}
