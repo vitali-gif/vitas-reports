@@ -118,7 +118,7 @@ function buildRulePayload(ruleType, params, projectName, campaignIds, notifyUser
         evaluation_spec: {
           evaluation_type: 'SCHEDULE',
           filters: [
-            { field: 'entity_type', operator: 'EQUAL', value: 'CAMPAIGN' },
+            { field: 'entity_type', operator: 'EQUAL', value: 'ADSET' },
             scope,
           ],
         },
