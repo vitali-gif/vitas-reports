@@ -141,6 +141,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [recSubTab, setRecSubTab] = useState('new')
   const [lockingRecKey, setLockingRecKey] = useState('')
   const [ruleDialog, setRuleDialog] = useState(null)  // {recRef, ruleType, params}
+  const [ruleError, setRuleError] = useState(null)
   const [creatingRule, setCreatingRule] = useState(false)
   const chartsRef = useRef([])
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
@@ -588,7 +589,8 @@ const loadClients = async () => {
       });
       const json = await res.json();
       if (!res.ok) {
-        const metaErr = json?.meta_error?.message || json?.error || 'unknown error';
+        const metaErr = json?.meta_error?.error_user_msg || json?.meta_error?.message || json?.error || 'unknown error';
+        setRuleError(metaErr);
         showToast('שגיאה ב-Meta: ' + metaErr);
         return false;
       }
@@ -597,6 +599,41 @@ const loadClients = async () => {
       return true;
     } catch (err) {
       showToast('שגיאת רשת: ' + (err.message || err));
+      return false;
+    } finally {
+      setCreatingRule(false);
+    }
+  };
+
+  // Creates BOTH rules for a high-CPL recommendation:
+  //  (1) notify_high_cpl  — campaign-level CPL alert (cost conditions only allowed at campaign level under CBO)
+  //  (2) pause_high_spend_no_results — ad-level auto-pause for spend with zero leads
+  const createCplCombo = async (params, recommendationKey) => {
+    if (!selectedProject) return;
+    setCreatingRule(true);
+    setRuleError(null);
+    const post = async (ruleType, p) => {
+      const res = await fetch('/api/meta/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify({ projectName: selectedProject.name, ruleType, params: p, recommendationKey }),
+      });
+      const json = await res.json().catch(() => ({}));
+      return { ok: res.ok, json };
+    };
+    try {
+      const r1 = await post('notify_high_cpl', { cplThreshold: params.cplThreshold, minSpend: 100, lookbackDays: params.lookbackDays });
+      const r2 = await post('pause_high_spend_no_results', { minSpend: params.wasteThreshold, lookbackDays: params.lookbackDays });
+      const created = [];
+      const failed = [];
+      if (r1.ok) created.push('התראת CPL'); else failed.push('התראת CPL: ' + (r1.json?.meta_error?.error_user_msg || r1.json?.meta_error?.message || r1.json?.error || 'שגיאה'));
+      if (r2.ok) created.push('השהיית בזבוז ללא לידים'); else failed.push('השהיית בזבוז: ' + (r2.json?.meta_error?.error_user_msg || r2.json?.meta_error?.message || r2.json?.error || 'שגיאה'));
+      if (failed.length) { setRuleError(failed.join('\n')); showToast('חלק מהכללים נכשלו'); }
+      if (created.length) showToast('✓ נוצרו ב-Meta: ' + created.join(' + '));
+      if (!failed.length) setRuleDialog(null);
+      return failed.length === 0;
+    } catch (err) {
+      setRuleError('שגיאת רשת: ' + (err.message || err));
       return false;
     } finally {
       setCreatingRule(false);
@@ -2234,16 +2271,16 @@ const selectProject = async (client, project) => {
                   {rec.type === 'creative_performance' && rec.assets && rec.assets.worst && (
                     <button
                       className="rec-auto-btn"
-                      onClick={() => setRuleDialog({
+                      onClick={() => { setRuleError(null); setRuleDialog({
                         rec,
-                        ruleType: 'pause_high_cpl_ads',
+                        ruleType: 'cpl_combo',
                         params: {
-                          minSpend: 200,
                           cplThreshold: Math.round((rec.baseline?.avgCpl || 100) * 1.6),
-                          lookbackDays: 14,
+                          wasteThreshold: Math.max(200, Math.round((rec.baseline?.avgCpl || 100) * 3)),
+                          lookbackDays: 7,
                         },
-                      })}
-                      title="צור כלל ב-Meta שמשהה אוטומטית כל מודעה בקמפיין שעוברת CPL מסוים - לנצח"
+                      }); }}
+                      title="צור 2 כללים ב-Meta: התראה על CPL גבוה (ברמת קמפיין) + השהיה אוטומטית של מודעות שבזבזו בלי אף ליד"
                     >
                       🤖 צור כלל אוטומטי
                     </button>
@@ -2466,6 +2503,35 @@ const selectProject = async (client, project) => {
                   <div className="rule-dialog" onClick={e => e.stopPropagation()}>
                     <div className="rule-dialog-title">🤖 יצירת כלל אוטומטי ב-Meta</div>
                     <div className="rule-dialog-body">
+                      {ruleDialog.ruleType === 'cpl_combo' && (
+                        <>
+                          <p><strong>ייווצרו 2 כללים אוטומטיים ב-Meta עבור {selectedProject?.name}:</strong></p>
+                          <p>1️⃣ <strong>התראה</strong> כשקמפיין עובר CPL מסוים (Meta לא מאפשרת השהיית מודעה בודדת לפי עלות תחת "מיטוב תקציב קמפיין", לכן זו התראה ברמת קמפיין — ואתה מחליט).</p>
+                          <p>2️⃣ <strong>השהיה אוטומטית</strong> של כל מודעה שבזבזה מעל סכום מסוים <strong>בלי אף ליד</strong> (פעולה בטוחה — מכבה רק "משקל מת").</p>
+                          <div className="rule-dialog-input">
+                            <label>1️⃣ סף CPL להתראה (₪):</label>
+                            <input type="number" min={10}
+                              value={ruleDialog.params.cplThreshold}
+                              onChange={e => setRuleDialog({...ruleDialog, params: {...ruleDialog.params, cplThreshold: Number(e.target.value)}})}
+                            />
+                          </div>
+                          <div className="rule-dialog-input">
+                            <label>2️⃣ סף בזבוז להשהיה — הוצאה ללא אף ליד (₪):</label>
+                            <input type="number" min={50}
+                              value={ruleDialog.params.wasteThreshold}
+                              onChange={e => setRuleDialog({...ruleDialog, params: {...ruleDialog.params, wasteThreshold: Number(e.target.value)}})}
+                            />
+                          </div>
+                          <div className="rule-dialog-input">
+                            <label>חלון זמן (ימים):</label>
+                            <select value={ruleDialog.params.lookbackDays}
+                              onChange={e => setRuleDialog({...ruleDialog, params: {...ruleDialog.params, lookbackDays: Number(e.target.value)}})}>
+                              <option value={7}>7 ימים (רספונסיבי)</option>
+                              <option value={14}>14 ימים (שמרני)</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
                       {ruleDialog.ruleType === 'pause_high_cpl_ads' && (
                         <>
                           <p><strong>מה הכלל יעשה:</strong></p>
@@ -2506,6 +2572,7 @@ const selectProject = async (client, project) => {
                           </div>
                         </>
                       )}
+                      {ruleError && <p className="rule-dialog-error" style={{color:'#c0392b',fontWeight:600,whiteSpace:'pre-wrap'}}>⚠️ {ruleError}</p>}
                       <p className="rule-dialog-note">⚠️ הכלל ייווצר ב-Meta Ads Manager תחת "Automated Rules" וירוץ אוטומטית עד שתשהה/תמחק אותו שם.</p>
                     </div>
                     <div className="rule-dialog-actions">
@@ -2513,7 +2580,7 @@ const selectProject = async (client, project) => {
                       <button
                         className="pipeline-btn pipeline-btn-primary"
                         disabled={creatingRule}
-                        onClick={() => createMetaRule(ruleDialog.ruleType, ruleDialog.params, ruleDialog.rec?.dedupKey)}
+                        onClick={() => ruleDialog.ruleType === 'cpl_combo' ? createCplCombo(ruleDialog.params, ruleDialog.rec?.dedupKey) : createMetaRule(ruleDialog.ruleType, ruleDialog.params, ruleDialog.rec?.dedupKey)}
                       >
                         {creatingRule ? '⏳ יוצר...' : '✓ צור כלל ב-Meta'}
                       </button>
