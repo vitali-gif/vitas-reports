@@ -129,11 +129,11 @@ function buildRulePayload(ruleType, params, projectName, campaignIds, notifyUser
       if (!cpl || cpl <= 0) throw new Error('cplThreshold must be a positive number')
       if (!notifyUserId) throw new Error('notifyUserId required for notification rules')
       return {
-        name: `[VITAS] \u05d4\u05ea\u05e8\u05d0\u05d4: \u05de\u05d5\u05d3\u05e2\u05d4 \u05e2\u05dd CPL > ${Math.round(cpl)}\u20aa \u05d1-${projectName}`,
+        name: `[VITAS] \u05d4\u05ea\u05e8\u05d0\u05d4: \u05e7\u05de\u05e4\u05d9\u05d9\u05df \u05e2\u05dd CPL > ${Math.round(cpl)}\u20aa \u05d1-${projectName}`,
         evaluation_spec: {
           evaluation_type: 'SCHEDULE',
           filters: [
-            { field: 'entity_type', operator: 'EQUAL', value: 'AD' },
+            { field: 'entity_type', operator: 'EQUAL', value: 'CAMPAIGN' },
             scope,
             { field: 'time_preset', operator: 'EQUAL', value: timePreset(params.lookbackDays) },
             { field: 'spent', operator: 'GREATER_THAN', value: minSpend * 100 },
