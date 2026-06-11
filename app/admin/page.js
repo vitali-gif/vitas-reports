@@ -1893,6 +1893,7 @@ const selectProject = async (client, project) => {
       return (<>
         {kpi('תקציב שנוצל', formatCurrency(spend), '', spend, prevSpend, true)}
         {kpi('לידים', formatNum(leads), 'green', leads, null)}
+        {kpi('עלות לליד', formatCurrency(leads > 0 ? spend / leads : 0), 'purple', leads > 0 ? spend / leads : 0, null, true)}
         {kpi('עברו להזדמנות', formatNum(opp), 'cyan', opp, null)}
         {kpi('רכשו', formatNum(purchased), 'purple', purchased, null)}
         {kpi('אחוז המרה לעסקה', (convRate || 0) + '%', 'orange', convRate, null)}
