@@ -640,6 +640,40 @@ const loadClients = async () => {
     }
   };
 
+  // Creates a PAIR of budget rules for a "golden day" recommendation:
+  //  (1) boost_budget_on_day   — +pct% on the golden day (campaign level, CBO)
+  //  (2) revert_budget_on_day  — undo it the next day so the boost doesn't compound weekly
+  const createBudgetCombo = async (params, recommendationKey) => {
+    if (!selectedProject) return;
+    setCreatingRule(true);
+    setRuleError(null);
+    const post = async (ruleType) => {
+      const res = await fetch('/api/meta/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify({ projectName: selectedProject.name, ruleType, params, recommendationKey }),
+      });
+      const json = await res.json().catch(() => ({}));
+      return { ok: res.ok, json };
+    };
+    try {
+      const r1 = await post('boost_budget_on_day');
+      const r2 = await post('revert_budget_on_day');
+      const created = [], failed = [];
+      if (r1.ok) created.push('העלאת תקציב'); else failed.push('העלאה: ' + (r1.json?.meta_error?.error_user_msg || r1.json?.meta_error?.message || r1.json?.error || 'שגיאה'));
+      if (r2.ok) created.push('החזרת תקציב'); else failed.push('החזרה: ' + (r2.json?.meta_error?.error_user_msg || r2.json?.meta_error?.message || r2.json?.error || 'שגיאה'));
+      if (failed.length) { setRuleError(failed.join('\n')); showToast('חלק מהכללים נכשלו'); }
+      if (created.length) showToast('✓ נוצרו ב-Meta: ' + created.join(' + '));
+      if (!failed.length) setRuleDialog(null);
+      return failed.length === 0;
+    } catch (err) {
+      setRuleError('שגיאת רשת: ' + (err.message || err));
+      return false;
+    } finally {
+      setCreatingRule(false);
+    }
+  };
+
   const addClient = async () => {
     if (!newClientName.trim()) return;
     const { data: client, error } = await supabase.from('clients').insert({ name: newClientName.trim(), color: newClientColor }).select().single();
@@ -2291,10 +2325,11 @@ const selectProject = async (client, project) => {
                       onClick={() => {
                         const dayMap = { 'ראשון': 0, 'שני': 1, 'שלישי': 2, 'רביעי': 3, 'חמישי': 4, 'שישי': 5, 'שבת': 6 };
                         const dow = dayMap[rec.baseline?.metric?.replace(/^day_/, '')] ?? 0;
+                        setRuleError(null);
                         setRuleDialog({
                           rec,
                           ruleType: 'boost_budget_on_day',
-                          params: { dayOfWeek: dow, pctIncrease: 30 },
+                          params: { dayOfWeek: dow, pctIncrease: 20 },
                         });
                       }}
                       title="צור כלל ב-Meta שמעלה אוטומטית את התקציב ביום הזה - לנצח"
@@ -2558,8 +2593,10 @@ const selectProject = async (client, project) => {
                       )}
                       {ruleDialog.ruleType === 'boost_budget_on_day' && (
                         <>
-                          <p><strong>מה הכלל יעשה:</strong></p>
-                          <p>יעלה את התקציב היומי של כל קבוצת מודעות בקמפיינים של <strong>{selectedProject?.name}</strong> ב-{ruleDialog.params.pctIncrease}%, רק בימים {['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][ruleDialog.params.dayOfWeek]}.</p>
+                          <p><strong>ייווצרו 2 כללים מקושרים ב-Meta עבור {selectedProject?.name}:</strong></p>
+                          <p>1️⃣ ביום {['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][ruleDialog.params.dayOfWeek]} בבוקר — מעלה את תקציב הקמפיינים ב-<strong>{ruleDialog.params.pctIncrease}%</strong>.</p>
+                          <p>2️⃣ למחרת בבוקר — מחזיר את התקציב למצב הרגיל (כדי שהבוסט לא יצטבר שבוע אחרי שבוע).</p>
+                          <p style={{fontSize:'0.85em',opacity:0.8}}>השינוי הוא ברמת הקמפיין (החשבון משתמש ב"מיטוב תקציב קמפיין", שם נמצא התקציב).</p>
                           <div className="rule-dialog-input">
                             <label>אחוז העלאה (%):</label>
                             <input
@@ -2580,7 +2617,7 @@ const selectProject = async (client, project) => {
                       <button
                         className="pipeline-btn pipeline-btn-primary"
                         disabled={creatingRule}
-                        onClick={() => ruleDialog.ruleType === 'cpl_combo' ? createCplCombo(ruleDialog.params, ruleDialog.rec?.dedupKey) : createMetaRule(ruleDialog.ruleType, ruleDialog.params, ruleDialog.rec?.dedupKey)}
+                        onClick={() => ruleDialog.ruleType === 'cpl_combo' ? createCplCombo(ruleDialog.params, ruleDialog.rec?.dedupKey) : ruleDialog.ruleType === 'boost_budget_on_day' ? createBudgetCombo(ruleDialog.params, ruleDialog.rec?.dedupKey) : createMetaRule(ruleDialog.ruleType, ruleDialog.params, ruleDialog.rec?.dedupKey)}
                       >
                         {creatingRule ? '⏳ יוצר...' : '✓ צור כלל ב-Meta'}
                       </button>

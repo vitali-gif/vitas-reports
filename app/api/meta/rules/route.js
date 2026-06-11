@@ -94,31 +94,44 @@ function buildRulePayload(ruleType, params, projectName, campaignIds, notifyUser
         status: 'ENABLED',
       }
     }
-    case 'boost_budget_on_day': {
+    case 'boost_budget_on_day':
+    case 'revert_budget_on_day': {
+      // HI PARK uses CBO -> budget lives at the CAMPAIGN level, so we change campaign budget.
+      // CHANGE_BUDGET uses execution_option `change_spec` { amount, unit }.
+      // A naive "+pct every golden-day" rule never auto-reverts and would compound weekly,
+      // so this is created as a PAIR: boost on the golden day, revert the next day.
       const dayOfWeek = Number(params.dayOfWeek)
       const pct = Number(params.pctIncrease)
       if (!(dayOfWeek >= 0 && dayOfWeek <= 6)) throw new Error('dayOfWeek must be 0..6')
       if (!pct || pct <= 0) throw new Error('pctIncrease must be a positive number')
       const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת']
+      const isRevert = ruleType === 'revert_budget_on_day'
+      const actDay = isRevert ? (dayOfWeek + 1) % 7 : dayOfWeek
+      // exact inverse of a +pct increase: -(pct/(100+pct))*100  (e.g. +20% -> -16.67%)
+      const revertPct = Math.round((pct / (100 + pct)) * 10000) / 100
+      const amount = isRevert ? -revertPct : Math.round(pct)
+      const name = isRevert
+        ? `[VITAS] החזרת תקציב ביום ${dayNames[actDay]} (סיום בוסט ${dayNames[dayOfWeek]}) ב-${projectName}`
+        : `[VITAS] +${Math.round(pct)}% תקציב ביום ${dayNames[dayOfWeek]} ב-${projectName}`
       return {
-        name: `[VITAS] +${pct}% תקציב ביום ${dayNames[dayOfWeek]} ב-${projectName}`,
+        name,
         evaluation_spec: {
           evaluation_type: 'SCHEDULE',
           filters: [
-            { field: 'entity_type', operator: 'EQUAL', value: 'ADSET' },
+            { field: 'entity_type', operator: 'EQUAL', value: 'CAMPAIGN' },
             scope,
           ],
         },
         execution_spec: {
           execution_type: 'CHANGE_BUDGET',
           execution_options: [
-            { field: 'change_value', value: Math.round(pct), operator: 'EQUAL' },
-            { field: 'change_type', value: 'PERCENTAGE_INCREASE', operator: 'EQUAL' },
+            { field: 'change_spec', value: { amount, unit: 'PERCENTAGE' }, operator: 'EQUAL' },
           ],
         },
         schedule_spec: {
           schedule_type: 'CUSTOM',
-          schedule: [ { start_minute: 0, end_minute: 60 * 23 + 30, days: [dayOfWeek] } ],
+          // narrow 30-min window (00:00-00:30) so the change is applied once that day, not compounded
+          schedule: [ { start_minute: 0, end_minute: 30, days: [actDay] } ],
         },
         status: 'ENABLED',
       }
