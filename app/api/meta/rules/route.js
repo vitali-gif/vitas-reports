@@ -42,8 +42,16 @@ async function getCampaignIds(adAccountId, token, projectName) {
     .map(c => String(c.id))
 }
 
+// Resolve the token owner's FB user id (recipient for NOTIFICATION rules).
+async function getMeId(token) {
+  const res = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me?fields=id&access_token=${encodeURIComponent(token)}`)
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error('Failed to resolve user id: ' + (json?.error?.message || res.status))
+  return String(json.id)
+}
+
 // Map our params to a Meta adrules_library payload, scoped to the given campaign IDs.
-function buildRulePayload(ruleType, params, projectName, campaignIds) {
+function buildRulePayload(ruleType, params, projectName, campaignIds, notifyUserId) {
   const scope = { field: 'campaign.id', operator: 'IN', value: campaignIds }
   switch (ruleType) {
     case 'pause_high_cpl_ads': {
@@ -115,6 +123,34 @@ function buildRulePayload(ruleType, params, projectName, campaignIds) {
         status: 'ENABLED',
       }
     }
+    case 'notify_high_cpl': {
+      const minSpend = Number(params.minSpend ?? 100)
+      const cpl = Number(params.cplThreshold)
+      if (!cpl || cpl <= 0) throw new Error('cplThreshold must be a positive number')
+      if (!notifyUserId) throw new Error('notifyUserId required for notification rules')
+      return {
+        name: `[VITAS] \u05d4\u05ea\u05e8\u05d0\u05d4: \u05de\u05d5\u05d3\u05e2\u05d4 \u05e2\u05dd CPL > ${Math.round(cpl)}\u20aa \u05d1-${projectName}`,
+        evaluation_spec: {
+          evaluation_type: 'SCHEDULE',
+          filters: [
+            { field: 'entity_type', operator: 'EQUAL', value: 'AD' },
+            scope,
+            { field: 'time_preset', operator: 'EQUAL', value: timePreset(params.lookbackDays) },
+            { field: 'spent', operator: 'GREATER_THAN', value: minSpend * 100 },
+            { field: 'cost_per_lead_fb', operator: 'GREATER_THAN', value: cpl * 100 },
+          ],
+        },
+        execution_spec: {
+          execution_type: 'NOTIFICATION',
+          execution_options: [
+            { field: 'user_ids', value: [notifyUserId], operator: 'EQUAL' },
+            { field: 'trigger_type', value: 'INACTIONABLE_RULE_NOTIFICATIONS', operator: 'EQUAL' },
+          ],
+        },
+        schedule_spec: { schedule_type: 'DAILY' },
+        status: 'ENABLED',
+      }
+    }
     default:
       throw new Error(`Unknown ruleType: ${ruleType}`)
   }
@@ -146,9 +182,14 @@ export async function POST(request) {
     return bad(`לא נמצאו קמפיינים ששמם מכיל "${projectName}" בחשבון המודעות. ודא ששמות הקמפיינים כוללים את שם הפרויקט.`, 404)
   }
 
+  let notifyUserId = null
+  if (ruleType === 'notify_high_cpl') {
+    try { notifyUserId = await getMeId(token) } catch (err) { return bad('Failed to resolve notification recipient: ' + (err.message || String(err)), 502) }
+  }
+
   let payload
   try {
-    payload = buildRulePayload(ruleType, params || {}, projectName, campaignIds)
+    payload = buildRulePayload(ruleType, params || {}, projectName, campaignIds, notifyUserId)
   } catch (err) {
     return bad('Invalid rule params: ' + (err.message || String(err)))
   }
