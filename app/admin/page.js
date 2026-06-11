@@ -657,13 +657,20 @@ const loadClients = async () => {
       return { ok: res.ok, json };
     };
     try {
-      const r1 = await post('boost_budget_on_day');
-      const r2 = await post('revert_budget_on_day');
+      const specs = [
+        ['boost_budget_on_day', 'העלאת תקציב (יום רווחי)'],
+        ['revert_budget_on_day', 'החזרת בוסט'],
+        ['cut_budget_on_day', 'קיצוץ תקציב (יום חלש)'],
+        ['restore_budget_on_day', 'החזרת קיצוץ'],
+      ];
       const created = [], failed = [];
-      if (r1.ok) created.push('העלאת תקציב'); else failed.push('העלאה: ' + (r1.json?.meta_error?.error_user_msg || r1.json?.meta_error?.message || r1.json?.error || 'שגיאה'));
-      if (r2.ok) created.push('החזרת תקציב'); else failed.push('החזרה: ' + (r2.json?.meta_error?.error_user_msg || r2.json?.meta_error?.message || r2.json?.error || 'שגיאה'));
+      for (const [rt, label] of specs) {
+        const r = await post(rt);
+        if (r.ok) created.push(label);
+        else failed.push(label + ': ' + (r.json?.meta_error?.error_user_msg || r.json?.meta_error?.message || r.json?.error || 'שגיאה'));
+      }
       if (failed.length) { setRuleError(failed.join('\n')); showToast('חלק מהכללים נכשלו'); }
-      if (created.length) showToast('✓ נוצרו ב-Meta: ' + created.join(' + '));
+      if (created.length) showToast('✓ נוצרו ' + created.length + ' כללים ב-Meta');
       if (!failed.length) setRuleDialog(null);
       return failed.length === 0;
     } catch (err) {
@@ -2329,7 +2336,7 @@ const selectProject = async (client, project) => {
                         setRuleDialog({
                           rec,
                           ruleType: 'boost_budget_on_day',
-                          params: { dayOfWeek: dow, pctIncrease: 20 },
+                          params: { dayOfWeek: dow, cutDay: (dow === 0 ? 1 : 0), pctIncrease: 30 },
                         });
                       }}
                       title="צור כלל ב-Meta שמעלה אוטומטית את התקציב ביום הזה - לנצח"
@@ -2591,24 +2598,32 @@ const selectProject = async (client, project) => {
                           </div>
                         </>
                       )}
-                      {ruleDialog.ruleType === 'boost_budget_on_day' && (
+                      {ruleDialog.ruleType === 'boost_budget_on_day' && (() => {
+                        const dn = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+                        const gd = ruleDialog.params.dayOfWeek, cd = ruleDialog.params.cutDay, pc = ruleDialog.params.pctIncrease;
+                        return (
                         <>
-                          <p><strong>ייווצרו 2 כללים מקושרים ב-Meta עבור {selectedProject?.name}:</strong></p>
-                          <p>1️⃣ ביום {['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][ruleDialog.params.dayOfWeek]} בבוקר — מעלה את תקציב הקמפיינים ב-<strong>{ruleDialog.params.pctIncrease}%</strong>.</p>
-                          <p>2️⃣ למחרת בבוקר — מחזיר את התקציב למצב הרגיל (כדי שהבוסט לא יצטבר שבוע אחרי שבוע).</p>
-                          <p style={{fontSize:'0.85em',opacity:0.8}}>השינוי הוא ברמת הקמפיין (החשבון משתמש ב"מיטוב תקציב קמפיין", שם נמצא התקציב).</p>
+                          <p><strong>ניתוב תקציב ניטרלי (הסה"כ החודשי לא משתנה) עבור {selectedProject?.name}:</strong></p>
+                          <p>📈 ביום <strong>{dn[gd]}</strong> (היום הרווחי) — מעלה תקציב ב-<strong>{pc}%</strong>.</p>
+                          <p>📉 ביום <strong>{dn[cd]}</strong> (היום החלש) — מקצץ תקציב ב-<strong>{pc}%</strong>, כדי לקזז.</p>
+                          <p style={{fontSize:'0.85em',opacity:0.8}}>כל שינוי חוזר למצב הרגיל למחרת — לכן התקציב לא מצטבר, והסכום החודשי נשאר זהה. הכסף פשוט עובר מהיום החלש ליום הרווחי. (ייווצרו 4 כללים מקושרים ב-Meta.)</p>
                           <div className="rule-dialog-input">
-                            <label>אחוז העלאה (%):</label>
-                            <input
-                              type="number"
-                              value={ruleDialog.params.pctIncrease}
+                            <label>אחוז הניתוב (%):</label>
+                            <input type="number" min={5} max={90}
+                              value={pc}
                               onChange={e => setRuleDialog({...ruleDialog, params: {...ruleDialog.params, pctIncrease: Number(e.target.value)}})}
-                              min={5}
-                              max={300}
                             />
                           </div>
+                          <div className="rule-dialog-input">
+                            <label>לקחת את התקציב מהיום:</label>
+                            <select value={cd}
+                              onChange={e => setRuleDialog({...ruleDialog, params: {...ruleDialog.params, cutDay: Number(e.target.value)}})}>
+                              {dn.map((d,i) => i === gd ? null : <option key={i} value={i}>{d}</option>)}
+                            </select>
+                          </div>
                         </>
-                      )}
+                        );
+                      })()}
                       {ruleError && <p className="rule-dialog-error" style={{color:'#c0392b',fontWeight:600,whiteSpace:'pre-wrap'}}>⚠️ {ruleError}</p>}
                       <p className="rule-dialog-note">⚠️ הכלל ייווצר ב-Meta Ads Manager תחת "Automated Rules" וירוץ אוטומטית עד שתשהה/תמחק אותו שם.</p>
                     </div>

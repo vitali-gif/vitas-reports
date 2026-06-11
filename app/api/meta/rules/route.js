@@ -94,25 +94,40 @@ function buildRulePayload(ruleType, params, projectName, campaignIds, notifyUser
         status: 'ENABLED',
       }
     }
-    case 'boost_budget_on_day':
-    case 'revert_budget_on_day': {
-      // HI PARK uses CBO -> budget lives at the CAMPAIGN level, so we change campaign budget.
-      // CHANGE_BUDGET uses execution_option `change_spec` { amount, unit }.
-      // A naive "+pct every golden-day" rule never auto-reverts and would compound weekly,
-      // so this is created as a PAIR: boost on the golden day, revert the next day.
-      const dayOfWeek = Number(params.dayOfWeek)
-      const pct = Number(params.pctIncrease)
-      if (!(dayOfWeek >= 0 && dayOfWeek <= 6)) throw new Error('dayOfWeek must be 0..6')
-      if (!pct || pct <= 0) throw new Error('pctIncrease must be a positive number')
+    case 'boost_budget_on_day':     // +pct% on the golden day
+    case 'revert_budget_on_day':    // undo the boost the next day
+    case 'cut_budget_on_day':       // -pct% on a weak day (offsets the boost -> budget-neutral)
+    case 'restore_budget_on_day': { // undo the cut the next day
+      // CHANGE_BUDGET must target ADSET (Meta requirement). change_spec { amount, unit }.
+      // Budget-NEUTRAL design: boost golden day by +pct%, cut weak day by -pct%. With equal
+      // base daily budgets the absolute +/- cancel, so monthly spend is unchanged - money is
+      // just shifted toward the golden day. Each change reverts the next day (narrow 30-min
+      // window -> applied once) so nothing compounds week over week.
       const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת']
-      const isRevert = ruleType === 'revert_budget_on_day'
-      const actDay = isRevert ? (dayOfWeek + 1) % 7 : dayOfWeek
-      // exact inverse of a +pct increase: -(pct/(100+pct))*100  (e.g. +20% -> -16.67%)
-      const revertPct = Math.round((pct / (100 + pct)) * 10000) / 100
-      const amount = isRevert ? -revertPct : Math.round(pct)
-      const name = isRevert
-        ? `[VITAS] החזרת תקציב ביום ${dayNames[actDay]} (סיום בוסט ${dayNames[dayOfWeek]}) ב-${projectName}`
-        : `[VITAS] +${Math.round(pct)}% תקציב ביום ${dayNames[dayOfWeek]} ב-${projectName}`
+      const pct = Number(params.pctIncrease)
+      if (!pct || pct <= 0 || pct >= 100) throw new Error('pctIncrease must be between 1 and 99')
+      const goldenDay = Number(params.dayOfWeek)
+      const cutDay = Number(params.cutDay)
+      // amount precision helper
+      const r2 = (x) => Math.round(x * 100) / 100
+      let actDay, amount, name
+      if (ruleType === 'boost_budget_on_day') {
+        if (!(goldenDay >= 0 && goldenDay <= 6)) throw new Error('dayOfWeek must be 0..6')
+        actDay = goldenDay; amount = Math.round(pct)
+        name = `[VITAS] +${Math.round(pct)}% תקציב ביום ${dayNames[goldenDay]} ב-${projectName}`
+      } else if (ruleType === 'revert_budget_on_day') {
+        if (!(goldenDay >= 0 && goldenDay <= 6)) throw new Error('dayOfWeek must be 0..6')
+        actDay = (goldenDay + 1) % 7; amount = -r2((pct / (100 + pct)) * 100) // undo +pct
+        name = `[VITAS] החזרת תקציב ביום ${dayNames[actDay]} (סיום בוסט ${dayNames[goldenDay]}) ב-${projectName}`
+      } else if (ruleType === 'cut_budget_on_day') {
+        if (!(cutDay >= 0 && cutDay <= 6)) throw new Error('cutDay must be 0..6')
+        actDay = cutDay; amount = -Math.round(pct)
+        name = `[VITAS] -${Math.round(pct)}% תקציב ביום ${dayNames[cutDay]} ב-${projectName}`
+      } else { // restore_budget_on_day
+        if (!(cutDay >= 0 && cutDay <= 6)) throw new Error('cutDay must be 0..6')
+        actDay = (cutDay + 1) % 7; amount = r2((pct / (100 - pct)) * 100) // undo -pct
+        name = `[VITAS] החזרת תקציב ביום ${dayNames[actDay]} (סיום קיצוץ ${dayNames[cutDay]}) ב-${projectName}`
+      }
       return {
         name,
         evaluation_spec: {
@@ -130,7 +145,6 @@ function buildRulePayload(ruleType, params, projectName, campaignIds, notifyUser
         },
         schedule_spec: {
           schedule_type: 'CUSTOM',
-          // narrow 30-min window (00:00-00:30) so the change is applied once that day, not compounded
           schedule: [ { start_minute: 0, end_minute: 30, days: [actDay] } ],
         },
         status: 'ENABLED',
