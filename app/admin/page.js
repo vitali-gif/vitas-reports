@@ -2048,6 +2048,7 @@ const selectProject = async (client, project) => {
           const _bucketTotals = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
           const _bucketWith  = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
           const _dowMerged = {};
+          const _hourlyLeadMerged = Array.from({ length: 24 }, () => 0);
           const _crmRepRows = [];
           const _byUser = {};
           const _sources = {};
@@ -2078,6 +2079,8 @@ const selectProject = async (client, project) => {
               _dowMerged[k].leads += dow[k].leads || 0;
               _dowMerged[k].scheduled += dow[k].scheduled || 0;
             }
+            const _hls = r.summary && r.summary.hourlyLeadStats;
+            if (Array.isArray(_hls)) for (let _hi = 0; _hi < 24; _hi++) _hourlyLeadMerged[_hi] += _hls[_hi] || 0;
             if (Array.isArray(r.summary && r.summary.crmRepRows)) {
               _crmRepRows.push(...r.summary.crmRepRows);
             }
@@ -2141,6 +2144,7 @@ const selectProject = async (client, project) => {
           const recs = buildRecommendations({
             bucketTotals: _bucketTotals, bucketWith: _bucketWith,
             dowMerged: _dowMerged, totalLids: _totalLids,
+            hourlyLeadStats: _hourlyLeadMerged,
             crmRepRows: _crmRepRows,
             byUser: _byUserFinal,
             sources: _sources,
@@ -2278,6 +2282,7 @@ const selectProject = async (client, project) => {
           const _impactInput = {
             bucketTotals: _bucketTotals, bucketWith: _bucketWith,
             dowMerged: _dowMerged, crmRepRows: _crmRepRows,
+            hourlyLeadStats: _hourlyLeadMerged,
             byUser: _byUserFinal, sources: _sources,
             fbRows: _fbAdRows, googRows: _ggAdRows,
           };
