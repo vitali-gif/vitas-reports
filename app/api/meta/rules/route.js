@@ -1,30 +1,17 @@
 // API route: /api/meta/rules
-//   POST — create a new Meta Automated Rule from a recommendation
-//   GET  — list current automated rules (mirrors diagnose, but only rules)
-//
-// Body shape (POST):
-//   {
-//     projectName:      'HI PARK' | 'ONCE' | 'REHAVIA',
-//     ruleType:         'pause_high_cpl_ads' | 'boost_budget_on_day' | 'pause_high_spend_no_results',
-//     params:           { ... }   // type-specific (see below)
-//     recommendationKey?: string  // for audit linkage to vitas_tasks
-//   }
-//
-// Rule types implemented (v1):
-//   pause_high_cpl_ads — pause any ad in the project's campaigns that has spent
-//     more than minSpend AND has CPL > cplThreshold over the last N days.
-//     Params: { minSpend: number (default 200), cplThreshold: number, lookbackDays: 7|14|30 }
-//
-//   pause_high_spend_no_results — pause any ad that spent more than minSpend but
-//     produced 0 leads in lookbackDays.
-//     Params: { minSpend: number (default 200), lookbackDays: 7|14|30 }
-//
-//   boost_budget_on_day — increase the daily_budget of all ad sets in the project's
-//     campaigns by pctIncrease, but only on the given dayOfWeek. (Implemented as a
-//     rule with schedule_spec for the day, action CHANGE_BUDGET.)
-//     Params: { dayOfWeek: 0..6 (0=Sun), pctIncrease: number (e.g. 30 for +30%) }
+//   POST   — create a Meta Automated Rule from a recommendation (scoped to a project's campaigns)
+//   GET    — list current automated rules
+//   DELETE — remove a rule by id (?id=RULE_ID) — for cleanup / UI rule management
 //
 // Auth: requires x-client-key = anon key (admin UI only).
+//
+// NOTE: Meta Automated Rules schema is strict. Key requirements (per Meta docs):
+//   - every rule MUST include an entity_type OR id filter
+//   - any insights filter requires a time_preset filter (operator EQUAL)
+//   - scope-by-name uses field `name`/`campaign.name` (NOT `entity_name`)
+//   - cost metrics must be valid Insights fields (e.g. cost_per_lead_fb, NOT cost_per_inline_link_click)
+// We scope by campaign.id IN [...] (resolved from the project name) so rules never
+// affect other clients sharing the same ad account, and to avoid case-sensitivity issues.
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -35,63 +22,67 @@ function bad(message, status = 400) {
   return Response.json({ error: message }, { status })
 }
 
-// Map our params to a Meta adrules_library payload
-function buildRulePayload(ruleType, params, projectName, adAccountId) {
-  // All rules apply to the user's whole account; we narrow via campaign filter.
-  // The filter uses Meta's evaluation operators (GREATER_THAN, LESS_THAN, etc.).
-  // Reference: https://developers.facebook.com/docs/marketing-api/automated-rules
-  const projectFilter = {
-    field: 'entity_name',
-    operator: 'CONTAIN',
-    value: projectName,
-  }
+// lookbackDays -> Meta time_preset (presets that include TODAY, suitable for schedule rules)
+function timePreset(lookbackDays) {
+  const n = Number(lookbackDays)
+  if (n >= 30) return 'LAST_30_DAYS'
+  if (n >= 14) return 'LAST_14_DAYS'
+  return 'LAST_7_DAYS'
+}
+
+// Resolve campaign IDs whose name contains projectName (case-insensitive) within the ad account.
+async function getCampaignIds(adAccountId, token, projectName) {
+  const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/campaigns?fields=id,name&limit=500&access_token=${encodeURIComponent(token)}`
+  const res = await fetch(url)
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error('Failed to list campaigns: ' + (json?.error?.message || res.status))
+  const needle = String(projectName || '').trim().toLowerCase()
+  return (json.data || [])
+    .filter(c => (c.name || '').toLowerCase().includes(needle))
+    .map(c => String(c.id))
+}
+
+// Map our params to a Meta adrules_library payload, scoped to the given campaign IDs.
+function buildRulePayload(ruleType, params, projectName, campaignIds) {
+  const scope = { field: 'campaign.id', operator: 'IN', value: campaignIds }
   switch (ruleType) {
     case 'pause_high_cpl_ads': {
       const minSpend = Number(params.minSpend ?? 200)
       const cpl = Number(params.cplThreshold)
-      const lookback = Number(params.lookbackDays ?? 14)
       if (!cpl || cpl <= 0) throw new Error('cplThreshold must be a positive number')
       return {
         name: `[VITAS] השהה מודעות עם CPL > ${Math.round(cpl)}₪ ב-${projectName}`,
         evaluation_spec: {
-          evaluation_type: 'SCHEDULE',  // run on schedule, not triggered
+          evaluation_type: 'SCHEDULE',
           filters: [
-            projectFilter,
-            { field: 'spent', operator: 'GREATER_THAN', value: minSpend * 100 },  // spent is in account currency cents
-            { field: 'cost_per_inline_link_click', operator: 'GREATER_THAN', value: cpl * 100 },
+            { field: 'entity_type', operator: 'EQUAL', value: 'AD' },
+            scope,
+            { field: 'time_preset', operator: 'EQUAL', value: timePreset(params.lookbackDays) },
+            { field: 'spent', operator: 'GREATER_THAN', value: minSpend * 100 },        // account currency cents
+            { field: 'cost_per_lead_fb', operator: 'GREATER_THAN', value: cpl * 100 },   // cost per lead, cents
           ],
         },
-        execution_spec: {
-          execution_type: 'PAUSE',
-          execution_options: [
-            { field: 'user_id', value: 'me', operator: 'EQUAL' },
-          ],
-        },
-        schedule_spec: {
-          schedule_type: 'SEMI_HOURLY',
-        },
+        execution_spec: { execution_type: 'PAUSE' },
+        schedule_spec: { schedule_type: 'SEMI_HOURLY' },
         status: 'ENABLED',
       }
     }
     case 'pause_high_spend_no_results': {
       const minSpend = Number(params.minSpend ?? 200)
-      const lookback = Number(params.lookbackDays ?? 7)
       return {
         name: `[VITAS] השהה מודעות שמבזבזות בלי לידים ב-${projectName}`,
         evaluation_spec: {
           evaluation_type: 'SCHEDULE',
           filters: [
-            projectFilter,
+            { field: 'entity_type', operator: 'EQUAL', value: 'AD' },
+            scope,
+            { field: 'time_preset', operator: 'EQUAL', value: timePreset(params.lookbackDays) },
             { field: 'spent', operator: 'GREATER_THAN', value: minSpend * 100 },
-            { field: 'actions:offsite_conversion.fb_pixel_lead', operator: 'EQUAL', value: 0 },
+            { field: 'offsite_conversion.fb_pixel_lead', operator: 'EQUAL', value: 0 },
           ],
         },
-        execution_spec: {
-          execution_type: 'PAUSE',
-        },
-        schedule_spec: {
-          schedule_type: 'SEMI_HOURLY',
-        },
+        execution_spec: { execution_type: 'PAUSE' },
+        schedule_spec: { schedule_type: 'SEMI_HOURLY' },
         status: 'ENABLED',
       }
     }
@@ -101,14 +92,13 @@ function buildRulePayload(ruleType, params, projectName, adAccountId) {
       if (!(dayOfWeek >= 0 && dayOfWeek <= 6)) throw new Error('dayOfWeek must be 0..6')
       if (!pct || pct <= 0) throw new Error('pctIncrease must be a positive number')
       const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת']
-      // Schedule: only active on the chosen day, from 00:00 to 23:30 in Asia/Jerusalem
       return {
         name: `[VITAS] +${pct}% תקציב ביום ${dayNames[dayOfWeek]} ב-${projectName}`,
         evaluation_spec: {
           evaluation_type: 'SCHEDULE',
           filters: [
-            projectFilter,
             { field: 'entity_type', operator: 'EQUAL', value: 'ADSET' },
+            scope,
           ],
         },
         execution_spec: {
@@ -120,13 +110,7 @@ function buildRulePayload(ruleType, params, projectName, adAccountId) {
         },
         schedule_spec: {
           schedule_type: 'CUSTOM',
-          schedule: [
-            {
-              start_minute: 0,                    // 00:00
-              end_minute: 60 * 23 + 30,           // 23:30
-              days: [dayOfWeek],
-            },
-          ],
+          schedule: [ { start_minute: 0, end_minute: 60 * 23 + 30, days: [dayOfWeek] } ],
         },
         status: 'ENABLED',
       }
@@ -151,25 +135,32 @@ export async function POST(request) {
   const adAccountId = process.env.META_AD_ACCOUNT_ID
   if (!token || !adAccountId) return bad('Meta env vars missing', 500)
 
+  // Resolve the project's campaigns so the rule is scoped (never account-wide).
+  let campaignIds
+  try {
+    campaignIds = await getCampaignIds(adAccountId, token, projectName)
+  } catch (err) {
+    return bad('Failed to resolve campaigns: ' + (err.message || String(err)), 502)
+  }
+  if (!campaignIds || campaignIds.length === 0) {
+    return bad(`לא נמצאו קמפיינים ששמם מכיל "${projectName}" בחשבון המודעות. ודא ששמות הקמפיינים כוללים את שם הפרויקט.`, 404)
+  }
+
   let payload
   try {
-    payload = buildRulePayload(ruleType, params || {}, projectName, adAccountId)
+    payload = buildRulePayload(ruleType, params || {}, projectName, campaignIds)
   } catch (err) {
     return bad('Invalid rule params: ' + (err.message || String(err)))
   }
 
   const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/adrules_library`
   const form = new URLSearchParams()
-  // Meta wants nested fields as JSON-stringified values
   for (const [k, v] of Object.entries(payload)) {
     form.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v))
   }
   form.append('access_token', token)
 
-  const res = await fetch(url, {
-    method: 'POST',
-    body: form,
-  })
+  const res = await fetch(url, { method: 'POST', body: form })
   const respText = await res.text()
   let respJson
   try { respJson = JSON.parse(respText) } catch { respJson = { raw: respText } }
@@ -180,10 +171,11 @@ export async function POST(request) {
       status: res.status,
       meta_error: respJson?.error || respJson,
       sent_payload: payload,
+      scoped_campaigns: campaignIds.length,
     }, { status: 502 })
   }
 
-  // Audit log
+  // Audit log (optional)
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -198,7 +190,6 @@ export async function POST(request) {
         params: params || {},
         recommendation_key: recommendationKey || null,
       })
-      // Ignore failure — log is optional, don't break the user
     }
   } catch {}
 
@@ -206,7 +197,7 @@ export async function POST(request) {
     ok: true,
     ruleId: respJson.id,
     ruleName: payload.name,
-    payload,
+    scopedCampaigns: campaignIds.length,
   }, { status: 201 })
 }
 
@@ -224,4 +215,20 @@ export async function GET(request) {
   const json = await res.json().catch(() => ({}))
   if (!res.ok) return Response.json({ error: json?.error || 'Meta API error' }, { status: 502 })
   return Response.json({ rules: json.data || [] })
+}
+
+export async function DELETE(request) {
+  const anon = request.headers.get('x-client-key')
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return bad('Unauthorized', 401)
+  }
+  const token = process.env.META_ACCESS_TOKEN
+  if (!token) return bad('Meta env vars missing', 500)
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get('id')
+  if (!id) return bad('id query param required')
+  const res = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/${id}?access_token=${encodeURIComponent(token)}`, { method: 'DELETE' })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) return Response.json({ error: json?.error || 'Meta API error' }, { status: 502 })
+  return Response.json({ ok: true, deleted: id })
 }
