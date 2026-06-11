@@ -31,15 +31,23 @@ function timePreset(lookbackDays) {
 }
 
 // Resolve campaign IDs whose name contains projectName (case-insensitive) within the ad account.
-async function getCampaignIds(adAccountId, token, projectName) {
+async function getCampaignScope(adAccountId, token, projectName) {
   const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}/campaigns?fields=id,name&limit=500&access_token=${encodeURIComponent(token)}`
   const res = await fetch(url)
   const json = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error('Failed to list campaigns: ' + (json?.error?.message || res.status))
-  const needle = String(projectName || '').trim().toLowerCase()
-  return (json.data || [])
-    .filter(c => (c.name || '').toLowerCase().includes(needle))
-    .map(c => String(c.id))
+  const wanted = String(projectName || '').trim()
+  const needle = wanted.toLowerCase()
+  const matched = (json.data || []).filter(c => (c.name || '').toLowerCase().includes(needle))
+  // Derive the actual-cased substring from a real campaign name so the CONTAIN filter
+  // matches regardless of case (e.g. project "HI PARK" but campaigns named "Hi Park-...").
+  let nameValue = wanted
+  if (matched.length) {
+    const nm = matched[0].name || ''
+    const idx = nm.toLowerCase().indexOf(needle)
+    if (idx >= 0) nameValue = nm.substr(idx, wanted.length)
+  }
+  return { nameValue, count: matched.length, ids: matched.map(c => String(c.id)) }
 }
 
 // Resolve the token owner's FB user id (recipient for NOTIFICATION rules).
@@ -51,8 +59,7 @@ async function getMeId(token) {
 }
 
 // Map our params to a Meta adrules_library payload, scoped to the given campaign IDs.
-function buildRulePayload(ruleType, params, projectName, campaignIds, notifyUserId) {
-  const scope = { field: 'campaign.id', operator: 'IN', value: campaignIds }
+function buildRulePayload(ruleType, params, projectName, scope, notifyUserId) {
   switch (ruleType) {
     case 'pause_high_cpl_ads': {
       const minSpend = Number(params.minSpend ?? 200)
@@ -198,15 +205,18 @@ export async function POST(request) {
   if (!token || !adAccountId) return bad('Meta env vars missing', 500)
 
   // Resolve the project's campaigns so the rule is scoped (never account-wide).
-  let campaignIds
+  // We scope by a readable, dynamic campaign.name CONTAIN filter (visible in Ads Manager,
+  // and auto-covers future campaigns) — using the actual-cased substring so it matches.
+  let scopeInfo
   try {
-    campaignIds = await getCampaignIds(adAccountId, token, projectName)
+    scopeInfo = await getCampaignScope(adAccountId, token, projectName)
   } catch (err) {
     return bad('Failed to resolve campaigns: ' + (err.message || String(err)), 502)
   }
-  if (!campaignIds || campaignIds.length === 0) {
+  if (!scopeInfo || scopeInfo.count === 0) {
     return bad(`לא נמצאו קמפיינים ששמם מכיל "${projectName}" בחשבון המודעות. ודא ששמות הקמפיינים כוללים את שם הפרויקט.`, 404)
   }
+  const scope = { field: 'campaign.name', operator: 'CONTAIN', value: scopeInfo.nameValue }
 
   let notifyUserId = null
   if (ruleType === 'notify_high_cpl') {
@@ -215,7 +225,7 @@ export async function POST(request) {
 
   let payload
   try {
-    payload = buildRulePayload(ruleType, params || {}, projectName, campaignIds, notifyUserId)
+    payload = buildRulePayload(ruleType, params || {}, projectName, scope, notifyUserId)
   } catch (err) {
     return bad('Invalid rule params: ' + (err.message || String(err)))
   }
@@ -238,7 +248,7 @@ export async function POST(request) {
       status: res.status,
       meta_error: respJson?.error || respJson,
       sent_payload: payload,
-      scoped_campaigns: campaignIds.length,
+      scoped_campaigns: scopeInfo.count,
     }, { status: 502 })
   }
 
@@ -264,7 +274,7 @@ export async function POST(request) {
     ok: true,
     ruleId: respJson.id,
     ruleName: payload.name,
-    scopedCampaigns: campaignIds.length,
+    scopedCampaigns: scopeInfo.count, scopeName: scopeInfo.nameValue,
   }, { status: 201 })
 }
 
