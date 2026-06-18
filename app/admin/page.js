@@ -475,18 +475,18 @@ const loadClients = async () => {
   const loadProjectReports = async (projectId) => {
     setPeriodLoading(true);
     let data = null;
-    if (isClientView) {
-      // Client view: reports table has RLS blocking anon reads.
-      // Use the service-role API endpoint instead.
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-      const res = await fetch(`/api/reports/by-project?projectId=${projectId}`, {
-        headers: { 'x-client-key': anonKey },
-      }).catch(() => null);
-      if (res && res.ok) data = await res.json().catch(() => null);
-    } else {
-      const { data: d } = await supabase.from('reports').select('*').eq('project_id', projectId).order('month', { ascending: false });
-      data = d;
-    }
+    // Always read reports through the service-role API endpoint (both client AND admin views).
+    // Reading reports directly via supabase.from('reports').select('*') runs under the
+    // anon/authenticated role, whose 8s statement_timeout is exceeded by the large JSONB
+    // `data` column once a project accumulates many reports -> Postgres error 57014
+    // ("canceling statement due to statement timeout") -> 500 -> blank dashboard for ALL
+    // clients. The by-project endpoint runs with service_role, which isn't subject to that
+    // limit, so it returns the same rows reliably.
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const res = await fetch(`/api/reports/by-project?projectId=${projectId}`, {
+      headers: { 'x-client-key': anonKey },
+    }).catch(() => null);
+    if (res && res.ok) data = await res.json().catch(() => null);
     if (data) {
       setReports(data);
       // Preserve current selectedMonth if it still exists in the new data;
