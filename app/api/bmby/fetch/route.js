@@ -937,21 +937,35 @@ async function runSync(opts = {}) {
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
     const CRM_SCHEMA_VERSION = 10  // v10: + hourlyLeadStats (leads by hour-of-day)
-    const { error: upsertErr } = await supabase.from('reports').upsert({
-      project_id: p.id,
-      source: 'crm',
-      month: m,
-      data: xlsxRows,
-      summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, namedLeads, schemaVersion: CRM_SCHEMA_VERSION },
-      file_name: 'BMBY API (live)',
-      row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
-    }, { onConflict: 'project_id,source,month' })
+    // === Data-integrity guard ===
+    // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
+    // while registrations/contracts/meetings — derived from other modules — survived.
+    // That's logically impossible (every registration/meeting belongs to a lead) and is
+    // exactly what produced broken cached snapshots shown to clients. In that case we
+    // SKIP the write so the previous good report is preserved, and flag it for alerting.
+    const _evidence = (totals.registrations || 0) + (totals.contracts || 0)
+      + (totals.meetingsScheduled || 0) + (totals.meetingsCompleted || 0)
+    const _skippedBroken = (totals.totalLeads === 0) && (_evidence > 0)
+    if (_skippedBroken) {
+      errors.push(`SKIPPED broken write for ${p.name} [${m}]: 0 leads but registrations/contracts/meetings present (likely failed fetch)`)
+    } else {
+      const { error: upsertErr } = await supabase.from('reports').upsert({
+        project_id: p.id,
+        source: 'crm',
+        month: m,
+        data: xlsxRows,
+        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, namedLeads, schemaVersion: CRM_SCHEMA_VERSION },
+        file_name: 'BMBY API (live)',
+        row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
+      }, { onConflict: 'project_id,source,month' })
 
-    if (upsertErr) errors.push('upsert: ' + upsertErr.message)
+      if (upsertErr) errors.push('upsert: ' + upsertErr.message)
+    }
 
     return {
       project: p.name,
       bmbyProjectId: bmbyPid,
+      skippedBroken: _skippedBroken,
       counts: {
         leads: aprilLids.length,
         registrations: registrationsInRange.length,

@@ -2,6 +2,8 @@
  * /api/cron/prefetch-ads — Meta + Google only (runs in ~20-25s, well under 60s limit)
  * Runs at 07:00 + 14:00 Israel time. BMBY handled separately by /api/cron/prefetch-crm.
  */
+import { sendAlert } from '../../../../lib/alert'
+
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
@@ -73,5 +75,17 @@ export async function GET(request) {
   }
 
   const failed = results.filter(r => !r.ok)
+  if (failed.length > 0) {
+    const fmt = new Intl.DateTimeFormat('he-IL', { timeZone: 'Asia/Jerusalem', dateStyle: 'short', timeStyle: 'short' }).format(new Date())
+    const failList = failed.slice(0, 30).map(f => `<li>${f.source || ''} · ${f.label || ''} · ${f.error || ('HTTP ' + (f.status||''))}</li>`).join('')
+    const html = `
+      <div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
+        <h2>⚠️ קרון מודעות (Meta/Google) — ${failed.length} משימות נכשלו</h2>
+        <p>${fmt}</p>
+        <ul>${failList}</ul>
+        <p style="color:#888;font-size:12px">VITAS Reports · ניטור אוטומטי</p>
+      </div>`
+    try { await sendAlert({ subject: `⚠️ VITAS Ads cron: ${failed.length} משימות נכשלו`, html }) } catch {}
+  }
   return Response.json({ ok: failed.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, elapsedMs: Date.now()-startedAt }, results })
 }

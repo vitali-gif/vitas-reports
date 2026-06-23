@@ -4,6 +4,8 @@
  * so we stay well under the 60s Vercel Hobby limit.
  * Jobs: 3 months + 2 ranges = 5 total, concurrency 2, ~25-35s
  */
+import { sendAlert } from '../../../../lib/alert'
+
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
@@ -81,5 +83,27 @@ export async function GET(request) {
   }
 
   const failed = results.filter(r => !r.ok)
-  return Response.json({ ok: failed.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, elapsedMs: Date.now()-startedAt }, results })
+  // Collect projects whose CRM write was skipped because the fetch looked broken.
+  const brokenProjects = []
+  for (const r of results) for (const pr of (r.projects || [])) {
+    if (pr && pr.skippedBroken) brokenProjects.push(`${pr.project} — ${r.label}`)
+  }
+
+  // Email alert if anything failed or any report was skipped as broken.
+  if (failed.length > 0 || brokenProjects.length > 0) {
+    const fmt = new Intl.DateTimeFormat('he-IL', { timeZone: 'Asia/Jerusalem', dateStyle: 'short', timeStyle: 'short' }).format(new Date())
+    const failList = failed.slice(0, 30).map(f => `<li>${f.source || ''} · ${f.label || ''} · ${f.error || ('HTTP ' + (f.status||''))}</li>`).join('')
+    const brokenList = brokenProjects.map(b => `<li>${b}</li>`).join('')
+    const html = `
+      <div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
+        <h2>⚠️ קרון CRM (BMBY) — בעיה בהרצה</h2>
+        <p>${fmt} · ${failed.length} כשלים · ${brokenProjects.length} דוחות שבורים שדולגו</p>
+        ${brokenProjects.length ? `<h3>דוחות שבורים שלא נשמרו (נשמר הקודם הטוב):</h3><ul>${brokenList}</ul>` : ''}
+        ${failed.length ? `<h3>משימות שנכשלו:</h3><ul>${failList}</ul>` : ''}
+        <p style="color:#888;font-size:12px">VITAS Reports · ניטור אוטומטי</p>
+      </div>`
+    try { await sendAlert({ subject: `⚠️ VITAS CRM cron: ${failed.length} כשלים, ${brokenProjects.length} שבורים`, html }) } catch {}
+  }
+
+  return Response.json({ ok: failed.length === 0 && brokenProjects.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, brokenSkipped: brokenProjects.length, elapsedMs: Date.now()-startedAt }, brokenProjects, results })
 }
