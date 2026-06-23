@@ -56,7 +56,16 @@ function normUtm(v) {
 
 // ===== Zoho OAuth =====
 
-async function getZohoAccessToken() {
+// Module-level access-token cache. Zoho access tokens live ~1h; refreshing one per
+// request caused the cron (~12 jobs) to hammer the OAuth endpoint -> Zoho rate-limit
+// ("too many requests continuously" / Access Denied), which then cascaded into
+// "fetch failed" on the data calls. Caching the token (and serialising concurrent
+// refreshes via a shared promise) collapses those ~12 refreshes to ~1 per warm instance.
+let _zohoToken = null
+let _zohoTokenExp = 0          // ms epoch when the cached token should be considered stale
+let _zohoRefreshInFlight = null // shared promise so concurrent calls don't all refresh
+
+async function _refreshZohoToken() {
   const params = new URLSearchParams({
     client_id:     process.env.ZOHO_CLIENT_ID,
     client_secret: process.env.ZOHO_CLIENT_SECRET,
@@ -70,11 +79,25 @@ async function getZohoAccessToken() {
   })
   if (!res.ok) {
     const txt = await res.text()
+    // On a transient rate-limit, fall back to a still-usable cached token if we have one.
+    if (_zohoToken && (res.status === 400 || res.status === 429)) return _zohoToken
     throw new Error(`Zoho token refresh failed ${res.status}: ${txt.slice(0, 300)}`)
   }
   const json = await res.json()
-  if (json.error) throw new Error(`Zoho OAuth error: ${json.error}`)
-  return json.access_token
+  if (json.error) {
+    if (_zohoToken) return _zohoToken
+    throw new Error(`Zoho OAuth error: ${json.error}`)
+  }
+  _zohoToken = json.access_token
+  _zohoTokenExp = Date.now() + 50 * 60 * 1000 // 50 min (tokens last ~60)
+  return _zohoToken
+}
+
+async function getZohoAccessToken() {
+  if (_zohoToken && Date.now() < _zohoTokenExp) return _zohoToken
+  if (_zohoRefreshInFlight) return _zohoRefreshInFlight   // a refresh is already happening
+  _zohoRefreshInFlight = _refreshZohoToken().finally(() => { _zohoRefreshInFlight = null })
+  return _zohoRefreshInFlight
 }
 
 // ===== Zoho API =====
