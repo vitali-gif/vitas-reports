@@ -196,7 +196,23 @@ function CalGrid({ year, month, tempStart, tempEnd, pickMode, hoverYmd, todayYmd
 }
 
 // ─── Main DatePicker component ───────────────────────────────────────────────
-export default function DatePicker({ activePreset, since, until, onApplyPreset, onApplyRange }) {
+export default function DatePicker({ activePreset, since, until, onApplyPreset, onApplyRange, showQuarters = true }) {
+  // When showQuarters is false (e.g. BCureLaser / Zoho — quarters aren't used and they
+  // trip Zoho's 2000-record fetch limit) drop q1-q4 from the preset list and collapse any
+  // separators that would be left dangling.
+  const presetList = (() => {
+    if (showQuarters) return PRESET_LIST
+    const QUARTER_KEYS = ['q1', 'q2', 'q3', 'q4']
+    const out = []
+    for (const p of PRESET_LIST) {
+      if (p.key && QUARTER_KEYS.includes(p.key)) continue
+      if (p.separator && out.length && out[out.length - 1].separator) continue
+      out.push(p)
+    }
+    while (out.length && out[0].separator) out.shift()
+    while (out.length && out[out.length - 1].separator) out.pop()
+    return out
+  })()
   const [open, setOpen] = useState(false)
   const [tempPreset, setTempPreset] = useState(activePreset || 'lastMonth')
   const [tempStart, setTempStart] = useState(since || '')
@@ -470,7 +486,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                 gap: 6, padding: '12px 12px 8px',
                 borderBottom: '1px solid var(--border)',
               }}>
-                {PRESET_LIST.filter(p => !p.separator && p.key !== 'custom').map(p => (
+                {presetList.filter(p => !p.separator && p.key !== 'custom').map(p => (
                   <button
                     key={p.key}
                     type="button"
@@ -646,7 +662,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                   }}>
                     תקופות
                   </div>
-                  {PRESET_LIST.map((p, idx) => p.separator ? (
+                  {presetList.map((p, idx) => p.separator ? (
                     <div key={'sep'+idx} style={{ height: 1, background: 'var(--border)', margin: '6px 12px' }} />
                   ) : (
                     <button

@@ -47,18 +47,26 @@ export async function GET(request) {
   ]
   const jobs = [
     ...months.map(month => ({ kind: 'month', label: month, payload: { month } })),
-    ...rangePresets.map(r => ({ kind: 'range', label: `${r.id} (${r.since}..${r.until})`, payload: { since: r.since, until: r.until } })),
+    ...rangePresets.map(r => ({ kind: 'range', label: `${r.id} (${r.since}..${r.until})`, rangeId: r.id, payload: { since: r.since, until: r.until } })),
   ]
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   const results = []
 
+  // BCureLaser / Zoho doesn't use quarterly views, and a full quarter usually exceeds
+  // Zoho's 2000-record search limit (LIMIT_REACHED) — which fails the job and triggers a
+  // false alert email every run. So skip the Zoho fetch for q1-q4. BMBY (ש.ברוך) still runs
+  // for quarters, since those clients do use quarterly ranges.
+  const ZOHO_SKIP_RANGES = ['q1', 'q2', 'q3', 'q4']
   async function run(job) {
     const t0 = Date.now()
     // Fire Zoho CRM (BCureLaser) in parallel — it only writes to BCureLaser project
-    const zohoPromise = fetch(`${base}/api/zoho/fetch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
-      .then(r => r.json()).catch(() => ({}))
+    const skipZoho = ZOHO_SKIP_RANGES.includes(job.rangeId)
+    const zohoPromise = skipZoho
+      ? null
+      : fetch(`${base}/api/zoho/fetch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
+          .then(r => r.json()).catch(() => ({}))
     try {
       const res = await fetch(`${base}/api/bmby/fetch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
       const data = await res.json().catch(() => ({}))
@@ -66,11 +74,13 @@ export async function GET(request) {
     } catch (err) {
       results.push({ kind: job.kind, label: job.label, source: 'bmby', ok: false, ms: Date.now()-t0, error: String(err) })
     }
-    // Wait for Zoho and record result (non-fatal if it fails)
-    try {
-      const zohoData = await zohoPromise
-      results.push({ kind: job.kind, label: job.label, source: 'zoho', ok: zohoData.ok ?? false, ms: Date.now()-t0, ...zohoData })
-    } catch {}
+    // Wait for Zoho and record result (non-fatal if it fails). Skipped entirely for quarters.
+    if (zohoPromise) {
+      try {
+        const zohoData = await zohoPromise
+        results.push({ kind: job.kind, label: job.label, source: 'zoho', ok: zohoData.ok ?? false, ms: Date.now()-t0, ...zohoData })
+      } catch {}
+    }
   }
 
   // Concurrency 2 — gentle on BMBY SOAP

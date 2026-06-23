@@ -41,7 +41,13 @@ export default function TitleBar({
   onApplyRange,
   comparisonOn = false,
   onToggleComparison,
+  showQuarters = true,
 }) {
+  // BCureLaser / Zoho: hide the quarterly presets (unused there + they trip Zoho's
+  // 2000-record fetch limit). Desktop list is filtered inside DatePicker via showQuarters.
+  const mobilePresets = showQuarters
+    ? MOBILE_PRESETS
+    : MOBILE_PRESETS.filter(p => !['q1', 'q2', 'q3', 'q4'].includes(p.id))
   const drpValue = {
     from: fromYMD(since),
     to:   fromYMD(until),
@@ -97,6 +103,7 @@ export default function TitleBar({
                 until={until}
                 onApplyPreset={onApplyPreset}
                 onApplyRange={onApplyRange}
+                showQuarters={showQuarters}
               />
             </div>
 
@@ -105,7 +112,7 @@ export default function TitleBar({
               <DateRangePicker
                 value={drpValue}
                 onChange={handleDrpChange}
-                presets={MOBILE_PRESETS}
+                presets={mobilePresets}
               />
             </div>
           </>
