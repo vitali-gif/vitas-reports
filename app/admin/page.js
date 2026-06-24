@@ -3523,7 +3523,7 @@ const selectProject = async (client, project) => {
               onApplyRange={applyCustomRange}
               comparisonOn={compareEnabled}
               onToggleComparison={() => onComparisonToggle(!compareEnabled)}
-              showQuarters={!reports.some(r => r.source === 'crm' && r.summary?.crmType === 'zoho')}
+              showQuarters={!(/bcurelaser/i.test(selectedProject?.name || '') || reports.some(r => r.source === 'crm' && r.summary?.crmType === 'zoho'))}
             />
             {(refreshing || refreshingCrm || periodLoading) && reports.length > 0 ? (<div className="period-loading-overlay"><div className="period-loading-spinner" /></div>) : null}
             {reports.length === 0 ? ((refreshing || refreshingCrm || periodLoading) ? <SkeletonDashboard /> : <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d3\u05d9\u05d9\u05df'}</h3><p style={{marginTop:10,color:'var(--text-secondary)'}}>{'\u05dc\u05d7\u05e5 \u05e2\u05dc \u05db\u05e4\u05ea\u05d5\u05e8 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05dc\u05de\u05e9\u05d9\u05db\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</p></div>) : renderDashboard()}
