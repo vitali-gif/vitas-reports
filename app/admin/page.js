@@ -3542,8 +3542,7 @@ const selectProject = async (client, project) => {
               showQuarters={!(/bcurelaser/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
             />
             {(() => {
-              const _isZohoProj = /bcurelaser/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho');
-              if (_isZohoProj) return null; // ש.ברוך (BMBY) only
+              // Budget bar shown for all projects (ש.ברוך + BCureLaser). Inert until a budget is set.
               const _d = new Date();
               const _curYM = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0');
               const ym = budgetMonth || _curYM;
