@@ -3,6 +3,7 @@
  * Runs at 07:00 + 14:00 Israel time. BMBY handled separately by /api/cron/prefetch-crm.
  */
 import { sendAlert } from '../../../../lib/alert'
+import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -87,5 +88,40 @@ export async function GET(request) {
       </div>`
     try { await sendAlert({ subject: `⚠️ VITAS Ads cron: ${failed.length} משימות נכשלו`, html }) } catch {}
   }
+  // === Monthly budget threshold alerts (ש.ברוך projects with a budget set) ===
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (supabaseUrl && supabaseKey) {
+      const sb = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+      const _n = nowIsrael()
+      const ym = `${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,'0')}`
+      const { data: projs } = await sb.from('projects').select('id, name, monthly_budgets, budget_alerts_sent')
+      const crossings = []
+      for (const pr of (projs || [])) {
+        const budget = (pr.monthly_budgets || {})[ym]
+        if (!budget || budget <= 0) continue
+        const { data: reps } = await sb.from('reports').select('summary, source').eq('project_id', pr.id).eq('month', ym)
+        let spend = 0
+        for (const r of (reps || [])) {
+          if (r.source === 'facebook' || (r.source || '').startsWith('google')) spend += (r.summary?.spend || 0)
+        }
+        const pct = Math.round(spend / budget * 100)
+        const sent = ((pr.budget_alerts_sent || {})[ym]) || []
+        const newly = [75, 95, 100].filter(t => pct >= t && !sent.includes(t))
+        if (newly.length) {
+          const merged = [...new Set([...sent, ...newly])].sort((a, b) => a - b)
+          await sb.from('projects').update({ budget_alerts_sent: { ...(pr.budget_alerts_sent || {}), [ym]: merged } }).eq('id', pr.id)
+          crossings.push({ project: pr.name, budget, spend, pct, newly })
+        }
+      }
+      if (crossings.length) {
+        const rows = crossings.map(c => `<li><b>${c.project}</b> — ${c.pct}% \u05de\u05d4\u05ea\u05e7\u05e6\u05d9\u05d1 (\u20aa${Math.round(c.spend).toLocaleString('he-IL')} / \u20aa${Number(c.budget).toLocaleString('he-IL')}) \u00b7 \u05e1\u05e4\u05d9\u05dd: ${c.newly.join('%, ')}%</li>`).join('')
+        const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right"><h2>\ud83d\udcb0 \u05d4\u05ea\u05e8\u05d0\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1 \u05d7\u05d5\u05d3\u05e9\u05d9 (${ym})</h2><ul>${rows}</ul><p style="color:#888;font-size:12px">VITAS Reports</p></div>`
+        await sendAlert({ subject: `\ud83d\udcb0 VITAS \u05ea\u05e7\u05e6\u05d9\u05d1: ` + crossings.map(c => `${c.project} ${c.pct}%`).join(', '), html })
+      }
+    }
+  } catch {}
+
   return Response.json({ ok: failed.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, elapsedMs: Date.now()-startedAt }, results })
 }

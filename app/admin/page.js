@@ -139,6 +139,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [caSaving, setCaSaving] = useState(false)
   const [vitasTasks, setVitasTasks] = useState([])
   const [recSubTab, setRecSubTab] = useState('new')
+  const [budgetMonth, setBudgetMonth] = useState(null)  // 'YYYY-MM' selected in the budget editor
+  const [budgetDraft, setBudgetDraft] = useState(null)  // null = show saved value; string = user is editing
   const [lockingRecKey, setLockingRecKey] = useState('')
   const [ruleDialog, setRuleDialog] = useState(null)  // {recRef, ruleType, params}
   const [ruleError, setRuleError] = useState(null)
@@ -468,7 +470,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   };
 
 const loadClients = async () => {
-    const { data } = await supabase.from('clients').select('*, projects(id, name, is_demo)').order('created_at');
+    const { data } = await supabase.from('clients').select('*, projects(id, name, is_demo, monthly_budgets)').order('created_at');
     if (data) setClients(data);
   };
 
@@ -689,6 +691,20 @@ const loadClients = async () => {
     for (const name of projects) { await supabase.from('projects').insert({ client_id: client.id, name }); }
     setNewClientName(''); setNewClientProjects(''); setShowAddClient(false);
     await loadClients(); showToast('Client "' + client.name + '" added');
+  };
+
+  const saveMonthlyBudget = async (ym, amount) => {
+    if (!selectedProject || !ym) return;
+    const cur = selectedProject.monthly_budgets || {};
+    const next = { ...cur };
+    const n = Number(amount);
+    if (amount === '' || amount == null || isNaN(n) || n <= 0) delete next[ym]; else next[ym] = n;
+    const { error } = await supabase.from('projects').update({ monthly_budgets: next }).eq('id', selectedProject.id);
+    if (error) { showToast('שגיאה: ' + error.message); return; }
+    // Reflect immediately + persist into clients state so it survives reselection.
+    setSelectedProject(prev => prev ? { ...prev, monthly_budgets: next } : prev);
+    showToast('✓ תקציב נשמר');
+    loadClients();
   };
 
   const addProject = async () => {
@@ -3525,6 +3541,38 @@ const selectProject = async (client, project) => {
               onToggleComparison={() => onComparisonToggle(!compareEnabled)}
               showQuarters={!(/bcurelaser/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
             />
+            {(() => {
+              const _isZohoProj = /bcurelaser/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho');
+              if (_isZohoProj) return null; // ש.ברוך (BMBY) only
+              const _d = new Date();
+              const _curYM = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0');
+              const ym = budgetMonth || _curYM;
+              const budgets = selectedProject?.monthly_budgets || {};
+              const budget = budgets[ym];
+              if (isClientView) {
+                return budget != null ? (
+                  <div style={{padding:'8px 20px',fontSize:14,fontWeight:600,borderBottom:'1px solid var(--border,#e2e8f0)'}}>💰 תקציב חודשי — {formatCurrency(budget)}</div>
+                ) : null;
+              }
+              const _spend = reports.filter(r => r.month === ym && (r.source==='facebook' || (r.source||'').startsWith('google'))).reduce((a,r)=>a+(r.summary?.spend||0),0);
+              const pct = budget ? Math.round(_spend/budget*100) : null;
+              const monthOpts = [];
+              for (let i=-2;i<=3;i++){ const dd=new Date(_d.getFullYear(),_d.getMonth()+i,1); monthOpts.push(dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')); }
+              const shownVal = budgetDraft !== null ? budgetDraft : (budget!=null ? String(budget) : '');
+              return (
+                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'10px 20px',background:'var(--surface-2,#f8fafc)',borderBottom:'1px solid var(--border,#e2e8f0)',fontSize:13}}>
+                  <span style={{fontWeight:700}}>💰 תקציב חודשי</span>
+                  <select value={ym} onChange={e=>{ setBudgetMonth(e.target.value); setBudgetDraft(null); }} style={{padding:'4px 8px',borderRadius:6}}>
+                    {monthOpts.map(m=><option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <input type="number" min="0" placeholder="₪" value={shownVal} onChange={e=>setBudgetDraft(e.target.value)} style={{padding:'4px 8px',borderRadius:6,width:120,border:'1px solid var(--border,#cbd5e1)'}} />
+                  <button onClick={async ()=>{ await saveMonthlyBudget(ym, shownVal); setBudgetDraft(null); }} className="pipeline-btn pipeline-btn-primary" style={{padding:'4px 14px'}}>שמור</button>
+                  {budget!=null
+                    ? <span style={{color:'var(--text-2,#64748b)'}}>נוצל החודש: {formatCurrency(_spend)}{pct!=null ? ` · ${pct}%${pct>=100?' ⚠️ חריגה':pct>=95?' 🔴':pct>=75?' 🟠':''}` : ''}</span>
+                    : <span style={{color:'var(--text-3,#94a3b8)'}}>לא הוגדר תקציב לחודש זה</span>}
+                </div>
+              );
+            })()}
             {(refreshing || refreshingCrm || periodLoading) && reports.length > 0 ? (<div className="period-loading-overlay"><div className="period-loading-spinner" /></div>) : null}
             {reports.length === 0 ? ((refreshing || refreshingCrm || periodLoading) ? <SkeletonDashboard /> : <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d3\u05d9\u05d9\u05df'}</h3><p style={{marginTop:10,color:'var(--text-secondary)'}}>{'\u05dc\u05d7\u05e5 \u05e2\u05dc \u05db\u05e4\u05ea\u05d5\u05e8 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05dc\u05de\u05e9\u05d9\u05db\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</p></div>) : renderDashboard()}
           </>)}
