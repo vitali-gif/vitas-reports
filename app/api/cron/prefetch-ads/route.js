@@ -6,7 +6,7 @@ import { sendAlert } from '../../../../lib/alert'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300  // was 60 — the budget-alert block at the end was being killed before it ran
 
 function nowIsrael() {
   const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -99,21 +99,23 @@ export async function GET(request) {
       const { data: projs } = await sb.from('projects').select('id, name, monthly_budgets, budget_alerts_sent')
       const crossings = []
       for (const pr of (projs || [])) {
-        const budget = (pr.monthly_budgets || {})[ym]
-        if (!budget || budget <= 0) continue
-        const { data: reps } = await sb.from('reports').select('summary, source').eq('project_id', pr.id).eq('month', ym)
-        let spend = 0
-        for (const r of (reps || [])) {
-          if (r.source === 'facebook' || (r.source || '').startsWith('google')) spend += (r.summary?.spend || 0)
-        }
-        const pct = Math.round(spend / budget * 100)
-        const sent = ((pr.budget_alerts_sent || {})[ym]) || []
-        const newly = [75, 95, 100].filter(t => pct >= t && !sent.includes(t))
-        if (newly.length) {
-          const merged = [...new Set([...sent, ...newly])].sort((a, b) => a - b)
-          await sb.from('projects').update({ budget_alerts_sent: { ...(pr.budget_alerts_sent || {}), [ym]: merged } }).eq('id', pr.id)
-          crossings.push({ project: pr.name, budget, spend, pct, newly })
-        }
+        try {
+          const budget = (pr.monthly_budgets || {})[ym]
+          if (!budget || budget <= 0) continue
+          const { data: reps } = await sb.from('reports').select('summary, source').eq('project_id', pr.id).eq('month', ym)
+          let spend = 0
+          for (const r of (reps || [])) {
+            if (r.source === 'facebook' || (r.source || '').startsWith('google')) spend += (r.summary?.spend || 0)
+          }
+          const pct = Math.round(spend / budget * 100)
+          const sent = ((pr.budget_alerts_sent || {})[ym]) || []
+          const newly = [75, 95, 100].filter(t => pct >= t && !sent.includes(t))
+          if (newly.length) {
+            const merged = [...new Set([...sent, ...newly])].sort((a, b) => a - b)
+            await sb.from('projects').update({ budget_alerts_sent: { ...(pr.budget_alerts_sent || {}), [ym]: merged } }).eq('id', pr.id)
+            crossings.push({ project: pr.name, budget, spend, pct, newly })
+          }
+        } catch (e) { /* one project's failure must not abort budget alerts for the rest */ }
       }
       if (crossings.length) {
         const rows = crossings.map(c => `<li><b>${c.project}</b> — ${c.pct}% \u05de\u05d4\u05ea\u05e7\u05e6\u05d9\u05d1 (\u20aa${Math.round(c.spend).toLocaleString('he-IL')} / \u20aa${Number(c.budget).toLocaleString('he-IL')}) \u00b7 \u05e1\u05e4\u05d9\u05dd: ${c.newly.join('%, ')}%</li>`).join('')
