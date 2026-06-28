@@ -6,7 +6,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300  // was 60 — full-quarter fetches (q1-q4) exceeded 60s and returned 504
 
 const GOOGLE_ADS_API_VERSION = 'v22'
 const GOOGLE_SCHEMA_VERSION = 2  // bump when stored summary shape changes

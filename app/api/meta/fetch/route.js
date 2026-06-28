@@ -6,7 +6,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300  // was 60 — full-quarter fetches (q1-q4) exceeded 60s and returned 504
 
 const META_GRAPH_VERSION = 'v21.0'
 
