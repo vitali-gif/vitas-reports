@@ -125,5 +125,14 @@ export async function GET(request) {
     }
   } catch {}
 
+  // heartbeat for the health watchdog (explicit timestamp -> updates every run)
+  try {
+    const _su = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const _sk = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (_su && _sk) {
+      const _hb = createClient(_su, _sk, { auth: { persistSession: false } })
+      await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-ads', last_run: new Date().toISOString() }, { onConflict: 'job' })
+    }
+  } catch {}
   return Response.json({ ok: failed.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, elapsedMs: Date.now()-startedAt }, results })
 }

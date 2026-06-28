@@ -5,6 +5,7 @@
  * Jobs: 3 months + 2 ranges = 5 total, concurrency 2, ~25-35s
  */
 import { sendAlert } from '../../../../lib/alert'
+import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -115,5 +116,14 @@ export async function GET(request) {
     try { await sendAlert({ subject: `⚠️ VITAS CRM cron: ${failed.length} כשלים, ${brokenProjects.length} שבורים`, html }) } catch {}
   }
 
+  // heartbeat for the health watchdog (explicit timestamp -> updates every run)
+  try {
+    const _su = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const _sk = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (_su && _sk) {
+      const _hb = createClient(_su, _sk, { auth: { persistSession: false } })
+      await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-crm', last_run: new Date().toISOString() }, { onConflict: 'job' })
+    }
+  } catch {}
   return Response.json({ ok: failed.length === 0 && brokenProjects.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, brokenSkipped: brokenProjects.length, elapsedMs: Date.now()-startedAt }, brokenProjects, results })
 }
