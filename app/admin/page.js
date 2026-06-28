@@ -147,6 +147,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [creatingRule, setCreatingRule] = useState(false)
   const chartsRef = useRef([])
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
+  const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was lazy-loaded
   const [showAddClient, setShowAddClient] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
   const [newClientName, setNewClientName] = useState('')
@@ -490,6 +491,7 @@ const loadClients = async () => {
     }).catch(() => null);
     if (res && res.ok) data = await res.json().catch(() => null);
     if (data) {
+      monthDataLoaded.current = new Set(); // fresh light load — heavy data must be re-loaded per viewed month
       setReports(data);
       // Preserve current selectedMonth if it still exists in the new data;
       // otherwise (first load or it was deleted) fall back to the most recent.
@@ -505,6 +507,34 @@ const loadClients = async () => {
     // reports.length > 0). A genuinely-empty project returns [] (truthy) → handled above.
     setPeriodLoading(false);
   };
+
+  // Lazy-load the heavy `data` only for the month-keys actually needed (viewed period +
+  // compare period + recommendations window). by-project returns light summaries for all
+  // months; this fetches the heavy rows on demand and merges them in.
+  const loadMonthsData = async (projectId, monthKeys) => {
+    if (!projectId || !monthKeys.length) return;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const res = await fetch(`/api/reports/by-project?projectId=${projectId}&dataForMonths=${encodeURIComponent(monthKeys.join(','))}`, { headers: { 'x-client-key': anonKey } }).catch(() => null);
+    if (!res || !res.ok) return;
+    const rows = await res.json().catch(() => null);
+    if (!Array.isArray(rows)) return;
+    const dataById = {};
+    for (const r of rows) if (r.data != null) dataById[r.id] = r.data;
+    if (!Object.keys(dataById).length) return;
+    setReports(prev => prev.map(r => (dataById[r.id] !== undefined ? { ...r, data: dataById[r.id] } : r)));
+  };
+
+  useEffect(() => {
+    if (!selectedProject || reports.length === 0) return;
+    const needed = new Set();
+    if (selectedMonth) needed.add(selectedMonth);
+    try { getRecommendationsWindowMonths(60).forEach(m => needed.add(m)); } catch {}
+    if (compareEnabled && selectedMonth) { const pm = getPrevMonth(selectedMonth); if (pm) needed.add(pm); }
+    const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && reports.some(r => r.month === m && r.data == null));
+    if (!toLoad.length) return;
+    toLoad.forEach(m => monthDataLoaded.current.add(m));
+    loadMonthsData(selectedProject.id, toLoad);
+  }, [selectedProject, selectedMonth, compareEnabled, reports]);
 
   const loadProjectTasks = async (projectId) => {
     const { data } = await supabase.from('vitas_tasks').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
@@ -1879,7 +1909,7 @@ const selectProject = async (client, project) => {
         : dashTab === 'google_search'
         ? prevReports.filter(r => r.source === 'google_search')
         : prevReports.filter(r => r.source && r.source.startsWith('google'));
-      if (displayPrev.length) { let prevRows = []; displayPrev.forEach(r => { prevRows = prevRows.concat(r.data); }); prevData = aggregateRows(prevRows); }
+      if (displayPrev.length) { let prevRows = []; displayPrev.forEach(r => { prevRows = prevRows.concat(r.data || []); }); prevData = aggregateRows(prevRows); }
     }
 
     let prevCrmTotals = null;
@@ -1907,17 +1937,16 @@ const selectProject = async (client, project) => {
     }
 
     const allMonths = [...new Set(reports.map(r => r.month))].sort();
+    // Built from per-report `summary` (not heavy `data`) so sparklines work under lazy-loading.
     const trendData = allMonths.map(m => {
-      let mRows = [];
-      reports.filter(r => r.month === m && r.source !== 'crm' && r.source !== 'crm_reports').forEach(r => { mRows = mRows.concat(r.data || []); });
-      let crmMRows = [];
-      reports.filter(r => r.month === m && r.source === 'crm').forEach(r => { if (r.data) crmMRows = crmMRows.concat(r.data); });
-      const crmMT = crmMRows.length > 0 ? aggregateCrmRows(crmMRows).totals : null;
-      return { month: m, ...aggregateRows(mRows).totals,
-        meetingsScheduled: crmMT?.meetingsScheduled || 0,
-        meetingsCompleted: crmMT?.meetingsCompleted || 0,
-        registrations: crmMT?.registrations || 0,
-        contracts: crmMT?.contracts || 0,
+      let leads = 0, spend = 0;
+      reports.filter(r => r.month === m && r.source !== 'crm' && r.source !== 'crm_reports').forEach(r => { const sm = r.summary || {}; leads += (sm.leads || 0); spend += (sm.spend || 0); });
+      const crmSm = reports.find(r => r.month === m && r.source === 'crm')?.summary || {};
+      return { month: m, leads, spend, cpl: leads > 0 ? spend / leads : 0,
+        meetingsScheduled: crmSm.meetingsScheduled || 0,
+        meetingsCompleted: crmSm.meetingsCompleted || 0,
+        registrations: crmSm.registrations || 0,
+        contracts: crmSm.contracts || 0,
       };
     });
 
