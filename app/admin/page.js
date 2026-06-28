@@ -148,6 +148,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const chartsRef = useRef([])
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
   const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was lazy-loaded
+  const projectReportsCache = useRef(new Map())  // projectId -> light reports (stale-while-revalidate for instant project switching)
   const [showAddClient, setShowAddClient] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
   const [newClientName, setNewClientName] = useState('')
@@ -476,35 +477,38 @@ const loadClients = async () => {
   };
 
   const loadProjectReports = async (projectId) => {
-    setPeriodLoading(true);
-    let data = null;
-    // Always read reports through the service-role API endpoint (both client AND admin views).
-    // Reading reports directly via supabase.from('reports').select('*') runs under the
-    // anon/authenticated role, whose 8s statement_timeout is exceeded by the large JSONB
-    // `data` column once a project accumulates many reports -> Postgres error 57014
-    // ("canceling statement due to statement timeout") -> 500 -> blank dashboard for ALL
-    // clients. The by-project endpoint runs with service_role, which isn't subject to that
-    // limit, so it returns the same rows reliably.
+    // Stale-while-revalidate: if we've loaded this project before, show the cached light
+    // index INSTANTLY (KPIs render from summaries, no blank/loader), then refresh in the
+    // background. Heavy `data` re-loads lazily per viewed month via the effect below.
+    const cached = projectReportsCache.current.get(projectId);
+    if (cached && cached.length) {
+      monthDataLoaded.current = new Set();
+      setReports(cached);
+      setSelectedMonth(prev => (prev && cached.some(r => r.month === prev)) ? prev : cached[0].month);
+      setPeriodLoading(false);
+    } else {
+      setPeriodLoading(true);
+    }
+    // by-project (service_role) returns a LIGHT index; never times out. Revalidate in background.
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     const res = await fetch(`/api/reports/by-project?projectId=${projectId}`, {
       headers: { 'x-client-key': anonKey },
     }).catch(() => null);
+    let data = null;
     if (res && res.ok) data = await res.json().catch(() => null);
     if (data) {
-      monthDataLoaded.current = new Set(); // fresh light load — heavy data must be re-loaded per viewed month
-      setReports(data);
-      // Preserve current selectedMonth if it still exists in the new data;
-      // otherwise (first load or it was deleted) fall back to the most recent.
+      projectReportsCache.current.set(projectId, data);
+      if (!cached) monthDataLoaded.current = new Set();
+      // Merge fresh summaries but PRESERVE any heavy `data` already loaded (avoid flicker on revalidate).
+      setReports(prev => {
+        const byId = new Map((prev || []).map(r => [r.id, r]));
+        return data.map(fr => { const old = byId.get(fr.id); return (old && old.data != null) ? { ...fr, data: old.data } : fr; });
+      });
       if (data.length > 0) {
-        setSelectedMonth(prev => {
-          if (prev && data.some(r => r.month === prev)) return prev;
-          return data[0].month;
-        });
+        setSelectedMonth(prev => (prev && data.some(r => r.month === prev)) ? prev : data[0].month);
       }
     }
-    // data === null ⇒ the read FAILED. Keep whatever is already on screen instead of
-    // blanking the dashboard to [] (which also hid the loading overlay, since it requires
-    // reports.length > 0). A genuinely-empty project returns [] (truthy) → handled above.
+    // data === null ⇒ read FAILED. Keep whatever is on screen (cache or prior) — never blank.
     setPeriodLoading(false);
   };
 
