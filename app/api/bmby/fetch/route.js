@@ -945,7 +945,17 @@ async function runSync(opts = {}) {
     // SKIP the write so the previous good report is preserved, and flag it for alerting.
     const _evidence = (totals.registrations || 0) + (totals.contracts || 0)
       + (totals.meetingsScheduled || 0) + (totals.meetingsCompleted || 0)
-    const _skippedBroken = (totals.totalLeads === 0) && (_evidence > 0)
+    // Range length (days) from the month key. For SHORT ranges (e.g. a single day),
+    // "0 new leads but a registration/meeting today" is LEGITIMATE — the conversion can
+    // belong to a lead created earlier. Only treat 0-leads-with-conversions as a failed
+    // fetch for LONG ranges (>=14 days), where 0 leads is essentially impossible.
+    const _spanDays = (() => {
+      if (!m || !m.includes('_')) return 30 // 'YYYY-MM' month mode → long
+      const [a, b] = m.split('_')
+      const d = Math.round((new Date(b) - new Date(a)) / 86400000)
+      return isNaN(d) ? 30 : d
+    })()
+    const _skippedBroken = (totals.totalLeads === 0) && (_evidence > 0) && (_spanDays >= 14)
     if (_skippedBroken) {
       errors.push(`SKIPPED broken write for ${p.name} [${m}]: 0 leads but registrations/contracts/meetings present (likely failed fetch)`)
     } else {
