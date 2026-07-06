@@ -358,6 +358,8 @@ async function runSync(opts = {}) {
     // NEW (verify-first debug): per-APPOINTMENT counts in range (not per-lead), to match BMBY.
     const _apptByCoord = { total: 0, scheduled: 0, completed: 0, cancelled: 0 } // by create_date (coordination date)
     const _apptByDate  = { total: 0, scheduled: 0, completed: 0, cancelled: 0 } // by start_date (meeting date)
+    const _todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
+    const _meetUntil = (until && until > _todayStr) ? _todayStr : until // BMBY counts meetings only up to today (not future-scheduled)
     for (const t of tasks) {
       const tyRaw = (t.type || '').toString()
       const ty = tyRaw.toLowerCase()
@@ -370,7 +372,8 @@ async function runSync(opts = {}) {
       const isDone = /done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)
       const isCanc = /cancel|בוטל/.test(status)
       if (inRangeDate(t.create_date)) { _apptByCoord.total++; if (!isCanc) _apptByCoord.scheduled++; if (isDone) _apptByCoord.completed++; if (isCanc) _apptByCoord.cancelled++; }
-      if (inRangeDate(t.start_date || t.create_date)) { _apptByDate.total++; if (!isCanc) _apptByDate.scheduled++; if (isDone) _apptByDate.completed++; if (isCanc) _apptByDate.cancelled++; }
+      const _sd = (t.start_date || t.create_date || '').toString().slice(0, 10)
+      if (_sd && _sd >= since && _sd <= _meetUntil) { _apptByDate.total++; if (!isCanc) _apptByDate.scheduled++; if (isDone) _apptByDate.completed++; if (isCanc) _apptByDate.cancelled++; }
       // Debug: count raw appointment status values
       const rawStatus = (t.status || '(empty)').toString()
       if (!apptStatusDebug[rawStatus]) apptStatusDebug[rawStatus] = { count: 0, isDone: 0, isCanc: 0, type: tyRaw }
@@ -941,7 +944,13 @@ async function runSync(opts = {}) {
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
     // Bump CRM_SCHEMA_VERSION whenever the shape/computation in xlsxRows or summary changes.
     // Dashboard auto-refreshes a cached row if its summary.schemaVersion is below this.
-    const CRM_SCHEMA_VERSION = 10  // v10: + hourlyLeadStats (leads by hour-of-day)
+    // === Meetings now match BMBY exactly: counted per APPOINTMENT by meeting date (start_date),
+    // up to today (BMBY excludes future-scheduled). Replaces the per-lead attribution for the
+    // top KPI totals. Verified vs BMBY (ONCE July): 4 scheduled / 4 completed.
+    totals.meetingsScheduled = _apptByDate.scheduled
+    totals.meetingsCompleted = _apptByDate.completed
+    totals.meetingsCancelled = _apptByDate.cancelled
+    const CRM_SCHEMA_VERSION = 11  // v11: meetings = per-appointment by meeting date up to today (match BMBY)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
