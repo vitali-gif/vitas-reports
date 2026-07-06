@@ -360,6 +360,9 @@ async function runSync(opts = {}) {
     const _apptByDate  = { total: 0, scheduled: 0, completed: 0, cancelled: 0 } // by start_date (meeting date)
     const _todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
     const _meetUntil = (until && until > _todayStr) ? _todayStr : until // BMBY counts meetings only up to today (not future-scheduled)
+    const cidToMedia = new Map() // client_id -> media_title (from any lead), for attributing meetings to source
+    for (const _t of tasks) { if ((_t.type || '').toString().toLowerCase() === 'lid') { const _c = String(_t.client_id || ''); const _md = (_t.media_title || '').trim(); if (_c && _md && !cidToMedia.has(_c)) cidToMedia.set(_c, _md) } }
+    const _meetRecs = { sched: [], comp: [], canc: [] } // per-appointment {cid,name} — matches the BMBY meeting count
     for (const t of tasks) {
       const tyRaw = (t.type || '').toString()
       const ty = tyRaw.toLowerCase()
@@ -373,7 +376,13 @@ async function runSync(opts = {}) {
       const isCanc = /cancel|בוטל/.test(status)
       if (inRangeDate(t.create_date)) { _apptByCoord.total++; if (!isCanc) _apptByCoord.scheduled++; if (isDone) _apptByCoord.completed++; if (isCanc) _apptByCoord.cancelled++; }
       const _sd = (t.start_date || t.create_date || '').toString().slice(0, 10)
-      if (_sd && _sd >= since && _sd <= _meetUntil) { _apptByDate.total++; if (!isCanc) _apptByDate.scheduled++; if (isDone) _apptByDate.completed++; if (isCanc) _apptByDate.cancelled++; }
+      if (_sd && _sd >= since && _sd <= _meetUntil) {
+        _apptByDate.total++
+        const _rec = { cid, name: (t.client_name || '').toString().trim() }
+        if (!isCanc) { _apptByDate.scheduled++; _meetRecs.sched.push(_rec) }
+        if (isDone)  { _apptByDate.completed++; _meetRecs.comp.push(_rec) }
+        if (isCanc)  { _apptByDate.cancelled++; _meetRecs.canc.push(_rec) }
+      }
       // Debug: count raw appointment status values
       const rawStatus = (t.status || '(empty)').toString()
       if (!apptStatusDebug[rawStatus]) apptStatusDebug[rawStatus] = { count: 0, isDone: 0, isCanc: 0, type: tyRaw }
@@ -618,6 +627,13 @@ async function runSync(opts = {}) {
     const pricesInRange = prices.filter(po => inRangeDate(po.offer_date || po.create_date))
 
     // Build xlsx-shape rows (one row per source) so the dashboard's aggregateCrmRows works as-is
+    // Per-source meeting buckets → per-APPOINTMENT (match BMBY), replacing per-lead values, so
+    // the "מקורות הגעה" table (built from xlsxRows below) stays consistent with the totals.
+    for (const _b of Object.values(sources)) { _b.meetingsScheduled = 0; _b.meetingsCompleted = 0; _b.meetingsCancelled = 0 }
+    for (const r of _meetRecs.sched) ensureSrc(cidToMedia.get(r.cid) || 'ללא מקור').meetingsScheduled += 1
+    for (const r of _meetRecs.comp)  ensureSrc(cidToMedia.get(r.cid) || 'ללא מקור').meetingsCompleted += 1
+    for (const r of _meetRecs.canc)  ensureSrc(cidToMedia.get(r.cid) || 'ללא מקור').meetingsCancelled += 1
+
     const xlsxRows = Object.entries(sources).map(([sourceName, s]) => ({
       source: sourceName,
       totalLeads: s.totalLeads,
@@ -939,6 +955,16 @@ async function runSync(opts = {}) {
       facebook: _buildGroup(_fbLids, _fbRegs, _fbConts),
       google:   _buildGroup(_glLids, _glRegs, _glConts),
     }
+    // Drill-down meeting name lists → per-APPOINTMENT (match the BMBY count + the KPI card).
+    const _mediaSrc = (md) => /פייסבוק|facebook/i.test(md || '') ? 'facebook' : /גוגל|google|pmax|search/i.test(md || '') ? 'google' : 'other'
+    const _mName = (r) => r.name || clientName.get(r.cid) || `ליד #${r.cid}`
+    const _recMedia = (r) => cidToMedia.get(r.cid) || ''
+    namedLeads.all.meetingsScheduled      = _meetRecs.sched.map(_mName).filter(Boolean)
+    namedLeads.all.meetingsCompleted      = _meetRecs.comp.map(_mName).filter(Boolean)
+    namedLeads.facebook.meetingsScheduled = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(_mName).filter(Boolean)
+    namedLeads.facebook.meetingsCompleted = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(_mName).filter(Boolean)
+    namedLeads.google.meetingsScheduled   = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(_mName).filter(Boolean)
+    namedLeads.google.meetingsCompleted   = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(_mName).filter(Boolean)
 
     // Single upsert: store source-level rows in `data`, and per-LID city/objection
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
@@ -950,7 +976,7 @@ async function runSync(opts = {}) {
     totals.meetingsScheduled = _apptByDate.scheduled
     totals.meetingsCompleted = _apptByDate.completed
     totals.meetingsCancelled = _apptByDate.cancelled
-    const CRM_SCHEMA_VERSION = 11  // v11: meetings = per-appointment by meeting date up to today (match BMBY)
+    const CRM_SCHEMA_VERSION = 12  // v12: meetings drill-down names + per-source breakdown also per-appointment (match BMBY)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
