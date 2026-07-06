@@ -355,6 +355,9 @@ async function runSync(opts = {}) {
     const clientsWithAppt = new Set()           // window-based (any status)
     const clientsWithDoneAppt = new Set()       // window + done
     const clientsWithCancelledAppt = new Set()  // window + cancelled
+    // NEW (verify-first debug): per-APPOINTMENT counts in range (not per-lead), to match BMBY.
+    const _apptByCoord = { total: 0, scheduled: 0, completed: 0, cancelled: 0 } // by create_date (coordination date)
+    const _apptByDate  = { total: 0, scheduled: 0, completed: 0, cancelled: 0 } // by start_date (meeting date)
     for (const t of tasks) {
       const tyRaw = (t.type || '').toString()
       const ty = tyRaw.toLowerCase()
@@ -366,6 +369,8 @@ async function runSync(opts = {}) {
       const apptDate = (t.start_date || t.create_date || '').toString().slice(0, 10)
       const isDone = /done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)
       const isCanc = /cancel|בוטל/.test(status)
+      if (inRangeDate(t.create_date)) { _apptByCoord.total++; if (!isCanc) _apptByCoord.scheduled++; if (isDone) _apptByCoord.completed++; if (isCanc) _apptByCoord.cancelled++; }
+      if (inRangeDate(t.start_date || t.create_date)) { _apptByDate.total++; if (!isCanc) _apptByDate.scheduled++; if (isDone) _apptByDate.completed++; if (isCanc) _apptByDate.cancelled++; }
       // Debug: count raw appointment status values
       const rawStatus = (t.status || '(empty)').toString()
       if (!apptStatusDebug[rawStatus]) apptStatusDebug[rawStatus] = { count: 0, isDone: 0, isCanc: 0, type: tyRaw }
@@ -993,6 +998,8 @@ async function runSync(opts = {}) {
       errors: errors.length ? errors : undefined,
       debug: Object.keys(debug).length ? debug : undefined,
       apptStatusDebug,
+      apptByCoord: _apptByCoord,
+      apptByDate: _apptByDate,
       completedMeetingSamples,
       clientProfileSamples,
       diag: {
