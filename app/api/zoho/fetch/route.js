@@ -31,6 +31,18 @@ const DIGITAL_SUBSOURCES = new Set([
   'גוגל', 'פייסבוק', // Hebrew variants
 ])
 
+// Zoho brands: match a project by a substring of its Supabase name, then map to the
+// EXACT value stored in the Zoho `segment` field (Zoho `equals` is case-sensitive).
+// BCureLaser + ISMOOTH share one Zoho org (parent client: Arika Carmel Ltd).
+const ZOHO_BRANDS = [
+  { match: 'bcurelaser', segment: 'bcurelaser' },
+  { match: 'ismooth', segment: 'ISMOOTH' },
+]
+function brandForProjectName(name) {
+  const n = (name || '').toLowerCase()
+  return ZOHO_BRANDS.find(b => n.includes(b.match)) || null
+}
+
 // ===== helpers =====
 
 function currentMonth() {
@@ -188,17 +200,21 @@ async function runSync(opts = {}) {
   // BMBY projects (ONCE/REHAVIA), racing the BMBY write on the same (project,crm,month) key
   // and rendering the Zoho layout. Always require the bcurelaser name, then optionally narrow by projectId.
   const projectsList = (projects || []).filter(p =>
-    (p.name || '').toLowerCase().includes('bcurelaser') &&
+    brandForProjectName(p.name) &&
     (!opts.projectId || p.id === opts.projectId)
   )
 
   if (projectsList.length === 0) {
-    return { status: 200, body: { ok: false, message: 'No BCureLaser project found in Supabase.' } }
+    return { status: 200, body: { ok: false, message: 'No Zoho project found in Supabase.' } }
   }
 
   let accessToken
   try { accessToken = await getZohoAccessToken() }
   catch (err) { return { status: 500, body: { error: 'Zoho OAuth failed: ' + (err.message || String(err)) } } }
+
+  const __allResults = []
+  for (const __proj of projectsList) {
+  const __brand = brandForProjectName(__proj.name)
 
   // ===== Fetch leads: BCureLaser + digital, INCLUDING converted leads =====
   const leadFields = [
@@ -209,14 +225,14 @@ async function runSync(opts = {}) {
   ].join(',')
 
   const leadCriteria =
-    `((segment:equals:bcurelaser)and(Lead_Source:equals:דיגיטל)` +
+    `((segment:equals:${__brand.segment})and(Lead_Source:equals:דיגיטל)` +
     `and(Created_Time:between:${since}T00:00:00+03:00,${until}T23:59:59+03:00))`
 
   let rawLeads = []
   try {
     rawLeads = await searchPaginated(accessToken, 'Leads', leadCriteria, leadFields, 'both')
   } catch (err) {
-    return { status: 500, body: { error: 'Leads fetch failed: ' + (err.message || String(err)) } }
+    __allResults.push({ project: __proj.name, error: 'Leads fetch failed: ' + (err.message || String(err)) }); continue
   }
   // Keep only the approved digital sub-sources
   const leads = rawLeads.filter(r => DIGITAL_SUBSOURCES.has((r.Sub_Lead_Source || '').toLowerCase()))
@@ -231,7 +247,7 @@ async function runSync(opts = {}) {
       linkedDeals = await fetchDealsByLeadIds(accessToken, leadIds, dealFields)
     }
   } catch (err) {
-    return { status: 500, body: { error: 'Deals fetch failed: ' + (err.message || String(err)) } }
+    __allResults.push({ project: __proj.name, error: 'Deals fetch failed: ' + (err.message || String(err)) }); continue
   }
   linkedDeals = linkedDeals.filter(d => leadIdSet.has(d.LidID))
 
@@ -499,23 +515,21 @@ async function runSync(opts = {}) {
     schemaVersion: ZOHO_SCHEMA_VERSION,
   }
 
-  const results = []
-  for (const p of projectsList) {
-    const { error: upsertErr } = await supabase.from('reports').upsert({
-      project_id: p.id,
-      source: 'crm',
-      month: m,
-      data: xlsxRows,
-      summary,
-      file_name: 'Zoho CRM (live)',
-      row_count: leads.length,
-    }, { onConflict: 'project_id,source,month' })
+  const { error: upsertErr } = await supabase.from('reports').upsert({
+    project_id: __proj.id,
+    source: 'crm',
+    month: m,
+    data: xlsxRows,
+    summary,
+    file_name: 'Zoho CRM (live)',
+    row_count: leads.length,
+  }, { onConflict: 'project_id,source,month' })
 
-    if (upsertErr) results.push({ project: p.name, error: upsertErr.message })
-    else results.push({ project: p.name, leads: leads.length, opportunities, purchased, ok: true })
-  }
+  if (upsertErr) __allResults.push({ project: __proj.name, error: upsertErr.message })
+  else __allResults.push({ project: __proj.name, brand: __brand.segment, leads: leads.length, opportunities, purchased, ok: true })
+  } // ===== end per-brand loop =====
 
-  return { status: 200, body: { ok: true, month: m, totalLeads: leads.length, opportunities, purchased, projects: results } }
+  return { status: 200, body: { ok: true, month: m, projects: __allResults } }
 }
 
 // ===== handlers =====

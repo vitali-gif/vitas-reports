@@ -3572,7 +3572,7 @@ const selectProject = async (client, project) => {
               onApplyRange={applyCustomRange}
               comparisonOn={compareEnabled}
               onToggleComparison={() => onComparisonToggle(!compareEnabled)}
-              showQuarters={!(/bcurelaser/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
+              showQuarters={!(/bcurelaser|ismooth/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
             />
             {(() => {
               // Budget bar shown for all projects (ש.ברוך + BCureLaser). Inert until a budget is set.
