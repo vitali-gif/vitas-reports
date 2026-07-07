@@ -1035,6 +1035,7 @@ async function runSync(opts = {}) {
       apptStatusDebug,
       apptByCoord: _apptByCoord,
       apptByDate: _apptByDate,
+      uniqueByDate: { scheduled: new Set(_meetRecs.sched.map(r => r.cid)).size, completed: new Set(_meetRecs.comp.map(r => r.cid)).size, cancelled: new Set(_meetRecs.canc.map(r => r.cid)).size },
       completedMeetingSamples,
       clientProfileSamples,
       diag: {
