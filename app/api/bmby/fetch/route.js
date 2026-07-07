@@ -1036,6 +1036,8 @@ async function runSync(opts = {}) {
       apptByCoord: _apptByCoord,
       apptByDate: _apptByDate,
       uniqueByDate: { scheduled: new Set(_meetRecs.sched.map(r => r.cid)).size, completed: new Set(_meetRecs.comp.map(r => r.cid)).size, cancelled: new Set(_meetRecs.canc.map(r => r.cid)).size },
+      byDateRelevant: { scheduled: _meetRecs.sched.filter(r => clientRelevant.get(r.cid)).length, completed: _meetRecs.comp.filter(r => clientRelevant.get(r.cid)).length },
+      uniqueByDateRelevant: { scheduled: new Set(_meetRecs.sched.filter(r => clientRelevant.get(r.cid)).map(r => r.cid)).size, completed: new Set(_meetRecs.comp.filter(r => clientRelevant.get(r.cid)).map(r => r.cid)).size },
       completedMeetingSamples,
       clientProfileSamples,
       diag: {
