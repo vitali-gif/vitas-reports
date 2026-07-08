@@ -21,6 +21,11 @@ const supabaseAdmin = createClient(
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
+export const revalidate = 0            // never cache this route
+export const fetchCache = 'force-no-store'
+
+// Ensure freshly-written reports are visible immediately (no stale cached snapshot).
+const NO_STORE = { 'Cache-Control': 'no-store, max-age=0, must-revalidate' }
 
 export async function GET(request) {
   const key = request.headers.get('x-client-key')
@@ -41,7 +46,7 @@ export async function GET(request) {
     .eq('project_id', projectId)
     .order('month', { ascending: false })
   if (liteErr) return NextResponse.json({ error: liteErr.message }, { status: 500 })
-  if (!lite || lite.length === 0) return NextResponse.json([])
+  if (!lite || lite.length === 0) return NextResponse.json([], { headers: NO_STORE })
 
   // 2) HEAVY `data` only for the requested month-keys.
   const heavyById = {}
@@ -56,5 +61,5 @@ export async function GET(request) {
   }
 
   const out = lite.map(r => ({ ...r, data: heavyById[r.id] ?? null }))
-  return NextResponse.json(out)
+  return NextResponse.json(out, { headers: NO_STORE })
 }
