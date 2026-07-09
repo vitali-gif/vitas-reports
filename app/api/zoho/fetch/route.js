@@ -20,7 +20,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300  // was 60 — per-brand loop (BCureLaser+ISMOOTH) + sequential deals fetch on last30 exceeded 60s → 504 (shown as blank 'HTTP ' in cron alerts)
 
 const ZOHO_TOKEN_URL = 'https://accounts.zoho.com/oauth/v2/token'
 const ZOHO_SCHEMA_VERSION = 2
