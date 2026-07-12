@@ -8,6 +8,9 @@ import { sendAlert } from '../../../../lib/alert'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+// force-no-store: supabase-js + internal calls go through fetch, which Next caches by
+// default. That cache made the cron read/write STALE data and skip the heartbeat.
+export const fetchCache = 'force-no-store'
 export const maxDuration = 300
 
 function nowIsrael() {
@@ -87,7 +90,7 @@ export async function GET(request) {
   }
 
   // Concurrency 2 — gentle on BMBY SOAP
-  const CONCURRENCY = 2
+  const CONCURRENCY = 4  // was 2 — with real (uncached) fetching the run exceeded 300s and 504'd
   const queue = [...jobs]
   const inFlight = new Set()
   while (queue.length > 0 || inFlight.size > 0) {

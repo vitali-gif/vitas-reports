@@ -8,6 +8,9 @@ import { createClient } from '@supabase/supabase-js'
 import { sendAlert } from '../../../../lib/alert'
 
 export const dynamic = 'force-dynamic'
+// force-no-store: supabase-js + internal calls go through fetch, which Next caches by
+// default. That cache made the cron read/write STALE data and skip the heartbeat.
+export const fetchCache = 'force-no-store'
 export const maxDuration = 60
 
 const STALE_HOURS = 4 // crons run every 2h; >4h stale during the day = something's wrong

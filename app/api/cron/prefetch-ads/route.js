@@ -6,6 +6,9 @@ import { sendAlert } from '../../../../lib/alert'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+// force-no-store: supabase-js + internal calls go through fetch, which Next caches by
+// default. That cache made the cron read/write STALE data and skip the heartbeat.
+export const fetchCache = 'force-no-store'
 export const maxDuration = 300  // was 60 — the budget-alert block at the end was being killed before it ran
 
 function nowIsrael() {
