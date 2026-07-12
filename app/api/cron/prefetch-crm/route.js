@@ -66,10 +66,12 @@ export async function GET(request) {
     const skipZoho = ZOHO_SKIP_RANGES.includes(job.rangeId)
     const zohoPromise = skipZoho
       ? null
-      : fetch(`${base}/api/zoho/fetch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
+      : fetch(`${base}/api/zoho/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
           .then(r => r.json()).catch(() => ({}))
     try {
-      const res = await fetch(`${base}/api/bmby/fetch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
+      // cache:'no-store' — see prefetch-ads: without it these internal calls came back from
+      // cache in milliseconds and no fresh data / heartbeat was written.
+      const res = await fetch(`${base}/api/bmby/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
       const data = await res.json().catch(() => ({}))
       results.push({ kind: job.kind, label: job.label, source: 'bmby', ok: res.ok, status: res.status, ms: Date.now()-t0, ...data })
     } catch (err) {
