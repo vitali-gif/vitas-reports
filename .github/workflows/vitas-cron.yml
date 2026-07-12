@@ -1,0 +1,75 @@
+name: VITAS cron (external scheduler)
+
+# WHY THIS EXISTS
+# Vercel's own cron scheduler silently stopped firing (last successful run 2026-07-09 18:32 UTC).
+# Everything on Vercel looked healthy — Pro plan, budget fine, Cron Jobs "Enabled", production
+# deployment Ready — and a redeploy did NOT revive it. The production domain itself is fully
+# reachable, so we schedule from GitHub Actions instead and no longer depend on Vercel's scheduler.
+#
+# SETUP (one-time): add a repository secret named CRON_SECRET with the SAME value as the
+# CRON_SECRET environment variable in Vercel.
+#   GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+#
+# Schedules are UTC. 04:30-18:30 UTC == 07:30-21:30 Israel time (same as vercel.json).
+
+on:
+  schedule:
+    - cron: '30 4,6,8,10,12,14,16,18 * * *'   # prefetch-ads
+    - cron: '40 4,6,8,10,12,14,16,18 * * *'   # prefetch-crm
+    - cron: '15 * * * *'                      # health watchdog
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which cron to run'
+        required: true
+        default: 'all'
+        type: choice
+        options: [all, prefetch-ads, prefetch-crm, health]
+
+concurrency:
+  group: vitas-cron-${{ github.event.schedule || github.event.inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve which endpoint(s) to call
+        id: t
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            case "${{ github.event.schedule }}" in
+              '30 4,6,8,10,12,14,16,18 * * *') echo 'paths=prefetch-ads' >> "$GITHUB_OUTPUT" ;;
+              '40 4,6,8,10,12,14,16,18 * * *') echo 'paths=prefetch-crm' >> "$GITHUB_OUTPUT" ;;
+              '15 * * * *')                    echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
+              *)                               echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
+            esac
+          elif [ "${{ github.event.inputs.target }}" = "all" ]; then
+            echo 'paths=prefetch-ads prefetch-crm health' >> "$GITHUB_OUTPUT"
+          else
+            echo 'paths=${{ github.event.inputs.target }}' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Call cron endpoint(s)
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Missing repository secret CRON_SECRET (see header of this file)"
+            exit 1
+          fi
+          fail=0
+          for p in ${{ steps.t.outputs.paths }}; do
+            url="https://reports.vitas.co.il/api/cron/$p"
+            echo "::group::$p"
+            code=$(curl -sS -o /tmp/out.json -w '%{http_code}' --max-time 600 \
+              -H "Authorization: Bearer $CRON_SECRET" "$url" || echo 000)
+            echo "HTTP $code"
+            head -c 1000 /tmp/out.json 2>/dev/null || true; echo
+            if [ "$code" != "200" ]; then
+              fail=1
+              echo "::error::$p returned HTTP $code"
+            fi
+            echo "::endgroup::"
+          done
+          exit $fail
