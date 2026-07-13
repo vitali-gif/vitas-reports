@@ -79,9 +79,11 @@ async function callPaginated(service, baseParams, maxPages = 6) {
 
 export async function GET(req) {
   const url = new URL(req.url)
-  const key = url.searchParams.get('key') || ''
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  if (!anonKey || key !== anonKey) {
+  // Restricted to CRON_SECRET only — anon key is public so allowing it
+  // would expose raw BMBY data (names, phones) to anyone.
+  const key = url.searchParams.get('secret') || ''
+  const cronSecret = process.env.CRON_SECRET || ''
+  if (!cronSecret || key !== cronSecret) {
     return Response.json({ error: 'unauthorized — pass ?secret=<CRON_SECRET>' }, { status: 401 })
   }
 

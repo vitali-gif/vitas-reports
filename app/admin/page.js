@@ -1388,7 +1388,7 @@ const selectProject = async (client, project) => {
             <>
               <h3>{'אין נתוני CRM לתקופה זו'}</h3>
               <p style={{color:'#64748b',marginTop:'8px'}}>{isCustomRange ? 'טווח מותאם אישי דורש משיכת נתונים חדשה' : 'לחץ על הכפתור כדי למשוך נתונים'}</p>
-              <button className="btn btn-primary" style={{marginTop:'16px'}} onClick={refreshFromBmby}>{'🔄 משוך נתונים מ-BMBY'}</button>
+              {!isClientView && <button className="btn btn-primary" style={{marginTop:'16px'}} onClick={refreshFromBmby}>{'🔄 משוך נתונים מ-BMBY'}</button>}
             </>
           )}
         </div>
@@ -1551,10 +1551,10 @@ const selectProject = async (client, project) => {
       return (
         <>
           <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
-            <button onClick={refreshFromBmby} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
+            {!isClientView && <button onClick={refreshFromBmby} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
               {refreshingCrm ? '⏳' : '🔄'} {refreshingCrm ? 'מושך...' : 'רענן CRM'}
               {!refreshingCrm && crmSchemaVersion > 0 && <span style={{fontSize:10,color:'var(--text-muted)',marginRight:2}}>v{crmSchemaVersion}</span>}
-            </button>
+            </button>}
           </div>
           <div className="kpi-grid">
             {crmKpi('סה"כ לידים', formatNum(L), 'cyan', L, null)}
@@ -1610,10 +1610,10 @@ const selectProject = async (client, project) => {
     return (
       <>
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
-          <button onClick={refreshFromBmby} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
+          {!isClientView && <button onClick={refreshFromBmby} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
             {refreshingCrm ? '⏳' : '🔄'} {refreshingCrm ? 'מושך...' : 'רענן CRM'}
             {!refreshingCrm && crmSchemaVersion > 0 && <span style={{fontSize:10,color:'var(--text-muted)',marginRight:2}}>v{crmSchemaVersion}</span>}
-          </button>
+          </button>}
         </div>
         <div className="kpi-grid">
           {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads)}
@@ -2132,10 +2132,10 @@ const selectProject = async (client, project) => {
           {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}>Google PMax</button>}
             {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
             {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
-            {hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
+            {!isClientView && hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
         </div>
 
-        {dashTab === 'recommendations' ? (() => {
+        {!isClientView && dashTab === 'recommendations' ? (() => {
           // 60-day rolling window - recommendations are ALWAYS based on the last 60 days,
           // independent of selectedMonth (which only affects the KPI/chart tabs).
           const recWindowMonths = getRecommendationsWindowMonths(60);

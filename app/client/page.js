@@ -61,7 +61,7 @@ export default function ClientPage() {
     const hb = setInterval(() => {
       fetch('/api/client-log', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
         body: JSON.stringify({ event: 'heartbeat', sessionId })
       }).catch(() => {})
     }, 60000)
@@ -122,7 +122,7 @@ export default function ClientPage() {
       // Log session start
       fetch('/api/client-log', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
         body: JSON.stringify({
           event: 'login',
           email: userEmail,

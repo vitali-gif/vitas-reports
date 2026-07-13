@@ -8,6 +8,10 @@ const supabaseAdmin = createClient(
 
 // POST — log session events from client dashboard
 export async function POST(req) {
+  const key = req.headers.get('x-client-key')
+  if (!key || key !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const body = await req.json().catch(() => ({}))
   const { event, email, clientName, projectIds, sessionId, durationSec } = body
 
