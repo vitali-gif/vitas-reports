@@ -13,7 +13,13 @@ export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 export const maxDuration = 60
 
-const STALE_HOURS = 4 // crons run every 2h; >4h stale during the day = something's wrong
+// GitHub Actions (our scheduler since Vercel's died) delivers schedules on a BEST-EFFORT
+// basis and is routinely late — the 04:30 UTC slot has landed as late as 07:46. Combined
+// with the legitimate overnight gap (last run ~18:30 UTC, next ~04:30 UTC = 10h), a tight
+// threshold produced a false "cron stopped" alarm every single morning.
+// 6h absorbs the 2h cadence + a few hours of GH delay; the window starts at 10:00 UTC so the
+// (possibly delayed) first run of the day has landed before we start judging.
+const STALE_HOURS = 6
 const JOBS = [
   { job: 'prefetch-ads', label: 'קרון מודעות (Meta/Google)' },
   { job: 'prefetch-crm', label: 'קרון CRM (BMBY/Zoho)' },
@@ -30,9 +36,9 @@ export async function GET(request) {
   if (!supabaseUrl || !supabaseKey) return Response.json({ ok: false, error: 'env missing' }, { status: 500 })
   const sb = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 
-  // Only watch during/after the active cron window (UTC 04:30–18:40 → check 06–21).
+  // Only judge once the (often-delayed) first run of the day has had time to land.
   const utcH = new Date().getUTCHours()
-  const inActiveWindow = utcH >= 6 && utcH <= 21
+  const inActiveWindow = utcH >= 10 && utcH <= 21
 
   let beats
   try {

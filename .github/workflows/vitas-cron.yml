@@ -14,9 +14,9 @@ name: VITAS cron (external scheduler)
 
 on:
   schedule:
-    - cron: '30 4,6,8,10,12,14,16,18 * * *'   # prefetch-ads
-    - cron: '40 4,6,8,10,12,14,16,18 * * *'   # prefetch-crm
-    - cron: '15 * * * *'                      # health watchdog
+    - cron: '7 4,6,8,10,12,14,16,18 * * *'    # prefetch-ads  (odd minute: GH delays :00/:30 heavily)
+    - cron: '17 4,6,8,10,12,14,16,18 * * *'   # prefetch-crm
+    - cron: '47 * * * *'                      # health watchdog
   workflow_dispatch:
     inputs:
       target:
@@ -39,9 +39,9 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
             case "${{ github.event.schedule }}" in
-              '30 4,6,8,10,12,14,16,18 * * *') echo 'paths=prefetch-ads' >> "$GITHUB_OUTPUT" ;;
-              '40 4,6,8,10,12,14,16,18 * * *') echo 'paths=prefetch-crm' >> "$GITHUB_OUTPUT" ;;
-              '15 * * * *')                    echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
+              '7 4,6,8,10,12,14,16,18 * * *')  echo 'paths=prefetch-ads' >> "$GITHUB_OUTPUT" ;;
+              '17 4,6,8,10,12,14,16,18 * * *') echo 'paths=prefetch-crm' >> "$GITHUB_OUTPUT" ;;
+              '47 * * * *')                    echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
               *)                               echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
             esac
           elif [ "${{ github.event.inputs.target }}" = "all" ]; then
