@@ -285,7 +285,6 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const callList = [];
     if (fb)  callList.push({ key: 'fb',  url: '/api/meta/fetch' });
     if (gg)  callList.push({ key: 'gg',  url: '/api/google/fetch' });
-    if ((selectedProject?.name || '').toLowerCase().includes('bcurelaser')) callList.push({ key: 'ga4', url: '/api/ga4/fetch' });
     if (crm) {
       callList.push({ key: 'crm',  url: '/api/bmby/fetch' });
       callList.push({ key: 'zoho', url: '/api/zoho/fetch' });
@@ -1539,7 +1538,6 @@ const selectProject = async (client, project) => {
     if (_zohoOverview) {
       const _zfn = ((crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {}).funnel || {};
       const _byCh = _zfn.byChannel || [];
-      const _ga4 = (reports.find(r => r.month === selectedMonth && r.source === 'ga4') || {}).summary || null;
       const totalSpend = _platformSpend;
       const totalRev = _zfn.netRevenue || 0;
       const roas = totalSpend > 0 ? (totalRev / totalSpend) : 0;
@@ -1606,33 +1604,6 @@ const selectProject = async (client, project) => {
               </table>
             </div>
           </div>
-          {_ga4 ? (
-            <div className="section">
-              <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><h2>{'GA4 \u2014 \u05ea\u05e0\u05d5\u05e2\u05ea \u05d0\u05ea\u05e8'}</h2><span className="sub">{'\u05d7\u05d3\u05e9 \u05de\u05d5\u05dc \u05d7\u05d5\u05d6\u05e8 \u00b7 \u05de\u05e9\u05e4\u05da \u05d0\u05ea\u05e8'}</span></div>
-              <div className="kpi-grid">
-                {crmKpi('\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd', formatNum(_ga4.users?.total || 0), 'cyan', _ga4.users?.total || 0, null)}
-                {crmKpi('\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd', formatNum(_ga4.users?.new || 0) + ' (' + (_ga4.users?.newPct || 0) + '%)', 'green', _ga4.users?.new || 0, null)}
-                {crmKpi('\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd \u05d7\u05d5\u05d6\u05e8\u05d9\u05dd', formatNum(_ga4.users?.returning || 0), 'purple', _ga4.users?.returning || 0, null)}
-                {crmKpi('\u05dc\u05d9\u05d3\u05d9\u05dd \u05de\u05de\u05d9\u05e0\u05d9-\u05e1\u05d9\u05d9\u05d8', formatNum(_ga4.leads?.minisite || 0), 'cyan', _ga4.leads?.minisite || 0, null)}
-                {crmKpi('\u05dc\u05d9\u05d3\u05d9\u05dd \u05de\u05d0\u05ea\u05e8 \u05d4\u05d7\u05d1\u05e8\u05d4', formatNum(_ga4.leads?.website || 0), 'green', _ga4.leads?.website || 0, null)}
-              </div>
-              <div className="crm-funnel" style={{marginTop:12}}>
-                {fstep('sky', _ga4.funnel?.minisiteUsers || 0, '\u05de\u05d9\u05e0\u05d9-\u05e1\u05d9\u05d9\u05d8', '100%')}
-                {farrow}
-                {fstep('', _ga4.funnel?.surveyUsers || 0, '\u05e9\u05d0\u05dc\u05d5\u05df', ((_ga4.funnel?.minisiteUsers || 0) > 0 ? (_ga4.funnel.surveyUsers / _ga4.funnel.minisiteUsers * 100).toFixed(0) : '-') + '%')}
-                {farrow}
-                {fstep('emerald', _ga4.funnel?.thankYouUsers || 0, '\u05e2\u05de\u05d5\u05d3 \u05ea\u05d5\u05d3\u05d4', ((_ga4.funnel?.surveyUsers || 0) > 0 ? (_ga4.funnel.thankYouUsers / _ga4.funnel.surveyUsers * 100).toFixed(0) : '-') + '%')}
-              </div>
-              <div className="table-wrapper" style={{marginTop:12}}>
-                <table className="data-table">
-                  <thead><tr><th>{'\u05e2\u05e8\u05d5\u05e5'}</th><th>{'\u05d7\u05d3\u05e9\u05d9\u05dd'}</th><th>{'\u05d7\u05d5\u05d6\u05e8\u05d9\u05dd'}</th><th>{'% \u05d7\u05d3\u05e9\u05d9\u05dd'}</th><th>{'\u05e1\u05e9\u05e0\u05d9\u05dd'}</th></tr></thead>
-                  <tbody>
-                    {Object.entries(_ga4.byChannel || {}).sort((a,b)=>((b[1].newUsers||0)+(b[1].returningUsers||0))-((a[1].newUsers||0)+(a[1].returningUsers||0))).slice(0,8).map(([ch,d])=>{ const tot=(d.newUsers||0)+(d.returningUsers||0); return (<tr key={ch}><td style={{fontWeight:600}}>{ch}</td><td>{formatNum(d.newUsers||0)}</td><td>{formatNum(d.returningUsers||0)}</td><td style={{color:'var(--emerald)',fontWeight:600}}>{tot>0?Math.round((d.newUsers||0)/tot*100):0}%</td><td>{formatNum(d.sessions||0)}</td></tr>); })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
         </>
       );
     }
@@ -2711,7 +2682,6 @@ const selectProject = async (client, project) => {
             const _devList  = Object.entries(_zs.devices || {}).sort((a,b) => b[1]-a[1])
             const _agentList = (_rt.byAgent || []).slice(0, 8)
             const _totalLeads = _zs.totalLeads || 0
-            const _ga4 = (currentReports.find(r => r.source === 'ga4') || {}).summary || null
 
             const _kpiZ = (lbl, val, cls) => (
               <div key={lbl} className={`kpi ${cls||'indigo'}`}>
@@ -2722,41 +2692,7 @@ const selectProject = async (client, project) => {
             )
 
             return (<>
-              <div className="client-tabs" style={{marginBottom: 15}}>
-                <button className={`client-tab ${crmSubTab !== 'ga4' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📊 סיכום כללי</button>
-                <button className={`client-tab ${crmSubTab === 'ga4' ? 'active' : ''}`} onClick={() => setCrmSubTab('ga4')}>🌐 GA4</button>
-              </div>
 
-              {crmSubTab === 'ga4' && (_ga4 ? (<>
-                <div className="kpi-grid">
-                  {_kpiZ('משתמשים', formatNum(_ga4.users?.total || 0), 'sky')}
-                  {_kpiZ('חדשים', formatNum(_ga4.users?.new || 0) + ' (' + (_ga4.users?.newPct || 0) + '%)', 'emerald')}
-                  {_kpiZ('חוזרים', formatNum(_ga4.users?.returning || 0), 'violet')}
-                  {_kpiZ('לידים ממיני-סייט', formatNum(_ga4.leads?.minisite || 0), 'sky')}
-                  {_kpiZ('לידים מאתר החברה', formatNum(_ga4.leads?.website || 0), 'emerald')}
-                </div>
-                <div className="section">
-                  <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><h2>משפך אתר</h2><span className="sub">מיני-סייט → שאלון → עמוד תודה</span></div>
-                  <div className="crm-funnel">
-                    <div className="crm-fstep sky"><div className="v">{formatNum(_ga4.funnel?.minisiteUsers||0)}</div><div className="l">מיני-סייט</div><div className="pct">100%</div></div>
-                    <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-                    <div className="crm-fstep"><div className="v">{formatNum(_ga4.funnel?.surveyUsers||0)}</div><div className="l">שאלון</div><div className="pct">{((_ga4.funnel?.minisiteUsers||0)>0?(_ga4.funnel.surveyUsers/_ga4.funnel.minisiteUsers*100).toFixed(0):'-')+'%'}</div></div>
-                    <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-                    <div className="crm-fstep emerald"><div className="v">{formatNum(_ga4.funnel?.thankYouUsers||0)}</div><div className="l">עמוד תודה</div><div className="pct">{((_ga4.funnel?.surveyUsers||0)>0?(_ga4.funnel.thankYouUsers/_ga4.funnel.surveyUsers*100).toFixed(0):'-')+'%'}</div></div>
-                  </div>
-                </div>
-                <div className="section">
-                  <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><h2>חדש מול חוזר לפי ערוץ</h2></div>
-                  <div className="table-wrapper">
-                    <table className="data-table">
-                      <thead><tr><th>ערוץ</th><th>חדשים</th><th>חוזרים</th><th>% חדשים</th><th>סשנים</th></tr></thead>
-                      <tbody>
-                        {Object.entries(_ga4.byChannel||{}).sort((a,b)=>((b[1].newUsers||0)+(b[1].returningUsers||0))-((a[1].newUsers||0)+(a[1].returningUsers||0))).slice(0,10).map(([ch,d])=>{const tot=(d.newUsers||0)+(d.returningUsers||0);return (<tr key={ch}><td style={{fontWeight:600}}>{ch}</td><td>{formatNum(d.newUsers||0)}</td><td>{formatNum(d.returningUsers||0)}</td><td style={{color:'var(--emerald)',fontWeight:600}}>{(tot>0?Math.round((d.newUsers||0)/tot*100):0)+'%'}</td><td>{formatNum(d.sessions||0)}</td></tr>);})}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </>) : (<div className="section" style={{textAlign:'center',padding:'40px',color:'var(--text-muted)'}}><div style={{marginBottom:14}}>אין נתוני GA4 לתקופה הנבחרת.</div><button onClick={async (e) => { const _b = e.currentTarget; _b.textContent = '⏳ מושך GA4...'; _b.disabled = true; try { const _pl = selectedMonth.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }; _pl.projectId = selectedProject?.id; const _r = await fetch('/api/ga4/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }, body: JSON.stringify(_pl) }); const _j = await _r.json().catch(() => ({})); if (!_r.ok || _j.error) { alert('GA4 שגיאה: ' + (_j.error || ('HTTP ' + _r.status))); _b.textContent = '🔄 משוך נתוני GA4'; _b.disabled = false; return; } if (selectedProject) await loadProjectReports(selectedProject.id); } catch (err) { alert('GA4 שגיאה: ' + (err && err.message ? err.message : err)); _b.textContent = '🔄 משוך נתוני GA4'; _b.disabled = false; } }} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:13,color:'#fff',background:'var(--violet)',border:'none',borderRadius:8,padding:'8px 16px',cursor:'pointer'}}>🔄 משוך נתוני GA4</button></div>))}
 
               {crmSubTab !== 'ga4' && (<>
                 <div className="kpi-grid">
