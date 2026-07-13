@@ -47,8 +47,9 @@ function brandForProjectName(name) {
 // ===== helpers =====
 
 function currentMonth() {
-  const now = new Date()
-  return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
+  // Israel-local month (not UTC) — matches the cron's nowIsrael() and avoids writing
+  // to the previous month key between midnight and ~02:00 Israel time on the 1st.
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7)
 }
 
 function num(v) {

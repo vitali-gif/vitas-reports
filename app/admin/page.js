@@ -105,6 +105,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [clients, setClients] = useState([])
   const [selectedClient, setSelectedClient] = useState(null)
   const [selectedProject, setSelectedProject] = useState(null)
+  const selectedProjectRef = useRef(null)
+  useEffect(() => { selectedProjectRef.current = selectedProject }, [selectedProject])
   const [view, setView] = useState('welcome')
   const [reports, setReports] = useState([])
   const [selectedMonth, setSelectedMonth] = useState('')
@@ -319,7 +321,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
         showToast('\u2713 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d5\u05d3\u05db\u05e0\u05d5 \u05d1\u05e8\u05e7\u05e2');  // "נתונים עודכנו ברקע"
       }
       await loadClients();
-      if (selectedProject) await loadProjectReports(selectedProject.id);
+      if (selectedProjectRef.current) await loadProjectReports(selectedProjectRef.current.id); // current selection, not stale closure
     } catch (err) {
       if (!isBackground) showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (err.message || err));
     } finally {
@@ -347,7 +349,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const haveAll = haveFb && haveGoog && haveCrm;
 
     // Is this an "open" period (today still updating) or a closed/finalized one?
-    const today = new Date().toISOString().slice(0, 10);
+    const _tn = new Date();
+    const today = _tn.getFullYear() + '-' + String(_tn.getMonth() + 1).padStart(2, '0') + '-' + String(_tn.getDate()).padStart(2, '0'); // local, not UTC
     const currentYM = today.slice(0, 7);
     let isOpen = true;  // default to assume open if we can't tell
     if (payload.month) isOpen = payload.month >= currentYM;
@@ -390,7 +393,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     if (isClientView) {
       // Reload reports from DB on every preset switch — picks up CRM data
       // saved by admin refresh or cron since page load. Cheap read, no live API fetch.
-      if (selectedProject) await loadProjectReports(selectedProject.id);
+      if (selectedProjectRef.current) await loadProjectReports(selectedProjectRef.current.id); // current selection, not stale closure
       showToast('✓ טוען...');
       return;
     }
@@ -437,7 +440,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
         showToast(`\u2713 BMBY: \u05e2\u05d5\u05d3\u05db\u05e0\u05d5 ${okProjects} \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd`);
       }
       await loadClients();
-      if (selectedProject) await loadProjectReports(selectedProject.id);
+      if (selectedProjectRef.current) await loadProjectReports(selectedProjectRef.current.id); // current selection, not stale closure
     } catch (err) {
       showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (err.message || err));
     }
@@ -912,6 +915,8 @@ const selectProject = async (client, project) => {
   const createChart = (id, type, labels, datasets, scalesConfig) => {
     const canvas = document.getElementById(id);
     if (!canvas) return;
+    const _existing = Chart.getChart(canvas);
+    if (_existing) _existing.destroy();
     const isDoughnut = type === 'doughnut' || type === 'pie';
     const enhancedDatasets = datasets.map(ds => isDoughnut
       ? { borderColor: '#FFFFFF', borderWidth: 3, hoverOffset: 8, ...ds }
@@ -1799,7 +1804,7 @@ const selectProject = async (client, project) => {
         </div>
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric]);
+  }, [selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric, refreshingCrm, isClientView]);
 
   const renderDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
@@ -3392,7 +3397,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, refreshingCrm, isClientView, selectedProject, activePreset]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
