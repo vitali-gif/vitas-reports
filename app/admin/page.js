@@ -2,7 +2,7 @@
 // rebuild trigger
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { supabase } from '../../lib/supabase'
+import { supabase, authHeaders } from '../../lib/supabase'
 import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
@@ -195,7 +195,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const handleSessionLogs = async () => {
     setShowSessionLogs(true)
     setLogsLoading(true)
-    const res = await fetch('/api/client-log', { headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
+    const res = await fetch('/api/client-log', { headers: await authHeaders() })
     const data = await res.json()
     setSessionLogs(Array.isArray(data) ? data : [])
     setLogsLoading(false)
@@ -203,7 +203,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const handleExport = () => { alert('ייצוא לאקסל יהיה זמין בקרוב'); };
 
   const loadClientAccess = async () => {
-    const res = await fetch('/api/client-access', { headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
+    const res = await fetch('/api/client-access', { headers: await authHeaders() })
     const data = await res.json()
     setClientAccessList(Array.isArray(data) ? data : [])
   }
@@ -213,7 +213,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     setCaSaving(true)
     const res = await fetch('/api/client-access', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+      headers: await authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ email: caEmail.trim(), client_id: caClientId })
     })
     setCaSaving(false)
@@ -245,8 +245,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const toDelete = clientAccessList.filter(ca =>
       ca.email === email && ca.projects?.client_id === clientId
     )
+    const _hdrs = await authHeaders()
     await Promise.all(toDelete.map(ca =>
-      fetch('/api/client-access?id=' + ca.id, { method: 'DELETE', headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
+      fetch('/api/client-access?id=' + ca.id, { method: 'DELETE', headers: _hdrs })
     ))
     setClientAccessList(prev => prev.filter(x => !toDelete.some(d => d.id === x.id)))
     showToast(`✓ גישה נמחקה (${toDelete.length} פרויקטים)`)
@@ -281,7 +282,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       setRefreshElapsed(0);
     }
     if (selectedProject && !payload.projectId) payload = { ...payload, projectId: selectedProject.id };
-    const headers = { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' };
+    const headers = await authHeaders({ 'Content-Type': 'application/json' });
     const callList = [];
     if (fb)  callList.push({ key: 'fb',  url: '/api/meta/fetch' });
     if (gg)  callList.push({ key: 'gg',  url: '/api/google/fetch' });
@@ -423,7 +424,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       if (selectedProject) payload = { ...payload, projectId: selectedProject.id };
       const res = await fetch('/api/bmby/fetch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -489,9 +490,8 @@ const loadClients = async () => {
       setPeriodLoading(true);
     }
     // by-project (service_role) returns a LIGHT index; never times out. Revalidate in background.
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     const res = await fetch(`/api/reports/by-project?projectId=${projectId}`, {
-      headers: { 'x-client-key': anonKey },
+      headers: await authHeaders(),
     }).catch(() => null);
     let data = null;
     if (res && res.ok) data = await res.json().catch(() => null);
@@ -516,8 +516,7 @@ const loadClients = async () => {
   // months; this fetches the heavy rows on demand and merges them in.
   const loadMonthsData = async (projectId, monthKeys) => {
     if (!projectId || !monthKeys.length) return;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    const res = await fetch(`/api/reports/by-project?projectId=${projectId}&dataForMonths=${encodeURIComponent(monthKeys.join(','))}`, { headers: { 'x-client-key': anonKey } }).catch(() => null);
+    const res = await fetch(`/api/reports/by-project?projectId=${projectId}&dataForMonths=${encodeURIComponent(monthKeys.join(','))}`, { headers: await authHeaders() }).catch(() => null);
     if (!res || !res.ok) return;
     const rows = await res.json().catch(() => null);
     if (!Array.isArray(rows)) return;
@@ -554,7 +553,7 @@ const loadClients = async () => {
       const description = (rec.body || []).join('\n\n') + (rec.suggestion ? '\n\nהמלצה: ' + rec.suggestion : '');
       const res = await fetch('/api/tasks/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           projectId: selectedProject.id,
           role: rec.role,
@@ -595,7 +594,7 @@ const loadClients = async () => {
     try {
       const res = await fetch('/api/tasks/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ taskId, status }),
       });
       const json = await res.json();
@@ -614,7 +613,7 @@ const loadClients = async () => {
     try {
       const res = await fetch('/api/meta/rules', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           projectName: selectedProject.name,
           ruleType,
@@ -650,7 +649,7 @@ const loadClients = async () => {
     const post = async (ruleType, p) => {
       const res = await fetch('/api/meta/rules', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ projectName: selectedProject.name, ruleType, params: p, recommendationKey }),
       });
       const json = await res.json().catch(() => ({}));
@@ -685,7 +684,7 @@ const loadClients = async () => {
     const post = async (ruleType) => {
       const res = await fetch('/api/meta/rules', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ projectName: selectedProject.name, ruleType, params, recommendationKey }),
       });
       const json = await res.json().catch(() => ({}));
@@ -3654,7 +3653,7 @@ const selectProject = async (client, project) => {
                 <button
                   onClick={async () => {
                     if (!confirm('למחוק את כל הלוגים?')) return
-                    await fetch('/api/client-log', { method:'DELETE', headers:{'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||''} })
+                    await fetch('/api/client-log', { method:'DELETE', headers: await authHeaders() })
                     setSessionLogs([])
                   }}
                   title="מחק את כל הלוגים"

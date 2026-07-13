@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { requireAuth } from '../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -6,11 +7,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-function checkAuth(req) {
-  const key = req.headers.get('x-client-key')
-  const expected = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  return expected && key === expected
-}
 
 // Generate a readable temporary password: XXXX-XXXX-XXXX
 function generateTempPassword() {
@@ -107,9 +103,12 @@ async function sendPasswordEmail(toEmail, tempPassword, clientName) {
 }
 
 export async function GET(req) {
-  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(req)
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { searchParams } = new URL(req.url)
-  const email = searchParams.get('email')
+  // Non-admin callers may only read their own access list
+  const email = auth.user.isAdmin ? searchParams.get('email') : auth.user.email
+  if (!auth.user.isAdmin && !email) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (email) {
     const { data, error } = await supabaseAdmin
       .from('client_access')
@@ -128,7 +127,8 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
-  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(req, { adminOnly: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const body = await req.json()
   const { email, client_id } = body
   if (!email || !client_id) return NextResponse.json({ error: 'email and client_id required' }, { status: 400 })
@@ -168,7 +168,8 @@ export async function POST(req) {
 }
 
 export async function DELETE(req) {
-  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(req, { adminOnly: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })

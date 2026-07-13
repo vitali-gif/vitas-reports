@@ -2,15 +2,14 @@
 // (same logic as the prefetch-ads cron). Sends 75/95/100% alerts for any project
 // that newly crossed a threshold this month, and marks them sent. Auth: x-client-key=anon.
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../../../../lib/auth'
 import { sendAlert } from '../../../../lib/alert'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAuth(request, { adminOnly: true, allowCron: true })
+  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,

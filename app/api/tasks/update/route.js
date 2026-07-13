@@ -13,6 +13,7 @@
 //   }
 
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,10 +24,8 @@ function badRequest(message) {
 }
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAuth(request, { adminOnly: true })
+  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
 
   let body = {}
   try { body = await request.json() } catch { return badRequest('Invalid JSON body') }

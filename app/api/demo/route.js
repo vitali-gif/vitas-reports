@@ -4,6 +4,7 @@
  * POST { action: 'setup' } → clone HI PARK data → demo project (anonymized)
  */
 import { NextResponse } from 'next/server'
+import { requireAuth } from '../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -85,13 +86,11 @@ function anonymize(report, demoProjectId) {
   return r
 }
 
-function checkAuth(req) {
-  const key = req.headers.get('x-client-key')
-  return key === process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-}
+
 
 export async function GET(req) {
-  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(req, { adminOnly: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { data } = await supabaseAdmin
     .from('projects')
     .select('*, clients(name, color)')
@@ -101,7 +100,8 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
-  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAuth(req, { adminOnly: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const body = await req.json().catch(() => ({}))
 
   if (body.action !== 'setup') return NextResponse.json({ error: 'unknown action' }, { status: 400 })

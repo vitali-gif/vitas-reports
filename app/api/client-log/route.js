@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../../../lib/auth'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -68,10 +69,8 @@ export async function POST(req) {
 
 // DELETE — clear all session logs (protected by anon key header)
 export async function DELETE(req) {
-  const key = req.headers.get('x-client-key')
-  if (!key || key !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAuth(req, { adminOnly: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const { error } = await supabaseAdmin.from('client_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
@@ -79,10 +78,8 @@ export async function DELETE(req) {
 
 // GET — fetch logs for admin (protected by anon key header)
 export async function GET(req) {
-  const key = req.headers.get('x-client-key')
-  if (!key || key !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAuth(req, { adminOnly: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const { data, error } = await supabaseAdmin
     .from('client_sessions')

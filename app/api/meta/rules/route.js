@@ -14,6 +14,7 @@
 // affect other clients sharing the same ad account, and to avoid case-sensitivity issues.
 
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 const META_GRAPH_VERSION = 'v21.0'
@@ -190,10 +191,8 @@ function buildRulePayload(ruleType, params, projectName, scope, notifyUserId) {
 }
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return bad('Unauthorized', 401)
-  }
+  const auth = await requireAuth(request, { adminOnly: true })
+  if (!auth.ok) return bad(auth.error, auth.status)
   let body = {}
   try { body = await request.json() } catch { return bad('Invalid JSON') }
   const { projectName, ruleType, params, recommendationKey } = body
@@ -279,10 +278,8 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return bad('Unauthorized', 401)
-  }
+  const auth = await requireAuth(request, { adminOnly: true })
+  if (!auth.ok) return bad(auth.error, auth.status)
   const token = process.env.META_ACCESS_TOKEN
   const adAccountId = process.env.META_AD_ACCOUNT_ID
   if (!token || !adAccountId) return bad('Meta env vars missing', 500)
@@ -295,10 +292,8 @@ export async function GET(request) {
 }
 
 export async function DELETE(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return bad('Unauthorized', 401)
-  }
+  const auth = await requireAuth(request, { adminOnly: true })
+  if (!auth.ok) return bad(auth.error, auth.status)
   const token = process.env.META_ACCESS_TOKEN
   if (!token) return bad('Meta env vars missing', 500)
   const { searchParams } = new URL(request.url)

@@ -12,6 +12,7 @@
  * Response shape unchanged: an array of report rows; rows outside dataForMonths have data:null.
  */
 import { NextResponse } from 'next/server'
+import { requireAuth } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -28,13 +29,11 @@ export const fetchCache = 'force-no-store'
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0, must-revalidate' }
 
 export async function GET(request) {
-  const key = request.headers.get('x-client-key')
-  if (!key || key !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const { searchParams } = new URL(request.url)
   const projectId = searchParams.get('projectId')
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 })
+  const auth = await requireAuth(request, { projectId, allowCron: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const dataForMonths = (searchParams.get('dataForMonths') || '')
     .split(',').map(s => s.trim()).filter(Boolean)

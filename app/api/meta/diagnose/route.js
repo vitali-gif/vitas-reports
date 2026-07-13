@@ -8,6 +8,7 @@
 // OR x-client-key = anon key (so we can call it from the admin UI).
 
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,10 +23,10 @@ async function fetchJson(url) {
 
 export async function GET(request) {
   // Auth: accept either anon key in x-client-key OR CRON_SECRET as Bearer
-  const anon = request.headers.get('x-client-key')
+
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '')
-  const okAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && anon === process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const okAnon = (await requireAuth(request, { adminOnly: true })).ok
   const okCron = process.env.CRON_SECRET && bearer === process.env.CRON_SECRET
   if (!okAnon && !okCron) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })

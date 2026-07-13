@@ -3,15 +3,14 @@
 // via Resend (sendAlert). If `budget` is supplied it is used for the email only
 // (demo) without touching the stored monthly_budgets. Auth: x-client-key = anon.
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../../../../lib/auth'
 import { sendAlert } from '../../../../lib/alert'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAuth(request, { adminOnly: true, allowCron: true })
+  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
   const body = await request.json().catch(() => ({}))
   const projectId = body.projectId
   if (!projectId) return Response.json({ error: 'projectId required' }, { status: 400 })

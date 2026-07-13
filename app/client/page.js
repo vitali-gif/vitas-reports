@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, authHeaders } from '../../lib/supabase'
 import dynamic from 'next/dynamic'
 
 const AdminPage = dynamic(() => import('../admin/page'), { ssr: false })
@@ -107,7 +107,7 @@ export default function ClientPage() {
     setLoading(true)
     try {
       const res = await fetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`, {
-        headers: { 'x-client-key': ANON_KEY }
+        headers: await authHeaders()
       })
       if (!res.ok) { setStep('error'); return }
       const list = await res.json()

@@ -4,6 +4,7 @@
 // Pulls Google Ads campaign/ad-level metrics via GAQL and writes one report per project per month.
 
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // was 60 — full-quarter fetches (q1-q4) exceeded 60s and returned 504
@@ -432,12 +433,14 @@ function isValidDate(v) {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
 }
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAuth(request, { allowCron: true })
+  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status })
   let body = {}
   try { body = await request.json() } catch {}
+  // Non-admin users may only refresh a project they were granted in client_access
+  if (!auth.user.isAdmin && (!body.projectId || !(auth.allowed || []).includes(body.projectId))) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) { return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 }) }
   const { status, body: responseBody } = await runSync({
     month: body.month,
