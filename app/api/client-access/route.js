@@ -130,7 +130,9 @@ export async function POST(req) {
   const auth = await requireAuth(req, { adminOnly: true })
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const body = await req.json()
-  const { email, client_id } = body
+  // project_ids is OPTIONAL: omit (or send empty) to grant access to ALL of the client's
+  // projects (the original behaviour); send a subset to grant per-project access.
+  const { email, client_id, project_ids } = body
   if (!email || !client_id) return NextResponse.json({ error: 'email and client_id required' }, { status: 400 })
 
   const cleanEmail = email.toLowerCase().trim()
@@ -141,9 +143,17 @@ export async function POST(req) {
     return NextResponse.json({ error: projErr?.message || 'No projects found' }, { status: 400 })
 
   const existingProjectIds = projects.map(p => p.id)
+
+  // Which projects should this person end up with? Guard against ids from another client.
+  const requested = Array.isArray(project_ids) ? project_ids.filter(id => existingProjectIds.includes(id)) : []
+  const grantedProjects = requested.length > 0 ? projects.filter(p => requested.includes(p.id)) : projects
+  if (!grantedProjects.length) return NextResponse.json({ error: 'no valid project_ids for this client' }, { status: 400 })
+
+  // Clean replace: drop every existing row for this email across THIS client's projects,
+  // then insert only the granted ones. So the saved set is exactly what was selected.
   await supabaseAdmin.from('client_access').delete().eq('email', cleanEmail).in('project_id', existingProjectIds)
 
-  const rows = projects.map(p => ({ email: cleanEmail, project_id: p.id }))
+  const rows = grantedProjects.map(p => ({ email: cleanEmail, project_id: p.id }))
   const { error: insertErr } = await supabaseAdmin.from('client_access').insert(rows)
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 })
 
@@ -171,7 +181,9 @@ export async function POST(req) {
   // this is the only moment it can be shown. Admin-only endpoint (requireAuth adminOnly).
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
   return NextResponse.json({
-    client_id, clientName, projectCount: projects.length, emailSent, emailError,
+    client_id, clientName, projectCount: grantedProjects.length,
+    projectNames: grantedProjects.map(p => p.name),
+    emailSent, emailError,
     email: cleanEmail,
     tempPassword: authResult.ok ? tempPassword : null,
     loginUrl: `${siteUrl}/client`,

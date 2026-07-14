@@ -139,6 +139,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [caClientId, setCaClientId] = useState('')
   const [caLabel, setCaLabel] = useState('')
   const [caSaving, setCaSaving] = useState(false)
+  const [caProjectIds, setCaProjectIds] = useState([])  // which projects of the client to grant; [] = all
   const [caCreds, setCaCreds] = useState(null)  // credentials of the last invite — shown ONCE (password is unrecoverable)
   const [vitasTasks, setVitasTasks] = useState([])
   const [recSubTab, setRecSubTab] = useState('new')
@@ -217,12 +218,12 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const res = await fetch('/api/client-access', {
       method: 'POST',
       headers: await authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ email: caEmail.trim(), client_id: caClientId })
+      body: JSON.stringify({ email: caEmail.trim(), client_id: caClientId, project_ids: caProjectIds })
     })
     setCaSaving(false)
     if (res.ok) {
       const result = await res.json()
-      setCaEmail(''); setCaClientId('')
+      setCaEmail(''); setCaClientId(''); setCaProjectIds([])
       await loadClientAccess()
       // Show the credentials in a PERSISTENT panel — never a toast. The password is hashed in
       // Supabase right after this and can never be retrieved again; a toast would lose it.
@@ -231,6 +232,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
           email: result.email,
           password: result.tempPassword,
           clientName: result.clientName,
+          projectNames: result.projectNames || [],
           loginUrl: result.loginUrl,
           emailSent: result.emailSent,
         })
@@ -3581,7 +3583,13 @@ const selectProject = async (client, project) => {
                 </div>
                 <div>
                   <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>לקוח</label>
-                  <select className="form-input" value={caClientId} onChange={e => setCaClientId(e.target.value)}>
+                  <select className="form-input" value={caClientId} onChange={e => {
+                    const cid = e.target.value
+                    setCaClientId(cid)
+                    // default: every project of that client (preserves the old behaviour)
+                    const cl = clients.find(c => c.id === cid)
+                    setCaProjectIds((cl?.projects || []).map(p => p.id))
+                  }}>
                     <option value="">-- בחר לקוח --</option>
                     {clients.map(cl => (
                       <option key={cl.id} value={cl.id}>{cl.name} ({(cl.projects||[]).length} פרויקטים)</option>
@@ -3589,7 +3597,49 @@ const selectProject = async (client, project) => {
                   </select>
                 </div>
               </div>
-              <button className="btn btn-primary" onClick={addClientAccess} disabled={caSaving || !caEmail || !caClientId}
+              {/* Per-project access. client_access already stores one row per project, so this
+                  needed no schema change — we just write a subset of the rows. */}
+              {caClientId && (() => {
+                const projs = (clients.find(c => c.id === caClientId)?.projects) || []
+                if (projs.length <= 1) return null
+                const allOn = caProjectIds.length === projs.length
+                const toggle = (id) => setCaProjectIds(prev =>
+                  prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+                return (
+                  <div style={{borderTop:'1px solid var(--border)',paddingTop:10}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+                      <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>אילו פרויקטים?</label>
+                      <button type="button"
+                        onClick={() => setCaProjectIds(allOn ? [] : projs.map(p => p.id))}
+                        style={{background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:600,color:'var(--indigo)'}}>
+                        {allOn ? 'נקה הכל' : 'בחר הכל'}
+                      </button>
+                    </div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                      {projs.map(p => {
+                        const on = caProjectIds.includes(p.id)
+                        return (
+                          <label key={p.id} style={{
+                            display:'inline-flex',alignItems:'center',gap:6,cursor:'pointer',
+                            padding:'6px 10px',borderRadius:8,fontSize:13,
+                            border:'1px solid ' + (on ? 'var(--indigo)' : 'var(--border)'),
+                            background: on ? 'var(--indigo-50)' : 'var(--card)',
+                            color: on ? 'var(--indigo)' : 'var(--text-2)', fontWeight: on ? 700 : 500,
+                          }}>
+                            <input type="checkbox" checked={on} onChange={() => toggle(p.id)} style={{margin:0}} />
+                            {p.name}
+                          </label>
+                        )
+                      })}
+                    </div>
+                    {caProjectIds.length === 0 && (
+                      <p style={{margin:'8px 0 0',fontSize:12,color:'#B45309'}}>בחר לפחות פרויקט אחד.</p>
+                    )}
+                  </div>
+                )
+              })()}
+              <button className="btn btn-primary" onClick={addClientAccess}
+                disabled={caSaving || !caEmail || !caClientId || caProjectIds.length === 0}
                 style={{alignSelf:'flex-end',padding:'8px 20px'}}>
                 {caSaving ? 'שומר...' : '+ הוסף גישה ושלח קישור'}
               </button>
@@ -3616,6 +3666,11 @@ const selectProject = async (client, project) => {
                     <div><strong>URL:</strong> {caCreds.loginUrl}</div>
                     <div><strong>Email:</strong> {caCreds.email}</div>
                     <div><strong>Password:</strong> <code style={{background:'#F5F7FB',padding:'2px 8px',borderRadius:5,letterSpacing:'0.05em'}}>{caCreds.password}</code></div>
+                    {caCreds.projectNames?.length > 0 && (
+                      <div style={{marginTop:6,paddingTop:6,borderTop:'1px dashed #EADFC0',direction:'rtl',textAlign:'right'}}>
+                        <strong>פרויקטים:</strong> {caCreds.projectNames.join(' · ')}
+                      </div>
+                    )}
                   </div>
                   <div style={{display:'flex',gap:8}}>
                     <button className="btn btn-primary" style={{padding:'7px 14px',fontSize:13}}
