@@ -140,7 +140,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [caLabel, setCaLabel] = useState('')
   const [caSaving, setCaSaving] = useState(false)
   const [caProjectIds, setCaProjectIds] = useState([])  // which projects of the client to grant; [] = all
-  const [caCreds, setCaCreds] = useState(null)  // credentials of the last invite — shown ONCE (password is unrecoverable)
+  const [caCreds, setCaCreds] = useState(null)
+  const [caEditing, setCaEditing] = useState(null)   // { email, clientId } currently being edited
+  const [caEditIds, setCaEditIds] = useState([])     // project ids selected in the edit row
+  const [caEditSaving, setCaEditSaving] = useState(false)  // credentials of the last invite — shown ONCE (password is unrecoverable)
   const [vitasTasks, setVitasTasks] = useState([])
   const [recSubTab, setRecSubTab] = useState('new')
   const [budgetMonth, setBudgetMonth] = useState(null)  // 'YYYY-MM' selected in the budget editor
@@ -241,6 +244,33 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       }
     } else {
       const err = await res.json()
+      showToast('שגיאה: ' + (err.error || 'unknown'))
+    }
+  }
+
+  // Edit an existing contact's project set. Uses PATCH — NOT POST — so the password of a
+  // contact who is already using the dashboard is left untouched.
+  const startEditAccess = (email, clientId, currentProjectIds) => {
+    setCaEditing({ email, clientId })
+    setCaEditIds(currentProjectIds)
+  }
+
+  const saveEditAccess = async () => {
+    if (!caEditing || caEditIds.length === 0) return
+    setCaEditSaving(true)
+    const res = await fetch('/api/client-access', {
+      method: 'PATCH',
+      headers: await authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ email: caEditing.email, client_id: caEditing.clientId, project_ids: caEditIds })
+    })
+    setCaEditSaving(false)
+    if (res.ok) {
+      const r = await res.json()
+      setCaEditing(null); setCaEditIds([])
+      await loadClientAccess()
+      showToast(`\u2713 ההרשאות עודכנו (${r.projectCount} פרויקטים) — הסיסמה לא שונתה`)
+    } else {
+      const err = await res.json().catch(() => ({}))
       showToast('שגיאה: ' + (err.error || 'unknown'))
     }
   }
@@ -3710,7 +3740,8 @@ const selectProject = async (client, project) => {
                   </thead>
                   <tbody>
                     {entries.map(g => (
-                      <tr key={g.email + g.clientId} style={{borderBottom:'1px solid var(--surface)'}}>
+                      <Fragment key={g.email + g.clientId}>
+                      <tr style={{borderBottom:'1px solid var(--surface)'}}>
                         <td style={{padding:'10px',direction:'ltr',textAlign:'left',fontFamily:'monospace',fontSize:12}}>{g.email}</td>
                         <td style={{padding:'10px',fontWeight:700,color:'var(--text)'}}>{g.clientName}</td>
                         <td style={{padding:'10px'}}>
@@ -3718,10 +3749,51 @@ const selectProject = async (client, project) => {
                             {g.rows.length} פרויקטים
                           </span>
                         </td>
-                        <td style={{padding:'10px',textAlign:'center'}}>
+                        <td style={{padding:'10px',textAlign:'center',whiteSpace:'nowrap'}}>
+                          <button onClick={() => startEditAccess(g.email, g.clientId, g.rows.map(r => r.project_id))} style={{background:'none',border:'none',cursor:'pointer',color:'var(--indigo)',fontSize:15,padding:'2px 6px'}} title="ערוך פרויקטים">✏️</button>
                           <button onClick={() => deleteClientAccess(g.email, g.clientId)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:16,padding:'2px 6px'}} title="מחק גישה">🗑</button>
                         </td>
                       </tr>
+                      {caEditing && caEditing.email === g.email && caEditing.clientId === g.clientId && (() => {
+                        const projs = (clients.find(c => c.id === g.clientId)?.projects) || []
+                        const toggle = (id) => setCaEditIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+                        return (
+                          <tr key={g.email + g.clientId + '-edit'}>
+                            <td colSpan={4} style={{padding:'12px 10px',background:'var(--surface)'}}>
+                              <div style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',marginBottom:8}}>
+                                אילו פרויקטים {g.email} יראה? <span style={{color:'var(--text-3)',fontWeight:500}}>(הסיסמה לא תשתנה)</span>
+                              </div>
+                              <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:10}}>
+                                {projs.map(p => {
+                                  const on = caEditIds.includes(p.id)
+                                  return (
+                                    <label key={p.id} style={{
+                                      display:'inline-flex',alignItems:'center',gap:6,cursor:'pointer',
+                                      padding:'6px 10px',borderRadius:8,fontSize:13,
+                                      border:'1px solid ' + (on ? 'var(--indigo)' : 'var(--border)'),
+                                      background: on ? 'var(--indigo-50)' : 'var(--card)',
+                                      color: on ? 'var(--indigo)' : 'var(--text-2)', fontWeight: on ? 700 : 500,
+                                    }}>
+                                      <input type="checkbox" checked={on} onChange={() => toggle(p.id)} style={{margin:0}} />
+                                      {p.name}
+                                    </label>
+                                  )
+                                })}
+                              </div>
+                              {caEditIds.length === 0 && <p style={{margin:'0 0 8px',fontSize:12,color:'#B45309'}}>בחר לפחות פרויקט אחד (למחיקה מלאה השתמש בפח).</p>}
+                              <div style={{display:'flex',gap:8}}>
+                                <button className="btn btn-primary" style={{padding:'6px 14px',fontSize:13}}
+                                  onClick={saveEditAccess} disabled={caEditSaving || caEditIds.length === 0}>
+                                  {caEditSaving ? 'שומר...' : 'שמור'}
+                                </button>
+                                <button className="btn" style={{padding:'6px 14px',fontSize:13}}
+                                  onClick={() => { setCaEditing(null); setCaEditIds([]) }}>ביטול</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })()}
+                    </Fragment>
                     ))}
                   </tbody>
                 </table>

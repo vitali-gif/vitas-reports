@@ -190,6 +190,50 @@ export async function POST(req) {
   }, { status: 201 })
 }
 
+// PATCH — edit which projects an EXISTING contact can see.
+// Deliberately does NOT touch the auth user: no new password, no email. Using POST to "edit"
+// would reset the password of someone who is already logged in and using the dashboard.
+export async function PATCH(req) {
+  const auth = await requireAuth(req, { adminOnly: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  const body = await req.json()
+  const { email, client_id, project_ids } = body
+  if (!email || !client_id || !Array.isArray(project_ids)) {
+    return NextResponse.json({ error: 'email, client_id and project_ids required' }, { status: 400 })
+  }
+  const cleanEmail = String(email).toLowerCase().trim()
+
+  const { data: projects, error: projErr } = await supabaseAdmin
+    .from('projects').select('id, name').eq('client_id', client_id)
+  if (projErr || !projects?.length) {
+    return NextResponse.json({ error: projErr?.message || 'No projects found' }, { status: 400 })
+  }
+  const clientProjectIds = projects.map(p => p.id)
+
+  // Only ids that really belong to this client.
+  const granted = project_ids.filter(id => clientProjectIds.includes(id))
+  if (!granted.length) {
+    return NextResponse.json({ error: 'select at least one project' }, { status: 400 })
+  }
+
+  // Clean replace within this client's scope: the saved set becomes exactly what was selected.
+  const { error: delErr } = await supabaseAdmin
+    .from('client_access').delete().eq('email', cleanEmail).in('project_id', clientProjectIds)
+  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
+
+  const rows = granted.map(id => ({ email: cleanEmail, project_id: id }))
+  const { error: insErr } = await supabaseAdmin.from('client_access').insert(rows)
+  if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
+
+  const grantedProjects = projects.filter(p => granted.includes(p.id))
+  return NextResponse.json({
+    ok: true,
+    email: cleanEmail,
+    projectCount: grantedProjects.length,
+    projectNames: grantedProjects.map(p => p.name),
+  })
+}
+
 export async function DELETE(req) {
   const auth = await requireAuth(req, { adminOnly: true })
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
