@@ -164,7 +164,18 @@ export async function POST(req) {
     emailError = authResult.error
   }
 
-  return NextResponse.json({ client_id, clientName, projectCount: projects.length, emailSent, emailError }, { status: 201 })
+  // Return the temp password so the admin can deliver it out-of-band (WhatsApp/phone).
+  // The email is NOT a reliable channel: Microsoft/Outlook quarantines mail containing a
+  // plaintext password as phishing (confirmed — Resend reports "Delivered", the client never
+  // sees it). The password is hashed in Supabase and can NEVER be recovered afterwards, so
+  // this is the only moment it can be shown. Admin-only endpoint (requireAuth adminOnly).
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
+  return NextResponse.json({
+    client_id, clientName, projectCount: projects.length, emailSent, emailError,
+    email: cleanEmail,
+    tempPassword: authResult.ok ? tempPassword : null,
+    loginUrl: `${siteUrl}/client`,
+  }, { status: 201 })
 }
 
 export async function DELETE(req) {

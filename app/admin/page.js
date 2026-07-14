@@ -139,6 +139,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [caClientId, setCaClientId] = useState('')
   const [caLabel, setCaLabel] = useState('')
   const [caSaving, setCaSaving] = useState(false)
+  const [caCreds, setCaCreds] = useState(null)  // credentials of the last invite — shown ONCE (password is unrecoverable)
   const [vitasTasks, setVitasTasks] = useState([])
   const [recSubTab, setRecSubTab] = useState('new')
   const [budgetMonth, setBudgetMonth] = useState(null)  // 'YYYY-MM' selected in the budget editor
@@ -223,16 +224,18 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       const result = await res.json()
       setCaEmail(''); setCaClientId('')
       await loadClientAccess()
-      if (result.emailSent) {
-        showToast(`✓ גישה נוספה ל-${result.clientName} (${result.projectCount} פרויקטים) — קישור נשלח במייל`)
+      // Show the credentials in a PERSISTENT panel — never a toast. The password is hashed in
+      // Supabase right after this and can never be retrieved again; a toast would lose it.
+      if (result.tempPassword) {
+        setCaCreds({
+          email: result.email,
+          password: result.tempPassword,
+          clientName: result.clientName,
+          loginUrl: result.loginUrl,
+          emailSent: result.emailSent,
+        })
       } else {
-        const link = result.magicLink || ''
-        if (link) {
-          navigator.clipboard?.writeText(link).catch(() => {})
-          showToast('⚠️ המייל לא נשלח. קישור הועתק ללוח — שלח ללקוח ידנית.')
-        } else {
-          showToast('✓ גישה נוספה — אך שליחת המייל נכשלה: ' + (result.emailError || 'שגיאה לא ידועה'))
-        }
+        showToast('שגיאה ביצירת המשתמש: ' + (result.emailError || 'שגיאה לא ידועה'))
       }
     } else {
       const err = await res.json()
@@ -3591,6 +3594,42 @@ const selectProject = async (client, project) => {
                 {caSaving ? 'שומר...' : '+ הוסף גישה ושלח קישור'}
               </button>
             </div>
+
+            {/* Credentials of the last invite — shown ONCE. The password is hashed in Supabase
+                immediately, so it can never be shown again. Email delivery is unreliable
+                (Outlook quarantines password mails), hence copy-to-WhatsApp. */}
+            {caCreds && (() => {
+              const msg = `שלום,\nניתנה לך גישה לדוח הביצועים${caCreds.clientName ? ` של ${caCreds.clientName}` : ''}.\n\nכניסה: ${caCreds.loginUrl}\nמייל: ${caCreds.email}\nסיסמה: ${caCreds.password}\n\nמומלץ לשמור את הפרטים.`
+              return (
+                <div style={{background:'#FFF8E6',border:'1px solid #F0C36D',borderRadius:12,padding:16,marginBottom:20}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                    <strong style={{fontSize:14,color:'#7A5B00'}}>🔑 פרטי הכניסה — מוצגים פעם אחת בלבד</strong>
+                    <button onClick={() => setCaCreds(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:18,color:'#7A5B00'}}>&times;</button>
+                  </div>
+                  <p style={{margin:'0 0 12px',fontSize:12,color:'#7A5B00',lineHeight:1.6}}>
+                    הסיסמה נשמרת מוצפנת ולא ניתן יהיה לשחזר אותה. העתק אותה עכשיו.
+                    {caCreds.emailSent
+                      ? ' המייל נשלח, אך Outlook עלול להסגיר אותו — עדיף לשלוח גם בוואטסאפ.'
+                      : ' ⚠️ שליחת המייל נכשלה — חובה למסור את הפרטים ידנית.'}
+                  </p>
+                  <div style={{background:'#fff',border:'1px solid #EADFC0',borderRadius:8,padding:'10px 12px',marginBottom:10,fontSize:13,direction:'ltr',textAlign:'left'}}>
+                    <div><strong>URL:</strong> {caCreds.loginUrl}</div>
+                    <div><strong>Email:</strong> {caCreds.email}</div>
+                    <div><strong>Password:</strong> <code style={{background:'#F5F7FB',padding:'2px 8px',borderRadius:5,letterSpacing:'0.05em'}}>{caCreds.password}</code></div>
+                  </div>
+                  <div style={{display:'flex',gap:8}}>
+                    <button className="btn btn-primary" style={{padding:'7px 14px',fontSize:13}}
+                      onClick={() => { navigator.clipboard?.writeText(msg).catch(()=>{}); showToast('✓ הודעה הועתקה — הדבק בוואטסאפ'); }}>
+                      📋 העתק הודעה לוואטסאפ
+                    </button>
+                    <button className="btn" style={{padding:'7px 14px',fontSize:13}}
+                      onClick={() => { navigator.clipboard?.writeText(caCreds.password).catch(()=>{}); showToast('✓ הסיסמה הועתקה'); }}>
+                      העתק סיסמה בלבד
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* List — grouped by email + client */}
             {(() => {
