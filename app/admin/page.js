@@ -1861,6 +1861,10 @@ const selectProject = async (client, project) => {
     let allRows = [];
     displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
     const data = aggregateRows(allRows);
+    // True while the heavy per-campaign/breakdown rows for the shown period are still
+    // downloading (KPI cards already render from the light summary). Used to show a
+    // loading placeholder for the detail tables instead of a blank/"missing" area.
+    const detailPending = displayReports.length > 0 && displayReports.some(r => r.data == null);
 
     // ⚡ Fast path: derive ad totals from the light `summary` (already computed by the cron)
     // so KPI cards render INSTANTLY instead of waiting for the heavy `data` rows to download.
@@ -3011,6 +3015,14 @@ const selectProject = async (client, project) => {
             );
           })()}
         </div>
+
+        {detailPending && (
+          <div className="section" style={{display:'flex',alignItems:'center',gap:12,padding:'18px 20px'}}>
+            <span style={{width:18,height:18,border:'2.5px solid var(--border)',borderTopColor:'var(--primary, #6366F1)',borderRadius:'50%',display:'inline-block',animation:'spin 0.8s linear infinite',flexShrink:0}} />
+            <span style={{color:'var(--text-secondary)',fontSize:14,fontWeight:600}}>{'טוען פירוט קמפיינים ופילוחים\u2026'}</span>
+            <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
+          </div>
+        )}
 
                 {/* Non-FB tabs: keep existing campaigns charts + flat table */}
         {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid"><div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns', 'google')}</div>)}
