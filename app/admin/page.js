@@ -532,13 +532,16 @@ const loadClients = async () => {
     if (!selectedProject || reports.length === 0) return;
     const needed = new Set();
     if (selectedMonth) needed.add(selectedMonth);
-    try { getRecommendationsWindowMonths(60).forEach(m => needed.add(m)); } catch {}
+    // Only pull the heavy 60-day recommendations window when THAT tab is actually open.
+    // Otherwise the first render and every project switch waited on ~3 months of heavy raw
+    // data that isn't displayed — making tables/breakdowns appear late and switching slow.
+    if (dashTab === 'recommendations') { try { getRecommendationsWindowMonths(60).forEach(m => needed.add(m)); } catch {} }
     if (compareEnabled && selectedMonth) { const pm = getPrevMonth(selectedMonth); if (pm) needed.add(pm); }
     const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && reports.some(r => r.month === m && r.data == null));
     if (!toLoad.length) return;
     toLoad.forEach(m => monthDataLoaded.current.add(m));
     loadMonthsData(selectedProject.id, toLoad);
-  }, [selectedProject, selectedMonth, compareEnabled, reports]);
+  }, [selectedProject, selectedMonth, compareEnabled, reports, dashTab]);
 
   const loadProjectTasks = async (projectId) => {
     const { data } = await supabase.from('vitas_tasks').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
