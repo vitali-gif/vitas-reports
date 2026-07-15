@@ -1859,6 +1859,21 @@ const selectProject = async (client, project) => {
     displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
     const data = aggregateRows(allRows);
 
+    // ⚡ Fast path: derive ad totals from the light `summary` (already computed by the cron)
+    // so KPI cards render INSTANTLY instead of waiting for the heavy `data` rows to download.
+    // Heavy `data` still powers the campaign tables/charts once it arrives (progressive load).
+    const adTotalsFromSummaries = (reps) => {
+      const tt = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 };
+      (reps || []).forEach(r => { const sm = r.summary || {}; tt.spend += (+sm.spend || 0); tt.impressions += (+sm.impressions || 0); tt.reach += (+sm.reach || 0); tt.clicks += (+sm.clicks || 0); tt.leads += (+sm.leads || 0); });
+      tt.cpl = tt.leads > 0 ? tt.spend / tt.leads : 0;
+      tt.cpc = tt.clicks > 0 ? tt.spend / tt.clicks : 0;
+      tt.cpm = tt.impressions > 0 ? (tt.spend / tt.impressions) * 1000 : 0;
+      tt.ctr = tt.impressions > 0 ? (tt.clicks / tt.impressions) * 100 : 0;
+      tt.convRate = tt.clicks > 0 ? (tt.leads / tt.clicks) * 100 : 0;
+      tt.frequency = tt.reach > 0 ? tt.impressions / tt.reach : 0;
+      return tt;
+    };
+
     // Add CRM leads to "all" tab totals
     let crmTotalLeads = 0;
     if (dashTab === 'all') {
@@ -1892,6 +1907,13 @@ const selectProject = async (client, project) => {
           filteredR = allCrmR.filter(r => /גוגל|google|pmax|search/i.test(r.source || ''));
         }
         if (filteredR.length > 0) crmTotals = aggregateCrmRows(filteredR).totals;
+        // ⚡ Fast path: if heavy CRM rows aren't loaded yet, use the cron-computed summary
+        // totals (unfiltered) so the 'all' tab CRM cards show instantly instead of 0.
+        if (!crmTotals && dashTab === 'all') {
+          const tt = { totalLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
+          crmReps.forEach(r => { const sm = r.summary || {}; tt.totalLeads += (+sm.totalLeads || 0); tt.meetingsScheduled += (+sm.meetingsScheduled || 0); tt.meetingsCompleted += (+sm.meetingsCompleted || 0); tt.meetingsCancelled += (+sm.meetingsCancelled || 0); tt.registrations += (+sm.registrations || 0); tt.registrationValue += (+sm.registrationValue || 0); tt.contracts += (+sm.contracts || 0); tt.contractValue += (+sm.contractValue || 0); });
+          crmTotals = tt;
+        }
       }
     }
 
@@ -1954,7 +1976,7 @@ const selectProject = async (client, project) => {
       };
     });
 
-    const t = data.totals;
+    const t = allRows.length ? data.totals : adTotalsFromSummaries(displayReports);
     const p = prevData?.totals;
 
     // v2 color map: old name → new class
@@ -2142,8 +2164,8 @@ const selectProject = async (client, project) => {
     const hasCrm = anyCrm;
 
     let fbTotals = null, gTotals = null;
-    if (hasFb) { let fbRows = []; fbReports.forEach(r => { if (r.data) fbRows = fbRows.concat(r.data); }); fbTotals = aggregateRows(fbRows).totals; }
-    if (hasG) { let gRows = []; gReports.forEach(r => { if (r.data) gRows = gRows.concat(r.data); }); gTotals = aggregateRows(gRows).totals; }
+    if (hasFb) { let fbRows = []; fbReports.forEach(r => { if (r.data) fbRows = fbRows.concat(r.data); }); fbTotals = fbRows.length ? aggregateRows(fbRows).totals : adTotalsFromSummaries(fbReports); }
+    if (hasG) { let gRows = []; gReports.forEach(r => { if (r.data) gRows = gRows.concat(r.data); }); gTotals = gRows.length ? aggregateRows(gRows).totals : adTotalsFromSummaries(gReports); }
 
     const activeT = dashTab === 'facebook' && fbTotals ? fbTotals : dashTab === 'google' && gTotals ? gTotals : t;
     const activeP = p;
