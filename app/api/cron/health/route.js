@@ -6,6 +6,7 @@
 // exist yet, it does nothing (no false alarms).
 import { createClient } from '@supabase/supabase-js'
 import { sendAlert } from '../../../../lib/alert'
+import { computeHealth, renderHealthEmail, israelHour } from '../../../../lib/health'
 
 export const dynamic = 'force-dynamic'
 // force-no-store: supabase-js + internal calls go through fetch, which Next caches by
@@ -70,5 +71,37 @@ export async function GET(request) {
     try { await sendAlert({ subject: `🚨 VITAS: ייתכן שקרון נתקע`, html }) } catch {}
   }
 
-  return Response.json({ ok: true, utcH, inActiveWindow, status, alerted: stale.length })
+  // ── Per-branch data health: morning + evening digest, immediate alert on a NEW red. ──
+  // Wrapped so it can NEVER break the heartbeat watchdog above. Date-based dedup makes the
+  // digest robust to GitHub Actions lateness (fires on the first hourly run past the target).
+  let health = null
+  try {
+    health = await computeHealth(sb)
+    const dateIL = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
+    const hr = israelHour()
+    let st = null, tableOk = true
+    try {
+      const { data, error } = await sb.from('health_state').select('id, reds, last_morning, last_evening').eq('id', 1)
+      if (error) tableOk = false
+      else st = (data && data[0]) || { reds: [], last_morning: null, last_evening: null }
+    } catch { tableOk = false }
+    if (tableOk && st) {
+      const prevReds = Array.isArray(st.reds) ? st.reds : []
+      let lastMorning = st.last_morning, lastEvening = st.last_evening, sentDigest = false
+      if (hr >= 7 && hr < 14 && lastMorning !== dateIL) {
+        await sendAlert({ subject: `📊 VITAS בריאות מערכת (בוקר) — ${health.anyRed ? '⚠️ יש בעיות' : '✔️ הכל תקין'}`, html: renderHealthEmail(health, { digest: true }) })
+        lastMorning = dateIL; sentDigest = true
+      } else if (hr >= 20 && lastEvening !== dateIL) {
+        await sendAlert({ subject: `📊 VITAS בריאות מערכת (ערב) — ${health.anyRed ? '⚠️ יש בעיות' : '✔️ הכל תקין'}`, html: renderHealthEmail(health, { digest: true }) })
+        lastEvening = dateIL; sentDigest = true
+      }
+      if (!sentDigest && health.anyRed) {
+        const newReds = health.reds.filter(r => !prevReds.includes(r))
+        if (newReds.length) await sendAlert({ subject: `🔴 VITAS: ${newReds.length} ענפים נשברו`, html: renderHealthEmail({ ...health, reds: newReds }, { digest: false }) })
+      }
+      await sb.from('health_state').upsert({ id: 1, reds: health.reds, last_morning: lastMorning, last_evening: lastEvening, updated_at: new Date().toISOString() })
+    }
+  } catch { /* health branch is best-effort; never fail the watchdog */ }
+
+  return Response.json({ ok: true, utcH, inActiveWindow, status, alerted: stale.length, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
 }
