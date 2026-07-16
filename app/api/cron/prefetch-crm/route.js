@@ -49,10 +49,17 @@ export async function GET(request) {
     { id: 'q1', ...q(1,1,3,31) }, { id: 'q2', ...q(4,1,6,30) },
     { id: 'q3', ...q(7,1,9,30) }, { id: 'q4', ...q(10,1,12,31) },
   ]
-  const jobs = [
+  // Split support: /api/cron/prefetch-crm?only=months  or  ?only=ranges.
+  // BMBY SOAP is slow; months + 10 ranges together can exceed maxDuration (300s), which cut
+  // the later RANGE jobs and left their summaries stale (no crmRepRows). Running ranges in
+  // their own invocation gives them a full 300s budget so they complete + write fresh.
+  const only = (new URL(request.url).searchParams.get('only') || '').toLowerCase()
+  let jobs = [
     ...months.map(month => ({ kind: 'month', label: month, payload: { month } })),
     ...rangePresets.map(r => ({ kind: 'range', label: `${r.id} (${r.since}..${r.until})`, rangeId: r.id, payload: { since: r.since, until: r.until } })),
   ]
+  if (only === 'months') jobs = jobs.filter(j => j.kind === 'month')
+  else if (only === 'ranges') jobs = jobs.filter(j => j.kind === 'range')
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
