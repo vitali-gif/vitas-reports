@@ -1401,19 +1401,7 @@ const selectProject = async (client, project) => {
 
     let allCrmRows = [];
     crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
-    // ⚡ Fast path: if the heavy per-lead CRM rows aren't loaded yet, build the source
-    // breakdown from the cron-computed `summary` (same {totals, sources} shape) so the
-    // "מקורות הגעה" tab renders INSTANTLY. Deep-clone `sources` because the code below
-    // mutates it (merging Facebook keys) — must not corrupt the cached summary object.
-    let crmData;
-    if (allCrmRows.length) {
-      crmData = aggregateCrmRows(allCrmRows);
-    } else {
-      const _sm = crmReports.find(r => r.summary && r.summary.sources)?.summary;
-      crmData = _sm
-        ? { totals: { ..._sm }, sources: JSON.parse(JSON.stringify(_sm.sources || {})) }
-        : aggregateCrmRows([]);
-    }
+    const crmData = aggregateCrmRows(allCrmRows);
     const crmNamedLeads = crmReports[0]?.summary?.namedLeads || null;
     const _crmLeads = crmNamedLeads?.all || crmNamedLeads;  // v5: namedLeads nested under .all
 
