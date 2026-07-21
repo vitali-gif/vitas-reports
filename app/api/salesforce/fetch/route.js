@@ -1,0 +1,301 @@
+// API route: /api/salesforce/fetch
+//   POST — from the admin UI (auth via x-client-key header = anon key)
+//   GET  — from Vercel Cron (auth via Authorization: Bearer <CRON_SECRET>)
+//
+// Pulls KLOSS leads + opportunities from Salesforce, writes to Supabase.
+//
+// Verified schema (2026-06-22, live against beithasapa.my.salesforce.com):
+//   Chain filter  : Lead.Chain_Name__c = 'קלוס'  |  Opportunity.Cahin_Name__c = 'קלוס'  (note the typo "Cahin")
+//   Lead          : Status, LeadSource, Branch_Name__c, Salesman__c (-> Contact, Salesman__r.Name),
+//                   meetingDate__c (datetime), Unqualified_Reason__c, Competitor_Name__c, IsConverted
+//   Opportunity   : StageName (חדש / קיבל הצעת מחיר / הזמנה - שולמה מקדמה / נסגר ללא הצלחה),
+//                   TotalPrice_Opp_Product__c (deal value), ovala__c (delivery+assembly, shown separately),
+//                   Buying_Purpose__c, Branch_Name__c
+//   Products      : OpportunityLineItem -> Product2.Name (cabinet types)
+//   Response time : LeadHistory (Field='Status') — Lead.CreatedDate -> first status change
+//
+// All periods filter on CreatedDate (period reporting, same as the other clients).
+//
+// SAFETY: Salesforce data must ONLY be written to KLOSS-named projects. The dashboard
+// live-fetch calls every CRM route with the currently-open projectId for ALL clients, so
+// without this guard a Salesforce report could overwrite another client's project.
+//
+// Env vars: SF_CLIENT_ID, SF_CLIENT_SECRET, SF_REFRESH_TOKEN, SF_LOGIN_URL, SF_API_VERSION
+
+import { createClient } from '@supabase/supabase-js'
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 300
+
+const SF_LOGIN_URL = process.env.SF_LOGIN_URL || 'https://login.salesforce.com'
+const SF_API_VERSION = process.env.SF_API_VERSION || 'v60.0'
+const SF_SCHEMA_VERSION = 1
+
+const CHAIN = 'קלוס'
+const STAGE_PAID = 'הזמנה - שולמה מקדמה'
+const STAGE_QUOTE = 'קיבל הצעת מחיר'
+const STAGE_LOST = 'נסגר ללא הצלחה'
+
+function currentMonth() {
+  const now = new Date()
+  return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
+}
+function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n }
+function r0(v) { return Math.round(num(v)) }
+
+// ===== OAuth =====
+async function getAuth() {
+  const params = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: process.env.SF_CLIENT_ID,
+    client_secret: process.env.SF_CLIENT_SECRET,
+    refresh_token: process.env.SF_REFRESH_TOKEN,
+  })
+  const res = await fetch(`${SF_LOGIN_URL}/services/oauth2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params,
+  })
+  if (!res.ok) throw new Error(`SF token refresh ${res.status}: ${(await res.text()).slice(0, 300)}`)
+  const j = await res.json()
+  if (j.error) throw new Error(`SF OAuth ${j.error}: ${j.error_description || ''}`)
+  return { token: j.access_token, instance: j.instance_url }
+}
+
+// ===== SOQL =====
+async function soql(auth, q, maxPages = 10) {
+  const out = []
+  let url = `${auth.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`
+  let page = 0
+  while (url && page < maxPages) {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${auth.token}` }, cache: 'no-store' })
+    if (!res.ok) throw new Error(`SOQL ${res.status}: ${(await res.text()).slice(0, 300)}`)
+    const j = await res.json()
+    out.push(...(j.records || []))
+    url = j.done ? null : auth.instance + j.nextRecordsUrl
+    page++
+  }
+  return out
+}
+async function soqlCount(auth, q) {
+  const url = `${auth.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${auth.token}` }, cache: 'no-store' })
+  if (!res.ok) throw new Error(`SOQL ${res.status}: ${(await res.text()).slice(0, 300)}`)
+  const j = await res.json()
+  return j.totalSize || 0
+}
+function pairs(recs, keyField, countField) {
+  const m = {}
+  for (const r of recs) m[(r[keyField] === null || r[keyField] === undefined || r[keyField] === '') ? 'לא ידוע' : r[keyField]] = r[countField]
+  return m
+}
+
+// ===== main sync =====
+async function runSync(opts = {}) {
+  const { month, since: sinceOpt, until: untilOpt } = opts
+
+  if (!process.env.SF_CLIENT_ID || !process.env.SF_CLIENT_SECRET || !process.env.SF_REFRESH_TOKEN) {
+    return { status: 200, body: { ok: false, pending: true, message: 'Salesforce credentials not configured.' } }
+  }
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseKey) return { status: 500, body: { error: 'Missing Supabase credentials' } }
+  const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+
+  let since, until, m
+  if (sinceOpt && untilOpt) { since = sinceOpt; until = untilOpt; m = `${since}_${until}` }
+  else {
+    const mArg = month || currentMonth()
+    const [y, mm] = mArg.split('-').map(Number)
+    since = `${y}-${String(mm).padStart(2, '0')}-01`
+    const lastDay = new Date(y, mm, 0).getDate()
+    until = `${y}-${String(mm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    m = mArg
+  }
+  const FROM = `${since}T00:00:00Z`, TO = `${until}T23:59:59Z`
+
+  const { data: projects, error: projErr } = await supabase.from('projects').select('id, name, client_id')
+  if (projErr) return { status: 500, body: { error: 'Failed to load projects: ' + projErr.message } }
+  const projectsList = (projects || []).filter(p =>
+    (p.name || '').toLowerCase().includes('kloss') && (!opts.projectId || p.id === opts.projectId)
+  )
+  if (projectsList.length === 0) return { status: 200, body: { ok: false, message: 'No KLOSS project found in Supabase.' } }
+
+  let auth
+  try { auth = await getAuth() } catch (e) { return { status: 500, body: { error: 'SF OAuth failed: ' + e.message } } }
+
+  const LW = `Chain_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
+  const OW = `Cahin_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
+
+  let totalLeads, convertedLeads, meetingLeads, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
+  let oppStageR, oppBranchR, salesmenR, purposeR, productsR
+  try {
+    ;[totalLeads, convertedLeads, meetingLeads] = await Promise.all([
+      soqlCount(auth, `SELECT COUNT() FROM Lead WHERE ${LW}`),
+      soqlCount(auth, `SELECT COUNT() FROM Lead WHERE ${LW} AND IsConverted=true`),
+      soqlCount(auth, `SELECT COUNT() FROM Lead WHERE ${LW} AND meetingDate__c!=null`),
+    ])
+    ;[byStatusR, byBranchR, bySourceR, reasonsR, competitorsR] = await Promise.all([
+      soql(auth, `SELECT Status k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Status`),
+      soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Branch_Name__c`),
+      soql(auth, `SELECT LeadSource k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY LeadSource`),
+      soql(auth, `SELECT Unqualified_Reason__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Unqualified_Reason__c!=null GROUP BY Unqualified_Reason__c`),
+      soql(auth, `SELECT Competitor_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Competitor_Name__c!=null GROUP BY Competitor_Name__c`),
+    ])
+    ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR] = await Promise.all([
+      soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o FROM Opportunity WHERE ${OW} GROUP BY StageName`),
+      soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} GROUP BY Branch_Name__c`),
+      soql(auth, `SELECT Salesman__r.Name k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} AND StageName='${STAGE_PAID}' GROUP BY Salesman__r.Name`),
+      soql(auth, `SELECT Buying_Purpose__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Buying_Purpose__c!=null GROUP BY Buying_Purpose__c`),
+      soql(auth, `SELECT Product2.Name k, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Product2.Name`),
+    ])
+  } catch (e) {
+    return { status: 500, body: { error: 'Salesforce query failed: ' + e.message } }
+  }
+
+  // ===== response time from LeadHistory =====
+  let responseTime = { avgHours: 0, medianHours: 0, within1h: 0, within4h: 0, within24h: 0, measured: 0 }
+  try {
+    const hist = await soql(auth,
+      `SELECT LeadId, Lead.CreatedDate, CreatedDate FROM LeadHistory WHERE Field='Status' AND Lead.Chain_Name__c='${CHAIN}' AND Lead.CreatedDate>=${FROM} AND Lead.CreatedDate<=${TO} ORDER BY LeadId, CreatedDate`, 8)
+    const first = {}
+    for (const h of hist) if (!(h.LeadId in first)) first[h.LeadId] = { lc: h.Lead && h.Lead.CreatedDate, hc: h.CreatedDate }
+    const hrs = Object.values(first).map(v => (new Date(v.hc) - new Date(v.lc)) / 3.6e6).filter(h => h >= 0).sort((a, b) => a - b)
+    const n = hrs.length
+    if (n) {
+      responseTime = {
+        measured: n,
+        avgHours: Math.round((hrs.reduce((s, h) => s + h, 0) / n) * 10) / 10,
+        medianHours: Math.round(hrs[Math.floor(n / 2)] * 10) / 10,
+        within1h: Math.round(hrs.filter(h => h <= 1).length / n * 100),
+        within4h: Math.round(hrs.filter(h => h <= 4).length / n * 100),
+        within24h: Math.round(hrs.filter(h => h <= 24).length / n * 100),
+      }
+    }
+  } catch (e) { responseTime.error = e.message }
+
+  // ===== shape =====
+  const byStatus = pairs(byStatusR, 'k', 'c')
+  const byBranchLeads = pairs(byBranchR, 'k', 'c')
+  const bySourceLeads = pairs(bySourceR, 'k', 'c')
+  const reasons = pairs(reasonsR, 'k', 'c')
+  const competitors = pairs(competitorsR, 'k', 'c')
+  const buyingPurpose = pairs(purposeR, 'k', 'c')
+
+  let opportunities = 0, quotes = 0, paid = 0, lost = 0, dealValue = 0, deliveryValue = 0
+  const byStage = {}
+  for (const r of oppStageR) {
+    const st = r.k || 'לא ידוע'
+    byStage[st] = { count: r.c, value: r0(r.v), delivery: r0(r.o) }
+    opportunities += r.c
+    if (st === STAGE_PAID) { paid = r.c; dealValue = r0(r.v); deliveryValue = r0(r.o) }
+    else if (st === STAGE_QUOTE) quotes = r.c
+    else if (st === STAGE_LOST) lost = r.c
+  }
+  // quotes = reached quote stage or beyond (quote + paid)
+  const quotesTotal = quotes + paid
+
+  const branches = {}
+  for (const k of Object.keys(byBranchLeads)) branches[k] = { leads: byBranchLeads[k], opportunities: 0, value: 0 }
+  for (const r of oppBranchR) {
+    const k = r.k || 'לא ידוע'
+    if (!branches[k]) branches[k] = { leads: 0, opportunities: 0, value: 0 }
+    branches[k].opportunities = r.c
+    branches[k].value = r0(r.v)
+  }
+
+  const salesmen = salesmenR.map(r => ({
+    name: r.k || 'לא ידוע', orders: r.c, value: r0(r.v),
+    avgDeal: r.c ? Math.round(num(r.v) / r.c) : 0,
+  })).sort((a, b) => b.value - a.value)
+
+  const products = productsR.map(r => ({ name: r.k || 'לא ידוע', units: r.c, value: r0(r.v) }))
+    .sort((a, b) => b.units - a.units)
+
+  const conversionRate = totalLeads ? Math.round((paid / totalLeads) * 1000) / 10 : 0
+  const avgDealValue = paid ? Math.round(dealValue / paid) : 0
+
+  // xlsxRows for aggregateCrmRows compatibility (source-level)
+  const xlsxRows = Object.entries(bySourceLeads).map(([source, c]) => ({
+    source, totalLeads: c, relevantLeads: c, irrelevantLeads: 0,
+    meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0,
+    registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0,
+  }))
+
+  const summary = {
+    crmType: 'salesforce',
+    chain: CHAIN,
+    totalLeads,
+    convertedLeads,
+    unconvertedLeads: totalLeads - convertedLeads,
+    meetingsScheduled: meetingLeads,
+    relevantLeads: totalLeads,
+    irrelevantLeads: 0,
+    byStatus,
+    bySource: bySourceLeads,
+    byBranch: branches,
+    reasons,
+    competitors,
+    buyingPurpose,
+    products,
+    salesmen,
+    responseTime,
+    funnel: {
+      leads: totalLeads,
+      meetings: meetingLeads,
+      opportunities,
+      quotes: quotesTotal,
+      paid,
+      lost,
+      conversionRate,
+      dealValue,
+      deliveryValue,
+      avgDealValue,
+      byStage,
+    },
+    deals: { opportunities, closed: paid, closingRate: conversionRate, revenue: dealValue, avgDealValue },
+    schemaVersion: SF_SCHEMA_VERSION,
+  }
+
+  const results = []
+  for (const p of projectsList) {
+    const { error: upErr } = await supabase.from('reports').upsert({
+      project_id: p.id, source: 'crm', month: m,
+      data: xlsxRows, summary, file_name: 'Salesforce CRM (live)', row_count: totalLeads,
+    }, { onConflict: 'project_id,source,month' })
+    if (upErr) results.push({ project: p.name, error: upErr.message })
+    else results.push({ project: p.name, leads: totalLeads, opportunities, paid, ok: true })
+  }
+  return { status: 200, body: { ok: true, month: m, totalLeads, opportunities, quotes: quotesTotal, paid, dealValue, projects: results } }
+}
+
+// ===== handlers =====
+function isValidDate(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }
+
+export async function POST(request) {
+  const anon = request.headers.get('x-client-key')
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  let body = {}
+  try { body = await request.json() } catch {}
+  if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) {
+    return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
+  }
+  try {
+    const { status, body: rb } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId })
+    return Response.json(rb, { status })
+  } catch (e) {
+    return Response.json({ error: 'runSync threw: ' + (e.message || String(e)) }, { status: 500 })
+  }
+}
+
+export async function GET(request) {
+  const auth = request.headers.get('authorization') || ''
+  const bearer = auth.replace(/^Bearer\s+/i, '')
+  if (process.env.CRON_SECRET && bearer === process.env.CRON_SECRET) {
+    const { status, body: rb } = await runSync()
+    return Response.json(rb, { status })
+  }
+  return Response.json({ ok: true, configured: Boolean(process.env.SF_CLIENT_ID && process.env.SF_CLIENT_SECRET && process.env.SF_REFRESH_TOKEN) })
+}

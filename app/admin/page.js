@@ -289,6 +289,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     if (crm) {
       callList.push({ key: 'crm',  url: '/api/bmby/fetch' });
       callList.push({ key: 'zoho', url: '/api/zoho/fetch' });
+      callList.push({ key: 'salesforce', url: '/api/salesforce/fetch' });
     }
     if (callList.length === 0) {
       if (!isBackground) setRefreshing(false);

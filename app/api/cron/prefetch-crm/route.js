@@ -78,6 +78,10 @@ export async function GET(request) {
       ? null
       : fetch(`${base}/api/zoho/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
           .then(r => r.json()).catch(() => ({}))
+    // Salesforce (KLOSS) in parallel — it only writes to KLOSS-named projects. Uses SOQL
+    // aggregates, so quarters are fine (no record-count limit like Zoho).
+    const sfPromise = fetch(`${base}/api/salesforce/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
+      .then(r => r.json()).catch(() => ({}))
     try {
       // cache:'no-store' — see prefetch-ads: without it these internal calls came back from
       // cache in milliseconds and no fresh data / heartbeat was written.
@@ -94,6 +98,10 @@ export async function GET(request) {
         results.push({ kind: job.kind, label: job.label, source: 'zoho', ok: zohoData.ok ?? false, ms: Date.now()-t0, ...zohoData })
       } catch {}
     }
+    try {
+      const sfData = await sfPromise
+      results.push({ kind: job.kind, label: job.label, source: 'salesforce', ok: sfData.ok ?? false, ms: Date.now()-t0, ...sfData })
+    } catch {}
   }
 
   // Concurrency 2 — gentle on BMBY SOAP
