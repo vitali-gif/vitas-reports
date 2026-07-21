@@ -1023,6 +1023,25 @@ async function runSync(opts = {}) {
       if (upsertErr) errors.push('upsert: ' + upsertErr.message)
     }
 
+    // DEBUG: locate specific leads by phone (searches every field) and dump their record + tasks,
+    // to reverse-engineer BMBY's "לידים לטיפול" definition against ground truth.
+    const _dbgPhones = Array.isArray(opts.debugPhones) ? opts.debugPhones.map(x => String(x).replace(/\D/g, '')).filter(Boolean) : []
+    let _phoneDump
+    if (_dbgPhones.length) {
+      _phoneDump = []
+      for (const c of clients) {
+        const digits = JSON.stringify(c).replace(/\D/g, '')
+        const hit = _dbgPhones.find(ph => ph.length >= 7 && digits.includes(ph))
+        if (!hit) continue
+        const cid = String(c.client_id || '')
+        _phoneDump.push({
+          matchedPhone: hit,
+          client: c,
+          tasks: (tasksByClient.get(cid) || []).map(t => ({ type: t.type, subject: (t.subject || '').toString().slice(0, 60), status: t.status, create_date: t.create_date, start_date: t.start_date })),
+        })
+      }
+    }
+
     return {
       project: p.name,
       bmbyProjectId: bmbyPid,
@@ -1043,6 +1062,7 @@ async function runSync(opts = {}) {
       sources,
       errors: errors.length ? errors : undefined,
       debug: Object.keys(debug).length ? debug : undefined,
+      phoneDump: _phoneDump,
       apptStatusDebug,
       apptByCoord: _apptByCoord,
       apptByDate: _apptByDate,
@@ -1099,6 +1119,7 @@ export async function POST(request) {
       since: body.since,
       until: body.until,
       projectId: body.projectId,
+      debugPhones: body.debugPhones,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
