@@ -872,12 +872,15 @@ async function runSync(opts = {}) {
 
     // Build namedLeads arrays — used by the dashboard's clickable KPI cards modal
     const _noResponseCids = new Set()
+    const _noRespInclUpdate = new Set() // variant: counts "Update Info Lead" as handling (to match BMBY "לידים לטיפול")
+    const _noRespAnyTask = new Set()    // variant: any non-lid task at all, ignoring timestamp order
     for (const lid of aprilLids) {
       const cid = String(lid.client_id || '')
       if (!cid) continue
       const lidMs = parseTs(lid.create_date || lid.start_date)
       if (isNaN(lidMs)) continue
-      const hasFollowup = (tasksByClient.get(cid) || []).some(t => {
+      const _tasks = tasksByClient.get(cid) || []
+      const hasFollowup = _tasks.some(t => {
         if ((t.type || '').toString().toLowerCase() === 'lid') return false
         const subj = (t.subject || '').toString().trim().toLowerCase()
         if (subj === 'update info lead') return false
@@ -885,6 +888,14 @@ async function runSync(opts = {}) {
         return !isNaN(tMs) && tMs >= lidMs
       })
       if (!hasFollowup) _noResponseCids.add(cid)
+      const hasAnyInclUpdate = _tasks.some(t => {
+        if ((t.type || '').toString().toLowerCase() === 'lid') return false
+        const tMs = parseTs(t.create_date || t.start_date)
+        return !isNaN(tMs) && tMs >= lidMs
+      })
+      if (!hasAnyInclUpdate) _noRespInclUpdate.add(cid)
+      const hasAnyTask = _tasks.some(t => (t.type || '').toString().toLowerCase() !== 'lid')
+      if (!hasAnyTask) _noRespAnyTask.add(cid)
     }
     // Classify each lid by source platform for per-tab filtering
     const _isFbLid   = (lid) => /\u05e4\u05d9\u05d9\u05e1\u05d1\u05d5\u05e7|facebook/i.test(lid.media_title || '')
@@ -1036,6 +1047,7 @@ async function runSync(opts = {}) {
       apptByCoord: _apptByCoord,
       apptByDate: _apptByDate,
       uniqueByDate: { scheduled: new Set(_meetRecs.sched.map(r => r.cid)).size, completed: new Set(_meetRecs.comp.map(r => r.cid)).size, cancelled: new Set(_meetRecs.canc.map(r => r.cid)).size },
+      noRespVariants: { strict: _noResponseCids.size, inclUpdateInfo: _noRespInclUpdate.size, anyTaskEver: _noRespAnyTask.size },
       byDateRelevant: { scheduled: _meetRecs.sched.filter(r => clientRelevant.get(r.cid)).length, completed: _meetRecs.comp.filter(r => clientRelevant.get(r.cid)).length },
       uniqueByDateRelevant: { scheduled: new Set(_meetRecs.sched.filter(r => clientRelevant.get(r.cid)).map(r => r.cid)).size, completed: new Set(_meetRecs.comp.filter(r => clientRelevant.get(r.cid)).map(r => r.cid)).size },
       completedMeetingSamples,
