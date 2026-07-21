@@ -282,11 +282,14 @@ async function runSync(opts = {}) {
 
     const commonParams = { Login: login, Password: password, ProjectID: parseInt(bmbyPid), UniqID: 1, FromDate: since, ToDate: until, Dynamic: 1 }
     // Each service runs paginated with up to 10 pages of 3000 rows. Per-service total budget 45s.
+    // Fast diagnostic path: clients only (skips the heavy tasks/prices/contracts calls),
+    // used to inspect the BMBY `client_stage` field ("לידים לטיפול") without a full sync.
+    const _stagesOnly = !!opts.stagesOnly
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
       withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4), 45000, 'clients'),
-      withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 10), 45000, 'tasks'),
-      withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 45000, 'price_offers'),
-      withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 45000, 'contracts'),
+      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 10), 45000, 'tasks'),
+      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 45000, 'price_offers'),
+      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 45000, 'contracts'),
     ])
 
     const safeRows = (r) => (r.status === 'fulfilled' && Array.isArray(r.value?.rows)) ? r.value.rows : []
@@ -294,6 +297,17 @@ async function runSync(opts = {}) {
     const tasks     = safeRows(tasksR)
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
+
+    if (_stagesOnly) {
+      const _dist = {}, _stageXstatus = {}
+      for (const c of clients) {
+        const st = String(c.client_stage || '(empty)')
+        _dist[st] = (_dist[st] || 0) + 1
+        const k = st + ' | ' + String(c.status || '(empty)') + ' | relevant=' + String(c.relevant || '')
+        _stageXstatus[k] = (_stageXstatus[k] || 0) + 1
+      }
+      return { project: p.name, stagesOnly: true, totalClients: clients.length, stageDist: _dist, stageXstatus: _stageXstatus }
+    }
 
     const errors = []
     const debug = {}
@@ -1120,6 +1134,7 @@ export async function POST(request) {
       until: body.until,
       projectId: body.projectId,
       debugPhones: body.debugPhones,
+      stagesOnly: body.stagesOnly,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
