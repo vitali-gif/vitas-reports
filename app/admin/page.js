@@ -2067,6 +2067,32 @@ const selectProject = async (client, project) => {
       </>);
     };
 
+    // ===== KLOSS / Salesforce =====
+    const sfKpiCards = (fn, rt, spend, prevSpend) => {
+      const leads = fn.leads || 0, opp = fn.opportunities || 0, quotes = fn.quotes || 0, paid = fn.paid || 0;
+      const dealValue = fn.dealValue || 0, delivery = fn.deliveryValue || 0;
+      const avgDeal = fn.avgDealValue || 0, conv = fn.conversionRate || 0;
+      const cpl = leads > 0 ? spend / leads : 0;
+      const cpo = paid > 0 ? spend / paid : 0;
+      const roas = spend > 0 ? (dealValue / 1.18) / spend : 0;
+      return (<>
+        {kpi('תקציב שנוצל', formatCurrency(spend), '', spend, prevSpend, true)}
+        {kpi('לידים', formatNum(leads), 'green', leads, null)}
+        {kpi('פגישות שנקבעו', formatNum(fn.meetings || 0), 'cyan', fn.meetings || 0, null)}
+        {kpi('הזדמנויות', formatNum(opp), 'cyan', opp, null)}
+        {kpi('הצעות מחיר', formatNum(quotes), 'orange', quotes, null)}
+        {kpi('הזמנות (שולמה מקדמה)', formatNum(paid), 'purple', paid, null)}
+        {kpi('אחוז המרה', (conv || 0) + '%', 'orange', conv, null)}
+        {kpi('שווי עסקאות', formatCurrencyCompact(dealValue), 'pink', dealValue, null)}
+        {kpi('ערך ממוצע לעסקה', formatCurrency(avgDeal), '', avgDeal, null)}
+        {kpi('הובלה והרכבה', formatCurrencyCompact(delivery), '', delivery, null)}
+        {spend > 0 ? kpi('עלות לליד', formatCurrency(cpl), 'purple', cpl, null, true) : null}
+        {spend > 0 ? kpi('עלות להזמנה', formatCurrency(cpo), 'red', cpo, null, true) : null}
+        {spend > 0 ? kpi('ROAS לא כולל מע"מ', roas.toFixed(2) + 'x', 'green', roas, null) : null}
+        {rt && rt.measured ? kpi('זמן תגובה חציוני', (rt.medianHours || 0) + 'ש\u05f3', 'amber', rt.medianHours, null, true) : null}
+      </>);
+    };
+
     const buildTable = (items, prevItems, labelName, tableId, source = '') => {
       if (!items || Object.keys(items).length === 0) return null;
       const cols = [{key:'name',label:labelName,get:(_,n)=>n},{key:'clicks',label:'קליקים',get:d=>d.clicks,higher:true},{key:'impressions',label:'חשיפות',get:d=>d.impressions,higher:true},{key:'cpc',label:'עלות לקליק',get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},{key:'ctr',label:'CTR',get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},{key:'cpm',label:'CPM',get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},{key:'leads',label:'לידים',get:d=>d.leads,higher:true},{key:'cpl',label:'עלות לליד',get:d=>d.leads>0?d.spend/d.leads:0,higher:false},{key:'spend',label:'תקציב שנוצל',get:d=>d.spend}];
@@ -2726,6 +2752,109 @@ const selectProject = async (client, project) => {
           const _zohoRep = currentReports.find(r => r.source === 'crm')
           const _isZoho = _zohoRep?.summary?.crmType === 'zoho'
 
+          // ===== KLOSS / Salesforce CRM tab =====
+          if (_zohoRep?.summary?.crmType === 'salesforce') {
+            const _s = _zohoRep.summary || {}
+            const _f = _s.funnel || {}
+            const _rt = _s.responseTime || {}
+            const ent = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1])
+            const _branches = Object.entries(_s.byBranch || {})
+              .map(([name, v]) => ({ name, ...v }))
+              .filter(b => (b.leads || 0) + (b.opportunities || 0) > 0)
+              .sort((a, b) => (b.leads || 0) - (a.leads || 0))
+            const _sources = ent(_s.bySource)
+            const _statuses = ent(_s.byStatus)
+            const _reasons = ent(_s.reasons)
+            const _competitors = ent(_s.competitors)
+            const _products = (_s.products || []).slice(0, 15)
+            const _salesmen = (_s.salesmen || []).slice(0, 15)
+            const th = { textAlign: 'right', padding: '8px 10px', fontSize: 12, color: '#64748b', fontWeight: 500, borderBottom: '1px solid #e2e8f0' }
+            const td = { textAlign: 'right', padding: '8px 10px', fontSize: 13, borderBottom: '1px solid #f1f5f9' }
+            const card = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }
+            const h4s = { margin: '0 0 10px', fontSize: 15, fontWeight: 600 }
+            const simpleTable = (title, rows, col1, col2) => (
+              <div style={card}>
+                <h4 style={h4s}>{title}</h4>
+                {rows.length === 0 ? <div style={{ color: '#94a3b8', fontSize: 13 }}>אין נתונים</div> : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr><th style={th}>{col1}</th><th style={th}>{col2}</th></tr></thead>
+                    <tbody>{rows.map(([k, v]) => (
+                      <tr key={k}><td style={td}>{k}</td><td style={td}>{formatNum(v)}</td></tr>
+                    ))}</tbody>
+                  </table>
+                )}
+              </div>
+            )
+            return (<>
+              <div style={card}>
+                <h4 style={h4s}>משפך לפי סניף</h4>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr><th style={th}>סניף</th><th style={th}>לידים</th><th style={th}>הזדמנויות</th><th style={th}>שווי</th></tr></thead>
+                  <tbody>{_branches.map(b => (
+                    <tr key={b.name}>
+                      <td style={td}>{b.name}</td>
+                      <td style={td}>{formatNum(b.leads || 0)}</td>
+                      <td style={td}>{formatNum(b.opportunities || 0)}</td>
+                      <td style={td}>{formatCurrencyCompact(b.value || 0)}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+
+              <div style={card}>
+                <h4 style={h4s}>זמני תגובה</h4>
+                {_rt.measured ? (
+                  <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13 }}>
+                    <div>ממוצע: <b>{_rt.avgHours}ש׳</b></div>
+                    <div>חציון: <b>{_rt.medianHours}ש׳</b></div>
+                    <div>תוך שעה: <b>{_rt.within1h}%</b></div>
+                    <div>תוך 4 שעות: <b>{_rt.within4h}%</b></div>
+                    <div>תוך 24 שעות: <b>{_rt.within24h}%</b></div>
+                    <div style={{ color: '#94a3b8' }}>({formatNum(_rt.measured)} לידים)</div>
+                  </div>
+                ) : <div style={{ color: '#94a3b8', fontSize: 13 }}>אין נתונים</div>}
+              </div>
+
+              <div style={card}>
+                <h4 style={h4s}>ביצועי אנשי מכירות</h4>
+                {_salesmen.length === 0 ? <div style={{ color: '#94a3b8', fontSize: 13 }}>אין נתונים</div> : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr><th style={th}>איש מכירות</th><th style={th}>הזמנות</th><th style={th}>שווי</th><th style={th}>ממוצע לעסקה</th></tr></thead>
+                    <tbody>{_salesmen.map(a => (
+                      <tr key={a.name}>
+                        <td style={td}>{a.name}</td>
+                        <td style={td}>{formatNum(a.orders)}</td>
+                        <td style={td}>{formatCurrencyCompact(a.value)}</td>
+                        <td style={td}>{formatCurrency(a.avgDeal)}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                )}
+              </div>
+
+              <div style={card}>
+                <h4 style={h4s}>מוצרים</h4>
+                {_products.length === 0 ? <div style={{ color: '#94a3b8', fontSize: 13 }}>אין נתונים</div> : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr><th style={th}>מוצר</th><th style={th}>כמות</th><th style={th}>שווי</th></tr></thead>
+                    <tbody>{_products.map(pr => (
+                      <tr key={pr.name}>
+                        <td style={td}>{pr.name}</td>
+                        <td style={td}>{formatNum(pr.units)}</td>
+                        <td style={td}>{formatCurrencyCompact(pr.value)}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                )}
+              </div>
+
+              {simpleTable('מקורות הגעה', _sources, 'מקור', 'לידים')}
+              {simpleTable('סטטוסי לידים', _statuses, 'סטטוס', 'לידים')}
+              {simpleTable('סיבות אי-המרה', _reasons, 'סיבה', 'לידים')}
+              {simpleTable('מתחרים', _competitors, 'מתחרה', 'לידים')}
+            </>)
+          }
+
           if (_isZoho) {
             const _zs = _zohoRep.summary
             const _rt = _zs.responseTime || {}
@@ -2890,20 +3019,24 @@ const selectProject = async (client, project) => {
               : { leads:_zf.leads, opportunities:_zf.opportunities, purchased:_zf.purchased, cancellations:_zf.cancellations, netRevenue:_zf.netRevenue, conversionRate:_zf.conversionRate };
             return zohoKpiCards(_scope, activeT.spend || 0, activeP?.spend);
           })() : null}
-          {crmReports[0]?.summary?.crmType !== 'zoho' && (<>
+          {crmReports[0]?.summary?.crmType === 'salesforce' ? (() => {
+            const _sr = (crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {};
+            return sfKpiCards(_sr.funnel || {}, _sr.responseTime || {}, activeT.spend || 0, activeP?.spend);
+          })() : null}
+          {!['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) && (<>
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
           {dashTab === 'all' ? kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(totalLeadsWithCrm)), 'green', totalLeadsWithCrm, activeP != null ? (activeP.leads + prevCrmTotalLeads) : null, false, _tabCrmLeads?.allLeads) : kpi('\u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(Math.round(activeT.leads)), 'green', activeT.leads, activeP?.leads, false, _tabCrmLeads?.allLeads)}
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(dashTab === 'all' ? (totalLeadsWithCrm > 0 ? activeT.spend / totalLeadsWithCrm : 0) : activeT.cpl), 'purple', (dashTab === 'all' ? (totalLeadsWithCrm > 0 ? activeT.spend / totalLeadsWithCrm : 0) : activeT.cpl), (dashTab === 'all' ? (activeP ? ((activeP.leads + prevCrmTotalLeads) > 0 ? activeP.spend / (activeP.leads + prevCrmTotalLeads) : 0) : null) : (activeP?.cpl ?? null)), true)}
           {crmReports[0]?.summary?.crmType === 'zoho' ? kpi('עלות ממוצעת לקליק', formatCurrency(activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0), 'amber', activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0, (activeP && activeP.clicks > 0 ? activeP.spend / activeP.clicks : null), true) : null}
           {crmReports[0]?.summary?.crmType === 'zoho' ? kpi('אחוז המרה', (activeT.convRate || 0).toFixed(2) + '%', 'cyan', activeT.convRate || 0, activeP?.convRate || null) : null}
-          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled) : null}
-          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted) : null}
-          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לפגישה שבוצעה', (crmTotals?.meetingsCompleted > 0) ? formatCurrency(activeT.spend / crmTotals.meetingsCompleted) : '—', 'purple', (crmTotals?.meetingsCompleted > 0) ? activeT.spend / crmTotals.meetingsCompleted : 0, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
-          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
-          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
-          {crmTotals && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
-          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
-          {activeT.spend > 0 && crmReports[0]?.summary?.crmType !== 'zoho' ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          {crmTotals && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled) : null}
+          {crmTotals && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted) : null}
+          {activeT.spend > 0 && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('עלות לפגישה שבוצעה', (crmTotals?.meetingsCompleted > 0) ? formatCurrency(activeT.spend / crmTotals.meetingsCompleted) : '—', 'purple', (crmTotals?.meetingsCompleted > 0) ? activeT.spend / crmTotals.meetingsCompleted : 0, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
+          {crmTotals && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
+          {activeT.spend > 0 && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
+          {crmTotals && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
+          {activeT.spend > 0 && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
+          {activeT.spend > 0 && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
           </>)}
         </div>
 
@@ -2926,6 +3059,25 @@ const selectProject = async (client, project) => {
               const isFlat = delta === 0;
               return <span className={`kpi-trend${isFlat ? ' flat' : ''}`} style={{fontSize:10,padding:'2px 6px',marginTop:4,display:'inline-block'}}>{arrow} {sign}{absDelta} ({isFlat ? '0%' : (delta > 0 ? '+' : '-') + pctStr})</span>;
             };
+            if (crmReports[0]?.summary?.crmType === 'salesforce') {
+              const _sr = (crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {};
+              const _f = _sr.funnel || {};
+              const sL = _f.leads || 0, sM = _f.meetings || 0, sO = _f.opportunities || 0, sQ = _f.quotes || 0, sP = _f.paid || 0;
+              const AR2 = (<div className="farrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>);
+              return (
+                <div className="funnel" style={{gridTemplateColumns:'1fr 14px 1fr 14px 1fr 14px 1fr 14px 1fr'}}>
+                  <div className="fstep terra"><div className="flabel">לידים</div><div className="fvalue">{formatNum(sL)}</div><div className="frate"><span className="pct">100%</span></div></div>
+                  {AR2}
+                  <div className="fstep sky"><div className="flabel">פגישות</div><div className="fvalue">{formatNum(sM)}</div><div className="frate"><span className="pct">{sL > 0 ? (sM / sL * 100).toFixed(0) + '%' : '-'}</span> מלידים</div></div>
+                  {AR2}
+                  <div className="fstep emerald"><div className="flabel">הזדמנויות</div><div className="fvalue">{formatNum(sO)}</div><div className="frate"><span className="pct">{sL > 0 ? (sO / sL * 100).toFixed(0) + '%' : '-'}</span> מלידים</div></div>
+                  {AR2}
+                  <div className="fstep"><div className="flabel">הצעות מחיר</div><div className="fvalue">{formatNum(sQ)}</div><div className="frate"><span className="pct">{sO > 0 ? (sQ / sO * 100).toFixed(0) + '%' : '-'}</span> מהזדמנויות</div></div>
+                  {AR2}
+                  <div className="fstep rose"><div className="flabel">הזמנות</div><div className="fvalue">{formatNum(sP)}</div><div className="frate"><span className="pct">{sQ > 0 ? (sP / sQ * 100).toFixed(0) + '%' : '-'}</span> מהצעות</div></div>
+                </div>
+              );
+            }
             if (crmReports[0]?.summary?.crmType === 'zoho') {
               const _zr = (crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {};
               const _zf = _zr.funnel || {};
@@ -2949,7 +3101,7 @@ const selectProject = async (client, project) => {
                 </div>
               );
             }
-            return (crmTotals && crmReports[0]?.summary?.crmType !== 'zoho') ? (
+            return (crmTotals && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType)) ? (
             <div className="funnel">
               <div className="fstep sky">
                 <div className="flabel">קליקים</div>
