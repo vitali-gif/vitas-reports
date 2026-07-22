@@ -2897,32 +2897,40 @@ const selectProject = async (client, project) => {
                           <td className="sub">{b.topSalesman || '—'}</td>
                         </tr>
                         {open && (<tr><td colSpan={9} style={{background:'#f8fafc',padding:'14px 18px'}}>
-                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:20,width:'100%'}}>
-                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px'}}>
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:20,width:'100%'}}>
+                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אנשי מכירות</div>
-                              {(b.salesmen || []).length === 0 ? <div className="sub">—</div> : (b.salesmen || []).map(a => (
-                                <div key={a.name} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,fontSize:13,padding:'3px 0',borderBottom:'1px solid #f1f5f9'}}>
-                                  <span style={{fontWeight:600}}>{a.name}</span>
-                                  <span style={{whiteSpace:'nowrap',color:'#475569'}}>{formatNum(a.orders)} · {formatCurrencyCompact(a.value)}</span>
-                                </div>
-                              ))}
+                              {(b.salesmen || []).length === 0 ? <div className="sub">—</div> : (
+                                <table className="data-table" style={{width:'100%'}}>
+                                  <thead><tr><th>שם</th><th>לידים</th><th>פגישות</th><th>% לפגישה</th><th>עסקאות</th><th>שווי</th><th>% לעסקה</th></tr></thead>
+                                  <tbody>{(b.salesmen || []).map(a => (
+                                    <tr key={a.name}>
+                                      <td style={{fontWeight:600}}>{a.name}</td>
+                                      <td>{formatNum(a.leads || 0)}</td>
+                                      <td>{formatNum(a.meetings || 0)}</td>
+                                      <td style={{color:'var(--violet)'}}>{(a.convToMeeting || 0) + '%'}</td>
+                                      <td style={{fontWeight:600}}>{formatNum(a.orders || 0)}</td>
+                                      <td>{formatCurrencyCompact(a.value || 0)}</td>
+                                      <td style={{color:'var(--violet)'}}>{(a.convToDeal || 0) + '%'}</td>
+                                    </tr>
+                                  ))}</tbody>
+                                </table>
+                              )}
                             </div>
-                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px'}}>
+                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>מוצרים מובילים</div>
-                              {(b.products || []).length === 0 ? <div className="sub">—</div> : (b.products || []).map(pr => (
-                                <div key={pr.name} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,fontSize:13,padding:'3px 0',borderBottom:'1px solid #f1f5f9'}}>
-                                  <span>{pr.name}</span>
-                                  <span style={{whiteSpace:'nowrap',fontWeight:600}}>{formatNum(pr.units)}</span>
-                                </div>
-                              ))}
-                            </div>
-                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px'}}>
-                              <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אחוזי המרה</div>
-                              {[['ליד → פגישה', b.convLeadToMeeting + '%'],['פגישה → הזדמנות', b.convMeetingToOpp + '%'],['הזדמנות → רכישה', b.convOppToPaid + '%'],['ממוצע לעסקה', formatCurrency(b.avgDeal)],['לא הגיעו לפגישה', formatNum(b.noShow)]].map(([k, v]) => (
-                                <div key={k} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,fontSize:13,padding:'3px 0',borderBottom:'1px solid #f1f5f9'}}>
-                                  <span>{k}</span><span style={{fontWeight:600,whiteSpace:'nowrap'}}>{v}</span>
-                                </div>
-                              ))}
+                              {(b.products || []).length === 0 ? <div className="sub">—</div> : (
+                                <table className="data-table" style={{width:'100%'}}>
+                                  <thead><tr><th>מוצר</th><th>כמות</th><th>שווי כולל</th></tr></thead>
+                                  <tbody>{(b.products || []).map(pr => (
+                                    <tr key={pr.name}>
+                                      <td style={{fontWeight:600}}>{pr.name}</td>
+                                      <td>{formatNum(pr.units)}</td>
+                                      <td>{formatCurrencyCompact(pr.value || 0)}</td>
+                                    </tr>
+                                  ))}</tbody>
+                                </table>
+                              )}
                             </div>
                           </div>
                         </td></tr>)}
@@ -2978,9 +2986,20 @@ const selectProject = async (client, project) => {
                 <div className="section-head">{ICO('violet', "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2")}<h2>ביצועי אנשי מכירות</h2><span className="sub">כלל הרשת</span></div>
                 <div className="table-wrapper">
                   <table className="data-table">
-                    <thead><tr><th>איש מכירות</th><th>הזמנות</th><th>שווי</th><th>ממוצע לעסקה</th></tr></thead>
+                    <thead><tr><th>איש מכירות</th><th>לידים</th><th>פגישות</th><th>הזדמנויות</th><th>הצעות</th><th>שווי הצעות</th><th>מכירות</th><th>שווי מכירות</th><th>ממוצע לעסקה</th><th>% לעסקה</th></tr></thead>
                     <tbody>{_salesmen.map(a => (
-                      <tr key={a.name}><td style={{fontWeight:600}}>{a.name}</td><td>{formatNum(a.orders)}</td><td>{formatCurrencyCompact(a.value)}</td><td>{formatCurrency(a.avgDeal)}</td></tr>
+                      <tr key={a.name}>
+                        <td style={{fontWeight:600}}>{a.name}</td>
+                        <td>{formatNum(a.leads || 0)}</td>
+                        <td>{formatNum(a.meetings || 0)}</td>
+                        <td>{formatNum(a.opportunities || 0)}</td>
+                        <td>{formatNum(a.quotesTotal || 0)}</td>
+                        <td>{formatCurrencyCompact(a.quotesValueTotal || 0)}</td>
+                        <td style={{fontWeight:600}}>{formatNum(a.orders || 0)}</td>
+                        <td>{formatCurrencyCompact(a.value || 0)}</td>
+                        <td>{formatCurrency(a.avgDeal || 0)}</td>
+                        <td style={{color:'var(--violet)',fontWeight:600}}>{(a.convToDeal || 0) + '%'}</td>
+                      </tr>
                     ))}</tbody>
                   </table>
                 </div>
