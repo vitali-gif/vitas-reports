@@ -2783,10 +2783,14 @@ const selectProject = async (client, project) => {
             const _lost = _f.notInterested || 0
             const _untreated = Object.entries(_s.byStatus || {}).reduce((a, [k, v]) => a + (/^(new|חדש)$/i.test(String(k).trim()) ? v : 0), 0)
             const _cpl = _leads > 0 ? _spend / _leads : 0
+            const _clicks = ((fbTotals && fbTotals.clicks) || 0) + ((gTotals && gTotals.clicks) || 0)
+            const _costArrived = _arrived2 > 0 ? _spend / _arrived2 : 0
+            const _costCustomer = _paid > 0 ? _spend / _paid : 0
 
-            const CARD = (label, value, color, info, cur) => (
+            const CARD = (label, value, color, info, cur, sub) => (
               <div key={label} style={{position:'relative'}}>
                 {kpi(label, value, color, cur === undefined ? null : cur, null)}
+                {sub ? (<span style={{position:'absolute',bottom:9,insetInlineStart:13,fontSize:11,fontWeight:600,color:'rgba(255,255,255,.9)',letterSpacing:'.2px'}}>{sub}</span>) : null}
                 <span role="button" aria-label="הסבר" onClick={() => setSfInfo(sfInfo === label ? null : label)}
                   style={{position:'absolute',insetInlineStart:10,top:10,zIndex:5,cursor:'pointer',width:17,height:17,borderRadius:'50%',background:'rgba(255,255,255,.28)',color:'#fff',fontSize:11,lineHeight:'17px',textAlign:'center',fontWeight:700,userSelect:'none'}}>!</span>
                 {sfInfo === label && (
@@ -2804,17 +2808,19 @@ const selectProject = async (client, project) => {
                 <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>מסך רשת</h2><span className="sub">כלל סניפי קלוס · לפי תאריך יצירה · לחיצה על ! להסבר</span></div>
                 <div className="kpi-grid">
                   {CARD('תקציב שנוצל', formatCurrency(_spend), '', 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.', _spend)}
-                  {CARD('סה"כ לידים', formatNum(_leads), 'green', 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו.', _leads)}
+                  {CARD('סה"כ לידים', formatNum(_leads), 'green', 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו. אחוז ההמרה מקליקים יוצג אוטומטית כשיחוברו חשבונות הפרסום.', _leads, _clicks > 0 ? pctOf(_leads, _clicks) + ' מהקליקים' : null)}
                   {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'purple', 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.', _cpl)}
                   {CARD('טרם טופלו / חדשים', formatNum(_untreated), 'amber', 'לידים שסטטוסם עדיין "חדש" (New) ולא נגעו בהם.', _untreated)}
-                  {CARD('פגישות שנקבעו', formatNum(_meet), 'sky', 'סכום שלושת סטטוסי הפגישה: "תואמה פגישה בסניף" (טרם התקיימה) + "הומר" (הגיע) + "לא הגיעו לפגישה". נספר לפי סטטוס ולא לפי תאריך הפגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא.', _meet)}
+                  {CARD('פגישות שנקבעו', formatNum(_meet), 'sky', 'סכום שלושת סטטוסי הפגישה: "תואמה פגישה בסניף" (טרם התקיימה) + "הומר" (הגיע) + "לא הגיעו לפגישה". נספר לפי סטטוס ולא לפי תאריך הפגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא. השורה התחתונה: אחוז מסך הלידים.', _meet, pctOf(_meet, _leads) + ' מהלידים')}
                   {CARD('פגישות עתידיות', formatNum(_sched), 'amber', 'לידים בסטטוס "תואמה פגישה בסניף" — הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.', _sched)}
-                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'cyan', 'לידים בסטטוס "הומר" (Qualified) — הגיעו לפגישה בפועל. אחוז מהפגישות: ' + pctOf(_arrived2, _meet), _arrived2)}
-                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'red', 'לידים בסטטוס "לא הגיעו לפגישה". אחוז מהפגישות: ' + pctOf(_noShow, _meet), _noShow)}
-                  {CARD('עברו להזדמנות', formatNum(_opps), 'cyan', 'הזדמנויות שנפתחו בטווח. הזדמנות נפתחת כשליד מגיע לפגישה בסניף. אחוז מהלידים: ' + pctOf(_opps, _leads), _opps)}
-                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'orange', 'הזדמנויות שהגיעו לשלב "קיבל הצעת מחיר" ומעלה (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps), _quotes)}
+                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'cyan', 'לידים בסטטוס "הומר" (Qualified) — הגיעו לפגישה בפועל. אחוז מהפגישות שנקבעו: ' + pctOf(_arrived2, _meet) + '. השורה התחתונה: אחוז מסך הלידים.', _arrived2, pctOf(_arrived2, _leads) + ' מהלידים')}
+                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'red', 'לידים בסטטוס "לא הגיעו לפגישה" — פגישות שנקבעו ולא התקיימו. השורה התחתונה: שיעור הביטול מתוך הפגישות שנקבעו.', _noShow, pctOf(_noShow, _meet) + ' מהפגישות')}
+                  {CARD('עברו להזדמנות', formatNum(_opps), 'cyan', 'הזדמנויות שנפתחו בטווח. הזדמנות נפתחת כשליד מגיע לפגישה בסניף. השורה התחתונה: אחוז מסך הלידים.', _opps, pctOf(_opps, _leads) + ' מהלידים')}
+                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'orange', 'הזדמנויות שהגיעו לשלב "קיבל הצעת מחיר" ומעלה (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps) + '. השורה התחתונה: אחוז מסך הלידים.', _quotes, pctOf(_quotes, _leads) + ' מהלידים')}
                   {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), 'orange', 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של הזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — פוטנציאל שטרם נסגר. לשם השוואה, בשדה Amount הסטנדרטי של Salesforce הסכום הוא ' + formatCurrencyCompact(_quotesAmount) + ' (כולל הובלה ותוספות).', _quotesVal)}
-                  {CARD('שילמו מקדמה', formatNum(_paid), 'pink', 'הזדמנויות בשלב "הזמנה - שולמה מקדמה" — הרכישה בפועל. אחוז מהלידים: ' + pctOf(_paid, _leads), _paid)}
+                  {CARD('שילמו מקדמה', formatNum(_paid), 'pink', 'הזדמנויות בשלב "הזמנה - שולמה מקדמה" — הרכישה בפועל. השורה התחתונה: אחוז מסך הלידים.', _paid, pctOf(_paid, _leads) + ' מהלידים')}
+                  {CARD('עלות פגישה שהגיעה', _spend > 0 ? formatCurrency(_costArrived) : '—', 'amber', 'תקציב שנוצל חלקי מספר הלידים שהגיעו לפגישה בפועל (סטטוס "הומר"). מוצג רק כשיש נתוני מדיה.', _costArrived)}
+                  {CARD('עלות לקוח', _spend > 0 ? formatCurrency(_costCustomer) : '—', 'red', 'תקציב שנוצל חלקי מספר ההזמנות ששולמה בהן מקדמה — כמה עולה לנו לקוח משלם. מוצג רק כשיש נתוני מדיה.', _costCustomer)}
                   {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), 'pink', 'סכום "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. ההובלה וההרכבה בנפרד. בשדה Amount הסטנדרטי: ' + formatCurrencyCompact(_dealAmount) + '.', _dealVal)}
                   {CARD('החליטו לא לרכוש', formatNum(_lost), '', 'הזדמנויות בשלב "נסגר ללא הצלחה". אחוז מההזדמנויות: ' + pctOf(_lost, _opps), _lost)}
                 </div>
