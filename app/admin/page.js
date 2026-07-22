@@ -2994,11 +2994,11 @@ const selectProject = async (client, project) => {
 
             return (<>
               <div className="client-tabs" style={{marginBottom:15}}>
-                <button className={`client-tab ${sfTab === 'network' ? 'active' : ''}`} onClick={() => setSfTab('network')}>מסך רשת</button>
-                <button className={`client-tab ${sfTab === 'branches' ? 'active' : ''}`} onClick={() => setSfTab('branches')}>סניפים</button>
-                <button className={`client-tab ${sfTab === 'people' ? 'active' : ''}`} onClick={() => setSfTab('people')}>אנשי מכירות ומוצרים</button>
-                <button className={`client-tab ${sfTab === 'timing' ? 'active' : ''}`} onClick={() => setSfTab('timing')}>זמנים</button>
-                <button className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={() => setSfTab('breakdown')}>מקורות וסטטוסים</button>
+                <button type="button" className={`client-tab ${sfTab === 'network' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('network'); }}>מסך רשת</button>
+                <button type="button" className={`client-tab ${sfTab === 'branches' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('branches'); }}>סניפים</button>
+                <button type="button" className={`client-tab ${sfTab === 'people' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('people'); }}>אנשי מכירות ומוצרים</button>
+                <button type="button" className={`client-tab ${sfTab === 'timing' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('timing'); }}>זמנים</button>
+                <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
               {sfTab === 'network' ? (<>{netCards}{funnelTable}</>)
                 : sfTab === 'branches' ? branchesSec
