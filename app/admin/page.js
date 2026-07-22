@@ -2784,36 +2784,37 @@ const selectProject = async (client, project) => {
             const _untreated = Object.entries(_s.byStatus || {}).reduce((a, [k, v]) => a + (/^(new|חדש)$/i.test(String(k).trim()) ? v : 0), 0)
             const _cpl = _leads > 0 ? _spend / _leads : 0
 
-            const CARD = (label, value, color, info) => (
-              <div key={label} style={{position:'relative',background:'#fff',border:'1px solid #e8eaf0',borderTop:'3px solid '+color,borderRadius:10,padding:'12px 14px',minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:6}}>
-                  <span style={{fontSize:12,color:'#64748b'}}>{label}</span>
-                  <span role="button" aria-label="הסבר" onClick={() => setSfInfo(sfInfo === label ? null : label)} style={{cursor:'pointer',width:15,height:15,borderRadius:'50%',border:'1px solid '+color,color:color,fontSize:10,lineHeight:'13px',textAlign:'center',fontWeight:700,flexShrink:0,userSelect:'none'}}>!</span>
-                </div>
-                <div style={{fontSize:22,fontWeight:700,marginTop:4,color:'#0f172a'}}>{value}</div>
+            const CARD = (label, value, color, info, cur) => (
+              <div key={label} style={{position:'relative'}}>
+                {kpi(label, value, color, cur === undefined ? null : cur, null)}
+                <span role="button" aria-label="הסבר" onClick={() => setSfInfo(sfInfo === label ? null : label)}
+                  style={{position:'absolute',insetInlineStart:10,top:10,zIndex:5,cursor:'pointer',width:17,height:17,borderRadius:'50%',background:'rgba(255,255,255,.28)',color:'#fff',fontSize:11,lineHeight:'17px',textAlign:'center',fontWeight:700,userSelect:'none'}}>!</span>
                 {sfInfo === label && (
-                  <div onClick={() => setSfInfo(null)} style={{position:'absolute',zIndex:60,top:'100%',insetInlineEnd:0,marginTop:6,width:255,background:'#0f172a',color:'#fff',fontSize:12,lineHeight:1.65,padding:'10px 12px',borderRadius:8,boxShadow:'0 8px 24px rgba(0,0,0,.20)',cursor:'pointer'}}>{info}</div>
+                  <div onClick={() => setSfInfo(null)} style={{position:'absolute',zIndex:60,top:'100%',insetInlineEnd:0,marginTop:6,width:265,background:'#0f172a',color:'#fff',fontSize:12,lineHeight:1.7,padding:'10px 12px',borderRadius:8,boxShadow:'0 8px 24px rgba(0,0,0,.22)',cursor:'pointer',textAlign:'right'}}>{info}</div>
                 )}
               </div>
             )
 
+            const _arrived2 = _f.arrived !== undefined ? _f.arrived : Math.max(0, _meet - _noShow)
+            const _quotesAmount = (_bs['קיבל הצעת מחיר'] || {}).amount || 0
+            const _dealAmount = (_bs['הזמנה - שולמה מקדמה'] || {}).amount || 0
             const netCards = (
               <div className="section">
-                <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>מסך רשת</h2><span className="sub">כלל סניפי קלוס · לפי תאריך יצירה</span></div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(168px,1fr))',gap:12,padding:'4px 2px'}}>
-                  {CARD('תקציב שנוצל', formatCurrency(_spend), '#6366f1', 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח התאריכים הנבחר. יתמלא כשיחוברו חשבונות הפרסום.')}
-                  {CARD('סה"כ לידים', formatNum(_leads), '#10b981', 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס" בלבד, לפי שדה תאריך היצירה (CreatedDate). כולל לידים שכבר הומרו.')}
-                  {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', '#8b5cf6', 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.')}
-                  {CARD('עברו להזדמנות', formatNum(_opps), '#06b6d4', 'מספר ההזדמנויות שנפתחו בטווח. הזדמנות נפתחת כשליד מגיע לפגישה בסניף. אחוז מהלידים: ' + pctOf(_opps, _leads))}
-                  {CARD('טרם טופלו / חדשים', formatNum(_untreated), '#f59e0b', 'לידים שסטטוסם עדיין "חדש" (או New) ולא נגעו בהם. מחושב מפילוח הסטטוסים.')}
-                  {CARD('פגישות שנקבעו', formatNum(_meet), '#3b82f6', 'לידים שיש להם תאריך פגישה (השדה meetingDate__c מלא). אחוז מהלידים: ' + pctOf(_meet, _leads))}
-                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), '#ef4444', 'לידים שסטטוסם "לא הגיעו לפגישה" — נקבעה להם פגישה אך לא הגיעו. אחוז מהפגישות: ' + pctOf(_noShow, _meet))}
-                  {CARD('הגיעו לפגישה', formatNum(_arrived), '#14b8a6', 'פגישות שנקבעו פחות מי שלא הגיעו. אחוז מהפגישות: ' + pctOf(_arrived, _meet))}
-                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), '#f97316', 'הזדמנויות שהגיעו לשלב "קיבל הצעת מחיר" ומעלה (כולל אלה שכבר שילמו מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps))}
-                  {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), '#fb923c', 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של ההזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — כלומר פוטנציאל שטרם נסגר. לא כולל הובלה והרכבה.')}
-                  {CARD('שילמו מקדמה', formatNum(_paid), '#a855f7', 'הזדמנויות בשלב "הזמנה - שולמה מקדמה". זו הרכישה בפועל. אחוז מהלידים: ' + pctOf(_paid, _leads))}
-                  {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), '#ec4899', 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. סכום ההובלה וההרכבה מוצג בנפרד ואינו נכלל כאן.')}
-                  {CARD('החליטו לא לרכוש', formatNum(_lost), '#64748b', 'הזדמנויות בשלב "נסגר ללא הצלחה". אחוז מההזדמנויות: ' + pctOf(_lost, _opps))}
+                <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>מסך רשת</h2><span className="sub">כלל סניפי קלוס · לפי תאריך יצירה · לחיצה על ! להסבר</span></div>
+                <div className="kpi-grid">
+                  {CARD('תקציב שנוצל', formatCurrency(_spend), '', 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.', _spend)}
+                  {CARD('סה"כ לידים', formatNum(_leads), 'green', 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו.', _leads)}
+                  {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'purple', 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.', _cpl)}
+                  {CARD('טרם טופלו / חדשים', formatNum(_untreated), 'amber', 'לידים שסטטוסם עדיין "חדש" (New) ולא נגעו בהם.', _untreated)}
+                  {CARD('פגישות שנקבעו', formatNum(_meet), 'sky', 'נספר לפי סטטוס הליד: מי שהגיע לפגישה או שהפגישה עדיין מתואמת (Qualified), ועוד מי שלא הגיע. כך סופר גם הדשבורד שלך ב-Salesforce. לא נספר לפי תאריך פגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא.', _meet)}
+                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'cyan', 'לידים בסטטוס Qualified — הגיעו לפגישה או שהפגישה מתואמת. אחוז מהפגישות: ' + pctOf(_arrived2, _meet), _arrived2)}
+                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'red', 'לידים בסטטוס "לא הגיעו לפגישה". אחוז מהפגישות: ' + pctOf(_noShow, _meet), _noShow)}
+                  {CARD('עברו להזדמנות', formatNum(_opps), 'cyan', 'הזדמנויות שנפתחו בטווח. הזדמנות נפתחת כשליד מגיע לפגישה בסניף. אחוז מהלידים: ' + pctOf(_opps, _leads), _opps)}
+                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'orange', 'הזדמנויות שהגיעו לשלב "קיבל הצעת מחיר" ומעלה (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps), _quotes)}
+                  {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), 'orange', 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של הזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — פוטנציאל שטרם נסגר. לשם השוואה, בשדה Amount הסטנדרטי של Salesforce הסכום הוא ' + formatCurrencyCompact(_quotesAmount) + ' (כולל הובלה ותוספות).', _quotesVal)}
+                  {CARD('שילמו מקדמה', formatNum(_paid), 'pink', 'הזדמנויות בשלב "הזמנה - שולמה מקדמה" — הרכישה בפועל. אחוז מהלידים: ' + pctOf(_paid, _leads), _paid)}
+                  {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), 'pink', 'סכום "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. ההובלה וההרכבה בנפרד. בשדה Amount הסטנדרטי: ' + formatCurrencyCompact(_dealAmount) + '.', _dealVal)}
+                  {CARD('החליטו לא לרכוש', formatNum(_lost), '', 'הזדמנויות בשלב "נסגר ללא הצלחה". אחוז מההזדמנויות: ' + pctOf(_lost, _opps), _lost)}
                 </div>
               </div>
             )
@@ -2822,7 +2823,7 @@ const selectProject = async (client, project) => {
               { label: 'לידים', v: _leads, of: null },
               { label: 'תיאמו פגישה', v: _meet, of: _leads },
               { label: 'לא הגיעו לפגישה', v: _noShow, of: _meet, neg: true },
-              { label: 'הגיעו לפגישה', v: _arrived, of: _meet },
+              { label: 'הגיעו לפגישה', v: _arrived2, of: _meet },
               { label: 'עברו להזדמנות', v: _opps, of: _meet },
               { label: 'קיבלו הצעת מחיר', v: _quotes, of: _opps },
               { label: 'שילמו מקדמה', v: _paid, of: _quotes },

@@ -29,13 +29,18 @@ export const maxDuration = 300
 
 const SF_LOGIN_URL = process.env.SF_LOGIN_URL || 'https://login.salesforce.com'
 const SF_API_VERSION = process.env.SF_API_VERSION || 'v60.0'
-const SF_SCHEMA_VERSION = 2
+const SF_SCHEMA_VERSION = 3
 
 const CHAIN = 'קלוס'
 const STAGE_PAID = 'הזמנה - שולמה מקדמה'
 const STAGE_QUOTE = 'קיבל הצעת מחיר'
 const STAGE_LOST = 'נסגר ללא הצלחה'
 const STATUS_NOSHOW = 'לא הגיעו לפגישה'
+// Meeting stage is tracked by Lead STATUS (verified against the client's own Salesforce
+// dashboard): 'Qualified' = meeting coordinated/attended, plus the Hebrew equivalents.
+// Counting by meetingDate__c over-counts, because a lead created this month can hold a
+// meeting date in a future month.
+const STATUS_ARRIVED = ['Qualified', 'תואמה פגישה בסניף', 'הומר']
 const DOW = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת']
 
 function currentMonth() {
@@ -140,7 +145,7 @@ async function runSync(opts = {}) {
 
   let totalLeads, convertedLeads, meetingLeads, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
   let oppStageR, oppBranchR, salesmenR, purposeR, productsR
-  let noShowR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR
+  let noShowR, arrivedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR
   try {
     ;[totalLeads, convertedLeads, meetingLeads] = await Promise.all([
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE ${LW}`),
@@ -155,14 +160,15 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT Competitor_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Competitor_Name__c!=null GROUP BY Competitor_Name__c`),
     ])
     ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR] = await Promise.all([
-      soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o FROM Opportunity WHERE ${OW} GROUP BY StageName`),
+      soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o, SUM(Amount) am FROM Opportunity WHERE ${OW} GROUP BY StageName`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Salesman__r.Name k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} AND StageName='${STAGE_PAID}' GROUP BY Salesman__r.Name`),
       soql(auth, `SELECT Buying_Purpose__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Buying_Purpose__c!=null GROUP BY Buying_Purpose__c`),
       soql(auth, `SELECT Product2.Name k, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Product2.Name`),
     ])
-    ;[noShowR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR] = await Promise.all([
+    ;[noShowR, arrivedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR] = await Promise.all([
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status='${STATUS_NOSHOW}' GROUP BY Branch_Name__c`),
+      soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status IN (${STATUS_ARRIVED.map(x => `'${x}'`).join(',')}) GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND meetingDate__c!=null GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Branch_Name__c k, StageName st, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} GROUP BY Branch_Name__c, StageName`),
       soql(auth, `SELECT Branch_Name__c k, Salesman__r.Name n, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} AND StageName='${STAGE_PAID}' GROUP BY Branch_Name__c, Salesman__r.Name`),
@@ -207,7 +213,7 @@ async function runSync(opts = {}) {
   const byStage = {}
   for (const r of oppStageR) {
     const st = r.k || 'לא ידוע'
-    byStage[st] = { count: r.c, value: r0(r.v), delivery: r0(r.o) }
+    byStage[st] = { count: r.c, value: r0(r.v), delivery: r0(r.o), amount: r0(r.am) }
     opportunities += r.c
     if (st === STAGE_PAID) { paid = r.c; dealValue = r0(r.v); deliveryValue = r0(r.o) }
     else if (st === STAGE_QUOTE) quotes = r.c
@@ -235,13 +241,24 @@ async function runSync(opts = {}) {
 
   // ---- per-branch detail (manager drill-down) ----
   const noShowByBranch = pairs(noShowR, 'k', 'c')
+  const arrivedByBranch = pairs(arrivedBranchR, 'k', 'c')
+  const _arrSet = new Set(STATUS_ARRIVED)
+  let arrivedCnt = 0, noShowCnt = 0
+  for (const [k, v] of Object.entries(byStatus)) {
+    const kk = String(k || '').trim()
+    if (_arrSet.has(kk)) arrivedCnt += v
+    else if (kk === STATUS_NOSHOW) noShowCnt += v
+  }
+  const meetingsTotal = arrivedCnt + noShowCnt
   const mtgByBranch = pairs(mtgBranchR, 'k', 'c')
   const bd = {}
   const bkey = (k) => (k === null || k === undefined || k === '') ? 'לא ידוע' : k
-  const ensure = (k) => (bd[k] = bd[k] || { branch: k, leads: 0, meetings: 0, noShow: 0, opportunities: 0, quotes: 0, paid: 0, lost: 0, value: 0, delivery: 0, salesmen: [], products: [] })
+  const ensure = (k) => (bd[k] = bd[k] || { branch: k, leads: 0, meetings: 0, meetingsByDate: 0, arrived: 0, noShow: 0, opportunities: 0, quotes: 0, paid: 0, lost: 0, value: 0, delivery: 0, salesmen: [], products: [] })
   for (const [k, v] of Object.entries(byBranchLeads)) ensure(k).leads = v
-  for (const [k, v] of Object.entries(mtgByBranch)) ensure(k).meetings = v
+  for (const [k, v] of Object.entries(mtgByBranch)) ensure(k).meetingsByDate = v
+  for (const [k, v] of Object.entries(arrivedByBranch)) ensure(k).arrived = v
   for (const [k, v] of Object.entries(noShowByBranch)) ensure(k).noShow = v
+  for (const b of Object.values(bd)) b.meetings = (b.arrived || 0) + (b.noShow || 0)
   for (const r of stageBranchR) {
     const b = ensure(bkey(r.k)); const st = r.st || ''
     b.opportunities += r.c
@@ -273,7 +290,6 @@ async function runSync(opts = {}) {
   const meetingsByDay = {}
   for (const r of mtgDayR) meetingsByDay[DOW[(r.dw || 1) - 1] || r.dw] = r.c
 
-  const noShowTotal = Object.values(noShowByBranch).reduce((a, b) => a + b, 0)
   const conversionRate = totalLeads ? Math.round((paid / totalLeads) * 1000) / 10 : 0
   const avgDealValue = paid ? Math.round(dealValue / paid) : 0
 
@@ -290,7 +306,7 @@ async function runSync(opts = {}) {
     totalLeads,
     convertedLeads,
     unconvertedLeads: totalLeads - convertedLeads,
-    meetingsScheduled: meetingLeads,
+    meetingsScheduled: meetingsTotal,
     relevantLeads: totalLeads,
     irrelevantLeads: 0,
     byStatus,
@@ -308,11 +324,13 @@ async function runSync(opts = {}) {
     meetingsByDay,
     funnel: {
       leads: totalLeads,
-      meetings: meetingLeads,
-      noShow: noShowTotal,
+      meetings: meetingsTotal,
+      arrived: arrivedCnt,
+      meetingsWithFutureDate: meetingLeads,
+      noShow: noShowCnt,
       notInterested: lost,
-      rateLeadToMeeting: totalLeads ? Math.round(meetingLeads / totalLeads * 1000) / 10 : 0,
-      rateMeetingToOpp: meetingLeads ? Math.round(opportunities / meetingLeads * 1000) / 10 : 0,
+      rateLeadToMeeting: totalLeads ? Math.round(meetingsTotal / totalLeads * 1000) / 10 : 0,
+      rateMeetingToOpp: meetingsTotal ? Math.round(opportunities / meetingsTotal * 1000) / 10 : 0,
       rateOppToQuote: opportunities ? Math.round((quotes + paid) / opportunities * 1000) / 10 : 0,
       rateQuoteToPaid: (quotes + paid) ? Math.round(paid / (quotes + paid) * 1000) / 10 : 0,
       opportunities,
