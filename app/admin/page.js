@@ -2896,27 +2896,33 @@ const selectProject = async (client, project) => {
                           <td style={{color:'var(--violet)',fontWeight:600}}>{b.convLeadToPaid}%</td>
                           <td className="sub">{b.topSalesman || '—'}</td>
                         </tr>
-                        {open && (<tr><td colSpan={9} style={{background:'#f8fafc'}}>
-                          <div style={{display:'flex',gap:32,flexWrap:'wrap',padding:'6px 4px'}}>
-                            <div style={{minWidth:220}}>
-                              <div className="sub" style={{marginBottom:6,fontWeight:600}}>אנשי מכירות</div>
+                        {open && (<tr><td colSpan={9} style={{background:'#f8fafc',padding:'14px 18px'}}>
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:20,width:'100%'}}>
+                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px'}}>
+                              <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אנשי מכירות</div>
                               {(b.salesmen || []).length === 0 ? <div className="sub">—</div> : (b.salesmen || []).map(a => (
-                                <div key={a.name} style={{display:'flex',justifyContent:'space-between',gap:16,fontSize:13,padding:'2px 0'}}><span>{a.name}</span><span>{formatNum(a.orders)} · {formatCurrencyCompact(a.value)}</span></div>
+                                <div key={a.name} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,fontSize:13,padding:'3px 0',borderBottom:'1px solid #f1f5f9'}}>
+                                  <span style={{fontWeight:600}}>{a.name}</span>
+                                  <span style={{whiteSpace:'nowrap',color:'#475569'}}>{formatNum(a.orders)} · {formatCurrencyCompact(a.value)}</span>
+                                </div>
                               ))}
                             </div>
-                            <div style={{minWidth:220}}>
-                              <div className="sub" style={{marginBottom:6,fontWeight:600}}>מוצרים מובילים</div>
+                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px'}}>
+                              <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>מוצרים מובילים</div>
                               {(b.products || []).length === 0 ? <div className="sub">—</div> : (b.products || []).map(pr => (
-                                <div key={pr.name} style={{display:'flex',justifyContent:'space-between',gap:16,fontSize:13,padding:'2px 0'}}><span>{pr.name}</span><span>{formatNum(pr.units)}</span></div>
+                                <div key={pr.name} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,fontSize:13,padding:'3px 0',borderBottom:'1px solid #f1f5f9'}}>
+                                  <span>{pr.name}</span>
+                                  <span style={{whiteSpace:'nowrap',fontWeight:600}}>{formatNum(pr.units)}</span>
+                                </div>
                               ))}
                             </div>
-                            <div style={{minWidth:190}}>
-                              <div className="sub" style={{marginBottom:6,fontWeight:600}}>אחוזי המרה</div>
-                              <div style={{fontSize:13}}>ליד → פגישה: <b>{b.convLeadToMeeting}%</b></div>
-                              <div style={{fontSize:13}}>פגישה → הזדמנות: <b>{b.convMeetingToOpp}%</b></div>
-                              <div style={{fontSize:13}}>הזדמנות → רכישה: <b>{b.convOppToPaid}%</b></div>
-                              <div style={{fontSize:13}}>ממוצע לעסקה: <b>{formatCurrency(b.avgDeal)}</b></div>
-                              <div style={{fontSize:13}}>לא הגיעו: <b>{formatNum(b.noShow)}</b></div>
+                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px'}}>
+                              <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אחוזי המרה</div>
+                              {[['ליד → פגישה', b.convLeadToMeeting + '%'],['פגישה → הזדמנות', b.convMeetingToOpp + '%'],['הזדמנות → רכישה', b.convOppToPaid + '%'],['ממוצע לעסקה', formatCurrency(b.avgDeal)],['לא הגיעו לפגישה', formatNum(b.noShow)]].map(([k, v]) => (
+                                <div key={k} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,fontSize:13,padding:'3px 0',borderBottom:'1px solid #f1f5f9'}}>
+                                  <span>{k}</span><span style={{fontWeight:600,whiteSpace:'nowrap'}}>{v}</span>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         </td></tr>)}
