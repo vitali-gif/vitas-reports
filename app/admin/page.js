@@ -2784,8 +2784,6 @@ const selectProject = async (client, project) => {
             const _untreated = Object.entries(_s.byStatus || {}).reduce((a, [k, v]) => a + (/^(new|חדש)$/i.test(String(k).trim()) ? v : 0), 0)
             const _cpl = _leads > 0 ? _spend / _leads : 0
             const _clicks = ((fbTotals && fbTotals.clicks) || 0) + ((gTotals && gTotals.clicks) || 0)
-            const _costArrived = _arrived2 > 0 ? _spend / _arrived2 : 0
-            const _costCustomer = _paid > 0 ? _spend / _paid : 0
 
             const CARD = (label, value, color, info, cur, sub) => (
               <div key={label} style={{position:'relative'}}>
@@ -2801,6 +2799,8 @@ const selectProject = async (client, project) => {
 
             const _arrived2 = _f.arrived !== undefined ? _f.arrived : Math.max(0, _meet - _noShow)
             const _sched = _f.scheduledUpcoming || 0
+            const _costArrived = _arrived2 > 0 ? _spend / _arrived2 : 0
+            const _costCustomer = _paid > 0 ? _spend / _paid : 0
             const _quotesAmount = (_bs['קיבל הצעת מחיר'] || {}).amount || 0
             const _dealAmount = (_bs['הזמנה - שולמה מקדמה'] || {}).amount || 0
             const netCards = (
