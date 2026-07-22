@@ -29,7 +29,7 @@ export const maxDuration = 300
 
 const SF_LOGIN_URL = process.env.SF_LOGIN_URL || 'https://login.salesforce.com'
 const SF_API_VERSION = process.env.SF_API_VERSION || 'v60.0'
-const SF_SCHEMA_VERSION = 4
+const SF_SCHEMA_VERSION = 5
 
 const CHAIN = 'קלוס'
 const STAGE_PAID = 'הזמנה - שולמה מקדמה'
@@ -132,7 +132,14 @@ async function runSync(opts = {}) {
     until = `${y}-${String(mm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     m = mArg
   }
-  const FROM = `${since}T00:00:00Z`, TO = `${until}T23:59:59Z`
+  // Period boundaries must be Israel-local midnight, not UTC midnight. Salesforce stores
+  // CreatedDate in UTC, so a plain `${since}T00:00:00Z` starts the month 3 hours late and
+  // drags in the first hours of the next month. Build the offset from Asia/Jerusalem (DST-aware).
+  const _off = israelOffsetHours(since)
+  const _sign = _off >= 0 ? '+' : '-'
+  const _pad = String(Math.abs(_off)).padStart(2, '0')
+  const FROM = `${since}T00:00:00${_sign}${_pad}:00`
+  const TO = `${until}T23:59:59${_sign}${_pad}:00`
 
   const { data: projects, error: projErr } = await supabase.from('projects').select('id, name, client_id')
   if (projErr) return { status: 500, body: { error: 'Failed to load projects: ' + projErr.message } }
