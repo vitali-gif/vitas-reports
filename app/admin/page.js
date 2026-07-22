@@ -2758,100 +2758,176 @@ const selectProject = async (client, project) => {
             const _f = _s.funnel || {}
             const _rt = _s.responseTime || {}
             const ent = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1])
-            const _branches = Object.entries(_s.byBranch || {})
-              .map(([name, v]) => ({ name, ...v }))
-              .filter(b => (b.leads || 0) + (b.opportunities || 0) > 0)
-              .sort((a, b) => (b.leads || 0) - (a.leads || 0))
-            const _sources = ent(_s.bySource)
-            const _statuses = ent(_s.byStatus)
-            const _reasons = ent(_s.reasons)
-            const _competitors = ent(_s.competitors)
-            const _products = (_s.products || []).slice(0, 15)
-            const _salesmen = (_s.salesmen || []).slice(0, 15)
-            const th = { textAlign: 'right', padding: '8px 10px', fontSize: 12, color: '#64748b', fontWeight: 500, borderBottom: '1px solid #e2e8f0' }
-            const td = { textAlign: 'right', padding: '8px 10px', fontSize: 13, borderBottom: '1px solid #f1f5f9' }
-            const card = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }
-            const h4s = { margin: '0 0 10px', fontSize: 15, fontWeight: 600 }
-            const simpleTable = (title, rows, col1, col2) => (
-              <div style={card}>
-                <h4 style={h4s}>{title}</h4>
-                {rows.length === 0 ? <div style={{ color: '#94a3b8', fontSize: 13 }}>אין נתונים</div> : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead><tr><th style={th}>{col1}</th><th style={th}>{col2}</th></tr></thead>
-                    <tbody>{rows.map(([k, v]) => (
-                      <tr key={k}><td style={td}>{k}</td><td style={td}>{formatNum(v)}</td></tr>
-                    ))}</tbody>
+            const _bd = _s.branchDetail || []
+            const _hours = _s.meetingsByHour || {}
+            const _days = _s.meetingsByDay || {}
+            const _salesmen = (_s.salesmen || []).slice(0, 12)
+            const _products = (_s.products || []).slice(0, 12)
+            const toggleBranch = (b) => setExpandedFunnelCh(prev => { const n = new Set(prev); if (n.has(b)) n.delete(b); else n.add(b); return n; })
+            const ICO = (cls, d) => (<div className={"ico " + cls}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg></div>)
+            const pctOf = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 + '%' : '—'
+            const stages = [
+              { label: 'לידים', v: _f.leads || 0, of: null },
+              { label: 'תיאמו פגישה', v: _f.meetings || 0, of: _f.leads || 0 },
+              { label: 'לא הגיעו לפגישה', v: _f.noShow || 0, of: _f.meetings || 0, neg: true },
+              { label: 'הגיעו / הזדמנות', v: _f.opportunities || 0, of: _f.meetings || 0 },
+              { label: 'קיבלו הצעת מחיר', v: _f.quotes || 0, of: _f.opportunities || 0 },
+              { label: 'שילמו מקדמה', v: _f.paid || 0, of: _f.quotes || 0 },
+              { label: 'לא מעוניינים', v: _f.notInterested || 0, of: _f.opportunities || 0, neg: true },
+            ]
+            const maxH = Math.max(1, ...Object.values(_hours))
+            const maxD = Math.max(1, ...Object.values(_days))
+            const hourKeys = Object.keys(_hours).map(Number).sort((a, b) => a - b)
+            const dayOrder = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת']
+            const simple = (title, rows, c1, c2, ico) => (
+              <div className="section">
+                <div className="section-head">{ICO(ico, "M3 3v18h18")}<h2>{title}</h2><span className="sub">{rows.length} ערכים</span></div>
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead><tr><th>{c1}</th><th>{c2}</th><th>אחוז</th></tr></thead>
+                    <tbody>{rows.map(([k, v]) => {
+                      const tot = rows.reduce((a, x) => a + x[1], 0)
+                      return (<tr key={k}><td style={{fontWeight:600}}>{k}</td><td>{formatNum(v)}</td><td style={{color:'var(--violet)'}}>{pctOf(v, tot)}</td></tr>)
+                    })}</tbody>
                   </table>
-                )}
+                </div>
               </div>
             )
             return (<>
-              <div style={card}>
-                <h4 style={h4s}>משפך לפי סניף</h4>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead><tr><th style={th}>סניף</th><th style={th}>לידים</th><th style={th}>הזדמנויות</th><th style={th}>שווי</th></tr></thead>
-                  <tbody>{_branches.map(b => (
-                    <tr key={b.name}>
-                      <td style={td}>{b.name}</td>
-                      <td style={td}>{formatNum(b.leads || 0)}</td>
-                      <td style={td}>{formatNum(b.opportunities || 0)}</td>
-                      <td style={td}>{formatCurrencyCompact(b.value || 0)}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
+              <div className="section">
+                <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>משפך ניהולי — כלל הרשת</h2><span className="sub">אחוז המרה בין שלב לשלב</span></div>
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead><tr><th>שלב</th><th>כמות</th><th>מהשלב הקודם</th><th>מסך הלידים</th></tr></thead>
+                    <tbody>{stages.map(st => (
+                      <tr key={st.label}>
+                        <td style={{fontWeight:600, color: st.neg ? 'var(--rose)' : undefined}}>{st.label}</td>
+                        <td style={{fontWeight:600}}>{formatNum(st.v)}</td>
+                        <td style={{color:'var(--violet)'}}>{st.of === null ? '—' : pctOf(st.v, st.of)}</td>
+                        <td className="sub">{pctOf(st.v, _f.leads || 0)}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
               </div>
 
-              <div style={card}>
-                <h4 style={h4s}>זמני תגובה</h4>
+              <div className="section">
+                <div className="section-head">{ICO('emerald', "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z")}<h2>ביצועים לפי סניף</h2><span className="sub">לחיצה על סניף פותחת אנשי מכירות ומוצרים</span></div>
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead><tr><th>סניף</th><th>לידים</th><th>פגישות</th><th>הזדמנויות</th><th>הצעות</th><th>רכשו</th><th>שווי</th><th>המרה</th><th>מוביל</th></tr></thead>
+                    <tbody>{_bd.map(b => {
+                      const open = expandedFunnelCh.has(b.branch)
+                      return (<Fragment key={b.branch}>
+                        <tr onClick={() => toggleBranch(b.branch)} style={{cursor:'pointer'}}>
+                          <td style={{fontWeight:600}}>{open ? '▾ ' : '▸ '}{b.branch}</td>
+                          <td>{formatNum(b.leads)}</td>
+                          <td>{formatNum(b.meetings)}</td>
+                          <td>{formatNum(b.opportunities)}</td>
+                          <td>{formatNum(b.quotesTotal)}</td>
+                          <td style={{fontWeight:600}}>{formatNum(b.paid)}</td>
+                          <td>{formatCurrencyCompact(b.value)}</td>
+                          <td style={{color:'var(--violet)',fontWeight:600}}>{b.convLeadToPaid}%</td>
+                          <td className="sub">{b.topSalesman || '—'}</td>
+                        </tr>
+                        {open && (<tr><td colSpan={9} style={{background:'var(--surface-1,#f8fafc)'}}>
+                          <div style={{display:'flex',gap:32,flexWrap:'wrap',padding:'6px 4px'}}>
+                            <div style={{minWidth:220}}>
+                              <div className="sub" style={{marginBottom:6,fontWeight:600}}>אנשי מכירות</div>
+                              {(b.salesmen || []).length === 0 ? <div className="sub">—</div> : (b.salesmen || []).map(a => (
+                                <div key={a.name} style={{display:'flex',justifyContent:'space-between',gap:16,fontSize:13,padding:'2px 0'}}><span>{a.name}</span><span>{formatNum(a.orders)} · {formatCurrencyCompact(a.value)}</span></div>
+                              ))}
+                            </div>
+                            <div style={{minWidth:220}}>
+                              <div className="sub" style={{marginBottom:6,fontWeight:600}}>מוצרים מובילים</div>
+                              {(b.products || []).length === 0 ? <div className="sub">—</div> : (b.products || []).map(pr => (
+                                <div key={pr.name} style={{display:'flex',justifyContent:'space-between',gap:16,fontSize:13,padding:'2px 0'}}><span>{pr.name}</span><span>{formatNum(pr.units)}</span></div>
+                              ))}
+                            </div>
+                            <div style={{minWidth:180}}>
+                              <div className="sub" style={{marginBottom:6,fontWeight:600}}>אחוזי המרה</div>
+                              <div style={{fontSize:13}}>ליד → פגישה: <b>{b.convLeadToMeeting}%</b></div>
+                              <div style={{fontSize:13}}>פגישה → הזדמנות: <b>{b.convMeetingToOpp}%</b></div>
+                              <div style={{fontSize:13}}>הזדמנות → רכישה: <b>{b.convOppToPaid}%</b></div>
+                              <div style={{fontSize:13}}>ממוצע לעסקה: <b>{formatCurrency(b.avgDeal)}</b></div>
+                              <div style={{fontSize:13}}>לא הגיעו: <b>{formatNum(b.noShow)}</b></div>
+                            </div>
+                          </div>
+                        </td></tr>)}
+                      </Fragment>)
+                    })}</tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="section">
+                <div className="section-head">{ICO('amber', "M12 6v6l4 2")}<h2>שעות תיאום פגישות</h2><span className="sub">שעון ישראל</span></div>
+                <div style={{display:'flex',alignItems:'flex-end',gap:6,padding:'12px 4px',minHeight:120}}>
+                  {hourKeys.length === 0 ? <div className="sub">אין נתונים</div> : hourKeys.map(h => (
+                    <div key={h} style={{flex:1,textAlign:'center'}}>
+                      <div style={{fontSize:11,marginBottom:4}}>{_hours[h]}</div>
+                      <div style={{height:Math.round((_hours[h]/maxH)*90)+6,background:'var(--violet,#7c6cf5)',borderRadius:4}}></div>
+                      <div className="sub" style={{fontSize:11,marginTop:4}}>{h}:00</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="section">
+                <div className="section-head">{ICO('sky', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z")}<h2>ימי תיאום פגישות</h2><span className="sub">לפי יום בשבוע</span></div>
+                <div style={{display:'flex',alignItems:'flex-end',gap:10,padding:'12px 4px',minHeight:120}}>
+                  {dayOrder.filter(d => _days[d]).length === 0 ? <div className="sub">אין נתונים</div> : dayOrder.map(d => _days[d] ? (
+                    <div key={d} style={{flex:1,textAlign:'center'}}>
+                      <div style={{fontSize:11,marginBottom:4}}>{_days[d]}</div>
+                      <div style={{height:Math.round((_days[d]/maxD)*90)+6,background:'var(--sky,#38bdf8)',borderRadius:4}}></div>
+                      <div className="sub" style={{fontSize:11,marginTop:4}}>{d}</div>
+                    </div>
+                  ) : null)}
+                </div>
+              </div>
+
+              <div className="section">
+                <div className="section-head">{ICO('rose', "M12 6v6l4 2")}<h2>זמני טיפול בליד</h2><span className="sub">מיצירת הליד עד הטיפול הראשון</span></div>
                 {_rt.measured ? (
-                  <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13 }}>
-                    <div>ממוצע: <b>{_rt.avgHours}ש׳</b></div>
-                    <div>חציון: <b>{_rt.medianHours}ש׳</b></div>
-                    <div>תוך שעה: <b>{_rt.within1h}%</b></div>
-                    <div>תוך 4 שעות: <b>{_rt.within4h}%</b></div>
-                    <div>תוך 24 שעות: <b>{_rt.within24h}%</b></div>
-                    <div style={{ color: '#94a3b8' }}>({formatNum(_rt.measured)} לידים)</div>
+                  <div style={{display:'flex',gap:28,flexWrap:'wrap',padding:'8px 4px',fontSize:14}}>
+                    <div>ממוצע <b>{_rt.avgHours}ש׳</b></div>
+                    <div>חציון <b>{_rt.medianHours}ש׳</b></div>
+                    <div>תוך שעה <b>{_rt.within1h}%</b></div>
+                    <div>תוך 4ש׳ <b>{_rt.within4h}%</b></div>
+                    <div>תוך 24ש׳ <b>{_rt.within24h}%</b></div>
+                    <div className="sub">({formatNum(_rt.measured)} לידים)</div>
                   </div>
-                ) : <div style={{ color: '#94a3b8', fontSize: 13 }}>אין נתונים</div>}
+                ) : <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div>}
               </div>
 
-              <div style={card}>
-                <h4 style={h4s}>ביצועי אנשי מכירות</h4>
-                {_salesmen.length === 0 ? <div style={{ color: '#94a3b8', fontSize: 13 }}>אין נתונים</div> : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead><tr><th style={th}>איש מכירות</th><th style={th}>הזמנות</th><th style={th}>שווי</th><th style={th}>ממוצע לעסקה</th></tr></thead>
+              <div className="section">
+                <div className="section-head">{ICO('violet', "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2")}<h2>ביצועי אנשי מכירות</h2><span className="sub">כלל הרשת</span></div>
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead><tr><th>איש מכירות</th><th>הזמנות</th><th>שווי</th><th>ממוצע לעסקה</th></tr></thead>
                     <tbody>{_salesmen.map(a => (
-                      <tr key={a.name}>
-                        <td style={td}>{a.name}</td>
-                        <td style={td}>{formatNum(a.orders)}</td>
-                        <td style={td}>{formatCurrencyCompact(a.value)}</td>
-                        <td style={td}>{formatCurrency(a.avgDeal)}</td>
-                      </tr>
+                      <tr key={a.name}><td style={{fontWeight:600}}>{a.name}</td><td>{formatNum(a.orders)}</td><td>{formatCurrencyCompact(a.value)}</td><td>{formatCurrency(a.avgDeal)}</td></tr>
                     ))}</tbody>
                   </table>
-                )}
+                </div>
               </div>
 
-              <div style={card}>
-                <h4 style={h4s}>מוצרים</h4>
-                {_products.length === 0 ? <div style={{ color: '#94a3b8', fontSize: 13 }}>אין נתונים</div> : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead><tr><th style={th}>מוצר</th><th style={th}>כמות</th><th style={th}>שווי</th></tr></thead>
+              <div className="section">
+                <div className="section-head">{ICO('emerald', "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z")}<h2>המוצרים הנמכרים ביותר</h2><span className="sub">כלל הרשת</span></div>
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead><tr><th>מוצר</th><th>כמות</th><th>שווי</th></tr></thead>
                     <tbody>{_products.map(pr => (
-                      <tr key={pr.name}>
-                        <td style={td}>{pr.name}</td>
-                        <td style={td}>{formatNum(pr.units)}</td>
-                        <td style={td}>{formatCurrencyCompact(pr.value)}</td>
-                      </tr>
+                      <tr key={pr.name}><td style={{fontWeight:600}}>{pr.name}</td><td>{formatNum(pr.units)}</td><td>{formatCurrencyCompact(pr.value)}</td></tr>
                     ))}</tbody>
                   </table>
-                )}
+                </div>
               </div>
 
-              {simpleTable('מקורות הגעה', _sources, 'מקור', 'לידים')}
-              {simpleTable('סטטוסי לידים', _statuses, 'סטטוס', 'לידים')}
-              {simpleTable('סיבות אי-המרה', _reasons, 'סיבה', 'לידים')}
-              {simpleTable('מתחרים', _competitors, 'מתחרה', 'לידים')}
+              {simple('מקורות הגעה', ent(_s.bySource), 'מקור', 'לידים', 'sky')}
+              {simple('סטטוסי לידים', ent(_s.byStatus), 'סטטוס', 'לידים', 'amber')}
+              {simple('סיבות אי-המרה', ent(_s.reasons), 'סיבה', 'לידים', 'rose')}
+              {simple('מתחרים', ent(_s.competitors), 'מתחרה', 'לידים', 'violet')}
             </>)
           }
 
