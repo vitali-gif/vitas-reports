@@ -162,6 +162,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
   const [expandedCrmSources, setExpandedCrmSources] = useState(new Set());
   const [expandedFunnelCh, setExpandedFunnelCh] = useState(new Set());
+  const [sfInfo, setSfInfo] = useState(null);
+  const [sfTab, setSfTab] = useState('network');
   const [expandedAgents, setExpandedAgents] = useState(new Set());
   const handleSort = (tableId, key) => { setSortConfig(prev => { const cur = prev[tableId]; if (cur && cur.key === key) return {...prev, [tableId]: {key, dir: cur.dir === 'desc' ? 'asc' : 'desc'}}; return {...prev, [tableId]: {key, dir: 'desc'}}; }); };
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
@@ -2757,6 +2759,7 @@ const selectProject = async (client, project) => {
             const _s = _zohoRep.summary || {}
             const _f = _s.funnel || {}
             const _rt = _s.responseTime || {}
+            const _bs = _f.byStage || {}
             const ent = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1])
             const _bd = _s.branchDetail || []
             const _hours = _s.meetingsByHour || {}
@@ -2766,21 +2769,90 @@ const selectProject = async (client, project) => {
             const toggleBranch = (b) => setExpandedFunnelCh(prev => { const n = new Set(prev); if (n.has(b)) n.delete(b); else n.add(b); return n; })
             const ICO = (cls, d) => (<div className={"ico " + cls}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg></div>)
             const pctOf = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 + '%' : '—'
+
+            const _spend = ((fbTotals && fbTotals.spend) || 0) + ((gTotals && gTotals.spend) || 0)
+            const _leads = _f.leads || 0
+            const _opps = _f.opportunities || 0
+            const _meet = _f.meetings || 0
+            const _noShow = _f.noShow || 0
+            const _arrived = Math.max(0, _meet - _noShow)
+            const _quotes = _f.quotes || 0
+            const _quotesVal = (_bs['קיבל הצעת מחיר'] || {}).value || 0
+            const _paid = _f.paid || 0
+            const _dealVal = _f.dealValue || 0
+            const _lost = _f.notInterested || 0
+            const _untreated = Object.entries(_s.byStatus || {}).reduce((a, [k, v]) => a + (/^(new|חדש)$/i.test(String(k).trim()) ? v : 0), 0)
+            const _cpl = _leads > 0 ? _spend / _leads : 0
+
+            const CARD = (label, value, color, info) => (
+              <div key={label} style={{position:'relative',background:'#fff',border:'1px solid #e8eaf0',borderTop:'3px solid '+color,borderRadius:10,padding:'12px 14px',minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <span style={{fontSize:12,color:'#64748b'}}>{label}</span>
+                  <span role="button" aria-label="הסבר" onClick={() => setSfInfo(sfInfo === label ? null : label)} style={{cursor:'pointer',width:15,height:15,borderRadius:'50%',border:'1px solid '+color,color:color,fontSize:10,lineHeight:'13px',textAlign:'center',fontWeight:700,flexShrink:0,userSelect:'none'}}>!</span>
+                </div>
+                <div style={{fontSize:22,fontWeight:700,marginTop:4,color:'#0f172a'}}>{value}</div>
+                {sfInfo === label && (
+                  <div onClick={() => setSfInfo(null)} style={{position:'absolute',zIndex:60,top:'100%',insetInlineEnd:0,marginTop:6,width:255,background:'#0f172a',color:'#fff',fontSize:12,lineHeight:1.65,padding:'10px 12px',borderRadius:8,boxShadow:'0 8px 24px rgba(0,0,0,.20)',cursor:'pointer'}}>{info}</div>
+                )}
+              </div>
+            )
+
+            const netCards = (
+              <div className="section">
+                <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>מסך רשת</h2><span className="sub">כלל סניפי קלוס · לפי תאריך יצירה</span></div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(168px,1fr))',gap:12,padding:'4px 2px'}}>
+                  {CARD('תקציב שנוצל', formatCurrency(_spend), '#6366f1', 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח התאריכים הנבחר. יתמלא כשיחוברו חשבונות הפרסום.')}
+                  {CARD('סה"כ לידים', formatNum(_leads), '#10b981', 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס" בלבד, לפי שדה תאריך היצירה (CreatedDate). כולל לידים שכבר הומרו.')}
+                  {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', '#8b5cf6', 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.')}
+                  {CARD('עברו להזדמנות', formatNum(_opps), '#06b6d4', 'מספר ההזדמנויות שנפתחו בטווח. הזדמנות נפתחת כשליד מגיע לפגישה בסניף. אחוז מהלידים: ' + pctOf(_opps, _leads))}
+                  {CARD('טרם טופלו / חדשים', formatNum(_untreated), '#f59e0b', 'לידים שסטטוסם עדיין "חדש" (או New) ולא נגעו בהם. מחושב מפילוח הסטטוסים.')}
+                  {CARD('פגישות שנקבעו', formatNum(_meet), '#3b82f6', 'לידים שיש להם תאריך פגישה (השדה meetingDate__c מלא). אחוז מהלידים: ' + pctOf(_meet, _leads))}
+                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), '#ef4444', 'לידים שסטטוסם "לא הגיעו לפגישה" — נקבעה להם פגישה אך לא הגיעו. אחוז מהפגישות: ' + pctOf(_noShow, _meet))}
+                  {CARD('הגיעו לפגישה', formatNum(_arrived), '#14b8a6', 'פגישות שנקבעו פחות מי שלא הגיעו. אחוז מהפגישות: ' + pctOf(_arrived, _meet))}
+                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), '#f97316', 'הזדמנויות שהגיעו לשלב "קיבל הצעת מחיר" ומעלה (כולל אלה שכבר שילמו מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps))}
+                  {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), '#fb923c', 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של ההזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — כלומר פוטנציאל שטרם נסגר. לא כולל הובלה והרכבה.')}
+                  {CARD('שילמו מקדמה', formatNum(_paid), '#a855f7', 'הזדמנויות בשלב "הזמנה - שולמה מקדמה". זו הרכישה בפועל. אחוז מהלידים: ' + pctOf(_paid, _leads))}
+                  {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), '#ec4899', 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. סכום ההובלה וההרכבה מוצג בנפרד ואינו נכלל כאן.')}
+                  {CARD('החליטו לא לרכוש', formatNum(_lost), '#64748b', 'הזדמנויות בשלב "נסגר ללא הצלחה". אחוז מההזדמנויות: ' + pctOf(_lost, _opps))}
+                </div>
+              </div>
+            )
+
             const stages = [
-              { label: 'לידים', v: _f.leads || 0, of: null },
-              { label: 'תיאמו פגישה', v: _f.meetings || 0, of: _f.leads || 0 },
-              { label: 'לא הגיעו לפגישה', v: _f.noShow || 0, of: _f.meetings || 0, neg: true },
-              { label: 'הגיעו / הזדמנות', v: _f.opportunities || 0, of: _f.meetings || 0 },
-              { label: 'קיבלו הצעת מחיר', v: _f.quotes || 0, of: _f.opportunities || 0 },
-              { label: 'שילמו מקדמה', v: _f.paid || 0, of: _f.quotes || 0 },
-              { label: 'לא מעוניינים', v: _f.notInterested || 0, of: _f.opportunities || 0, neg: true },
+              { label: 'לידים', v: _leads, of: null },
+              { label: 'תיאמו פגישה', v: _meet, of: _leads },
+              { label: 'לא הגיעו לפגישה', v: _noShow, of: _meet, neg: true },
+              { label: 'הגיעו לפגישה', v: _arrived, of: _meet },
+              { label: 'עברו להזדמנות', v: _opps, of: _meet },
+              { label: 'קיבלו הצעת מחיר', v: _quotes, of: _opps },
+              { label: 'שילמו מקדמה', v: _paid, of: _quotes },
+              { label: 'לא מעוניינים', v: _lost, of: _opps, neg: true },
             ]
+            const funnelTable = (
+              <div className="section">
+                <div className="section-head">{ICO('emerald', "M3 4h18l-7 8v6l-4 2v-8z")}<h2>משפך — שלב אחר שלב</h2><span className="sub">אחוז המרה בין שלב לשלב</span></div>
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead><tr><th>שלב</th><th>כמות</th><th>מהשלב הקודם</th><th>מסך הלידים</th></tr></thead>
+                    <tbody>{stages.map(st => (
+                      <tr key={st.label}>
+                        <td style={{fontWeight:600, color: st.neg ? 'var(--rose)' : undefined}}>{st.label}</td>
+                        <td style={{fontWeight:600}}>{formatNum(st.v)}</td>
+                        <td style={{color:'var(--violet)'}}>{st.of === null ? '—' : pctOf(st.v, st.of)}</td>
+                        <td className="sub">{pctOf(st.v, _leads)}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )
+
             const maxH = Math.max(1, ...Object.values(_hours))
             const maxD = Math.max(1, ...Object.values(_days))
             const hourKeys = Object.keys(_hours).map(Number).sort((a, b) => a - b)
             const dayOrder = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת']
             const simple = (title, rows, c1, c2, ico) => (
-              <div className="section">
+              <div className="section" key={title}>
                 <div className="section-head">{ICO(ico, "M3 3v18h18")}<h2>{title}</h2><span className="sub">{rows.length} ערכים</span></div>
                 <div className="table-wrapper">
                   <table className="data-table">
@@ -2793,24 +2865,8 @@ const selectProject = async (client, project) => {
                 </div>
               </div>
             )
-            return (<>
-              <div className="section">
-                <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>משפך ניהולי — כלל הרשת</h2><span className="sub">אחוז המרה בין שלב לשלב</span></div>
-                <div className="table-wrapper">
-                  <table className="data-table">
-                    <thead><tr><th>שלב</th><th>כמות</th><th>מהשלב הקודם</th><th>מסך הלידים</th></tr></thead>
-                    <tbody>{stages.map(st => (
-                      <tr key={st.label}>
-                        <td style={{fontWeight:600, color: st.neg ? 'var(--rose)' : undefined}}>{st.label}</td>
-                        <td style={{fontWeight:600}}>{formatNum(st.v)}</td>
-                        <td style={{color:'var(--violet)'}}>{st.of === null ? '—' : pctOf(st.v, st.of)}</td>
-                        <td className="sub">{pctOf(st.v, _f.leads || 0)}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                </div>
-              </div>
 
+            const branchesSec = (
               <div className="section">
                 <div className="section-head">{ICO('emerald', "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z")}<h2>ביצועים לפי סניף</h2><span className="sub">לחיצה על סניף פותחת אנשי מכירות ומוצרים</span></div>
                 <div className="table-wrapper">
@@ -2830,7 +2886,7 @@ const selectProject = async (client, project) => {
                           <td style={{color:'var(--violet)',fontWeight:600}}>{b.convLeadToPaid}%</td>
                           <td className="sub">{b.topSalesman || '—'}</td>
                         </tr>
-                        {open && (<tr><td colSpan={9} style={{background:'var(--surface-1,#f8fafc)'}}>
+                        {open && (<tr><td colSpan={9} style={{background:'#f8fafc'}}>
                           <div style={{display:'flex',gap:32,flexWrap:'wrap',padding:'6px 4px'}}>
                             <div style={{minWidth:220}}>
                               <div className="sub" style={{marginBottom:6,fontWeight:600}}>אנשי מכירות</div>
@@ -2844,7 +2900,7 @@ const selectProject = async (client, project) => {
                                 <div key={pr.name} style={{display:'flex',justifyContent:'space-between',gap:16,fontSize:13,padding:'2px 0'}}><span>{pr.name}</span><span>{formatNum(pr.units)}</span></div>
                               ))}
                             </div>
-                            <div style={{minWidth:180}}>
+                            <div style={{minWidth:190}}>
                               <div className="sub" style={{marginBottom:6,fontWeight:600}}>אחוזי המרה</div>
                               <div style={{fontSize:13}}>ליד → פגישה: <b>{b.convLeadToMeeting}%</b></div>
                               <div style={{fontSize:13}}>פגישה → הזדמנות: <b>{b.convMeetingToOpp}%</b></div>
@@ -2859,33 +2915,33 @@ const selectProject = async (client, project) => {
                   </table>
                 </div>
               </div>
+            )
 
+            const timingSec = (<>
               <div className="section">
                 <div className="section-head">{ICO('amber', "M12 6v6l4 2")}<h2>שעות תיאום פגישות</h2><span className="sub">שעון ישראל</span></div>
                 <div style={{display:'flex',alignItems:'flex-end',gap:6,padding:'12px 4px',minHeight:120}}>
                   {hourKeys.length === 0 ? <div className="sub">אין נתונים</div> : hourKeys.map(h => (
                     <div key={h} style={{flex:1,textAlign:'center'}}>
                       <div style={{fontSize:11,marginBottom:4}}>{_hours[h]}</div>
-                      <div style={{height:Math.round((_hours[h]/maxH)*90)+6,background:'var(--violet,#7c6cf5)',borderRadius:4}}></div>
+                      <div style={{height:Math.round((_hours[h]/maxH)*90)+6,background:'#7c6cf5',borderRadius:4}}></div>
                       <div className="sub" style={{fontSize:11,marginTop:4}}>{h}:00</div>
                     </div>
                   ))}
                 </div>
               </div>
-
               <div className="section">
                 <div className="section-head">{ICO('sky', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z")}<h2>ימי תיאום פגישות</h2><span className="sub">לפי יום בשבוע</span></div>
                 <div style={{display:'flex',alignItems:'flex-end',gap:10,padding:'12px 4px',minHeight:120}}>
                   {dayOrder.filter(d => _days[d]).length === 0 ? <div className="sub">אין נתונים</div> : dayOrder.map(d => _days[d] ? (
                     <div key={d} style={{flex:1,textAlign:'center'}}>
                       <div style={{fontSize:11,marginBottom:4}}>{_days[d]}</div>
-                      <div style={{height:Math.round((_days[d]/maxD)*90)+6,background:'var(--sky,#38bdf8)',borderRadius:4}}></div>
+                      <div style={{height:Math.round((_days[d]/maxD)*90)+6,background:'#38bdf8',borderRadius:4}}></div>
                       <div className="sub" style={{fontSize:11,marginTop:4}}>{d}</div>
                     </div>
                   ) : null)}
                 </div>
               </div>
-
               <div className="section">
                 <div className="section-head">{ICO('rose', "M12 6v6l4 2")}<h2>זמני טיפול בליד</h2><span className="sub">מיצירת הליד עד הטיפול הראשון</span></div>
                 {_rt.measured ? (
@@ -2899,7 +2955,9 @@ const selectProject = async (client, project) => {
                   </div>
                 ) : <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div>}
               </div>
+            </>)
 
+            const peopleSec = (<>
               <div className="section">
                 <div className="section-head">{ICO('violet', "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2")}<h2>ביצועי אנשי מכירות</h2><span className="sub">כלל הרשת</span></div>
                 <div className="table-wrapper">
@@ -2911,7 +2969,6 @@ const selectProject = async (client, project) => {
                   </table>
                 </div>
               </div>
-
               <div className="section">
                 <div className="section-head">{ICO('emerald', "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z")}<h2>המוצרים הנמכרים ביותר</h2><span className="sub">כלל הרשת</span></div>
                 <div className="table-wrapper">
@@ -2923,11 +2980,26 @@ const selectProject = async (client, project) => {
                   </table>
                 </div>
               </div>
+            </>)
 
-              {simple('מקורות הגעה', ent(_s.bySource), 'מקור', 'לידים', 'sky')}
-              {simple('סטטוסי לידים', ent(_s.byStatus), 'סטטוס', 'לידים', 'amber')}
-              {simple('סיבות אי-המרה', ent(_s.reasons), 'סיבה', 'לידים', 'rose')}
-              {simple('מתחרים', ent(_s.competitors), 'מתחרה', 'לידים', 'violet')}
+            return (<>
+              <div className="client-tabs" style={{marginBottom:15}}>
+                <button className={`client-tab ${sfTab === 'network' ? 'active' : ''}`} onClick={() => setSfTab('network')}>מסך רשת</button>
+                <button className={`client-tab ${sfTab === 'branches' ? 'active' : ''}`} onClick={() => setSfTab('branches')}>סניפים</button>
+                <button className={`client-tab ${sfTab === 'people' ? 'active' : ''}`} onClick={() => setSfTab('people')}>אנשי מכירות ומוצרים</button>
+                <button className={`client-tab ${sfTab === 'timing' ? 'active' : ''}`} onClick={() => setSfTab('timing')}>זמנים</button>
+                <button className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={() => setSfTab('breakdown')}>מקורות וסטטוסים</button>
+              </div>
+              {sfTab === 'network' ? (<>{netCards}{funnelTable}</>)
+                : sfTab === 'branches' ? branchesSec
+                : sfTab === 'people' ? peopleSec
+                : sfTab === 'timing' ? timingSec
+                : (<>
+                    {simple('מקורות הגעה', ent(_s.bySource), 'מקור', 'לידים', 'sky')}
+                    {simple('סטטוסי לידים', ent(_s.byStatus), 'סטטוס', 'לידים', 'amber')}
+                    {simple('סיבות אי-המרה', ent(_s.reasons), 'סיבה', 'לידים', 'rose')}
+                    {simple('מתחרים', ent(_s.competitors), 'מתחרה', 'לידים', 'violet')}
+                  </>)}
             </>)
           }
 
