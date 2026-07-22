@@ -2796,6 +2796,7 @@ const selectProject = async (client, project) => {
             )
 
             const _arrived2 = _f.arrived !== undefined ? _f.arrived : Math.max(0, _meet - _noShow)
+            const _sched = _f.scheduledUpcoming || 0
             const _quotesAmount = (_bs['קיבל הצעת מחיר'] || {}).amount || 0
             const _dealAmount = (_bs['הזמנה - שולמה מקדמה'] || {}).amount || 0
             const netCards = (
@@ -2806,8 +2807,9 @@ const selectProject = async (client, project) => {
                   {CARD('סה"כ לידים', formatNum(_leads), 'green', 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו.', _leads)}
                   {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'purple', 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.', _cpl)}
                   {CARD('טרם טופלו / חדשים', formatNum(_untreated), 'amber', 'לידים שסטטוסם עדיין "חדש" (New) ולא נגעו בהם.', _untreated)}
-                  {CARD('פגישות שנקבעו', formatNum(_meet), 'sky', 'נספר לפי סטטוס הליד: מי שהגיע לפגישה או שהפגישה עדיין מתואמת (Qualified), ועוד מי שלא הגיע. כך סופר גם הדשבורד שלך ב-Salesforce. לא נספר לפי תאריך פגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא.', _meet)}
-                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'cyan', 'לידים בסטטוס Qualified — הגיעו לפגישה או שהפגישה מתואמת. אחוז מהפגישות: ' + pctOf(_arrived2, _meet), _arrived2)}
+                  {CARD('פגישות שנקבעו', formatNum(_meet), 'sky', 'סכום שלושת סטטוסי הפגישה: "תואמה פגישה בסניף" (טרם התקיימה) + "הומר" (הגיע) + "לא הגיעו לפגישה". נספר לפי סטטוס ולא לפי תאריך הפגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא.', _meet)}
+                  {CARD('פגישות עתידיות', formatNum(_sched), 'amber', 'לידים בסטטוס "תואמה פגישה בסניף" — הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.', _sched)}
+                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'cyan', 'לידים בסטטוס "הומר" (Qualified) — הגיעו לפגישה בפועל. אחוז מהפגישות: ' + pctOf(_arrived2, _meet), _arrived2)}
                   {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'red', 'לידים בסטטוס "לא הגיעו לפגישה". אחוז מהפגישות: ' + pctOf(_noShow, _meet), _noShow)}
                   {CARD('עברו להזדמנות', formatNum(_opps), 'cyan', 'הזדמנויות שנפתחו בטווח. הזדמנות נפתחת כשליד מגיע לפגישה בסניף. אחוז מהלידים: ' + pctOf(_opps, _leads), _opps)}
                   {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'orange', 'הזדמנויות שהגיעו לשלב "קיבל הצעת מחיר" ומעלה (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps), _quotes)}
@@ -2823,6 +2825,7 @@ const selectProject = async (client, project) => {
               { label: 'לידים', v: _leads, of: null },
               { label: 'תיאמו פגישה', v: _meet, of: _leads },
               { label: 'לא הגיעו לפגישה', v: _noShow, of: _meet, neg: true },
+              { label: 'תואמה פגישה (עתידית)', v: _sched, of: _meet },
               { label: 'הגיעו לפגישה', v: _arrived2, of: _meet },
               { label: 'עברו להזדמנות', v: _opps, of: _meet },
               { label: 'קיבלו הצעת מחיר', v: _quotes, of: _opps },
