@@ -2859,27 +2859,30 @@ const selectProject = async (client, project) => {
             const _fc = _s.funnelCohort || {}
             const _fp = _s.funnelPeriod || {}
             const funnelBars = (title, subtitle, ico, steps, showStepPct) => {
-              const mx = Math.max(1, steps[0] ? steps[0].v : 1)
+              const mainSteps = steps.filter(x => !x.aux)
+              const mx = Math.max(1, mainSteps[0] ? mainSteps[0].v : 1)
+              const leadsTot = mainSteps[0] ? mainSteps[0].v : 0
               return (
                 <div className="section">
                   <div className="section-head">{ICO(ico, "M3 4h18l-7 8v6l-4 2v-8z")}<h2>{title}</h2><span className="sub">{subtitle}</span></div>
                   <div style={{padding:'14px 4px'}}>
                     {steps.map((st, i) => {
-                      const w = Math.max(6, Math.round(st.v / mx * 100))
-                      const prev = i === 0 ? null : steps[i - 1].v
-                      const dropPct = (showStepPct && prev) ? pctOf(st.v, prev) : null
+                      const w = Math.max(4, Math.round(st.v / mx * 100))
+                      const prevMain = (() => { for (let j = i - 1; j >= 0; j--) { if (!steps[j].aux) return steps[j].v } return null })()
+                      const dropPct = (showStepPct && prevMain !== null && !st.aux) ? pctOf(st.v, prevMain) : null
                       return (
-                        <div key={st.label} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
-                          <div style={{width:140,fontSize:13,fontWeight:600,textAlign:'left',flexShrink:0,color:'#334155'}}>{st.label}</div>
-                          <div style={{flex:1,position:'relative',height:34,background:'#f1f5f9',borderRadius:8,overflow:'hidden'}}>
-                            <div style={{position:'absolute',insetInlineStart:0,top:0,height:'100%',width:w+'%',background:st.color,borderRadius:8,transition:'width .5s ease',display:'flex',alignItems:'center',paddingInline:12,minWidth:54}}>
-                              <span style={{color:'#fff',fontWeight:700,fontSize:14}}>{formatNum(st.v)}</span>
+                        <div key={st.label} style={{display:'flex',alignItems:'center',gap:12,marginBottom:9,opacity: st.aux ? 0.92 : 1}}>
+                          <div style={{width:150,fontSize:13,fontWeight:600,textAlign:'left',flexShrink:0,color: st.aux ? '#ef4444' : '#334155'}}>{st.aux ? '↳ ' : ''}{st.label}</div>
+                          <div style={{flex:1,position:'relative',height:st.aux?26:34,background:'#f1f5f9',borderRadius:8,overflow:'hidden'}}>
+                            <div style={{position:'absolute',insetInlineStart:0,top:0,height:'100%',width:w+'%',background:st.color,borderRadius:8,transition:'width .5s ease',display:'flex',alignItems:'center',paddingInline:12,minWidth:50,gap:8}}>
+                              <span style={{color:'#fff',fontWeight:700,fontSize:st.aux?12:14}}>{formatNum(st.v)}</span>
+                              {st.note ? <span style={{color:'rgba(255,255,255,.92)',fontWeight:600,fontSize:11}}>· {st.note}</span> : null}
                             </div>
                           </div>
                           <div style={{width:120,fontSize:12,flexShrink:0,textAlign:'right'}}>
-                            {i === 0 ? <span style={{color:'#94a3b8'}}>100%</span> : (
-                              <><span style={{color:'#7c6cf5',fontWeight:600}}>{pctOf(st.v, steps[0].v)}</span><span style={{color:'#94a3b8'}}> מהלידים</span>{dropPct ? <span style={{color:'#cbd5e1'}}> · {dropPct} מהקודם</span> : null}</>
-                            )}
+                            {st.aux ? <span style={{color:'#f87171'}}>{pctOf(st.v, st.of || leadsTot)} {st.ofLabel || 'מהלידים'}</span>
+                              : i === 0 ? <span style={{color:'#94a3b8'}}>100%</span>
+                              : (<><span style={{color:'#7c6cf5',fontWeight:600}}>{pctOf(st.v, leadsTot)}</span><span style={{color:'#94a3b8'}}> מהלידים</span>{dropPct ? <span style={{color:'#cbd5e1'}}> · {dropPct} מהקודם</span> : null}</>)}
                           </div>
                         </div>
                       )
@@ -2894,10 +2897,12 @@ const selectProject = async (client, project) => {
               [
                 { label: 'לידים', v: _fc.leads || 0, color: '#10b981' },
                 { label: 'תיאמו פגישה', v: _fc.meetings || 0, color: '#3b82f6' },
+                { label: 'לא הגיעו לפגישה', v: _fc.noShow || 0, color: '#ef4444', aux: true, of: _fc.meetings || 0, ofLabel: 'מהפגישות' },
                 { label: 'הגיעו לפגישה', v: _fc.arrived || 0, color: '#14b8a6' },
                 { label: 'עברו להזדמנות', v: _fc.opportunities || 0, color: '#06b6d4' },
-                { label: 'קיבלו הצעת מחיר', v: _fc.quotes || 0, color: '#f97316' },
-                { label: 'שילמו מקדמה', v: _fc.paid || 0, color: '#a855f7' },
+                { label: 'קיבלו הצעת מחיר', v: _fc.quotes || 0, color: '#f97316', note: formatCurrencyCompact(_fc.quotesValue || 0) },
+                { label: 'שילמו מקדמה', v: _fc.paid || 0, color: '#a855f7', note: formatCurrencyCompact(_fc.paidValue || 0) },
+                { label: 'לא רכשו', v: _fc.lost || 0, color: '#94a3b8', aux: true, of: _fc.opportunities || 0, ofLabel: 'מההזדמנויות' },
               ], true)
             const periodFunnel = funnelBars(
               'דוח ביצועים — פעילות החודש', 'כל מה שנוצר/התקיים החודש, כולל לידים מחודשים קודמים',
@@ -2906,8 +2911,10 @@ const selectProject = async (client, project) => {
                 { label: 'לידים שנוצרו', v: _fp.leads || 0, color: '#10b981' },
                 { label: 'הזדמנויות שנפתחו', v: _fp.opportunities || 0, color: '#06b6d4' },
                 { label: 'פגישות שהתקיימו', v: _fp.meetings || 0, color: '#3b82f6' },
-                { label: 'קיבלו הצעת מחיר', v: _fp.quotes || 0, color: '#f97316' },
-                { label: 'שילמו מקדמה', v: _fp.paid || 0, color: '#a855f7' },
+                { label: 'לא הגיעו לפגישה', v: _fp.noShow || 0, color: '#ef4444', aux: true, of: _fp.meetings || 0, ofLabel: 'מהפגישות' },
+                { label: 'קיבלו הצעת מחיר', v: _fp.quotes || 0, color: '#f97316', note: formatCurrencyCompact(_fp.quotesValue || 0) },
+                { label: 'שילמו מקדמה', v: _fp.paid || 0, color: '#a855f7', note: formatCurrencyCompact(_fp.paidValue || _fp.dealValue || 0) },
+                { label: 'לא רכשו', v: _fp.lost || 0, color: '#94a3b8', aux: true, of: _fp.opportunities || 0, ofLabel: 'מההזדמנויות' },
               ], false)
 
             const maxH = Math.max(1, ...Object.values(_hours))
@@ -3259,7 +3266,15 @@ const selectProject = async (client, project) => {
           })() : null}
           {crmReports[0]?.summary?.crmType === 'salesforce' ? (() => {
             const _sr = (crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {};
-            return sfKpiCards(_sr.funnel || {}, _sr.responseTime || {}, activeT.spend || 0, activeP?.spend);
+            const _fcO = _sr.funnelCohort || {}; const _perfO = _sr.funnel || {};
+            const _cohortCards = {
+              leads: _fcO.leads || 0, meetings: _fcO.meetings || 0, opportunities: _fcO.opportunities || 0,
+              quotes: _fcO.quotes || 0, paid: _fcO.paid || 0,
+              dealValue: _fcO.paidValue || 0, deliveryValue: _perfO.deliveryValue || 0,
+              conversionRate: _fcO.rateLeadToPaid || 0,
+              avgDealValue: (_fcO.paid ? Math.round((_fcO.paidValue || 0) / _fcO.paid) : 0),
+            };
+            return sfKpiCards(_cohortCards, _sr.responseTime || {}, activeT.spend || 0, activeP?.spend);
           })() : null}
           {!['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) && (<>
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
