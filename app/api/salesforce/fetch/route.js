@@ -301,6 +301,16 @@ async function runSync(opts = {}) {
     else if (st === STAGE_QUOTE) b.quotes = r.c
     else if (st === STAGE_LOST) b.lost = r.c
   }
+  // per-branch COHORT (this month's leads -> their converted opportunity)
+  for (const r of (branchCohortR || [])) {
+    const b = ensure(bkey(r.Branch_Name__c))
+    const o = r.ConvertedOpportunity; if (!o) continue
+    const st = o.StageName || ''
+    b.cohortOpps = (b.cohortOpps || 0) + 1
+    if (st === STAGE_PAID) { b.cohortPaid = (b.cohortPaid || 0) + 1; b.cohortValue = (b.cohortValue || 0) + num(o.TotalPrice_Opp_Product__c) }
+    else if (st === STAGE_QUOTE) { b.cohortQuote = (b.cohortQuote || 0) + 1; b.cohortQuoteValue = (b.cohortQuoteValue || 0) + num(o.TotalPrice_Opp_Product__c) }
+    else if (st === STAGE_LOST) { b.cohortLost = (b.cohortLost || 0) + 1 }
+  }
   const brSm = {}
   const brSmGet = (b, n) => { brSm[b] = brSm[b] || {}; brSm[b][n] = brSm[b][n] || { name: n, opportunities: 0, quotes: 0, quotesValue: 0, orders: 0, value: 0 }; return brSm[b][n] }
   for (const r of salesBranchR) {

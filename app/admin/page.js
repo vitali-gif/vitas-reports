@@ -164,6 +164,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [expandedFunnelCh, setExpandedFunnelCh] = useState(new Set());
   const [sfInfo, setSfInfo] = useState(null);
   const [sfTab, setSfTab] = useState('network');
+  const [sfBranchLens, setSfBranchLens] = useState('cohort');
   const [expandedAgents, setExpandedAgents] = useState(new Set());
   const handleSort = (tableId, key) => { setSortConfig(prev => { const cur = prev[tableId]; if (cur && cur.key === key) return {...prev, [tableId]: {key, dir: cur.dir === 'desc' ? 'asc' : 'desc'}}; return {...prev, [tableId]: {key, dir: 'desc'}}; }); };
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
@@ -2936,24 +2937,32 @@ const selectProject = async (client, project) => {
               </div>
             )
 
+            const _bLens = sfBranchLens
+            const _lensBtn = (v, label) => (<button type="button" onClick={(e)=>{e.preventDefault();e.stopPropagation();setSfBranchLens(v);}} style={{fontSize:12,fontWeight:600,padding:'4px 12px',borderRadius:6,cursor:'pointer',border:'1px solid '+(_bLens===v?'#7c6cf5':'var(--border)'),background:_bLens===v?'#7c6cf5':'transparent',color:_bLens===v?'#fff':'var(--text-secondary)'}}>{label}</button>)
             const branchesSec = (
               <div className="section">
-                <div className="section-head">{ICO('emerald', "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z")}<h2>ביצועים לפי סניף</h2><span className="sub">לחיצה על סניף פותחת אנשי מכירות ומוצרים</span></div>
+                <div className="section-head">{ICO('emerald', "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z")}<h2>ביצועים לפי סניף</h2><span className="sub">{_bLens==='cohort'?'מה קרה ללידים של החודש':'פעילות החודש (כולל לידים קודמים)'}</span></div>
+                <div style={{display:'flex',gap:8,padding:'0 2px 12px'}}>{_lensBtn('cohort','לידים של החודש')}{_lensBtn('period','פעילות החודש')}</div>
                 <div className="table-wrapper">
                   <table className="data-table">
                     <thead><tr><th>סניף</th><th>לידים</th><th>פגישות</th><th>הזדמנויות</th><th>הצעות</th><th>רכשו</th><th>שווי</th><th>המרה</th><th>מוביל</th></tr></thead>
                     <tbody>{_bd.map(b => {
                       const open = expandedFunnelCh.has(b.branch)
+                      const oOpps = _bLens==='cohort' ? (b.cohortOpps||0) : (b.opportunities||0)
+                      const oQuotes = _bLens==='cohort' ? (b.cohortQuotesTotal||0) : (b.quotesTotal||0)
+                      const oPaid = _bLens==='cohort' ? (b.cohortPaid||0) : (b.paid||0)
+                      const oValue = _bLens==='cohort' ? (b.cohortValue||0) : (b.value||0)
+                      const oConv = _bLens==='cohort' ? (b.cohortConvLeadToPaid||0) : (b.convLeadToPaid||0)
                       return (<Fragment key={b.branch}>
                         <tr onClick={() => toggleBranch(b.branch)} style={{cursor:'pointer'}}>
                           <td style={{fontWeight:600}}>{open ? '▾ ' : '▸ '}{b.branch}</td>
                           <td>{formatNum(b.leads)}</td>
                           <td>{formatNum(b.meetings)}</td>
-                          <td>{formatNum(b.opportunities)}</td>
-                          <td>{formatNum(b.quotesTotal)}</td>
-                          <td style={{fontWeight:600}}>{formatNum(b.paid)}</td>
-                          <td>{formatCurrencyCompact(b.value)}</td>
-                          <td style={{color:'var(--violet)',fontWeight:600}}>{b.convLeadToPaid}%</td>
+                          <td>{formatNum(oOpps)}</td>
+                          <td>{formatNum(oQuotes)}</td>
+                          <td style={{fontWeight:600}}>{formatNum(oPaid)}</td>
+                          <td>{formatCurrencyCompact(oValue)}</td>
+                          <td style={{color:'var(--violet)',fontWeight:600}}>{oConv}%</td>
                           <td className="sub">{b.topSalesman || '—'}</td>
                         </tr>
                         {open && (<tr><td colSpan={9} style={{background:'#f8fafc',padding:'14px 18px'}}>
@@ -3900,7 +3909,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
