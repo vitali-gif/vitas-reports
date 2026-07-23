@@ -447,6 +447,34 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     setRefreshingCrm(false);
   };
 
+  const refreshFromSalesforce = async () => {
+    if (refreshingCrm) return;
+    setRefreshingCrm(true);
+    showToast('מושך נתונים מ-Salesforce...');
+    try {
+      let payload = selectedMonth && !selectedMonth.includes('_')
+        ? { month: selectedMonth }
+        : selectedMonth
+          ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
+          : {};
+      if (selectedProject) payload = { ...payload, projectId: selectedProject.id };
+      const res = await fetch('/api/salesforce/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.pending) showToast('\u26a0\ufe0f Salesforce: ' + (json.message || 'credentials not configured'));
+      else if (!res.ok) showToast('שגיאה: ' + (json.error || 'unknown'));
+      else showToast('\u2713 Salesforce: ' + formatNum(json.totalLeads || 0) + ' לידים, ' + formatNum(json.paid || 0) + ' מכירות');
+      await loadClients();
+      if (selectedProject) await loadProjectReports(selectedProject.id);
+    } catch (err) {
+      showToast('שגיאה: ' + (err.message || err));
+    }
+    setRefreshingCrm(false);
+  };
+
     const refreshAll = async () => {
     // Re-fetch the current period
     if (!selectedMonth) {
@@ -3039,6 +3067,11 @@ const selectProject = async (client, project) => {
             </>)
 
             return (<>
+              <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
+                <button type="button" onClick={refreshFromSalesforce} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
+                  {refreshingCrm ? '\u23f3' : '\ud83d\udd04'} {refreshingCrm ? 'מושך...' : 'רענן CRM'}
+                </button>
+              </div>
               <div className="client-tabs" style={{marginBottom:15}}>
                 <button type="button" className={`client-tab ${sfTab === 'network' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('network'); }}>מסך רשת</button>
                 <button type="button" className={`client-tab ${sfTab === 'branches' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('branches'); }}>סניפים</button>
