@@ -158,7 +158,7 @@ async function runSync(opts = {}) {
   let totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, noShowPeriodCnt, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
   let oppStageR, oppBranchR, salesmenR, purposeR, productsR
   let cohortStagesR
-  let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR
+  let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR
   try {
     ;[totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, noShowPeriodCnt] = await Promise.all([
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE ${LW}`),
@@ -182,7 +182,7 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT Buying_Purpose__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Buying_Purpose__c!=null GROUP BY Buying_Purpose__c`),
       soql(auth, `SELECT Product2.Name k, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Product2.Name`),
     ])
-    ;[noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR] = await Promise.all([
+    ;[noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR] = await Promise.all([
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status='${STATUS_NOSHOW}' GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status IN (${STATUS_ARRIVED.map(x => `'${x}'`).join(',')}) GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status='${STATUS_SCHEDULED}' GROUP BY Branch_Name__c`),
@@ -192,6 +192,7 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT Opportunity.Branch_Name__c k, Product2.Name n, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Opportunity.Branch_Name__c, Product2.Name`),
       soql(auth, `SELECT HOUR_IN_DAY(meetingDate__c) hr, COUNT(Id) c FROM Lead WHERE ${LW} AND meetingDate__c!=null GROUP BY HOUR_IN_DAY(meetingDate__c)`),
       soql(auth, `SELECT DAY_IN_WEEK(meetingDate__c) dw, COUNT(Id) c FROM Lead WHERE ${LW} AND meetingDate__c!=null GROUP BY DAY_IN_WEEK(meetingDate__c)`),
+      soql(auth, `SELECT Branch_Name__c, ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c FROM Lead WHERE ${LW} AND IsConverted=true`),
     ])
   } catch (e) {
     return { status: 500, body: { error: 'Salesforce query failed: ' + e.message } }
