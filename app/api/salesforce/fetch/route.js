@@ -158,7 +158,7 @@ async function runSync(opts = {}) {
   let totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, noShowPeriodCnt, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
   let oppStageR, oppBranchR, salesmenR, purposeR, productsR
   let cohortStagesR
-  let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR
+  let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR, prodBranchCohortR
   try {
     ;[totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, noShowPeriodCnt] = await Promise.all([
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE ${LW}`),
@@ -182,7 +182,7 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT Buying_Purpose__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Buying_Purpose__c!=null GROUP BY Buying_Purpose__c`),
       soql(auth, `SELECT Product2.Name k, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Product2.Name`),
     ])
-    ;[noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR] = await Promise.all([
+    ;[noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR, prodBranchCohortR] = await Promise.all([
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status='${STATUS_NOSHOW}' GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status IN (${STATUS_ARRIVED.map(x => `'${x}'`).join(',')}) GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status='${STATUS_SCHEDULED}' GROUP BY Branch_Name__c`),
@@ -192,7 +192,8 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT Opportunity.Branch_Name__c k, Product2.Name n, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Opportunity.Branch_Name__c, Product2.Name`),
       soql(auth, `SELECT HOUR_IN_DAY(meetingDate__c) hr, COUNT(Id) c FROM Lead WHERE ${LW} AND meetingDate__c!=null GROUP BY HOUR_IN_DAY(meetingDate__c)`),
       soql(auth, `SELECT DAY_IN_WEEK(meetingDate__c) dw, COUNT(Id) c FROM Lead WHERE ${LW} AND meetingDate__c!=null GROUP BY DAY_IN_WEEK(meetingDate__c)`),
-      soql(auth, `SELECT Branch_Name__c, ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c FROM Lead WHERE ${LW} AND IsConverted=true`),
+      soql(auth, `SELECT Branch_Name__c, ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c, ConvertedOpportunity.Salesman__r.Name FROM Lead WHERE ${LW} AND IsConverted=true`),
+      soql(auth, `SELECT Opportunity.Branch_Name__c k, Product2.Name n, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Id IN (SELECT ConvertedOpportunityId FROM Lead WHERE ${LW} AND IsConverted=true) GROUP BY Opportunity.Branch_Name__c, Product2.Name`),
     ])
   } catch (e) {
     return { status: 500, body: { error: 'Salesforce query failed: ' + e.message } }
@@ -303,6 +304,8 @@ async function runSync(opts = {}) {
     else if (st === STAGE_LOST) b.lost = r.c
   }
   // per-branch COHORT (this month's leads -> their converted opportunity)
+  const brSmC = {}
+  const brSmCGet = (b, n) => { brSmC[b] = brSmC[b] || {}; brSmC[b][n] = brSmC[b][n] || { name: n, opportunities: 0, quotes: 0, quotesValue: 0, orders: 0, value: 0 }; return brSmC[b][n] }
   for (const r of (branchCohortR || [])) {
     const b = ensure(bkey(r.Branch_Name__c))
     const o = r.ConvertedOpportunity; if (!o) continue
@@ -311,7 +314,16 @@ async function runSync(opts = {}) {
     if (st === STAGE_PAID) { b.cohortPaid = (b.cohortPaid || 0) + 1; b.cohortValue = (b.cohortValue || 0) + num(o.TotalPrice_Opp_Product__c) }
     else if (st === STAGE_QUOTE) { b.cohortQuote = (b.cohortQuote || 0) + 1; b.cohortQuoteValue = (b.cohortQuoteValue || 0) + num(o.TotalPrice_Opp_Product__c) }
     else if (st === STAGE_LOST) { b.cohortLost = (b.cohortLost || 0) + 1 }
+    const sname = (o.Salesman__r && o.Salesman__r.Name) || 'לא ידוע'
+    const so = brSmCGet(bkey(r.Branch_Name__c), sname)
+    so.opportunities += 1
+    if (st === STAGE_PAID) { so.orders += 1; so.value += num(o.TotalPrice_Opp_Product__c) }
+    else if (st === STAGE_QUOTE) { so.quotes += 1; so.quotesValue += num(o.TotalPrice_Opp_Product__c) }
   }
+  for (const [bk, obj] of Object.entries(brSmC)) {
+    ensure(bk).cohortSalesmen = Object.values(obj).map(o => ({ ...o, quotesTotal: o.quotes + o.orders, quotesValueTotal: o.quotesValue + o.value, convToDeal: _rate(o.orders, o.opportunities), avgDeal: o.orders ? Math.round(o.value / o.orders) : 0 }))
+  }
+  for (const r of (prodBranchCohortR || [])) { const b = ensure(bkey(r.k)); (b.cohortProducts = b.cohortProducts || []).push({ name: r.n || 'לא ידוע', units: r.c, value: r0(r.v) }) }
   const brSm = {}
   const brSmGet = (b, n) => { brSm[b] = brSm[b] || {}; brSm[b][n] = brSm[b][n] || { name: n, opportunities: 0, quotes: 0, quotesValue: 0, orders: 0, value: 0 }; return brSm[b][n] }
   for (const r of salesBranchR) {
@@ -337,6 +349,9 @@ async function runSync(opts = {}) {
     b.cohortLost = b.cohortLost || 0
     b.cohortConvLeadToPaid = b.leads ? Math.round(b.cohortPaid / b.leads * 1000) / 10 : 0
     b.cohortAvgDeal = b.cohortPaid ? Math.round(b.cohortValue / b.cohortPaid) : 0
+    b.cohortSalesmen = (b.cohortSalesmen || []).filter(x => x.opportunities > 0).sort((x, y) => y.value - x.value).slice(0, 10)
+    b.cohortProducts = (b.cohortProducts || []).sort((x, y) => y.units - x.units).slice(0, 8)
+    b.cohortTopSalesman = b.cohortSalesmen[0] ? b.cohortSalesmen[0].name : null
     b.convLeadToMeeting = b.leads ? Math.round(b.meetings / b.leads * 1000) / 10 : 0
     b.convMeetingToOpp = b.meetings ? Math.round(b.opportunities / b.meetings * 1000) / 10 : 0
     b.convOppToPaid = b.opportunities ? Math.round(b.paid / b.opportunities * 1000) / 10 : 0

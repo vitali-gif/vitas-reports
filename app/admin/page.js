@@ -2953,6 +2953,9 @@ const selectProject = async (client, project) => {
                       const oPaid = _bLens==='cohort' ? (b.cohortPaid||0) : (b.paid||0)
                       const oValue = _bLens==='cohort' ? (b.cohortValue||0) : (b.value||0)
                       const oConv = _bLens==='cohort' ? (b.cohortConvLeadToPaid||0) : (b.convLeadToPaid||0)
+                      const oTop = _bLens==='cohort' ? (b.cohortTopSalesman||null) : (b.topSalesman||null)
+                      const _sm = _bLens==='cohort' ? (b.cohortSalesmen||[]) : (b.salesmen||[])
+                      const _pr = _bLens==='cohort' ? (b.cohortProducts||[]) : (b.products||[])
                       return (<Fragment key={b.branch}>
                         <tr onClick={() => toggleBranch(b.branch)} style={{cursor:'pointer'}}>
                           <td style={{fontWeight:600}}>{open ? '▾ ' : '▸ '}{b.branch}</td>
@@ -2963,16 +2966,16 @@ const selectProject = async (client, project) => {
                           <td style={{fontWeight:600}}>{formatNum(oPaid)}</td>
                           <td>{formatCurrencyCompact(oValue)}</td>
                           <td style={{color:'var(--violet)',fontWeight:600}}>{oConv}%</td>
-                          <td className="sub">{b.topSalesman || '—'}</td>
+                          <td className="sub">{oTop || '—'}</td>
                         </tr>
                         {open && (<tr><td colSpan={9} style={{background:'#f8fafc',padding:'14px 18px'}}>
                           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:20,width:'100%'}}>
                             <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אנשי מכירות</div>
-                              {(b.salesmen || []).length === 0 ? <div className="sub">—</div> : (
+                              {_sm.length === 0 ? <div className="sub">—</div> : (
                                 <table className="data-table" style={{width:'100%'}}>
                                   <thead><tr><th>שם</th><th>הזדמנויות</th><th>הצעות</th><th>עסקאות</th><th>שווי</th><th>% לעסקה</th></tr></thead>
-                                  <tbody>{(b.salesmen || []).map(a => (
+                                  <tbody>{_sm.map(a => (
                                     <tr key={a.name}>
                                       <td style={{fontWeight:600}}>{a.name}</td>
                                       <td>{formatNum(a.opportunities || 0)}</td>
@@ -2987,10 +2990,10 @@ const selectProject = async (client, project) => {
                             </div>
                             <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>מוצרים מובילים</div>
-                              {(b.products || []).length === 0 ? <div className="sub">—</div> : (
+                              {_pr.length === 0 ? <div className="sub">—</div> : (
                                 <table className="data-table" style={{width:'100%'}}>
                                   <thead><tr><th>מוצר</th><th>כמות</th><th>שווי כולל</th></tr></thead>
-                                  <tbody>{(b.products || []).map(pr => (
+                                  <tbody>{_pr.map(pr => (
                                     <tr key={pr.name}>
                                       <td style={{fontWeight:600}}>{pr.name}</td>
                                       <td>{formatNum(pr.units)}</td>
