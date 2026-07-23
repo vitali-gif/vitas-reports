@@ -157,6 +157,7 @@ async function runSync(opts = {}) {
 
   let totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
   let oppStageR, oppBranchR, salesmenR, purposeR, productsR
+  let cohortStagesR
   let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR
   try {
     ;[totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt] = await Promise.all([
