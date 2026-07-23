@@ -2838,6 +2838,42 @@ const selectProject = async (client, project) => {
               { label: 'שילמו מקדמה', v: _paid, of: _quotes },
               { label: 'לא מעוניינים', v: _lost, of: _opps, neg: true },
             ]
+            const _fSteps = [
+              { label: 'לידים', v: _leads, color: '#10b981' },
+              { label: 'תיאמו פגישה', v: _meet, color: '#3b82f6' },
+              { label: 'הגיעו לפגישה', v: _arrived2, color: '#14b8a6' },
+              { label: 'עברו להזדמנות', v: _opps, color: '#06b6d4' },
+              { label: 'קיבלו הצעת מחיר', v: _quotes, color: '#f97316' },
+              { label: 'שילמו מקדמה', v: _paid, color: '#a855f7' },
+            ]
+            const _fMax = Math.max(1, _leads)
+            const funnelChart = (
+              <div className="section">
+                <div className="section-head">{ICO('violet', "M3 4h18l-7 8v6l-4 2v-8z")}<h2>משפך ויזואלי</h2><span className="sub">רוחב הפס יחסי לכמות · האחוז הוא מהשלב הקודם</span></div>
+                <div style={{padding:'14px 4px'}}>
+                  {_fSteps.map((st, i) => {
+                    const w = Math.max(6, Math.round(st.v / _fMax * 100))
+                    const prev = i === 0 ? null : _fSteps[i - 1].v
+                    const dropPct = prev ? pctOf(st.v, prev) : null
+                    return (
+                      <div key={st.label} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+                        <div style={{width:130,fontSize:13,fontWeight:600,textAlign:'left',flexShrink:0,color:'#334155'}}>{st.label}</div>
+                        <div style={{flex:1,position:'relative',height:34,background:'#f1f5f9',borderRadius:8,overflow:'hidden'}}>
+                          <div style={{position:'absolute',insetInlineStart:0,top:0,height:'100%',width:w+'%',background:st.color,borderRadius:8,transition:'width .5s ease',display:'flex',alignItems:'center',paddingInline:12,minWidth:54}}>
+                            <span style={{color:'#fff',fontWeight:700,fontSize:14}}>{formatNum(st.v)}</span>
+                          </div>
+                        </div>
+                        <div style={{width:110,fontSize:12,flexShrink:0,textAlign:'right'}}>
+                          {dropPct ? (<span style={{color:'#7c6cf5',fontWeight:600}}>{dropPct}</span>) : null}
+                          {dropPct ? <span style={{color:'#94a3b8'}}> מהקודם</span> : null}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+
             const funnelTable = (
               <div className="section">
                 <div className="section-head">{ICO('emerald', "M3 4h18l-7 8v6l-4 2v-8z")}<h2>משפך — שלב אחר שלב</h2><span className="sub">אחוז המרה בין שלב לשלב</span></div>
@@ -3022,7 +3058,7 @@ const selectProject = async (client, project) => {
                 <button type="button" className={`client-tab ${sfTab === 'timing' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('timing'); }}>זמנים</button>
                 <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
-              {sfTab === 'network' ? (<>{netCards}{funnelTable}</>)
+              {sfTab === 'network' ? (<>{netCards}{funnelChart}{funnelTable}</>)
                 : sfTab === 'branches' ? branchesSec
                 : sfTab === 'people' ? peopleSec
                 : sfTab === 'timing' ? timingSec
