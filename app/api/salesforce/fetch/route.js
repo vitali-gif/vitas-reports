@@ -532,5 +532,19 @@ export async function GET(request) {
     const { status, body: rb } = await runSync()
     return Response.json(rb, { status })
   }
+  const { searchParams } = new URL(request.url)
+  if (searchParams.get('describe')) {
+    try {
+      const a = await getAuth()
+      const obj = searchParams.get('describe') === '1' ? 'Opportunity' : searchParams.get('describe')
+      const r = await fetch(`${a.instance}/services/data/${SF_API_VERSION}/sobjects/${obj}/describe`, { headers: { Authorization: `Bearer ${a.token}` } })
+      const j = await r.json()
+      const term = searchParams.get('find') || ''
+      const fields = (j.fields || [])
+        .filter(fl => !term || (fl.label && fl.label.includes(term)) || (fl.name && fl.name.toLowerCase().includes(term.toLowerCase())))
+        .map(fl => ({ name: fl.name, label: fl.label, type: fl.type, picklist: (fl.picklistValues || []).map(p => p.value).slice(0, 40) }))
+      return Response.json({ object: obj, count: fields.length, fields })
+    } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
+  }
   return Response.json({ ok: true, configured: Boolean(process.env.SF_CLIENT_ID && process.env.SF_CLIENT_SECRET && process.env.SF_REFRESH_TOKEN) })
 }
