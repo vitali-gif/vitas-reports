@@ -2800,15 +2800,16 @@ const selectProject = async (client, project) => {
 
             const _spend = ((fbTotals && fbTotals.spend) || 0) + ((gTotals && gTotals.spend) || 0)
             const _leads = _f.leads || 0
-            const _opps = _f.opportunities || 0
+            const _fcCards = _s.funnelCohort || {}
+            const _opps = _fcCards.opportunities || 0
             const _meet = _f.meetings || 0
             const _noShow = _f.noShow || 0
             const _arrived = Math.max(0, _meet - _noShow)
-            const _quotes = _f.quotes || 0
-            const _quotesVal = (_bs['קיבל הצעת מחיר'] || {}).value || 0
-            const _paid = _f.paid || 0
-            const _dealVal = _f.dealValue || 0
-            const _lost = _f.notInterested || 0
+            const _quotes = _fcCards.quotes || 0
+            const _quotesVal = _fcCards.quotesValue || 0
+            const _paid = _fcCards.paid || 0
+            const _dealVal = _fcCards.paidValue || 0
+            const _lost = _fcCards.lost || 0
             const _untreated = Object.entries(_s.byStatus || {}).reduce((a, [k, v]) => a + (/^(new|חדש)$/i.test(String(k).trim()) ? v : 0), 0)
             const _cpl = _leads > 0 ? _spend / _leads : 0
             const _clicks = ((fbTotals && fbTotals.clicks) || 0) + ((gTotals && gTotals.clicks) || 0)
@@ -2833,7 +2834,7 @@ const selectProject = async (client, project) => {
             const _dealAmount = (_bs['הזמנה - שולמה מקדמה'] || {}).amount || 0
             const netCards = (
               <div className="section">
-                <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>מסך רשת</h2><span className="sub">כלל סניפי קלוס · לפי תאריך יצירה · לחיצה על ! להסבר</span></div>
+                <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>מסך רשת</h2><span className="sub">קבוצת הלידים שנוצרו החודש · מה קרה להם עד כה · לחיצה על ! להסבר</span></div>
                 <div className="kpi-grid">
                   {CARD('תקציב שנוצל', formatCurrency(_spend), '', 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.', _spend)}
                   {CARD('סה"כ לידים', formatNum(_leads), 'green', 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו. אחוז ההמרה מקליקים יוצג אוטומטית כשיחוברו חשבונות הפרסום.', _leads, _clicks > 0 ? pctOf(_leads, _clicks) + ' מהקליקים' : null)}
@@ -2843,14 +2844,14 @@ const selectProject = async (client, project) => {
                   {CARD('פגישות עתידיות', formatNum(_sched), 'amber', 'לידים בסטטוס "תואמה פגישה בסניף" — הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.', _sched)}
                   {CARD('הגיעו לפגישה', formatNum(_arrived2), 'cyan', 'לידים בסטטוס "הומר" (Qualified) — הגיעו לפגישה בפועל. אחוז מהפגישות שנקבעו: ' + pctOf(_arrived2, _meet) + '. השורה התחתונה: אחוז מסך הלידים.', _arrived2, pctOf(_arrived2, _leads) + ' מהלידים')}
                   {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'red', 'לידים בסטטוס "לא הגיעו לפגישה" — פגישות שנקבעו ולא התקיימו. השורה התחתונה: שיעור הביטול מתוך הפגישות שנקבעו.', _noShow, pctOf(_noShow, _meet) + ' מהפגישות')}
-                  {CARD('עברו להזדמנות', formatNum(_opps), 'cyan', 'הזדמנויות שנפתחו בטווח. הזדמנות נפתחת כשליד מגיע לפגישה בסניף. השורה התחתונה: אחוז מסך הלידים.', _opps, pctOf(_opps, _leads) + ' מהלידים')}
-                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'orange', 'הזדמנויות שהגיעו לשלב "קיבל הצעת מחיר" ומעלה (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps) + '. השורה התחתונה: אחוז מסך הלידים.', _quotes, pctOf(_quotes, _leads) + ' מהלידים')}
+                  {CARD('עברו להזדמנות', formatNum(_opps), 'cyan', 'מתוך הלידים שנוצרו החודש — כמה נפתחה להם הזדמנות (הגיעו לפגישה ונפתח תיק). לא כולל הזדמנויות מלידים של חודשים קודמים. השורה התחתונה: אחוז מסך הלידים.', _opps, pctOf(_opps, _leads) + ' מהלידים')}
+                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'orange', 'מתוך הלידים של החודש — כמה קיבלו הצעת מחיר (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps) + '. השורה התחתונה: אחוז מסך הלידים.', _quotes, pctOf(_quotes, _leads) + ' מהלידים')}
                   {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), 'orange', 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של הזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — פוטנציאל שטרם נסגר. לשם השוואה, בשדה Amount הסטנדרטי של Salesforce הסכום הוא ' + formatCurrencyCompact(_quotesAmount) + ' (כולל הובלה ותוספות).', _quotesVal)}
-                  {CARD('שילמו מקדמה', formatNum(_paid), 'pink', 'הזדמנויות בשלב "הזמנה - שולמה מקדמה" — הרכישה בפועל. השורה התחתונה: אחוז מסך הלידים.', _paid, pctOf(_paid, _leads) + ' מהלידים')}
+                  {CARD('שילמו מקדמה', formatNum(_paid), 'pink', 'מתוך הלידים של החודש — כמה כבר שילמו מקדמה (רכשו). לא כולל עסקאות שנסגרו החודש מלידים קודמים. השורה התחתונה: אחוז מסך הלידים.', _paid, pctOf(_paid, _leads) + ' מהלידים')}
                   {CARD('עלות פגישה שהגיעה', _spend > 0 ? formatCurrency(_costArrived) : '—', 'amber', 'תקציב שנוצל חלקי מספר הלידים שהגיעו לפגישה בפועל (סטטוס "הומר"). מוצג רק כשיש נתוני מדיה.', _costArrived)}
                   {CARD('עלות לקוח', _spend > 0 ? formatCurrency(_costCustomer) : '—', 'red', 'תקציב שנוצל חלקי מספר ההזמנות ששולמה בהן מקדמה — כמה עולה לנו לקוח משלם. מוצג רק כשיש נתוני מדיה.', _costCustomer)}
                   {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), 'pink', 'סכום "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. ההובלה וההרכבה בנפרד. בשדה Amount הסטנדרטי: ' + formatCurrencyCompact(_dealAmount) + '.', _dealVal)}
-                  {CARD('החליטו לא לרכוש', formatNum(_lost), '', 'הזדמנויות בשלב "נסגר ללא הצלחה". אחוז מההזדמנויות: ' + pctOf(_lost, _opps), _lost)}
+                  {CARD('החליטו לא לרכוש', formatNum(_lost), '', 'מתוך הלידים של החודש — כמה מההזדמנויות נסגרו ללא רכישה. אחוז מההזדמנויות: ' + pctOf(_lost, _opps), _lost)}
                 </div>
               </div>
             )

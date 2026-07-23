@@ -29,7 +29,7 @@ export const maxDuration = 300
 
 const SF_LOGIN_URL = process.env.SF_LOGIN_URL || 'https://login.salesforce.com'
 const SF_API_VERSION = process.env.SF_API_VERSION || 'v60.0'
-const SF_SCHEMA_VERSION = 8
+const SF_SCHEMA_VERSION = 9
 
 const CHAIN = 'קלוס'
 const STAGE_PAID = 'הזמנה - שולמה מקדמה'
@@ -172,7 +172,7 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT LeadSource k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY LeadSource`),
       soql(auth, `SELECT Unqualified_Reason__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Unqualified_Reason__c!=null GROUP BY Unqualified_Reason__c`),
       soql(auth, `SELECT Competitor_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Competitor_Name__c!=null GROUP BY Competitor_Name__c`),
-      soql(auth, `SELECT ConvertedOpportunity.StageName k, COUNT(Id) c FROM Lead WHERE ${LW} AND IsConverted=true GROUP BY ConvertedOpportunity.StageName`),
+      soql(auth, `SELECT ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c FROM Lead WHERE ${LW} AND IsConverted=true`),
     ])
     ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR] = await Promise.all([
       soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o, SUM(Amount) am FROM Opportunity WHERE ${OW} GROUP BY StageName`),
@@ -335,13 +335,20 @@ async function runSync(opts = {}) {
   for (const r of mtgDayR) meetingsByDay[DOW[(r.dw || 1) - 1] || r.dw] = r.c
 
   // ===== two lenses =====
-  const _cm = {}
-  for (const r of (cohortStagesR || [])) _cm[r.k || 'none'] = r.c
-  const cohortPaid = _cm[STAGE_PAID] || 0
-  const cohortQuote = _cm[STAGE_QUOTE] || 0
-  const cohortLost = _cm[STAGE_LOST] || 0
-  const cohortNew = _cm['חדש'] || 0
+  const _cc = {}, _cv = {}
+  for (const r of (cohortStagesR || [])) {
+    const o = r.ConvertedOpportunity; if (!o) continue
+    const st = o.StageName || 'none'
+    _cc[st] = (_cc[st] || 0) + 1
+    _cv[st] = (_cv[st] || 0) + num(o.TotalPrice_Opp_Product__c)
+  }
+  const cohortPaid = _cc[STAGE_PAID] || 0
+  const cohortQuote = _cc[STAGE_QUOTE] || 0
+  const cohortLost = _cc[STAGE_LOST] || 0
+  const cohortNew = _cc['חדש'] || 0
   const cohortOpps = cohortPaid + cohortQuote + cohortLost + cohortNew
+  const cohortPaidValue = r0(_cv[STAGE_PAID])
+  const cohortQuoteValue = r0(_cv[STAGE_QUOTE])
   const _r1 = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 : 0
   // Cohort funnel — this month's leads, strictly nested
   const funnelCohort = {
@@ -350,7 +357,11 @@ async function runSync(opts = {}) {
     arrived: arrivedCnt,
     opportunities: cohortOpps,
     quotes: cohortQuote + cohortPaid,
+    quotesValue: cohortQuoteValue,
     paid: cohortPaid,
+    paidValue: cohortPaidValue,
+    lost: cohortLost,
+    untreated: cohortNew,
     rateLeadToMeeting: _r1(meetingsTotal, totalLeads),
     rateMeetingToArrived: _r1(arrivedCnt, meetingsTotal),
     rateArrivedToOpp: _r1(cohortOpps, arrivedCnt),
