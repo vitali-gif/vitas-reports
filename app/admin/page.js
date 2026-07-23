@@ -2902,13 +2902,12 @@ const selectProject = async (client, project) => {
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אנשי מכירות</div>
                               {(b.salesmen || []).length === 0 ? <div className="sub">—</div> : (
                                 <table className="data-table" style={{width:'100%'}}>
-                                  <thead><tr><th>שם</th><th>לידים</th><th>פגישות</th><th>% לפגישה</th><th>עסקאות</th><th>שווי</th><th>% לעסקה</th></tr></thead>
+                                  <thead><tr><th>שם</th><th>הזדמנויות</th><th>הצעות</th><th>עסקאות</th><th>שווי</th><th>% לעסקה</th></tr></thead>
                                   <tbody>{(b.salesmen || []).map(a => (
                                     <tr key={a.name}>
                                       <td style={{fontWeight:600}}>{a.name}</td>
-                                      <td>{formatNum(a.leads || 0)}</td>
-                                      <td>{formatNum(a.meetings || 0)}</td>
-                                      <td style={{color:'var(--violet)'}}>{(a.convToMeeting || 0) + '%'}</td>
+                                      <td>{formatNum(a.opportunities || 0)}</td>
+                                      <td>{formatNum(a.quotesTotal || 0)}</td>
                                       <td style={{fontWeight:600}}>{formatNum(a.orders || 0)}</td>
                                       <td>{formatCurrencyCompact(a.value || 0)}</td>
                                       <td style={{color:'var(--violet)'}}>{(a.convToDeal || 0) + '%'}</td>
@@ -2986,12 +2985,10 @@ const selectProject = async (client, project) => {
                 <div className="section-head">{ICO('violet', "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2")}<h2>ביצועי אנשי מכירות</h2><span className="sub">כלל הרשת</span></div>
                 <div className="table-wrapper">
                   <table className="data-table">
-                    <thead><tr><th>איש מכירות</th><th>לידים</th><th>פגישות</th><th>הזדמנויות</th><th>הצעות</th><th>שווי הצעות</th><th>מכירות</th><th>שווי מכירות</th><th>ממוצע לעסקה</th><th>% לעסקה</th></tr></thead>
+                    <thead><tr><th>איש מכירות</th><th>הזדמנויות</th><th>הצעות מחיר</th><th>שווי הצעות</th><th>מכירות</th><th>שווי מכירות</th><th>ממוצע לעסקה</th><th>% המרה</th></tr></thead>
                     <tbody>{_salesmen.map(a => (
                       <tr key={a.name}>
                         <td style={{fontWeight:600}}>{a.name}</td>
-                        <td>{formatNum(a.leads || 0)}</td>
-                        <td>{formatNum(a.meetings || 0)}</td>
                         <td>{formatNum(a.opportunities || 0)}</td>
                         <td>{formatNum(a.quotesTotal || 0)}</td>
                         <td>{formatCurrencyCompact(a.quotesValueTotal || 0)}</td>
