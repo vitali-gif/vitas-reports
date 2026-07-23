@@ -3023,32 +3023,39 @@ const selectProject = async (client, project) => {
             ]
             const branchesChart = (
               <div className="section">
-                <div className="section-head">{ICO('violet', "M4 20V10M10 20V4M16 20v-7M22 20h-2M2 20h20")}<h2>השוואת סניפים</h2><span className="sub">{_bcLens==='cohort'?'לידים של החודש':'פעילות החודש'} · כל סניף = משפט של ארבע עמודות</span></div>
-                <div style={{display:'flex',gap:18,fontSize:12,margin:'4px 2px 16px',color:'#475569',flexWrap:'wrap'}}>
-                  {_bcSeries.map(sr => (<span key={sr.key}><span style={{display:'inline-block',width:11,height:11,background:sr.color,borderRadius:2,marginInlineEnd:5,verticalAlign:'-1px'}}></span>{sr.label}</span>))}
-                  <span style={{marginInlineStart:'auto',color:'#7c6cf5'}}>המספר מעל כל עמודה · אחוז ההמרה מתחת לשם</span>
+                <div className="section-head">{ICO('violet', "M4 20V10M10 20V4M16 20v-7M22 20h-2M2 20h20")}<h2>השוואת סניפים</h2><span className="sub">{_bcLens==='cohort'?'לידים של החודש':'פעילות החודש'} · מיני-משפך לכל סניף</span></div>
+                <div style={{display:'flex',gap:16,fontSize:12,margin:'4px 2px 16px',color:'#475569',flexWrap:'wrap'}}>
+                  {_bcSeries.map(sr => (<span key={sr.key}><span style={{display:'inline-block',width:10,height:10,background:sr.color,borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>{sr.label}</span>))}
+                  <span style={{marginInlineStart:'auto',color:'#94a3b8'}}>האחוז מימין = מעבר מהשלב הקודם</span>
                 </div>
-                <div style={{display:'flex',alignItems:'flex-end',gap:10,overflowX:'auto',paddingBottom:6,minHeight:200}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:12}}>
                   {_bcRows.map(b => {
                     const v = _bcVal(b)
+                    const _vals = [b.leads || 0, b.meetings || 0, v.opp, v.paid]
+                    const _base = Math.max(1, b.leads || 0)
+                    const _convColor = v.conv >= 30 ? '#0f6e56' : v.conv >= 15 ? '#854f0b' : '#a32d2d'
+                    const _convBg = v.conv >= 30 ? '#e1f5ee' : v.conv >= 15 ? '#faeeda' : '#fcebeb'
                     return (
-                      <div key={b.branch} style={{flex:'1 1 0',minWidth:120,textAlign:'center'}}>
-                        <div style={{display:'flex',alignItems:'flex-end',justifyContent:'center',gap:5,height:150}}>
-                          {_bcSeries.map(sr => {
-                            const val = sr.get(b)
-                            const h = Math.max(3, Math.round(val / _bcMax * 140))
-                            return (
-                              <div key={sr.key} style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
-                                <span style={{fontSize:11,fontWeight:600,color:'#334155',marginBottom:2}}>{formatNum(val)}</span>
-                                <div style={{width:20,height:h,background:sr.color,borderRadius:'4px 4px 0 0'}} title={sr.label+': '+val}></div>
+                      <div key={b.branch} style={{background:'var(--surface-2, #fff)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px'}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                          <span style={{fontSize:15,fontWeight:600,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.branch}</span>
+                          <span style={{fontSize:12,fontWeight:600,color:_convColor,background:_convBg,padding:'3px 10px',borderRadius:20,whiteSpace:'nowrap',flexShrink:0}}>{v.conv}% המרה</span>
+                        </div>
+                        {_bcSeries.map((sr, i) => {
+                          const val = _vals[i]
+                          const w = Math.max(4, Math.round(val / _base * 100))
+                          const step = i > 0 ? Math.round(val / Math.max(1, _vals[i-1]) * 100) : null
+                          return (
+                            <div key={sr.key} style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
+                              <span style={{fontSize:11,color:'#64748b',width:60,flexShrink:0,textAlign:'start'}}>{sr.label}</span>
+                              <div style={{flex:1,background:'#f1f5f9',borderRadius:5,height:20,overflow:'hidden'}}>
+                                <div style={{width:w+'%',height:'100%',background:sr.color,borderRadius:5}}></div>
                               </div>
-                            )
-                          })}
-                        </div>
-                        <div style={{borderTop:'2px solid #e2e8f0',marginTop:6,paddingTop:6}}>
-                          <div style={{fontSize:13,fontWeight:600,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.branch}</div>
-                          <div style={{fontSize:12,color:'#7c6cf5',fontWeight:600}}>{v.conv}% המרה</div>
-                        </div>
+                              <span style={{fontSize:13,fontWeight:600,color:'#0f172a',width:40,textAlign:'start',flexShrink:0}}>{formatNum(val)}</span>
+                              <span style={{fontSize:10,color:'#94a3b8',width:38,textAlign:'start',flexShrink:0}}>{step !== null ? step+'%' : ''}</span>
+                            </div>
+                          )
+                        })}
                       </div>
                     )
                   })}
