@@ -156,7 +156,7 @@ async function runSync(opts = {}) {
   const OW = `Cahin_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
 
   let totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, noShowPeriodCnt, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
-  let oppStageR, oppBranchR, salesmenR, purposeR, productsR
+  let oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, otherLossR
   let cohortStagesR
   let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR
   try {
@@ -175,12 +175,14 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT Competitor_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Competitor_Name__c!=null GROUP BY Competitor_Name__c`),
       soql(auth, `SELECT ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c FROM Lead WHERE ${LW} AND IsConverted=true`),
     ])
-    ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR] = await Promise.all([
+    ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, otherLossR] = await Promise.all([
       soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o, SUM(Amount) am FROM Opportunity WHERE ${OW} GROUP BY StageName`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Salesman__r.Name k, StageName st, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} GROUP BY Salesman__r.Name, StageName`),
       soql(auth, `SELECT Buying_Purpose__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Buying_Purpose__c!=null GROUP BY Buying_Purpose__c`),
       soql(auth, `SELECT Product2.Name k, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Product2.Name`),
+      soql(auth, `SELECT Loss_Reason__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Loss_Reason__c!=null GROUP BY Loss_Reason__c`),
+      soql(auth, `SELECT Other_Loss_Reason__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Other_Loss_Reason__c!=null GROUP BY Other_Loss_Reason__c`),
     ])
     ;[noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR] = await Promise.all([
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status='${STATUS_NOSHOW}' GROUP BY Branch_Name__c`),
@@ -271,6 +273,11 @@ async function runSync(opts = {}) {
 
   const products = productsR.map(r => ({ name: r.k || 'לא ידוע', units: r.c, value: r0(r.v) }))
     .sort((a, b) => b.units - a.units)
+
+  const LOSS_MAP = { 'Lost to Competitor': 'מתחרה', 'No Decision / Non-Responsive': 'אין החלטה / לא מגיב', 'Price': 'מחיר', 'Other': 'אחר' }
+  const lossReasons = (lossReasonR || []).map(r => ({ reason: LOSS_MAP[r.k] || r.k || 'לא ידוע', count: r.c })).sort((a, b) => b.count - a.count)
+  const lossTotal = lossReasons.reduce((s2, r) => s2 + r.count, 0)
+  const otherLossReasons = (otherLossR || []).map(r => ({ text: r.k, count: r.c })).sort((a, b) => b.count - a.count).slice(0, 40)
 
   // ---- per-branch detail (manager drill-down) ----
   const noShowByBranch = pairs(noShowR, 'k', 'c')
@@ -488,6 +495,9 @@ async function runSync(opts = {}) {
       byStage,
     },
     deals: { opportunities, closed: paid, closingRate: conversionRate, revenue: dealValue, avgDealValue },
+    lossReasons,
+    lossTotal,
+    otherLossReasons,
     schemaVersion: SF_SCHEMA_VERSION,
     _cohortDrillErr: cohortDrillErr,
   }

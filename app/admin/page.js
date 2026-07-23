@@ -2795,6 +2795,9 @@ const selectProject = async (client, project) => {
             const _days = _s.meetingsByDay || {}
             const _salesmen = (_s.salesmen || []).slice(0, 12)
             const _products = (_s.products || []).slice(0, 12)
+            const _lossReasons = _s.lossReasons || []
+            const _lossTotal = _s.lossTotal || 0
+            const _otherLoss = _s.otherLossReasons || []
             const toggleBranch = (b) => setExpandedFunnelCh(prev => { const n = new Set(prev); if (n.has(b)) n.delete(b); else n.add(b); return n; })
             const ICO = (cls, d) => (<div className={"ico " + cls}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg></div>)
             const pctOf = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 + '%' : '—'
@@ -3140,6 +3143,33 @@ const selectProject = async (client, project) => {
               </div>
             </>)
 
+            const objectionsSec = (<>
+              <div className="section">
+                <div className="section-head">{ICO('rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z")}<h2>התנגדויות — סיבות "נסגר ללא הצלחה"</h2><span className="sub">כלל הרשת · הזדמנויות שנסגרו ללא הצלחה החודש</span></div>
+                {_lossReasons.length === 0 ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div> : (
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:20,alignItems:'start'}}>
+                    <div>
+                      {_lossReasons.map(r => { const pc = _lossTotal ? Math.round(r.count/_lossTotal*100) : 0; return (
+                        <div key={r.reason} style={{marginBottom:10}}>
+                          <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}><span style={{fontWeight:600,color:'#0f172a'}}>{r.reason}</span><span style={{color:'#64748b'}}>{formatNum(r.count)} · {pc}%</span></div>
+                          <div style={{background:'#f1f5f9',borderRadius:5,height:14,overflow:'hidden'}}><div style={{width:pc+'%',height:'100%',background:'#e24b4a',borderRadius:5}}></div></div>
+                        </div>
+                      )})}
+                    </div>
+                    <div style={{background:'#fff',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px'}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>פירוט "אחר" (טקסט חופשי)</div>
+                      {_otherLoss.length === 0 ? <div className="sub">—</div> : (
+                        <table className="data-table" style={{width:'100%'}}>
+                          <thead><tr><th>סיבה</th><th>כמות</th></tr></thead>
+                          <tbody>{_otherLoss.map((o, i) => (<tr key={i}><td>{o.text}</td><td>{formatNum(o.count)}</td></tr>))}</tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>)
+
             return (<>
               <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
                 <button type="button" onClick={refreshFromSalesforce} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
@@ -3154,7 +3184,7 @@ const selectProject = async (client, project) => {
                 <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
               {sfTab === 'network' ? (<>{netCards}{cohortFunnel}{periodFunnel}</>)
-                : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}</>)
+                : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}{objectionsSec}</>)
                 : sfTab === 'people' ? peopleSec
                 : sfTab === 'timing' ? timingSec
                 : (<>
