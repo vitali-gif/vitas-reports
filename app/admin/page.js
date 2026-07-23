@@ -3010,35 +3010,45 @@ const selectProject = async (client, project) => {
             )
 
             const _bcLens = sfBranchLens
-            const _bcRows = _bd.filter(b => (b.leads || 0) > 0).slice(0, 12)
+            const _bcRows = _bd.filter(b => (b.leads || 0) > 0).slice(0, 9)
             const _bcVal = (b) => _bcLens === 'cohort'
               ? { opp: b.cohortOpps || 0, paid: b.cohortPaid || 0, conv: b.cohortConvLeadToPaid || 0 }
               : { opp: b.opportunities || 0, paid: b.paid || 0, conv: b.convLeadToPaid || 0 }
-            const _bcMaxLeads = Math.max(1, ..._bcRows.map(b => b.leads || 0))
+            const _bcMax = Math.max(1, ..._bcRows.map(b => b.leads || 0))
+            const _bcSeries = [
+              { key: 'leads', label: 'לידים', color: '#10b981', get: (b) => b.leads || 0 },
+              { key: 'meet', label: 'פגישות', color: '#3b82f6', get: (b) => b.meetings || 0 },
+              { key: 'opp', label: 'הזדמנויות', color: '#06b6d4', get: (b) => _bcVal(b).opp },
+              { key: 'paid', label: 'רכשו', color: '#a855f7', get: (b) => _bcVal(b).paid },
+            ]
             const branchesChart = (
               <div className="section">
-                <div className="section-head">{ICO('violet', "M4 20V10M10 20V4M16 20v-7M22 20h-2M2 20h20")}<h2>השוואת סניפים</h2><span className="sub">{_bcLens==='cohort'?'לידים של החודש':'פעילות החודש'} · לידים · פגישות · רכשו</span></div>
-                <div style={{padding:'12px 4px'}}>
-                  <div style={{display:'flex',gap:16,fontSize:12,marginBottom:12,color:'#64748b'}}>
-                    <span><span style={{display:'inline-block',width:10,height:10,background:'#10b981',borderRadius:2,marginInlineEnd:5}}></span>לידים</span>
-                    <span><span style={{display:'inline-block',width:10,height:10,background:'#3b82f6',borderRadius:2,marginInlineEnd:5}}></span>פגישות</span>
-                    <span><span style={{display:'inline-block',width:10,height:10,background:'#a855f7',borderRadius:2,marginInlineEnd:5}}></span>רכשו</span>
-                    <span style={{marginInlineStart:'auto'}}>אחוז המרה מצוין בקצה</span>
-                  </div>
+                <div className="section-head">{ICO('violet', "M4 20V10M10 20V4M16 20v-7M22 20h-2M2 20h20")}<h2>השוואת סניפים</h2><span className="sub">{_bcLens==='cohort'?'לידים של החודש':'פעילות החודש'} · כל סניף = משפט של ארבע עמודות</span></div>
+                <div style={{display:'flex',gap:18,fontSize:12,margin:'4px 2px 16px',color:'#475569',flexWrap:'wrap'}}>
+                  {_bcSeries.map(sr => (<span key={sr.key}><span style={{display:'inline-block',width:11,height:11,background:sr.color,borderRadius:2,marginInlineEnd:5,verticalAlign:'-1px'}}></span>{sr.label}</span>))}
+                  <span style={{marginInlineStart:'auto',color:'#7c6cf5'}}>המספר מעל כל עמודה · אחוז ההמרה מתחת לשם</span>
+                </div>
+                <div style={{display:'flex',alignItems:'flex-end',gap:10,overflowX:'auto',paddingBottom:6,minHeight:200}}>
                   {_bcRows.map(b => {
                     const v = _bcVal(b)
-                    const wL = Math.max(2, Math.round((b.leads || 0) / _bcMaxLeads * 100))
-                    const wM = Math.max(0, Math.round((b.meetings || 0) / _bcMaxLeads * 100))
-                    const wP = Math.max(0, Math.round((v.paid || 0) / _bcMaxLeads * 100))
                     return (
-                      <div key={b.branch} style={{marginBottom:14}}>
-                        <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
-                          <span style={{fontWeight:600}}>{b.branch}</span>
-                          <span style={{color:'#7c6cf5',fontWeight:600}}>{v.conv}% המרה</span>
+                      <div key={b.branch} style={{flex:'1 1 0',minWidth:120,textAlign:'center'}}>
+                        <div style={{display:'flex',alignItems:'flex-end',justifyContent:'center',gap:5,height:150}}>
+                          {_bcSeries.map(sr => {
+                            const val = sr.get(b)
+                            const h = Math.max(3, Math.round(val / _bcMax * 140))
+                            return (
+                              <div key={sr.key} style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
+                                <span style={{fontSize:11,fontWeight:600,color:'#334155',marginBottom:2}}>{formatNum(val)}</span>
+                                <div style={{width:20,height:h,background:sr.color,borderRadius:'4px 4px 0 0'}} title={sr.label+': '+val}></div>
+                              </div>
+                            )
+                          })}
                         </div>
-                        <div style={{position:'relative',height:9,marginBottom:3,background:'#f1f5f9',borderRadius:5}}><div style={{position:'absolute',insetInlineStart:0,height:'100%',width:wL+'%',background:'#10b981',borderRadius:5}} title={'לידים '+(b.leads||0)}></div></div>
-                        <div style={{position:'relative',height:9,marginBottom:3,background:'#f1f5f9',borderRadius:5}}><div style={{position:'absolute',insetInlineStart:0,height:'100%',width:wM+'%',background:'#3b82f6',borderRadius:5}} title={'פגישות '+(b.meetings||0)}></div></div>
-                        <div style={{position:'relative',height:9,background:'#f1f5f9',borderRadius:5}}><div style={{position:'absolute',insetInlineStart:0,height:'100%',width:wP+'%',background:'#a855f7',borderRadius:5}} title={'רכשו '+(v.paid||0)}></div></div>
+                        <div style={{borderTop:'2px solid #e2e8f0',marginTop:6,paddingTop:6}}>
+                          <div style={{fontSize:13,fontWeight:600,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.branch}</div>
+                          <div style={{fontSize:12,color:'#7c6cf5',fontWeight:600}}>{v.conv}% המרה</div>
+                        </div>
                       </div>
                     )
                   })}
