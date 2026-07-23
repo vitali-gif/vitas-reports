@@ -328,6 +328,15 @@ async function runSync(opts = {}) {
     b.salesmen = b.salesmen.filter(x => x.opportunities > 0).sort((x, y) => y.value - x.value).slice(0, 10)
     b.products.sort((x, y) => y.units - x.units); b.products = b.products.slice(0, 8)
     b.quotesTotal = b.quotes + b.paid
+    b.value = r0(b.value)
+    b.cohortOpps = b.cohortOpps || 0
+    b.cohortQuotesTotal = (b.cohortQuote || 0) + (b.cohortPaid || 0)
+    b.cohortQuotesValue = r0(b.cohortQuoteValue)
+    b.cohortPaid = b.cohortPaid || 0
+    b.cohortValue = r0(b.cohortValue)
+    b.cohortLost = b.cohortLost || 0
+    b.cohortConvLeadToPaid = b.leads ? Math.round(b.cohortPaid / b.leads * 1000) / 10 : 0
+    b.cohortAvgDeal = b.cohortPaid ? Math.round(b.cohortValue / b.cohortPaid) : 0
     b.convLeadToMeeting = b.leads ? Math.round(b.meetings / b.leads * 1000) / 10 : 0
     b.convMeetingToOpp = b.meetings ? Math.round(b.opportunities / b.meetings * 1000) / 10 : 0
     b.convOppToPaid = b.opportunities ? Math.round(b.paid / b.opportunities * 1000) / 10 : 0

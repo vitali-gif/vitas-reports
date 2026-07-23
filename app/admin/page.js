@@ -3009,6 +3009,43 @@ const selectProject = async (client, project) => {
               </div>
             )
 
+            const _bcLens = sfBranchLens
+            const _bcRows = _bd.filter(b => (b.leads || 0) > 0).slice(0, 12)
+            const _bcVal = (b) => _bcLens === 'cohort'
+              ? { opp: b.cohortOpps || 0, paid: b.cohortPaid || 0, conv: b.cohortConvLeadToPaid || 0 }
+              : { opp: b.opportunities || 0, paid: b.paid || 0, conv: b.convLeadToPaid || 0 }
+            const _bcMaxLeads = Math.max(1, ..._bcRows.map(b => b.leads || 0))
+            const branchesChart = (
+              <div className="section">
+                <div className="section-head">{ICO('violet', "M4 20V10M10 20V4M16 20v-7M22 20h-2M2 20h20")}<h2>השוואת סניפים</h2><span className="sub">{_bcLens==='cohort'?'לידים של החודש':'פעילות החודש'} · לידים · פגישות · רכשו</span></div>
+                <div style={{padding:'12px 4px'}}>
+                  <div style={{display:'flex',gap:16,fontSize:12,marginBottom:12,color:'#64748b'}}>
+                    <span><span style={{display:'inline-block',width:10,height:10,background:'#10b981',borderRadius:2,marginInlineEnd:5}}></span>לידים</span>
+                    <span><span style={{display:'inline-block',width:10,height:10,background:'#3b82f6',borderRadius:2,marginInlineEnd:5}}></span>פגישות</span>
+                    <span><span style={{display:'inline-block',width:10,height:10,background:'#a855f7',borderRadius:2,marginInlineEnd:5}}></span>רכשו</span>
+                    <span style={{marginInlineStart:'auto'}}>אחוז המרה מצוין בקצה</span>
+                  </div>
+                  {_bcRows.map(b => {
+                    const v = _bcVal(b)
+                    const wL = Math.max(2, Math.round((b.leads || 0) / _bcMaxLeads * 100))
+                    const wM = Math.max(0, Math.round((b.meetings || 0) / _bcMaxLeads * 100))
+                    const wP = Math.max(0, Math.round((v.paid || 0) / _bcMaxLeads * 100))
+                    return (
+                      <div key={b.branch} style={{marginBottom:14}}>
+                        <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
+                          <span style={{fontWeight:600}}>{b.branch}</span>
+                          <span style={{color:'#7c6cf5',fontWeight:600}}>{v.conv}% המרה</span>
+                        </div>
+                        <div style={{position:'relative',height:9,marginBottom:3,background:'#f1f5f9',borderRadius:5}}><div style={{position:'absolute',insetInlineStart:0,height:'100%',width:wL+'%',background:'#10b981',borderRadius:5}} title={'לידים '+(b.leads||0)}></div></div>
+                        <div style={{position:'relative',height:9,marginBottom:3,background:'#f1f5f9',borderRadius:5}}><div style={{position:'absolute',insetInlineStart:0,height:'100%',width:wM+'%',background:'#3b82f6',borderRadius:5}} title={'פגישות '+(b.meetings||0)}></div></div>
+                        <div style={{position:'relative',height:9,background:'#f1f5f9',borderRadius:5}}><div style={{position:'absolute',insetInlineStart:0,height:'100%',width:wP+'%',background:'#a855f7',borderRadius:5}} title={'רכשו '+(v.paid||0)}></div></div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+
             const timingSec = (<>
               <div className="section">
                 <div className="section-head">{ICO('amber', "M12 6v6l4 2")}<h2>שעות תיאום פגישות</h2><span className="sub">שעון ישראל</span></div>
@@ -3097,7 +3134,7 @@ const selectProject = async (client, project) => {
                 <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
               {sfTab === 'network' ? (<>{netCards}{cohortFunnel}{periodFunnel}</>)
-                : sfTab === 'branches' ? branchesSec
+                : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}</>)
                 : sfTab === 'people' ? peopleSec
                 : sfTab === 'timing' ? timingSec
                 : (<>
