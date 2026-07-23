@@ -29,7 +29,7 @@ export const maxDuration = 300
 
 const SF_LOGIN_URL = process.env.SF_LOGIN_URL || 'https://login.salesforce.com'
 const SF_API_VERSION = process.env.SF_API_VERSION || 'v60.0'
-const SF_SCHEMA_VERSION = 7
+const SF_SCHEMA_VERSION = 8
 
 const CHAIN = 'קלוס'
 const STAGE_PAID = 'הזמנה - שולמה מקדמה'
@@ -155,21 +155,23 @@ async function runSync(opts = {}) {
   const LW = `Chain_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
   const OW = `Cahin_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
 
-  let totalLeads, convertedLeads, meetingLeads, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
+  let totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
   let oppStageR, oppBranchR, salesmenR, purposeR, productsR
   let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR
   try {
-    ;[totalLeads, convertedLeads, meetingLeads] = await Promise.all([
+    ;[totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt] = await Promise.all([
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE ${LW}`),
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE ${LW} AND IsConverted=true`),
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE ${LW} AND meetingDate__c!=null`),
+      soqlCount(auth, `SELECT COUNT() FROM Lead WHERE Chain_Name__c='${CHAIN}' AND meetingDate__c>=${FROM} AND meetingDate__c<=${TO}`),
     ])
-    ;[byStatusR, byBranchR, bySourceR, reasonsR, competitorsR] = await Promise.all([
+    ;[byStatusR, byBranchR, bySourceR, reasonsR, competitorsR, cohortStagesR] = await Promise.all([
       soql(auth, `SELECT Status k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Status`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Branch_Name__c`),
       soql(auth, `SELECT LeadSource k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY LeadSource`),
       soql(auth, `SELECT Unqualified_Reason__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Unqualified_Reason__c!=null GROUP BY Unqualified_Reason__c`),
       soql(auth, `SELECT Competitor_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Competitor_Name__c!=null GROUP BY Competitor_Name__c`),
+      soql(auth, `SELECT ConvertedOpportunity.StageName k, COUNT(Id) c FROM Lead WHERE ${LW} AND IsConverted=true GROUP BY ConvertedOpportunity.StageName`),
     ])
     ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR] = await Promise.all([
       soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o, SUM(Amount) am FROM Opportunity WHERE ${OW} GROUP BY StageName`),
@@ -331,6 +333,40 @@ async function runSync(opts = {}) {
   const meetingsByDay = {}
   for (const r of mtgDayR) meetingsByDay[DOW[(r.dw || 1) - 1] || r.dw] = r.c
 
+  // ===== two lenses =====
+  const _cm = {}
+  for (const r of (cohortStagesR || [])) _cm[r.k || 'none'] = r.c
+  const cohortPaid = _cm[STAGE_PAID] || 0
+  const cohortQuote = _cm[STAGE_QUOTE] || 0
+  const cohortLost = _cm[STAGE_LOST] || 0
+  const cohortNew = _cm['חדש'] || 0
+  const cohortOpps = cohortPaid + cohortQuote + cohortLost + cohortNew
+  const _r1 = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 : 0
+  // Cohort funnel — this month's leads, strictly nested
+  const funnelCohort = {
+    leads: totalLeads,
+    meetings: meetingsTotal,
+    arrived: arrivedCnt,
+    opportunities: cohortOpps,
+    quotes: cohortQuote + cohortPaid,
+    paid: cohortPaid,
+    rateLeadToMeeting: _r1(meetingsTotal, totalLeads),
+    rateMeetingToArrived: _r1(arrivedCnt, meetingsTotal),
+    rateArrivedToOpp: _r1(cohortOpps, arrivedCnt),
+    rateOppToQuote: _r1(cohortQuote + cohortPaid, cohortOpps),
+    rateQuoteToPaid: _r1(cohortPaid, cohortQuote + cohortPaid),
+    rateLeadToPaid: _r1(cohortPaid, totalLeads),
+  }
+  // Period report — everything created/held this month (incl. earlier leads)
+  const funnelPeriod = {
+    leads: totalLeads,
+    meetings: meetingPeriodCnt || 0,
+    opportunities,
+    quotes: quotes + paid,
+    paid,
+    dealValue,
+    rateLeadToPaid: _r1(paid, totalLeads),
+  }
   const conversionRate = totalLeads ? Math.round((paid / totalLeads) * 1000) / 10 : 0
   const avgDealValue = paid ? Math.round(dealValue / paid) : 0
 
@@ -359,6 +395,8 @@ async function runSync(opts = {}) {
     products,
     salesmen,
     responseTime,
+    funnelCohort,
+    funnelPeriod,
     branchDetail,
     meetingsByHour,
     meetingHourOffset: OFF,

@@ -2827,71 +2827,59 @@ const selectProject = async (client, project) => {
               </div>
             )
 
-            const stages = [
-              { label: 'לידים', v: _leads, of: null },
-              { label: 'תיאמו פגישה', v: _meet, of: _leads },
-              { label: 'לא הגיעו לפגישה', v: _noShow, of: _meet, neg: true },
-              { label: 'תואמה פגישה (עתידית)', v: _sched, of: _meet },
-              { label: 'הגיעו לפגישה', v: _arrived2, of: _meet },
-              { label: 'עברו להזדמנות', v: _opps, of: _meet },
-              { label: 'קיבלו הצעת מחיר', v: _quotes, of: _opps },
-              { label: 'שילמו מקדמה', v: _paid, of: _quotes },
-              { label: 'לא מעוניינים', v: _lost, of: _opps, neg: true },
-            ]
-            const _fSteps = [
-              { label: 'לידים', v: _leads, color: '#10b981' },
-              { label: 'תיאמו פגישה', v: _meet, color: '#3b82f6' },
-              { label: 'הגיעו לפגישה', v: _arrived2, color: '#14b8a6' },
-              { label: 'עברו להזדמנות', v: _opps, color: '#06b6d4' },
-              { label: 'קיבלו הצעת מחיר', v: _quotes, color: '#f97316' },
-              { label: 'שילמו מקדמה', v: _paid, color: '#a855f7' },
-            ]
-            const _fMax = Math.max(1, _leads)
-            const funnelChart = (
-              <div className="section">
-                <div className="section-head">{ICO('violet', "M3 4h18l-7 8v6l-4 2v-8z")}<h2>משפך ויזואלי</h2><span className="sub">רוחב הפס יחסי לכמות · האחוז הוא מהשלב הקודם</span></div>
-                <div style={{padding:'14px 4px'}}>
-                  {_fSteps.map((st, i) => {
-                    const w = Math.max(6, Math.round(st.v / _fMax * 100))
-                    const prev = i === 0 ? null : _fSteps[i - 1].v
-                    const dropPct = prev ? pctOf(st.v, prev) : null
-                    return (
-                      <div key={st.label} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
-                        <div style={{width:130,fontSize:13,fontWeight:600,textAlign:'left',flexShrink:0,color:'#334155'}}>{st.label}</div>
-                        <div style={{flex:1,position:'relative',height:34,background:'#f1f5f9',borderRadius:8,overflow:'hidden'}}>
-                          <div style={{position:'absolute',insetInlineStart:0,top:0,height:'100%',width:w+'%',background:st.color,borderRadius:8,transition:'width .5s ease',display:'flex',alignItems:'center',paddingInline:12,minWidth:54}}>
-                            <span style={{color:'#fff',fontWeight:700,fontSize:14}}>{formatNum(st.v)}</span>
+            const _fc = _s.funnelCohort || {}
+            const _fp = _s.funnelPeriod || {}
+            const funnelBars = (title, subtitle, ico, steps, showStepPct) => {
+              const mx = Math.max(1, steps[0] ? steps[0].v : 1)
+              return (
+                <div className="section">
+                  <div className="section-head">{ICO(ico, "M3 4h18l-7 8v6l-4 2v-8z")}<h2>{title}</h2><span className="sub">{subtitle}</span></div>
+                  <div style={{padding:'14px 4px'}}>
+                    {steps.map((st, i) => {
+                      const w = Math.max(6, Math.round(st.v / mx * 100))
+                      const prev = i === 0 ? null : steps[i - 1].v
+                      const dropPct = (showStepPct && prev) ? pctOf(st.v, prev) : null
+                      return (
+                        <div key={st.label} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+                          <div style={{width:140,fontSize:13,fontWeight:600,textAlign:'left',flexShrink:0,color:'#334155'}}>{st.label}</div>
+                          <div style={{flex:1,position:'relative',height:34,background:'#f1f5f9',borderRadius:8,overflow:'hidden'}}>
+                            <div style={{position:'absolute',insetInlineStart:0,top:0,height:'100%',width:w+'%',background:st.color,borderRadius:8,transition:'width .5s ease',display:'flex',alignItems:'center',paddingInline:12,minWidth:54}}>
+                              <span style={{color:'#fff',fontWeight:700,fontSize:14}}>{formatNum(st.v)}</span>
+                            </div>
+                          </div>
+                          <div style={{width:120,fontSize:12,flexShrink:0,textAlign:'right'}}>
+                            {i === 0 ? <span style={{color:'#94a3b8'}}>100%</span> : (
+                              <><span style={{color:'#7c6cf5',fontWeight:600}}>{pctOf(st.v, steps[0].v)}</span><span style={{color:'#94a3b8'}}> מהלידים</span>{dropPct ? <span style={{color:'#cbd5e1'}}> · {dropPct} מהקודם</span> : null}</>
+                            )}
                           </div>
                         </div>
-                        <div style={{width:110,fontSize:12,flexShrink:0,textAlign:'right'}}>
-                          {dropPct ? (<span style={{color:'#7c6cf5',fontWeight:600}}>{dropPct}</span>) : null}
-                          {dropPct ? <span style={{color:'#94a3b8'}}> מהקודם</span> : null}
-                        </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )
-
-            const funnelTable = (
-              <div className="section">
-                <div className="section-head">{ICO('emerald', "M3 4h18l-7 8v6l-4 2v-8z")}<h2>משפך — שלב אחר שלב</h2><span className="sub">אחוז המרה בין שלב לשלב</span></div>
-                <div className="table-wrapper">
-                  <table className="data-table">
-                    <thead><tr><th>שלב</th><th>כמות</th><th>מהשלב הקודם</th><th>מסך הלידים</th></tr></thead>
-                    <tbody>{stages.map(st => (
-                      <tr key={st.label}>
-                        <td style={{fontWeight:600, color: st.neg ? 'var(--rose)' : undefined}}>{st.label}</td>
-                        <td style={{fontWeight:600}}>{formatNum(st.v)}</td>
-                        <td style={{color:'var(--violet)'}}>{st.of === null ? '—' : pctOf(st.v, st.of)}</td>
-                        <td className="sub">{pctOf(st.v, _leads)}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                </div>
-              </div>
-            )
+              )
+            }
+            const cohortFunnel = funnelBars(
+              'מה קרה ללידים של החודש', 'קבוצת הלידים שנוצרו החודש — כל שלב מתוך אותם לידים · האחוז הוא מהשלב הקודם',
+              'emerald',
+              [
+                { label: 'לידים', v: _fc.leads || 0, color: '#10b981' },
+                { label: 'תיאמו פגישה', v: _fc.meetings || 0, color: '#3b82f6' },
+                { label: 'הגיעו לפגישה', v: _fc.arrived || 0, color: '#14b8a6' },
+                { label: 'עברו להזדמנות', v: _fc.opportunities || 0, color: '#06b6d4' },
+                { label: 'קיבלו הצעת מחיר', v: _fc.quotes || 0, color: '#f97316' },
+                { label: 'שילמו מקדמה', v: _fc.paid || 0, color: '#a855f7' },
+              ], true)
+            const periodFunnel = funnelBars(
+              'דוח ביצועים — פעילות החודש', 'כל מה שנוצר/התקיים החודש, כולל לידים מחודשים קודמים',
+              'violet',
+              [
+                { label: 'לידים שנוצרו', v: _fp.leads || 0, color: '#10b981' },
+                { label: 'הזדמנויות שנפתחו', v: _fp.opportunities || 0, color: '#06b6d4' },
+                { label: 'פגישות שהתקיימו', v: _fp.meetings || 0, color: '#3b82f6' },
+                { label: 'קיבלו הצעת מחיר', v: _fp.quotes || 0, color: '#f97316' },
+                { label: 'שילמו מקדמה', v: _fp.paid || 0, color: '#a855f7' },
+              ], false)
 
             const maxH = Math.max(1, ...Object.values(_hours))
             const maxD = Math.max(1, ...Object.values(_days))
@@ -3058,7 +3046,7 @@ const selectProject = async (client, project) => {
                 <button type="button" className={`client-tab ${sfTab === 'timing' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('timing'); }}>זמנים</button>
                 <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
-              {sfTab === 'network' ? (<>{netCards}{funnelChart}{funnelTable}</>)
+              {sfTab === 'network' ? (<>{netCards}{cohortFunnel}{periodFunnel}</>)
                 : sfTab === 'branches' ? branchesSec
                 : sfTab === 'people' ? peopleSec
                 : sfTab === 'timing' ? timingSec
