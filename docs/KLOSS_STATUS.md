@@ -54,3 +54,21 @@ Repo: `vitali-gif/vitas-reports` · Deploy: Vercel → reports.vitas.co.il/admin
 - הכרעה: "ליד" כולל מומרים (מומלץ) או לא
 - חיבור 2 חשבונות Meta + 2 חשבונות Google (שתי סוכנויות כל אחד) → יפעיל עלות לליד/פגישה/לקוח ו-ROAS
 - גישת לקוח ותקציב חודשי
+
+
+## עדכון 2026-07-23 — שתי עדשות (קוהורט מול פעילות)
+בעיה חוזרת: לידים/פגישות נספרים לפי תאריך יצירת הליד (קוהורט), אבל הזדמנויות/מכירות לפי תאריך יצירת ההזדמנות (פעילות, כולל לידים מחודשים קודמים). זה יצר מספרים "בלתי-אפשריים" (הזדמנויות > פגישות).
+
+**הפתרון שהוטמע (schema v11):**
+- `funnelCohort` — קבוצת הלידים שנוצרו החודש: leads→meetings→arrived→opportunities→quotes→paid, מקונן. כולל quotesValue, paidValue, lost, noShow. מקור: `SELECT ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c FROM Lead WHERE ... AND IsConverted=true` + סיכום ב-JS (SUM דרך יחס-אב חסום ב-SF).
+- `funnelPeriod` — פעילות החודש: leads, opportunities(created this month), meetings(meetingDate this month), quotes+value, paid+value, lost, noShow.
+- **קלפי מסך רשת + קלפי טאב "הכל"** מציגים קוהורט. שני המשפכים + טבלת הסניפים מציגים את שתי העדשות (בטבלת הסניפים יש טוגל `sfBranchLens`, ברירת מחדל cohort). ה-`branchDetail` מכיל cohortOpps/cohortQuotesTotal/cohortPaid/cohortValue/cohortConvLeadToPaid לצד השדות ה-period.
+- כפתור **"רענן CRM"** ב-CRM tab (handler `refreshFromSalesforce`).
+
+**מלכודת שחזרה שלוש פעמים (חשוב!):** משתנה שמוצב ב-destructuring אבל לא מוכרז ב-`let` (למשל `cohortStagesR`, `branchCohortR`) → `ReferenceError` בזמן ריצה → כל משיכה מחזירה **500** והנתונים לא נכתבים. `node --check` ו-`esbuild` **לא** תופסים את זה. לוודא: כל משתנה חדש ב-destructure מוכרז ב-let, ומספר ה-soql = מספר המשתנים.
+
+**מלכודת שנייה:** אחרי דחיפת שינוי route, הנתונים נמשכים טריים אבל ה-JS bundle בדפדפן מטמון — צריך **טעינה מחדש מלאה** של הדף כדי לראות שינויי UI. משיכת נתונים (רענן CRM) לא מספיקה לשינויי קוד.
+
+**מיפוי משתנים ל-CARD/funnel:** anchor וריאנטים ב-app/admin/page.js — הקלפים ב-crmType==='salesforce' branch (~L2800), sfKpiCards (~L2101, מקבל _cohortCards בקריאה ב-~L3262), funnelBars + cohortFunnel/periodFunnel, branchesSec עם sfBranchLens.
+
+**מצב פריסה נוכחי:** commit `9a6a75d` = הכל עובד, 200 על משיכה, טוגל סניפים חי. הנתונים נמשכו ל-2026-07.
