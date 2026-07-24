@@ -628,6 +628,46 @@ export async function GET(request) {
     return Response.json(rb, { status })
   }
   const { searchParams } = new URL(request.url)
+  if (searchParams.get('leadtopay4')) {
+    try {
+      const a = await getAuth()
+      const qy = async (q) => { let url = `${a.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`; let rows = []; for (let i = 0; i < 25 && url; i++) { const r = await fetch(url, { headers: { Authorization: `Bearer ${a.token}` } }); const j = await r.json(); if (j.records) rows = rows.concat(j.records); url = j.nextRecordsUrl ? `${a.instance}${j.nextRecordsUrl}` : null } return rows }
+      const norm = (p) => { if (!p) return null; let d = String(p).replace(/[^0-9]/g, ''); if (d.startsWith('972')) d = '0' + d.slice(3); if (d.length === 9) d = '0' + d; return d.length >= 9 ? d.slice(-10) : null }
+      const paidRows = await qy(`SELECT OpportunityId, CreatedDate FROM OpportunityHistory WHERE Opportunity.Cahin_Name__c='קלוס' AND StageName='הזמנה - שולמה מקדמה' AND CreatedDate>=2026-07-01T00:00:00Z AND CreatedDate<=2026-07-31T23:59:59Z ORDER BY OpportunityId, CreatedDate`)
+      const paidTime = {}
+      for (const r of paidRows) { const t = new Date(r.CreatedDate).getTime(); if (paidTime[r.OpportunityId] == null || t < paidTime[r.OpportunityId]) paidTime[r.OpportunityId] = t }
+      const oppIds = Object.keys(paidTime)
+      const oppPhone = {}; const rawPhones = new Set()
+      for (let i = 0; i < oppIds.length; i += 200) {
+        const inList = oppIds.slice(i, i + 200).map(x => `'${x}'`).join(',')
+        const orr = await qy(`SELECT Id, Mobile__c FROM Opportunity WHERE Id IN (${inList})`)
+        for (const r of orr) if (r.Mobile__c) { oppPhone[r.Id] = norm(r.Mobile__c); rawPhones.add(String(r.Mobile__c)) }
+      }
+      const rawArr = [...rawPhones]
+      const leadsByPhone = {}  // phone -> [timestamps]
+      for (let i = 0; i < rawArr.length; i += 150) {
+        const inList = rawArr.slice(i, i + 150).map(x => `'${x.replace(/'/g, "")}'`).join(',')
+        const lr = await qy(`SELECT Phone, MobilePhone, CreatedDate FROM Lead WHERE Chain_Name__c='קלוס' AND (MobilePhone IN (${inList}) OR Phone IN (${inList}))`)
+        for (const r of lr) { const t = new Date(r.CreatedDate).getTime(); for (const ph of [norm(r.MobilePhone), norm(r.Phone)]) if (ph) (leadsByPhone[ph] = leadsByPhone[ph] || []).push(t) }
+      }
+      const days = [], buckets = { d0: 0, d1_7: 0, d8_14: 0, d15_30: 0, d31_60: 0, d60plus: 0, negative: 0 }, samples = []
+      let matched = 0
+      for (const id of oppIds) {
+        const ph = oppPhone[id]; const arr = ph ? leadsByPhone[ph] : null; if (!arr || !arr.length) continue
+        const pt = paidTime[id]
+        const before = arr.filter(t => t <= pt)
+        const lc = before.length ? Math.max(...before) : Math.min(...arr)
+        matched++
+        const d = (pt - lc) / 86400000; days.push(d)
+        if (d < 0) buckets.negative++; else if (d < 1) buckets.d0++; else if (d <= 7) buckets.d1_7++; else if (d <= 14) buckets.d8_14++; else if (d <= 30) buckets.d15_30++; else if (d <= 60) buckets.d31_60++; else buckets.d60plus++
+        if (samples.length < 12) samples.push({ leadCreated: new Date(lc).toISOString().slice(0, 10), paid: new Date(pt).toISOString().slice(0, 10), days: Math.round(d * 10) / 10 })
+      }
+      days.sort((a, b) => a - b)
+      const avg = days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length * 10) / 10 : 0
+      const median = days.length ? Math.round(days[Math.floor(days.length / 2)] * 10) / 10 : 0
+      return Response.json({ julyDeposits: oppIds.length, matchedToLead: matched, avgDays: avg, medianDays: median, buckets, samples })
+    } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
+  }
   if (searchParams.get('leadtopay3')) {
     try {
       const a = await getAuth()
