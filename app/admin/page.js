@@ -2806,8 +2806,6 @@ const selectProject = async (client, project) => {
             const _otherUnqual = _s.otherUnqualNotes || []
             const _lossByBranch = _s.lossReasonsByBranch || {}
             const _unqualByBranch = _s.unqualReasonsByBranch || {}
-            const _buyingPurpose = _s.buyingPurpose || {}
-            const _purposeByBranch = _s.buyingPurposeByBranch || {}
             const _q2d = _s.quoteToDeposit || {}
             const _q2dByBranch = _s.quoteToDepositByBranch || {}
             const _objBranchList = (_bd || []).map(b => b.branch).filter(Boolean)
@@ -3193,32 +3191,6 @@ const selectProject = async (client, project) => {
                 )}
               </div>
             )
-            const _purposeVals = Object.keys(_buyingPurpose)
-            const _purposeTotal = Object.values(_buyingPurpose).reduce((a, b) => a + b, 0)
-            const purposeSec = (
-              <div className="section">
-                <div className="section-head">{ICO('emerald', "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z")}<h2>מהות הקנייה</h2><span className="sub">הזדמנויות החודש · כלל הרשת + פילוח לפי סניף</span></div>
-                {_purposeVals.length === 0 ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים (השדה מלא רק בחלק מההזדמנויות)</div> : (<>
-                  <div style={{maxWidth:480,marginBottom:16}}>
-                    {_purposeVals.map(k => { const c = _buyingPurpose[k]; const pc = _purposeTotal ? Math.round(c/_purposeTotal*100) : 0; return (
-                      <div key={k} style={{marginBottom:10}}>
-                        <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}><span style={{fontWeight:600,color:'#0f172a'}}>{k}</span><span style={{color:'#64748b'}}>{formatNum(c)} · {pc}%</span></div>
-                        <div style={{background:'#f1f5f9',borderRadius:5,height:14,overflow:'hidden'}}><div style={{width:pc+'%',height:'100%',background:'#1d9e75',borderRadius:5}}></div></div>
-                      </div>
-                    )})}
-                  </div>
-                  <div className="table-wrapper">
-                    <table className="data-table">
-                      <thead><tr><th>סניף</th>{_purposeVals.map(k => <th key={k}>{k}</th>)}<th>סה"כ</th></tr></thead>
-                      <tbody>{Object.entries(_purposeByBranch).map(([b, arr]) => {
-                        const m = {}; arr.forEach(x => { m[x.reason] = x.count }); const tot = arr.reduce((a, x) => a + x.count, 0);
-                        return (<tr key={b}><td style={{fontWeight:600}}>{b}</td>{_purposeVals.map(k => <td key={k}>{formatNum(m[k] || 0)}</td>)}<td style={{fontWeight:600}}>{formatNum(tot)}</td></tr>)
-                      })}</tbody>
-                    </table>
-                  </div>
-                </>)}
-              </div>
-            )
             const _q2dRows = Object.entries(_q2dByBranch).sort((a, b) => b[1].measured - a[1].measured)
             const quoteTimeSec = (
               <div className="section">
@@ -3267,7 +3239,7 @@ const selectProject = async (client, project) => {
                 <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
               {sfTab === 'network' ? (<>{netCards}{cohortFunnel}{periodFunnel}</>)
-                : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}{objectionsSec}{purposeSec}{quoteTimeSec}</>)
+                : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}{objectionsSec}{quoteTimeSec}</>)
                 : sfTab === 'people' ? peopleSec
                 : sfTab === 'timing' ? timingSec
                 : (<>
