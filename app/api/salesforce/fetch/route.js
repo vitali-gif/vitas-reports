@@ -176,7 +176,7 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c FROM Lead WHERE ${LW} AND IsConverted=true`),
       soql(auth, `SELECT Branch_Name__c b, Unqualified_Reason__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Unqualified_Reason__c!=null GROUP BY Branch_Name__c, Unqualified_Reason__c`),
     ])
-    ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR] = await Promise.all([
+    ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, lossByBranchR] = await Promise.all([
       soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o, SUM(Amount) am FROM Opportunity WHERE ${OW} GROUP BY StageName`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Salesman__r.Name k, StageName st, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} GROUP BY Salesman__r.Name, StageName`),
