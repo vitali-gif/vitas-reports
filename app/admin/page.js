@@ -3198,6 +3198,7 @@ const selectProject = async (client, project) => {
                   {_objBranchList.map(b => (<option key={b} value={b}>{b}</option>))}
                 </select>
                 <span className="sub" style={{fontSize:12,color:'#94a3b8'}}>לידים ─(אי המרה)─▶ הזדמנויות ─(נסגר ללא הצלחה)─▶ רכשו</span>
+                <span style={{marginInlineStart:'auto',fontSize:11,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:6,padding:'3px 9px',whiteSpace:'nowrap'}}>מבוסס פעילות החודש · לא מושפע מהעדשה למעלה</span>
               </div>
               {_objBlock('נשירת ליד — סיבת אי המרה', 'לידים שלא הומרו החודש · ' + _objScope, ['amber', "M18 6 6 18M6 6l12 12"], _unqR, _unqT, _otherUnqualF, 'lead', '#eda100')}
               {_objBlock('נשירת הזדמנות — נסגר ללא הצלחה', 'הזדמנויות שנסגרו ללא הצלחה החודש · ' + _objScope, ['rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"], _lossR, _lossT, _otherLossF, 'opp', '#e24b4a')}
