@@ -628,6 +628,31 @@ export async function GET(request) {
     return Response.json(rb, { status })
   }
   const { searchParams } = new URL(request.url)
+  if (searchParams.get('q2ddebug')) {
+    try {
+      const a = await getAuth()
+      const q = `SELECT OpportunityId, StageName, CreatedDate FROM OpportunityHistory WHERE Opportunity.Cahin_Name__c='קלוס' AND Opportunity.CreatedDate>=2026-07-01T00:00:00Z AND StageName IN ('קיבל הצעת מחיר','הזמנה - שולמה מקדמה') ORDER BY OpportunityId, CreatedDate`
+      let url = `${a.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`
+      let rows = []
+      for (let i = 0; i < 15 && url; i++) { const r = await fetch(url, { headers: { Authorization: `Bearer ${a.token}` } }); const j = await r.json(); rows = rows.concat(j.records || []); url = j.nextRecordsUrl ? `${a.instance}${j.nextRecordsUrl}` : null }
+      const per = {}
+      for (const r of rows) { const p = per[r.OpportunityId] || (per[r.OpportunityId] = { q: null, p: null }); const t = new Date(r.CreatedDate).getTime(); if (r.StageName === 'קיבל הצעת מחיר') { if (p.q === null || t < p.q) p.q = t } else { if (p.p === null || t < p.p) p.p = t } }
+      const buckets = { same0: 0, d1_3: 0, d4_10: 0, d11_30: 0, d30plus: 0, negative: 0 }
+      const samples = []
+      const days = []
+      for (const [id, o] of Object.entries(per)) {
+        if (o.q === null || o.p === null) continue
+        const d = (o.p - o.q) / 86400000
+        days.push(d)
+        if (d < 0) buckets.negative++; else if (d < 1) buckets.same0++; else if (d <= 3) buckets.d1_3++; else if (d <= 10) buckets.d4_10++; else if (d <= 30) buckets.d11_30++; else buckets.d30plus++
+        if (samples.length < 10) samples.push({ id, quote: new Date(o.q).toISOString(), paid: new Date(o.p).toISOString(), days: Math.round(d * 100) / 100 })
+      }
+      const bothCount = days.length
+      const oppWithQuote = Object.values(per).filter(o => o.q !== null).length
+      const oppWithPaid = Object.values(per).filter(o => o.p !== null).length
+      return Response.json({ historyRows: rows.length, distinctOpps: Object.keys(per).length, oppWithQuote, oppWithPaid, measuredBoth: bothCount, buckets, samples })
+    } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
+  }
   if (searchParams.get('probe')) {
     try {
       const a = await getAuth()
