@@ -639,6 +639,7 @@ export async function GET(request) {
         oppOtherLoss_all: await cnt(`SELECT COUNT() FROM Opportunity WHERE Cahin_Name__c='קלוס' AND Other_Loss_Reason__c!=null`),
         leadOtherUnqual_all: await cnt(`SELECT COUNT() FROM Lead WHERE Chain_Name__c='קלוס' AND Other_Unqualified_Reason__c!=null`),
         leadUnqual_all: await cnt(`SELECT COUNT() FROM Lead WHERE Chain_Name__c='קלוס' AND Unqualified_Reason__c!=null`),
+        oppHist_quoteOrPaid_2026_07: await cnt(`SELECT COUNT() FROM OpportunityHistory WHERE Opportunity.Cahin_Name__c='קלוס' AND Opportunity.CreatedDate>=2026-07-01T00:00:00Z AND StageName IN ('קיבל הצעת מחיר','הזמנה - שולמה מקדמה')`),
       }
       return Response.json(out)
     } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
