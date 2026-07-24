@@ -2806,8 +2806,8 @@ const selectProject = async (client, project) => {
             const _otherUnqual = _s.otherUnqualNotes || []
             const _lossByBranch = _s.lossReasonsByBranch || {}
             const _unqualByBranch = _s.unqualReasonsByBranch || {}
-            const _q2d = _s.quoteToDeposit || {}
-            const _q2dByBranch = _s.quoteToDepositByBranch || {}
+            const _q2d = _s.leadToDeposit || {}
+            const _q2dByBranch = _s.leadToDepositByBranch || {}
             const _objBranchList = (_bd || []).map(b => b.branch).filter(Boolean)
             const _ob = sfObjBranch
             const _lossR = _ob === 'all' ? _lossReasons : (_lossByBranch[_ob] || [])
@@ -3191,20 +3191,21 @@ const selectProject = async (client, project) => {
                 )}
               </div>
             )
-            const _q2dRows = Object.entries(_q2dByBranch).sort((a, b) => b[1].measured - a[1].measured)
+            const _q2dRows = Object.entries(_q2dByBranch).sort((a, b) => (b[1].measured + b[1].repeatCustomers) - (a[1].measured + a[1].repeatCustomers))
             const quoteTimeSec = (
               <div className="section">
-                <div className="section-head">{ICO('violet', "M12 6v6l4 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z")}<h2>זמן ממוצע: הצעת מחיר ← תשלום מקדמה</h2><span className="sub">ימים · הזדמנויות החודש שהגיעו למקדמה</span></div>
-                {!_q2d.measured ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div> : (<>
+                <div className="section-head">{ICO('violet', "M12 6v6l4 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z")}<h2>זמן ממוצע: כניסת ליד ← תשלום מקדמה</h2><span className="sub">ימים · מקדמות ששולמו החודש · חלון 180 יום (חוזרים בנפרד)</span></div>
+                {(!_q2d.measured && !_q2d.repeatCustomers) ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div> : (<>
                   <div style={{display:'flex',gap:28,flexWrap:'wrap',padding:'8px 4px 16px',fontSize:14}}>
-                    <div>ממוצע <b>{_q2d.avgDays} ימים</b></div>
                     <div>חציון <b>{_q2d.medianDays} ימים</b></div>
-                    <div className="sub">({formatNum(_q2d.measured)} הזדמנויות)</div>
+                    <div>ממוצע <b>{_q2d.avgDays} ימים</b></div>
+                    <div className="sub">({formatNum(_q2d.measured)} עסקאות)</div>
+                    <div style={{color:'#b45309'}}>+{formatNum(_q2d.repeatCustomers || 0)} לקוחות חוזרים <span className="sub" style={{color:'#b45309'}}>(ליד מלפני 180+ יום)</span></div>
                   </div>
                   <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th>סניף</th><th>ממוצע ימים</th><th>חציון ימים</th><th>נמדדו</th></tr></thead>
-                      <tbody>{_q2dRows.map(([b, st]) => (<tr key={b}><td style={{fontWeight:600}}>{b}</td><td style={{fontWeight:600}}>{st.avgDays}</td><td>{st.medianDays}</td><td className="sub">{formatNum(st.measured)}</td></tr>))}</tbody>
+                      <thead><tr><th>סניף</th><th>חציון ימים</th><th>ממוצע ימים</th><th>נמדדו</th><th>חוזרים</th></tr></thead>
+                      <tbody>{_q2dRows.map(([b, st]) => (<tr key={b}><td style={{fontWeight:600}}>{b}</td><td style={{fontWeight:600}}>{st.medianDays}</td><td>{st.avgDays}</td><td className="sub">{formatNum(st.measured)}</td><td className="sub">{formatNum(st.repeatCustomers || 0)}</td></tr>))}</tbody>
                     </table>
                   </div>
                 </>)}
