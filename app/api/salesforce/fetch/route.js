@@ -156,7 +156,7 @@ async function runSync(opts = {}) {
   const OW = `Cahin_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
 
   let totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, noShowPeriodCnt, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
-  let oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR
+  let oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, lossByBranchR, unqualByBranchR
   let cohortStagesR
   let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR
   try {
@@ -167,13 +167,14 @@ async function runSync(opts = {}) {
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE Chain_Name__c='${CHAIN}' AND meetingDate__c>=${FROM} AND meetingDate__c<=${TO}`),
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE Chain_Name__c='${CHAIN}' AND meetingDate__c>=${FROM} AND meetingDate__c<=${TO} AND Status='${STATUS_NOSHOW}'`),
     ])
-    ;[byStatusR, byBranchR, bySourceR, reasonsR, competitorsR, cohortStagesR] = await Promise.all([
+    ;[byStatusR, byBranchR, bySourceR, reasonsR, competitorsR, cohortStagesR, unqualByBranchR] = await Promise.all([
       soql(auth, `SELECT Status k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Status`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Branch_Name__c`),
       soql(auth, `SELECT LeadSource k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY LeadSource`),
       soql(auth, `SELECT Unqualified_Reason__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Unqualified_Reason__c!=null GROUP BY Unqualified_Reason__c`),
       soql(auth, `SELECT Competitor_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Competitor_Name__c!=null GROUP BY Competitor_Name__c`),
       soql(auth, `SELECT ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c FROM Lead WHERE ${LW} AND IsConverted=true`),
+      soql(auth, `SELECT Branch_Name__c b, Unqualified_Reason__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Unqualified_Reason__c!=null GROUP BY Branch_Name__c, Unqualified_Reason__c`),
     ])
     ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR] = await Promise.all([
       soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o, SUM(Amount) am FROM Opportunity WHERE ${OW} GROUP BY StageName`),
@@ -182,6 +183,7 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT Buying_Purpose__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Buying_Purpose__c!=null GROUP BY Buying_Purpose__c`),
       soql(auth, `SELECT Product2.Name k, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Product2.Name`),
       soql(auth, `SELECT Loss_Reason__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Loss_Reason__c!=null GROUP BY Loss_Reason__c`),
+      soql(auth, `SELECT Branch_Name__c b, Loss_Reason__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Loss_Reason__c!=null GROUP BY Branch_Name__c, Loss_Reason__c`),
     ])
     ;[noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR] = await Promise.all([
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status='${STATUS_NOSHOW}' GROUP BY Branch_Name__c`),
@@ -281,6 +283,17 @@ async function runSync(opts = {}) {
   // Lead-level: unqualified reasons (aggregated bars)
   const unqualReasons = (reasonsR || []).map(r => ({ reason: UNQ_MAP[r.k] || r.k || 'לא ידוע', count: r.c })).sort((a, b) => b.count - a.count)
   const unqualTotal = unqualReasons.reduce((s2, r) => s2 + r.count, 0)
+  const _byBranchReasons = (rows, MAP) => {
+    const m = {}
+    for (const r of (rows || [])) {
+      const b = (r.b === null || r.b === undefined || r.b === '') ? 'לא ידוע' : r.b
+      ;(m[b] = m[b] || []).push({ reason: MAP[r.k] || r.k || 'לא ידוע', count: r.c })
+    }
+    for (const b of Object.keys(m)) m[b].sort((x, y) => y.count - x.count)
+    return m
+  }
+  const lossReasonsByBranch = _byBranchReasons(lossByBranchR, LOSS_MAP)
+  const unqualReasonsByBranch = _byBranchReasons(unqualByBranchR, UNQ_MAP)
   // "Other" free-text individual notes (lead + opportunity) — best-effort, never breaks the base fetch
   let otherLossNotes = [], otherUnqualNotes = [], objNotesErr = null
   try {
@@ -537,6 +550,8 @@ async function runSync(opts = {}) {
     unqualReasons,
     unqualTotal,
     otherUnqualNotes,
+    lossReasonsByBranch,
+    unqualReasonsByBranch,
     _objNotesErr: objNotesErr,
     schemaVersion: SF_SCHEMA_VERSION,
     _cohortDrillErr: cohortDrillErr,

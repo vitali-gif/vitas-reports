@@ -158,6 +158,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [toast, setToast] = useState('')
   const [namedLeadsModal, setNamedLeadsModal] = useState(null) // {title, names:[]}
   const [sfNoteModal, setSfNoteModal] = useState(null) // {kind:'lead'|'opp', ...record}
+  const [sfObjBranch, setSfObjBranch] = useState('all') // objections branch filter
   const [sortConfig, setSortConfig] = useState({});
   const [expandedCampaigns, setExpandedCampaigns] = useState(new Set());
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
@@ -2803,6 +2804,16 @@ const selectProject = async (client, project) => {
             const _unqualReasons = _s.unqualReasons || []
             const _unqualTotal = _s.unqualTotal || 0
             const _otherUnqual = _s.otherUnqualNotes || []
+            const _lossByBranch = _s.lossReasonsByBranch || {}
+            const _unqualByBranch = _s.unqualReasonsByBranch || {}
+            const _objBranchList = (_bd || []).map(b => b.branch).filter(Boolean)
+            const _ob = sfObjBranch
+            const _lossR = _ob === 'all' ? _lossReasons : (_lossByBranch[_ob] || [])
+            const _lossT = _lossR.reduce((a, r) => a + r.count, 0)
+            const _unqR = _ob === 'all' ? _unqualReasons : (_unqualByBranch[_ob] || [])
+            const _unqT = _unqR.reduce((a, r) => a + r.count, 0)
+            const _otherLossF = _ob === 'all' ? _otherLoss : _otherLoss.filter(n => n.branch === _ob)
+            const _otherUnqualF = _ob === 'all' ? _otherUnqual : _otherUnqual.filter(n => n.branch === _ob)
             const toggleBranch = (b) => setExpandedFunnelCh(prev => { const n = new Set(prev); if (n.has(b)) n.delete(b); else n.add(b); return n; })
             const ICO = (cls, d) => (<div className={"ico " + cls}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg></div>)
             const pctOf = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 + '%' : '—'
@@ -3178,10 +3189,18 @@ const selectProject = async (client, project) => {
                 )}
               </div>
             )
+            const _objScope = _ob === 'all' ? 'כלל הרשת' : ('סניף: ' + _ob)
             const objectionsSec = (<>
-              <div className="sub" style={{padding:'2px 4px 10px',fontSize:12,color:'#64748b'}}>לידים ─(נשירת ליד: אי המרה)─▶ פגישות/הזדמנויות ─(נשירת הזדמנות: נסגר ללא הצלחה)─▶ רכשו</div>
-              {_objBlock('נשירת ליד — סיבת אי המרה', 'לידים שלא הומרו החודש · כלל הרשת', ['amber', "M18 6 6 18M6 6l12 12"], _unqualReasons, _unqualTotal, _otherUnqual, 'lead', '#eda100')}
-              {_objBlock('נשירת הזדמנות — נסגר ללא הצלחה', 'הזדמנויות שנסגרו ללא הצלחה החודש · כלל הרשת', ['rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"], _lossReasons, _lossTotal, _otherLoss, 'opp', '#e24b4a')}
+              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'2px 4px 12px'}}>
+                <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>התנגדויות לפי:</span>
+                <select value={_ob} onChange={(e)=>setSfObjBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
+                  <option value="all">כל הרשת</option>
+                  {_objBranchList.map(b => (<option key={b} value={b}>{b}</option>))}
+                </select>
+                <span className="sub" style={{fontSize:12,color:'#94a3b8'}}>לידים ─(אי המרה)─▶ הזדמנויות ─(נסגר ללא הצלחה)─▶ רכשו</span>
+              </div>
+              {_objBlock('נשירת ליד — סיבת אי המרה', 'לידים שלא הומרו החודש · ' + _objScope, ['amber', "M18 6 6 18M6 6l12 12"], _unqR, _unqT, _otherUnqualF, 'lead', '#eda100')}
+              {_objBlock('נשירת הזדמנות — נסגר ללא הצלחה', 'הזדמנויות שנסגרו ללא הצלחה החודש · ' + _objScope, ['rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"], _lossR, _lossT, _otherLossF, 'opp', '#e24b4a')}
             </>)
 
             return (<>
@@ -4010,7 +4029,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
