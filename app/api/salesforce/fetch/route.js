@@ -583,6 +583,18 @@ export async function GET(request) {
     return Response.json(rb, { status })
   }
   const { searchParams } = new URL(request.url)
+  if (searchParams.get('probe')) {
+    try {
+      const a = await getAuth()
+      const cnt = async (q) => { const r = await fetch(`${a.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`, { headers: { Authorization: `Bearer ${a.token}` } }); const j = await r.json(); return j.totalSize }
+      const out = {
+        oppOtherLoss_all: await cnt(`SELECT COUNT() FROM Opportunity WHERE Cahin_Name__c='קלוס' AND Other_Loss_Reason__c!=null`),
+        leadOtherUnqual_all: await cnt(`SELECT COUNT() FROM Lead WHERE Chain_Name__c='קלוס' AND Other_Unqualified_Reason__c!=null`),
+        leadUnqual_all: await cnt(`SELECT COUNT() FROM Lead WHERE Chain_Name__c='קלוס' AND Unqualified_Reason__c!=null`),
+      }
+      return Response.json(out)
+    } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
+  }
   if (searchParams.get('describe')) {
     try {
       const a = await getAuth()
