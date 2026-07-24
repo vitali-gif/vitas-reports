@@ -3199,9 +3199,11 @@ const selectProject = async (client, project) => {
                 <div className="section-head">{ICO('violet', "M12 6v6l4 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z")}<h2>זמן כניסת ליד ← תשלום מקדמה</h2><span className="sub">מקדמות ששולמו החודש · פילוח לפי טווח זמן · חלון 180 יום</span></div>
                 {(!_q2d.measured && !_q2d.repeatCustomers) ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div> : (<>
                   <div style={{display:'flex',gap:24,flexWrap:'wrap',padding:'4px 4px 14px',fontSize:13,color:'#475569'}}>
-                    <div>סה"כ נמדדו <b style={{color:'#0f172a'}}>{formatNum(_q2d.measured)}</b></div>
+                    <div>מקדמות החודש <b style={{color:'#0f172a'}}>{formatNum(_q2d.totalDeposits || 0)}</b></div>
+                    <div>נמדדו (היו ליד, עד 180 יום) <b style={{color:'#0f172a'}}>{formatNum(_q2d.measured)}</b></div>
                     <div>חציון <b style={{color:'#0f172a'}}>{_q2d.medianDays} ימים</b></div>
-                    <div style={{color:'#b45309'}}>לקוחות חוזרים (180+ יום) <b>{formatNum(_q2d.repeatCustomers || 0)}</b></div>
+                    <div style={{color:'#b45309'}}>לקוחות חוזרים (180+) <b>{formatNum(_q2d.repeatCustomers || 0)}</b></div>
+                    <div style={{color:'#64748b'}}>ללא ליד — רכשו ישירות <b>{formatNum(_q2d.noLead || 0)}</b></div>
                   </div>
                   <div style={{maxWidth:520,marginBottom:18}}>
                     {_q2dLabels.map((lb, i) => { const c = (_q2d.counts || [])[i] || 0; const pc = _q2d.measured ? Math.round(c/_q2d.measured*100) : 0; return (

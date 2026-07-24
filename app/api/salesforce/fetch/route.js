@@ -524,15 +524,16 @@ async function runSync(opts = {}) {
     const BUCKETS = [{ label: 'יום אחד', max: 1 }, { label: '2-5 ימים', max: 5 }, { label: '6-10 ימים', max: 10 }, { label: '11-20 ימים', max: 20 }, { label: '21-45 ימים', max: 45 }, { label: '46-180 ימים', max: 180 }]
     const mkDist = (arr) => { const c = BUCKETS.map(() => 0); for (const d of arr) { let i = BUCKETS.findIndex(b => d <= b.max); if (i < 0) i = BUCKETS.length - 1; c[i]++ } return c }
     const stat = (arr) => { if (!arr.length) return { avgDays: 0, medianDays: 0, measured: 0, counts: BUCKETS.map(() => 0) }; const so = arr.slice().sort((a, b) => a - b); return { avgDays: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10, medianDays: Math.round(so[Math.floor(so.length / 2)] * 10) / 10, measured: arr.length, counts: mkDist(arr) } }
-    const all = [], byBr = {}, repBr = {}; let repeat = 0
+    const all = [], byBr = {}, repBr = {}; let repeat = 0, noLead = 0
     for (const id of oppIds) {
-      const info = oppInfo[id]; const arr = info && info.phone ? leadsByPhone[info.phone] : null; if (!arr || !arr.length) continue
-      const pt = paidTime[id]; const before = arr.filter(t => t <= pt); if (!before.length) continue
+      const info = oppInfo[id]; const arr = info && info.phone ? leadsByPhone[info.phone] : null
+      const pt = paidTime[id]; const before = arr ? arr.filter(t => t <= pt) : []
+      if (!before.length) { noLead++; continue }
       const lc = Math.max(...before); const d = (pt - lc) / 86400000
       if (d > 180) { repeat++; repBr[info.branch] = (repBr[info.branch] || 0) + 1; continue }
       all.push(d); (byBr[info.branch] = byBr[info.branch] || []).push(d)
     }
-    leadToDeposit = { ...stat(all), repeatCustomers: repeat }
+    leadToDeposit = { ...stat(all), repeatCustomers: repeat, totalDeposits: oppIds.length, noLead }
     for (const [b, arr] of Object.entries(byBr)) leadToDepositByBranch[b] = { ...stat(arr), repeatCustomers: repBr[b] || 0 }
     for (const [b, c] of Object.entries(repBr)) if (!leadToDepositByBranch[b]) leadToDepositByBranch[b] = { avgDays: 0, medianDays: 0, measured: 0, counts: BUCKETS.map(() => 0), repeatCustomers: c }
     leadToDeposit.buckets = BUCKETS.map(b => b.label)
@@ -642,39 +643,6 @@ export async function GET(request) {
     return Response.json(rb, { status })
   }
   const { searchParams } = new URL(request.url)
-  if (searchParams.get('l2dcov')) {
-    try {
-      const a = await getAuth()
-      const qy = async (q) => { let url = `${a.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`; let rows = []; for (let i = 0; i < 25 && url; i++) { const r = await fetch(url, { headers: { Authorization: `Bearer ${a.token}` } }); const j = await r.json(); if (j.records) rows = rows.concat(j.records); url = j.nextRecordsUrl ? `${a.instance}${j.nextRecordsUrl}` : null } return rows }
-      const norm = (p) => { if (!p) return null; let d = String(p).replace(/[^0-9]/g, ''); if (d.startsWith('972')) d = '0' + d.slice(3); if (d.length === 9) d = '0' + d; return d.length >= 9 ? d.slice(-10) : null }
-      const paidRows = await qy(`SELECT OpportunityId, CreatedDate FROM OpportunityHistory WHERE Opportunity.Cahin_Name__c='קלוס' AND StageName='הזמנה - שולמה מקדמה' AND CreatedDate>=2026-07-01T00:00:00Z AND CreatedDate<=2026-07-31T23:59:59Z`)
-      const oppSet = new Set(paidRows.map(r => r.OpportunityId)); const oppIds = [...oppSet]
-      const oppNorm = {}; const rawVariants = new Set()
-      for (let i = 0; i < oppIds.length; i += 200) {
-        const inList = oppIds.slice(i, i + 200).map(x => `'${x}'`).join(',')
-        const orr = await qy(`SELECT Id, Mobile__c FROM Opportunity WHERE Id IN (${inList})`)
-        for (const r of orr) if (r.Mobile__c) { const n = norm(r.Mobile__c); if (n) { oppNorm[r.Id] = n; rawVariants.add(n); rawVariants.add(n.slice(1)); rawVariants.add('972' + n.slice(1)); rawVariants.add(String(r.Mobile__c)) } }
-      }
-      const va = [...rawVariants]
-      const leadNorms = new Set()
-      for (let i = 0; i < va.length; i += 150) {
-        const inList = va.slice(i, i + 150).map(x => `'${x.replace(/'/g, "")}'`).join(',')
-        const lr = await qy(`SELECT Phone, MobilePhone FROM Lead WHERE Chain_Name__c='קלוס' AND (MobilePhone IN (${inList}) OR Phone IN (${inList}))`)
-        for (const r of lr) { for (const ph of [norm(r.MobilePhone), norm(r.Phone)]) if (ph) leadNorms.add(ph) }
-      }
-      const leadNormsAny = new Set()
-      for (let i = 0; i < va.length; i += 150) {
-        const inList = va.slice(i, i + 150).map(x => `'${x.replace(/'/g, "")}'`).join(',')
-        const lr = await qy(`SELECT Phone, MobilePhone FROM Lead WHERE (MobilePhone IN (${inList}) OR Phone IN (${inList}))`)
-        for (const r of lr) { for (const ph of [norm(r.MobilePhone), norm(r.Phone)]) if (ph) leadNormsAny.add(ph) }
-      }
-      let matchedAnyChain = 0
-      for (const id of oppIds) { const n = oppNorm[id]; if (n && leadNormsAny.has(n)) matchedAnyChain++ }
-      let oppWithPhone = 0, matchedVariant = 0
-      for (const id of oppIds) { const n = oppNorm[id]; if (n) oppWithPhone++; if (n && leadNorms.has(n)) matchedVariant++ }
-      return Response.json({ julyDeposits: oppIds.length, oppWithPhone, matchedVariant, matchedAnyChain, note: 'matchedVariant = opp phones that exist as a KLOSS lead using format variants (any date)' })
-    } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
-  }
   if (searchParams.get('describe')) {
     try {
       const a = await getAuth()
