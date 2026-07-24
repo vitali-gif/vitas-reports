@@ -662,9 +662,17 @@ export async function GET(request) {
         const lr = await qy(`SELECT Phone, MobilePhone FROM Lead WHERE Chain_Name__c='קלוס' AND (MobilePhone IN (${inList}) OR Phone IN (${inList}))`)
         for (const r of lr) { for (const ph of [norm(r.MobilePhone), norm(r.Phone)]) if (ph) leadNorms.add(ph) }
       }
+      const leadNormsAny = new Set()
+      for (let i = 0; i < va.length; i += 150) {
+        const inList = va.slice(i, i + 150).map(x => `'${x.replace(/'/g, "")}'`).join(',')
+        const lr = await qy(`SELECT Phone, MobilePhone FROM Lead WHERE (MobilePhone IN (${inList}) OR Phone IN (${inList}))`)
+        for (const r of lr) { for (const ph of [norm(r.MobilePhone), norm(r.Phone)]) if (ph) leadNormsAny.add(ph) }
+      }
+      let matchedAnyChain = 0
+      for (const id of oppIds) { const n = oppNorm[id]; if (n && leadNormsAny.has(n)) matchedAnyChain++ }
       let oppWithPhone = 0, matchedVariant = 0
       for (const id of oppIds) { const n = oppNorm[id]; if (n) oppWithPhone++; if (n && leadNorms.has(n)) matchedVariant++ }
-      return Response.json({ julyDeposits: oppIds.length, oppWithPhone, matchedVariant, note: 'matchedVariant = opp phones that exist as a KLOSS lead using format variants (any date)' })
+      return Response.json({ julyDeposits: oppIds.length, oppWithPhone, matchedVariant, matchedAnyChain, note: 'matchedVariant = opp phones that exist as a KLOSS lead using format variants (any date)' })
     } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
   }
   if (searchParams.get('describe')) {
