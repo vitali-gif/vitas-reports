@@ -157,6 +157,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [newProjectName, setNewProjectName] = useState('')
   const [toast, setToast] = useState('')
   const [namedLeadsModal, setNamedLeadsModal] = useState(null) // {title, names:[]}
+  const [sfNoteModal, setSfNoteModal] = useState(null) // {kind:'lead'|'opp', ...record}
   const [sortConfig, setSortConfig] = useState({});
   const [expandedCampaigns, setExpandedCampaigns] = useState(new Set());
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
@@ -869,6 +870,7 @@ const selectProject = async (client, project) => {
     const onPop = () => {
       if (!isMobile()) { window.__vitasNavArmed = false; return; }
       if (namedLeadsModal) setNamedLeadsModal(null);
+      if (sfNoteModal) setSfNoteModal(null);
       else if (dashTab === 'crm' && crmSubTab !== 'sources') setCrmSubTab('sources');
       else if (dashTab !== 'all') setDashTab('all');
       // re-arm so the next back is also handled internally (never leaves the dashboard)
@@ -876,7 +878,7 @@ const selectProject = async (client, project) => {
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [dashTab, crmSubTab, namedLeadsModal]);
+  }, [dashTab, crmSubTab, namedLeadsModal, sfNoteModal]);
 
   const destroyCharts = () => {
     // Cancel any pending chart-creation timeouts (prevents stale charts from
@@ -2797,7 +2799,10 @@ const selectProject = async (client, project) => {
             const _products = (_s.products || []).slice(0, 12)
             const _lossReasons = _s.lossReasons || []
             const _lossTotal = _s.lossTotal || 0
-            const _otherLoss = _s.otherLossReasons || []
+            const _otherLoss = _s.otherLossNotes || []
+            const _unqualReasons = _s.unqualReasons || []
+            const _unqualTotal = _s.unqualTotal || 0
+            const _otherUnqual = _s.otherUnqualNotes || []
             const toggleBranch = (b) => setExpandedFunnelCh(prev => { const n = new Set(prev); if (n.has(b)) n.delete(b); else n.add(b); return n; })
             const ICO = (cls, d) => (<div className={"ico " + cls}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg></div>)
             const pctOf = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 + '%' : '—'
@@ -3143,31 +3148,40 @@ const selectProject = async (client, project) => {
               </div>
             </>)
 
-            const objectionsSec = (<>
+            const _objBlock = (title, subtitle, ico, reasons, total, notes, kind, barColor) => (
               <div className="section">
-                <div className="section-head">{ICO('rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z")}<h2>התנגדויות — סיבות "נסגר ללא הצלחה"</h2><span className="sub">כלל הרשת · הזדמנויות שנסגרו ללא הצלחה החודש</span></div>
-                {_lossReasons.length === 0 ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div> : (
+                <div className="section-head">{ICO(ico[0], ico[1])}<h2>{title}</h2><span className="sub">{subtitle}</span></div>
+                {reasons.length === 0 && notes.length === 0 ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div> : (
                   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:20,alignItems:'start'}}>
                     <div>
-                      {_lossReasons.map(r => { const pc = _lossTotal ? Math.round(r.count/_lossTotal*100) : 0; return (
+                      {reasons.map(r => { const pc = total ? Math.round(r.count/total*100) : 0; return (
                         <div key={r.reason} style={{marginBottom:10}}>
                           <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}><span style={{fontWeight:600,color:'#0f172a'}}>{r.reason}</span><span style={{color:'#64748b'}}>{formatNum(r.count)} · {pc}%</span></div>
-                          <div style={{background:'#f1f5f9',borderRadius:5,height:14,overflow:'hidden'}}><div style={{width:pc+'%',height:'100%',background:'#e24b4a',borderRadius:5}}></div></div>
+                          <div style={{background:'#f1f5f9',borderRadius:5,height:14,overflow:'hidden'}}><div style={{width:pc+'%',height:'100%',background:barColor,borderRadius:5}}></div></div>
                         </div>
                       )})}
                     </div>
                     <div style={{background:'#fff',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px'}}>
-                      <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>פירוט "אחר" (טקסט חופשי)</div>
-                      {_otherLoss.length === 0 ? <div className="sub">—</div> : (
-                        <table className="data-table" style={{width:'100%'}}>
-                          <thead><tr><th>סיבה</th><th>כמות</th></tr></thead>
-                          <tbody>{_otherLoss.map((o, i) => (<tr key={i}><td>{o.text}</td><td>{formatNum(o.count)}</td></tr>))}</tbody>
-                        </table>
+                      <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>פירוט "אחר" · לחצו לפרטי קשר ({formatNum(notes.length)})</div>
+                      {notes.length === 0 ? <div className="sub">—</div> : (
+                        <div style={{maxHeight:320,overflowY:'auto'}}>
+                          {notes.map((n, i2) => (
+                            <div key={i2} onClick={() => setSfNoteModal({ ...n, kind })} style={{padding:'8px 10px',borderBottom:'1px solid var(--border)',cursor:'pointer',borderRadius:6}} onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                              <div style={{fontSize:13,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{n.text}</div>
+                              <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>{[n.branch, n.date].filter(Boolean).join(' · ')}</div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
                 )}
               </div>
+            )
+            const objectionsSec = (<>
+              <div className="sub" style={{padding:'2px 4px 10px',fontSize:12,color:'#64748b'}}>לידים ─(נשירת ליד: אי המרה)─▶ פגישות/הזדמנויות ─(נשירת הזדמנות: נסגר ללא הצלחה)─▶ רכשו</div>
+              {_objBlock('נשירת ליד — סיבת אי המרה', 'לידים שלא הומרו החודש · כלל הרשת', ['amber', "M18 6 6 18M6 6l12 12"], _unqualReasons, _unqualTotal, _otherUnqual, 'lead', '#eda100')}
+              {_objBlock('נשירת הזדמנות — נסגר ללא הצלחה', 'הזדמנויות שנסגרו ללא הצלחה החודש · כלל הרשת', ['rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"], _lossReasons, _lossTotal, _otherLoss, 'opp', '#e24b4a')}
             </>)
 
             return (<>
@@ -3996,7 +4010,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
@@ -4335,6 +4349,43 @@ const selectProject = async (client, project) => {
             )}
             <div style={{marginTop:14,textAlign:'left'}}>
               <span style={{fontSize:12,color:'#94a3b8'}}>{namedLeadsModal.names.length} רשומות</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sfNoteModal && (
+        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setSfNoteModal(null); }} style={{zIndex:9999}}>
+          <div className="modal" style={{maxWidth:440,maxHeight:'80vh',display:'flex',flexDirection:'column',direction:'rtl'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700}}>{sfNoteModal.contactName || sfNoteModal.name || 'פרטי לקוח'}</h3>
+              <button onClick={() => setSfNoteModal(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
+            </div>
+            <div style={{fontSize:12,color:'#94a3b8',marginBottom:14}}>{sfNoteModal.kind === 'lead' ? 'נשירת ליד — סיבת אי המרה' : 'נשירת הזדמנות — נסגר ללא הצלחה'}</div>
+            <div style={{overflowY:'auto',flex:1}}>
+              <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'10px 12px',marginBottom:14}}>
+                <div style={{fontSize:11,fontWeight:700,color:'#991b1b',marginBottom:4}}>ההערה שנכתבה{sfNoteModal.reason ? ' · ' + sfNoteModal.reason : ''}</div>
+                <div style={{fontSize:14,color:'#0f172a',lineHeight:1.6}}>{sfNoteModal.text}</div>
+              </div>
+              <table className="data-table" style={{width:'100%',fontSize:13}}>
+                <tbody>
+                  {(sfNoteModal.name && sfNoteModal.contactName && sfNoteModal.name !== sfNoteModal.contactName) ? (<tr><td style={{color:'#64748b'}}>שם הזדמנות</td><td style={{fontWeight:600}}>{sfNoteModal.name}</td></tr>) : null}
+                  <tr><td style={{color:'#64748b'}}>טלפון</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{sfNoteModal.phone ? (<a href={'tel:'+sfNoteModal.phone} style={{color:'var(--violet,#7c3aed)'}}>{sfNoteModal.phone}</a>) : '—'}</td></tr>
+                  <tr><td style={{color:'#64748b'}}>אימייל</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{sfNoteModal.email || '—'}</td></tr>
+                  <tr><td style={{color:'#64748b'}}>סניף</td><td>{sfNoteModal.branch || '—'}</td></tr>
+                  <tr><td style={{color:'#64748b'}}>איש מכירות</td><td>{sfNoteModal.salesman || '—'}</td></tr>
+                  {sfNoteModal.kind === 'lead'
+                    ? (<>
+                        <tr><td style={{color:'#64748b'}}>סטטוס</td><td>{sfNoteModal.status || '—'}</td></tr>
+                        <tr><td style={{color:'#64748b'}}>מקור</td><td>{sfNoteModal.source || '—'}</td></tr>
+                      </>)
+                    : (<>
+                        <tr><td style={{color:'#64748b'}}>שלב</td><td>{sfNoteModal.stage || '—'}</td></tr>
+                        <tr><td style={{color:'#64748b'}}>שווי</td><td style={{fontWeight:600}}>{sfNoteModal.value ? formatCurrency(sfNoteModal.value) : '—'}</td></tr>
+                      </>)}
+                  <tr><td style={{color:'#64748b'}}>תאריך</td><td>{sfNoteModal.date || '—'}</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

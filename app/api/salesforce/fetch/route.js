@@ -155,7 +155,7 @@ async function runSync(opts = {}) {
   const LW = `Chain_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
   const OW = `Cahin_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
 
-  let totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, noShowPeriodCnt, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
+  let totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, noShowPeriodCnt, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR, otherUnqualR
   let oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, otherLossR
   let cohortStagesR
   let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR
@@ -167,13 +167,14 @@ async function runSync(opts = {}) {
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE Chain_Name__c='${CHAIN}' AND meetingDate__c>=${FROM} AND meetingDate__c<=${TO}`),
       soqlCount(auth, `SELECT COUNT() FROM Lead WHERE Chain_Name__c='${CHAIN}' AND meetingDate__c>=${FROM} AND meetingDate__c<=${TO} AND Status='${STATUS_NOSHOW}'`),
     ])
-    ;[byStatusR, byBranchR, bySourceR, reasonsR, competitorsR, cohortStagesR] = await Promise.all([
+    ;[byStatusR, byBranchR, bySourceR, reasonsR, competitorsR, cohortStagesR, otherUnqualR] = await Promise.all([
       soql(auth, `SELECT Status k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Status`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Branch_Name__c`),
       soql(auth, `SELECT LeadSource k, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY LeadSource`),
       soql(auth, `SELECT Unqualified_Reason__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Unqualified_Reason__c!=null GROUP BY Unqualified_Reason__c`),
       soql(auth, `SELECT Competitor_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Competitor_Name__c!=null GROUP BY Competitor_Name__c`),
       soql(auth, `SELECT ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c FROM Lead WHERE ${LW} AND IsConverted=true`),
+      soql(auth, `SELECT Id, Name, Phone, MobilePhone, Email, Branch_Name__c, Salesman__r.Name, Status, LeadSource, CreatedDate, Unqualified_Reason__c, Other_Unqualified_Reason__c FROM Lead WHERE ${LW} AND Other_Unqualified_Reason__c!=null ORDER BY CreatedDate DESC LIMIT 200`),
     ])
     ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, otherLossR] = await Promise.all([
       soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o, SUM(Amount) am FROM Opportunity WHERE ${OW} GROUP BY StageName`),
@@ -182,7 +183,7 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT Buying_Purpose__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Buying_Purpose__c!=null GROUP BY Buying_Purpose__c`),
       soql(auth, `SELECT Product2.Name k, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Product2.Name`),
       soql(auth, `SELECT Loss_Reason__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Loss_Reason__c!=null GROUP BY Loss_Reason__c`),
-      soql(auth, `SELECT Other_Loss_Reason__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Other_Loss_Reason__c!=null GROUP BY Other_Loss_Reason__c`),
+      soql(auth, `SELECT Id, Name, Mobile__c, Contact.Name, Contact.Phone, Contact.Email, Branch_Name__c, Salesman__r.Name, StageName, TotalPrice_Opp_Product__c, CreatedDate, Loss_Reason__c, Other_Loss_Reason__c FROM Opportunity WHERE ${OW} AND Other_Loss_Reason__c!=null ORDER BY CreatedDate DESC LIMIT 200`),
     ])
     ;[noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR] = await Promise.all([
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status='${STATUS_NOSHOW}' GROUP BY Branch_Name__c`),
@@ -275,9 +276,39 @@ async function runSync(opts = {}) {
     .sort((a, b) => b.units - a.units)
 
   const LOSS_MAP = { 'Lost to Competitor': 'מתחרה', 'No Decision / Non-Responsive': 'אין החלטה / לא מגיב', 'Price': 'מחיר', 'Other': 'אחר' }
+  const UNQ_MAP = { 'Expensive': 'יקר מדי', 'Competitor': 'מתחרה', 'Other': 'אחר' }
+  // Opportunity-level: closed-lost reasons (aggregated bars)
   const lossReasons = (lossReasonR || []).map(r => ({ reason: LOSS_MAP[r.k] || r.k || 'לא ידוע', count: r.c })).sort((a, b) => b.count - a.count)
   const lossTotal = lossReasons.reduce((s2, r) => s2 + r.count, 0)
-  const otherLossReasons = (otherLossR || []).map(r => ({ text: r.k, count: r.c })).sort((a, b) => b.count - a.count).slice(0, 40)
+  // Opportunity-level "Other" free-text -> individual notes with contact details (clickable)
+  const otherLossNotes = (otherLossR || []).map(r => ({
+    text: r.Other_Loss_Reason__c || '',
+    reason: LOSS_MAP[r.Loss_Reason__c] || r.Loss_Reason__c || '',
+    name: r.Name || '',
+    contactName: (r.Contact && r.Contact.Name) || '',
+    phone: r.Mobile__c || (r.Contact && r.Contact.Phone) || '',
+    email: (r.Contact && r.Contact.Email) || '',
+    branch: r.Branch_Name__c || '',
+    salesman: (r.Salesman__r && r.Salesman__r.Name) || '',
+    stage: r.StageName || '',
+    value: r0(num(r.TotalPrice_Opp_Product__c)),
+    date: r.CreatedDate ? String(r.CreatedDate).slice(0, 10) : '',
+  }))
+  // Lead-level: unqualified reasons (aggregated bars) + "Other" free-text individual notes
+  const unqualReasons = (reasonsR || []).map(r => ({ reason: UNQ_MAP[r.k] || r.k || 'לא ידוע', count: r.c })).sort((a, b) => b.count - a.count)
+  const unqualTotal = unqualReasons.reduce((s2, r) => s2 + r.count, 0)
+  const otherUnqualNotes = (otherUnqualR || []).map(r => ({
+    text: r.Other_Unqualified_Reason__c || '',
+    reason: UNQ_MAP[r.Unqualified_Reason__c] || r.Unqualified_Reason__c || '',
+    name: r.Name || '',
+    phone: r.MobilePhone || r.Phone || '',
+    email: r.Email || '',
+    branch: r.Branch_Name__c || '',
+    salesman: (r.Salesman__r && r.Salesman__r.Name) || '',
+    status: r.Status || '',
+    source: r.LeadSource || '',
+    date: r.CreatedDate ? String(r.CreatedDate).slice(0, 10) : '',
+  }))
 
   // ---- per-branch detail (manager drill-down) ----
   const noShowByBranch = pairs(noShowR, 'k', 'c')
@@ -497,7 +528,10 @@ async function runSync(opts = {}) {
     deals: { opportunities, closed: paid, closingRate: conversionRate, revenue: dealValue, avgDealValue },
     lossReasons,
     lossTotal,
-    otherLossReasons,
+    otherLossNotes,
+    unqualReasons,
+    unqualTotal,
+    otherUnqualNotes,
     schemaVersion: SF_SCHEMA_VERSION,
     _cohortDrillErr: cohortDrillErr,
   }
