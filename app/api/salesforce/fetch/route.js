@@ -156,7 +156,7 @@ async function runSync(opts = {}) {
   const OW = `Cahin_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
 
   let totalLeads, convertedLeads, meetingLeads, meetingPeriodCnt, noShowPeriodCnt, byStatusR, byBranchR, bySourceR, reasonsR, competitorsR
-  let oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, lossByBranchR, unqualByBranchR
+  let oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, lossByBranchR, unqualByBranchR, purposeByBranchR
   let cohortStagesR
   let noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR
   try {
@@ -176,7 +176,7 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT ConvertedOpportunity.StageName, ConvertedOpportunity.TotalPrice_Opp_Product__c FROM Lead WHERE ${LW} AND IsConverted=true`),
       soql(auth, `SELECT Branch_Name__c b, Unqualified_Reason__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Unqualified_Reason__c!=null GROUP BY Branch_Name__c, Unqualified_Reason__c`),
     ])
-    ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, lossByBranchR] = await Promise.all([
+    ;[oppStageR, oppBranchR, salesmenR, purposeR, productsR, lossReasonR, lossByBranchR, purposeByBranchR] = await Promise.all([
       soql(auth, `SELECT StageName k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v, SUM(ovala__c) o, SUM(Amount) am FROM Opportunity WHERE ${OW} GROUP BY StageName`),
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} GROUP BY Branch_Name__c`),
       soql(auth, `SELECT Salesman__r.Name k, StageName st, COUNT(Id) c, SUM(TotalPrice_Opp_Product__c) v FROM Opportunity WHERE ${OW} GROUP BY Salesman__r.Name, StageName`),
@@ -184,6 +184,7 @@ async function runSync(opts = {}) {
       soql(auth, `SELECT Product2.Name k, COUNT(Id) c, SUM(TotalPrice) v FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} GROUP BY Product2.Name`),
       soql(auth, `SELECT Loss_Reason__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Loss_Reason__c!=null GROUP BY Loss_Reason__c`),
       soql(auth, `SELECT Branch_Name__c b, Loss_Reason__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Loss_Reason__c!=null GROUP BY Branch_Name__c, Loss_Reason__c`),
+      soql(auth, `SELECT Branch_Name__c b, Buying_Purpose__c k, COUNT(Id) c FROM Opportunity WHERE ${OW} AND Buying_Purpose__c!=null GROUP BY Branch_Name__c, Buying_Purpose__c`),
     ])
     ;[noShowR, arrivedBranchR, schedBranchR, mtgBranchR, stageBranchR, salesBranchR, prodBranchR, mtgHourR, mtgDayR, branchCohortR] = await Promise.all([
       soql(auth, `SELECT Branch_Name__c k, COUNT(Id) c FROM Lead WHERE ${LW} AND Status='${STATUS_NOSHOW}' GROUP BY Branch_Name__c`),
@@ -294,6 +295,7 @@ async function runSync(opts = {}) {
   }
   const lossReasonsByBranch = _byBranchReasons(lossByBranchR, LOSS_MAP)
   const unqualReasonsByBranch = _byBranchReasons(unqualByBranchR, UNQ_MAP)
+  const buyingPurposeByBranch = _byBranchReasons(purposeByBranchR, {})
   // "Other" free-text individual notes (lead + opportunity) — best-effort, never breaks the base fetch
   let otherLossNotes = [], otherUnqualNotes = [], objNotesErr = null
   try {
@@ -497,6 +499,33 @@ async function runSync(opts = {}) {
     registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0,
   }))
 
+  // ===== time from "קיבל הצעת מחיר" -> "הזמנה - שולמה מקדמה" (OpportunityHistory) =====
+  let quoteToDeposit = { avgDays: 0, medianDays: 0, measured: 0 }, quoteToDepositByBranch = {}, q2dErr = null
+  try {
+    const hist = await soql(auth,
+      `SELECT OpportunityId, Opportunity.Branch_Name__c, StageName, CreatedDate FROM OpportunityHistory WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO} AND StageName IN ('${STAGE_QUOTE}','${STAGE_PAID}') ORDER BY OpportunityId, CreatedDate`, 12)
+    const perOpp = {}
+    for (const r of (hist || [])) {
+      const id = r.OpportunityId
+      const br = bkey(r.Opportunity && r.Opportunity.Branch_Name__c)
+      const p = perOpp[id] || (perOpp[id] = { branch: br, quote: null, paid: null })
+      const t = new Date(r.CreatedDate).getTime()
+      if (r.StageName === STAGE_QUOTE) { if (p.quote === null || t < p.quote) p.quote = t }
+      else if (r.StageName === STAGE_PAID) { if (p.paid === null || t < p.paid) p.paid = t }
+    }
+    const stat = (arr) => { if (!arr.length) return { avgDays: 0, medianDays: 0, measured: 0 }; const so = arr.slice().sort((a, b) => a - b); return { avgDays: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10, medianDays: Math.round(so[Math.floor(so.length / 2)] * 10) / 10, measured: arr.length } }
+    const all = [], byBr = {}
+    for (const o of Object.values(perOpp)) {
+      if (o.quote !== null && o.paid !== null && o.paid >= o.quote) {
+        const days = (o.paid - o.quote) / 86400000
+        all.push(days)
+        ;(byBr[o.branch] = byBr[o.branch] || []).push(days)
+      }
+    }
+    quoteToDeposit = stat(all)
+    for (const [b, arr] of Object.entries(byBr)) quoteToDepositByBranch[b] = stat(arr)
+  } catch (e) { q2dErr = e.message }
+
   const summary = {
     crmType: 'salesforce',
     chain: CHAIN,
@@ -552,7 +581,11 @@ async function runSync(opts = {}) {
     otherUnqualNotes,
     lossReasonsByBranch,
     unqualReasonsByBranch,
+    buyingPurposeByBranch,
+    quoteToDeposit,
+    quoteToDepositByBranch,
     _objNotesErr: objNotesErr,
+    _q2dErr: q2dErr,
     schemaVersion: SF_SCHEMA_VERSION,
     _cohortDrillErr: cohortDrillErr,
   }
