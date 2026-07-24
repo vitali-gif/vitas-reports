@@ -521,7 +521,9 @@ async function runSync(opts = {}) {
       for (const r of (lr || [])) { const t = new Date(r.CreatedDate).getTime(); for (const ph of [normPh(r.MobilePhone), normPh(r.Phone)]) if (ph) (leadsByPhone[ph] = leadsByPhone[ph] || []).push(t) }
     }
     const WINDOW = 180 * 86400000
-    const stat = (arr) => { if (!arr.length) return { avgDays: 0, medianDays: 0, measured: 0 }; const so = arr.slice().sort((a, b) => a - b); return { avgDays: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10, medianDays: Math.round(so[Math.floor(so.length / 2)] * 10) / 10, measured: arr.length } }
+    const BUCKETS = [{ label: 'יום אחד', max: 1 }, { label: '2-5 ימים', max: 5 }, { label: '6-10 ימים', max: 10 }, { label: '11-20 ימים', max: 20 }, { label: '21-45 ימים', max: 45 }, { label: '46-180 ימים', max: 180 }]
+    const mkDist = (arr) => { const c = BUCKETS.map(() => 0); for (const d of arr) { let i = BUCKETS.findIndex(b => d <= b.max); if (i < 0) i = BUCKETS.length - 1; c[i]++ } return c }
+    const stat = (arr) => { if (!arr.length) return { avgDays: 0, medianDays: 0, measured: 0, counts: BUCKETS.map(() => 0) }; const so = arr.slice().sort((a, b) => a - b); return { avgDays: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10, medianDays: Math.round(so[Math.floor(so.length / 2)] * 10) / 10, measured: arr.length, counts: mkDist(arr) } }
     const all = [], byBr = {}, repBr = {}; let repeat = 0
     for (const id of oppIds) {
       const info = oppInfo[id]; const arr = info && info.phone ? leadsByPhone[info.phone] : null; if (!arr || !arr.length) continue
@@ -532,7 +534,8 @@ async function runSync(opts = {}) {
     }
     leadToDeposit = { ...stat(all), repeatCustomers: repeat }
     for (const [b, arr] of Object.entries(byBr)) leadToDepositByBranch[b] = { ...stat(arr), repeatCustomers: repBr[b] || 0 }
-    for (const [b, c] of Object.entries(repBr)) if (!leadToDepositByBranch[b]) leadToDepositByBranch[b] = { avgDays: 0, medianDays: 0, measured: 0, repeatCustomers: c }
+    for (const [b, c] of Object.entries(repBr)) if (!leadToDepositByBranch[b]) leadToDepositByBranch[b] = { avgDays: 0, medianDays: 0, measured: 0, counts: BUCKETS.map(() => 0), repeatCustomers: c }
+    leadToDeposit.buckets = BUCKETS.map(b => b.label)
   } catch (e) { l2dErr = e.message }
 
   const summary = {
