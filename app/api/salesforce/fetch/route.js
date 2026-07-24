@@ -643,33 +643,6 @@ export async function GET(request) {
     return Response.json(rb, { status })
   }
   const { searchParams } = new URL(request.url)
-  if (searchParams.get('nolead')) {
-    try {
-      const a = await getAuth()
-      const qy = async (q) => { let url = `${a.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`; let rows = []; for (let i = 0; i < 25 && url; i++) { const r = await fetch(url, { headers: { Authorization: `Bearer ${a.token}` } }); const j = await r.json(); if (j.records) rows = rows.concat(j.records); url = j.nextRecordsUrl ? `${a.instance}${j.nextRecordsUrl}` : null } return rows }
-      const norm = (p) => { if (!p) return null; let d = String(p).replace(/[^0-9]/g, ''); if (d.startsWith('972')) d = '0' + d.slice(3); if (d.length === 9) d = '0' + d; return d.length >= 9 ? d.slice(-10) : null }
-      const paidRows = await qy(`SELECT OpportunityId, CreatedDate FROM OpportunityHistory WHERE Opportunity.Cahin_Name__c='קלוס' AND StageName='הזמנה - שולמה מקדמה' AND CreatedDate>=2026-07-01T00:00:00Z AND CreatedDate<=2026-07-31T23:59:59Z ORDER BY OpportunityId, CreatedDate`)
-      const paidTime = {}
-      for (const r of paidRows) { const t = new Date(r.CreatedDate).getTime(); if (paidTime[r.OpportunityId] == null || t < paidTime[r.OpportunityId]) paidTime[r.OpportunityId] = t }
-      const oppIds = Object.keys(paidTime)
-      const info = {}; const variants = new Set()
-      for (let i = 0; i < oppIds.length; i += 200) {
-        const inList = oppIds.slice(i, i + 200).map(x => `'${x}'`).join(',')
-        const orr = await qy(`SELECT Id, Name, Mobile__c, Branch_Name__c FROM Opportunity WHERE Id IN (${inList})`)
-        for (const r of orr) { const n = norm(r.Mobile__c); info[r.Id] = { name: r.Name, mobile: r.Mobile__c, branch: r.Branch_Name__c, n }; if (n) { variants.add(n); variants.add(n.slice(1)); variants.add('972' + n.slice(1)); } if (r.Mobile__c) variants.add(String(r.Mobile__c)) }
-      }
-      const va = [...variants]
-      const leadNorms = new Set()
-      for (let i = 0; i < va.length; i += 150) {
-        const inList = va.slice(i, i + 150).map(x => `'${x.replace(/'/g, "")}'`).join(',')
-        const lr = await qy(`SELECT Phone, MobilePhone FROM Lead WHERE (MobilePhone IN (${inList}) OR Phone IN (${inList}))`)
-        for (const r of lr) { for (const ph of [norm(r.MobilePhone), norm(r.Phone)]) if (ph) leadNorms.add(ph) }
-      }
-      const noLead = []
-      for (const id of oppIds) { const it = info[id]; if (it && it.n && leadNorms.has(it.n)) continue; noLead.push({ id, url: `${a.instance}/${id}`, name: it && it.name, mobile: it && it.mobile, branch: it && it.branch, paid: new Date(paidTime[id]).toISOString().slice(0, 10) }) }
-      return Response.json({ totalDeposits: oppIds.length, noLeadCount: noLead.length, samples: noLead.slice(0, 20) })
-    } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
-  }
   if (searchParams.get('describe')) {
     try {
       const a = await getAuth()
