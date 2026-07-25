@@ -647,7 +647,7 @@ export async function GET(request) {
     try {
       const a = await getAuth()
       const num = String(searchParams.get('diagphone')).replace(/[^0-9]/g, '')
-      const sosl = `FIND {${num}} IN PHONE FIELDS RETURNING Lead(Id,Name,Phone,MobilePhone,CreatedDate,Chain_Name__c,IsConverted,Status), Contact(Id,Name,Phone,MobilePhone,HomePhone,CreatedDate), Opportunity(Id,Name,Mobile__c,Cahin_Name__c,StageName,CreatedDate)`
+      const sosl = `FIND {${num}} IN PHONE FIELDS RETURNING Lead(Id,Name,Phone,MobilePhone,CreatedDate,Chain_Name__c,IsConverted,Status), Contact(Id,Name,Phone,MobilePhone,CreatedDate), Opportunity(Id,Name,Mobile__c,Cahin_Name__c,StageName,CreatedDate)`
       const r = await fetch(`${a.instance}/services/data/${SF_API_VERSION}/search/?q=${encodeURIComponent(sosl)}`, { headers: { Authorization: `Bearer ${a.token}` } })
       const j = await r.json()
       return Response.json({ query: num, result: j })
