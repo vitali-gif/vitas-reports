@@ -285,11 +285,12 @@ async function runSync(opts = {}) {
     // Fast diagnostic path: clients only (skips the heavy tasks/prices/contracts calls),
     // used to inspect the BMBY `client_stage` field ("לידים לטיפול") without a full sync.
     const _stagesOnly = !!opts.stagesOnly
+    const _apptDump = !!opts.apptDump  // fast: clients+tasks only, dump raw appointment rows
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
       withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4), 45000, 'clients'),
       _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 10), 45000, 'tasks'),
-      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 45000, 'price_offers'),
-      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 45000, 'contracts'),
+      (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 45000, 'price_offers'),
+      (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 45000, 'contracts'),
     ])
 
     const safeRows = (r) => (r.status === 'fulfilled' && Array.isArray(r.value?.rows)) ? r.value.rows : []
@@ -307,6 +308,18 @@ async function runSync(opts = {}) {
         _stageXstatus[k] = (_stageXstatus[k] || 0) + 1
       }
       return { project: p.name, stagesOnly: true, totalClients: clients.length, stageDist: _dist, stageXstatus: _stageXstatus }
+    }
+
+    if (_apptDump) {
+      const _appts = []
+      for (const t of tasks) {
+        const ty = (t.type || '').toString()
+        if (!/appointment|meeting|פגישה/i.test(ty.toLowerCase())) continue
+        _appts.push(t)  // full raw row, every field BMBY returns
+      }
+      // sort by meeting date
+      _appts.sort((a,b) => String(a.start_date||'').localeCompare(String(b.start_date||'')))
+      return { project: p.name, apptDump: true, since, until, apptCount: _appts.length, appts: _appts }
     }
 
     const errors = []
@@ -1135,6 +1148,7 @@ export async function POST(request) {
       projectId: body.projectId,
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
+      apptDump: body.apptDump,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
