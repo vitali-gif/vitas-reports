@@ -2806,8 +2806,6 @@ const selectProject = async (client, project) => {
             const _otherUnqual = _s.otherUnqualNotes || []
             const _lossByBranch = _s.lossReasonsByBranch || {}
             const _unqualByBranch = _s.unqualReasonsByBranch || {}
-            const _q2d = _s.leadToDeposit || {}
-            const _q2dByBranch = _s.leadToDepositByBranch || {}
             const _objBranchList = (_bd || []).map(b => b.branch).filter(Boolean)
             const _ob = sfObjBranch
             const _lossR = _ob === 'all' ? _lossReasons : (_lossByBranch[_ob] || [])
@@ -3191,37 +3189,6 @@ const selectProject = async (client, project) => {
                 )}
               </div>
             )
-            const _q2dLabels = _q2d.buckets || []
-            const _q2dRows = Object.entries(_q2dByBranch).sort((a, b) => (b[1].measured + (b[1].repeatCustomers||0)) - (a[1].measured + (a[1].repeatCustomers||0)))
-            const _q2dColors = ['#10b981', '#22c55e', '#84cc16', '#eab308', '#f59e0b', '#ef4444']
-            const quoteTimeSec = (
-              <div className="section">
-                <div className="section-head">{ICO('violet', "M12 6v6l4 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z")}<h2>זמן כניסת ליד ← תשלום מקדמה</h2><span className="sub">מקדמות ששולמו החודש · פילוח לפי טווח זמן · חלון 180 יום</span></div>
-                {(!_q2d.measured && !_q2d.repeatCustomers) ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div> : (<>
-                  <div style={{display:'flex',gap:24,flexWrap:'wrap',padding:'4px 4px 14px',fontSize:13,color:'#475569'}}>
-                    <div>מקדמות החודש <b style={{color:'#0f172a'}}>{formatNum(_q2d.totalDeposits || 0)}</b></div>
-                    <div>נמדדו (היו ליד, עד 180 יום) <b style={{color:'#0f172a'}}>{formatNum(_q2d.measured)}</b></div>
-                    <div>חציון <b style={{color:'#0f172a'}}>{_q2d.medianDays} ימים</b></div>
-                    <div style={{color:'#b45309'}}>לקוחות חוזרים (180+) <b>{formatNum(_q2d.repeatCustomers || 0)}</b></div>
-                    <div style={{color:'#64748b'}}>ללא ליד — רכשו ישירות <b>{formatNum(_q2d.noLead || 0)}</b></div>
-                  </div>
-                  <div style={{maxWidth:520,marginBottom:18}}>
-                    {_q2dLabels.map((lb, i) => { const c = (_q2d.counts || [])[i] || 0; const pc = _q2d.measured ? Math.round(c/_q2d.measured*100) : 0; return (
-                      <div key={lb} style={{marginBottom:10}}>
-                        <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}><span style={{fontWeight:600,color:'#0f172a'}}>{lb}</span><span style={{color:'#64748b'}}>{formatNum(c)} · {pc}%</span></div>
-                        <div style={{background:'#f1f5f9',borderRadius:5,height:16,overflow:'hidden'}}><div style={{width:pc+'%',height:'100%',background:_q2dColors[i]||'#7c6cf5',borderRadius:5}}></div></div>
-                      </div>
-                    )})}
-                  </div>
-                  <div className="table-wrapper">
-                    <table className="data-table">
-                      <thead><tr><th>סניף</th>{_q2dLabels.map(lb => <th key={lb}>{lb}</th>)}<th>חוזרים</th><th>סה"כ</th></tr></thead>
-                      <tbody>{_q2dRows.map(([b, st]) => (<tr key={b}><td style={{fontWeight:600}}>{b}</td>{_q2dLabels.map((lb, i) => <td key={lb}>{formatNum((st.counts || [])[i] || 0)}</td>)}<td className="sub" style={{color:'#b45309'}}>{formatNum(st.repeatCustomers || 0)}</td><td style={{fontWeight:600}}>{formatNum(st.measured || 0)}</td></tr>))}</tbody>
-                    </table>
-                  </div>
-                </>)}
-              </div>
-            )
             const _objScope = _ob === 'all' ? 'כלל הרשת' : ('סניף: ' + _ob)
             const objectionsSec = (<>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'2px 4px 12px'}}>
@@ -3251,7 +3218,7 @@ const selectProject = async (client, project) => {
                 <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
               {sfTab === 'network' ? (<>{netCards}{cohortFunnel}{periodFunnel}</>)
-                : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}{objectionsSec}{quoteTimeSec}</>)
+                : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}{objectionsSec}</>)
                 : sfTab === 'people' ? peopleSec
                 : sfTab === 'timing' ? timingSec
                 : (<>

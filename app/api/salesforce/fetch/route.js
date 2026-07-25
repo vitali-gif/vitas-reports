@@ -497,47 +497,6 @@ async function runSync(opts = {}) {
     registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0,
   }))
 
-  // ===== time from LEAD ENTRY -> deposit paid (phone-matched to originating lead) =====
-  // Match each opp that paid a deposit this period, by phone (Mobile__c) to leads, picking the
-  // most recent lead created BEFORE the deposit. Window 180d = originating lead; older = repeat customer.
-  let leadToDeposit = { avgDays: 0, medianDays: 0, measured: 0, repeatCustomers: 0 }, leadToDepositByBranch = {}, l2dErr = null
-  try {
-    const normPh = (p) => { if (!p) return null; let d = String(p).replace(/[^0-9]/g, ''); if (d.startsWith('972')) d = '0' + d.slice(3); if (d.length === 9) d = '0' + d; return d.length >= 9 ? d.slice(-10) : null }
-    const paidRows = await soql(auth, `SELECT OpportunityId, CreatedDate FROM OpportunityHistory WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND StageName='${STAGE_PAID}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO} ORDER BY OpportunityId, CreatedDate`, 15)
-    const paidTime = {}
-    for (const r of (paidRows || [])) { const t = new Date(r.CreatedDate).getTime(); if (paidTime[r.OpportunityId] == null || t < paidTime[r.OpportunityId]) paidTime[r.OpportunityId] = t }
-    const oppIds = Object.keys(paidTime)
-    const oppInfo = {}; const vset = new Set()
-    for (let i = 0; i < oppIds.length; i += 200) {
-      const inList = oppIds.slice(i, i + 200).map(x => `'${x}'`).join(',')
-      const orr = await soql(auth, `SELECT Id, Mobile__c, Branch_Name__c FROM Opportunity WHERE Id IN (${inList})`, 3)
-      for (const r of (orr || [])) { const n = normPh(r.Mobile__c); oppInfo[r.Id] = { phone: n, branch: bkey(r.Branch_Name__c) }; if (n) { const b9 = n.slice(1); vset.add(n); vset.add(b9); vset.add('972' + b9); vset.add('+972' + b9) } }
-    }
-    const varArr = [...vset]
-    const leadsByPhone = {}
-    for (let i = 0; i < varArr.length; i += 150) {
-      const inList = varArr.slice(i, i + 150).map(x => `'${x.replace(/'/g, "")}'`).join(',')
-      const lr = await soql(auth, `SELECT Phone, MobilePhone, CreatedDate FROM Lead WHERE Chain_Name__c='${CHAIN}' AND (MobilePhone IN (${inList}) OR Phone IN (${inList}))`, 3)
-      for (const r of (lr || [])) { const t = new Date(r.CreatedDate).getTime(); for (const ph of [normPh(r.MobilePhone), normPh(r.Phone)]) if (ph) (leadsByPhone[ph] = leadsByPhone[ph] || []).push(t) }
-    }
-    const WINDOW = 180 * 86400000
-    const BUCKETS = [{ label: 'יום אחד', max: 1 }, { label: '2-5 ימים', max: 5 }, { label: '6-10 ימים', max: 10 }, { label: '11-20 ימים', max: 20 }, { label: '21-45 ימים', max: 45 }, { label: '46-180 ימים', max: 180 }]
-    const mkDist = (arr) => { const c = BUCKETS.map(() => 0); for (const d of arr) { let i = BUCKETS.findIndex(b => d <= b.max); if (i < 0) i = BUCKETS.length - 1; c[i]++ } return c }
-    const stat = (arr) => { if (!arr.length) return { avgDays: 0, medianDays: 0, measured: 0, counts: BUCKETS.map(() => 0) }; const so = arr.slice().sort((a, b) => a - b); return { avgDays: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10, medianDays: Math.round(so[Math.floor(so.length / 2)] * 10) / 10, measured: arr.length, counts: mkDist(arr) } }
-    const all = [], byBr = {}, repBr = {}; let repeat = 0, noLead = 0
-    for (const id of oppIds) {
-      const info = oppInfo[id]; const arr = info && info.phone ? leadsByPhone[info.phone] : null
-      const pt = paidTime[id]; const before = arr ? arr.filter(t => t <= pt) : []
-      if (!before.length) { noLead++; continue }
-      const lc = Math.max(...before); const d = (pt - lc) / 86400000
-      if (d > 180) { repeat++; repBr[info.branch] = (repBr[info.branch] || 0) + 1; continue }
-      all.push(d); (byBr[info.branch] = byBr[info.branch] || []).push(d)
-    }
-    leadToDeposit = { ...stat(all), repeatCustomers: repeat, totalDeposits: oppIds.length, noLead }
-    for (const [b, arr] of Object.entries(byBr)) leadToDepositByBranch[b] = { ...stat(arr), repeatCustomers: repBr[b] || 0 }
-    for (const [b, c] of Object.entries(repBr)) if (!leadToDepositByBranch[b]) leadToDepositByBranch[b] = { avgDays: 0, medianDays: 0, measured: 0, counts: BUCKETS.map(() => 0), repeatCustomers: c }
-    leadToDeposit.buckets = BUCKETS.map(b => b.label)
-  } catch (e) { l2dErr = e.message }
 
   const summary = {
     crmType: 'salesforce',
@@ -594,10 +553,7 @@ async function runSync(opts = {}) {
     otherUnqualNotes,
     lossReasonsByBranch,
     unqualReasonsByBranch,
-    leadToDeposit,
-    leadToDepositByBranch,
     _objNotesErr: objNotesErr,
-    _l2dErr: l2dErr,
     schemaVersion: SF_SCHEMA_VERSION,
     _cohortDrillErr: cohortDrillErr,
   }
