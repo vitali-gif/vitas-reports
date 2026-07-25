@@ -159,6 +159,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [namedLeadsModal, setNamedLeadsModal] = useState(null) // {title, names:[]}
   const [sfNoteModal, setSfNoteModal] = useState(null) // {kind:'lead'|'opp', ...record}
   const [sfObjBranch, setSfObjBranch] = useState('all') // objections branch filter
+  const [sfTimeBranch, setSfTimeBranch] = useState('הכל') // timing tab branch filter
   const [sortConfig, setSortConfig] = useState({});
   const [expandedCampaigns, setExpandedCampaigns] = useState(new Set());
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
@@ -2824,6 +2825,12 @@ const selectProject = async (client, project) => {
             const _s = _zohoRep.summary || {}
             const _f = _s.funnel || {}
             const _rt = _s.responseTime || {}
+            const _timing = _s.timing || {}
+            const _timeBranches = _timing.branches || []
+            const _tb = (_timing.data && _timing.data[sfTimeBranch]) ? sfTimeBranch : 'הכל'
+            const _td = (_timing.data && _timing.data[_tb]) || {}
+            const _tdays = _timing.days || ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת']
+            const _tRespLabels = _timing.respLabels || []
             const _bs = _f.byStage || {}
             const ent = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1])
             const _bd = _s.branchDetail || []
@@ -3118,44 +3125,47 @@ const selectProject = async (client, project) => {
               </div>
             )
 
-            const timingSec = (<>
-              <div className="section">
-                <div className="section-head">{ICO('amber', "M12 6v6l4 2")}<h2>שעות תיאום פגישות</h2><span className="sub">שעון ישראל</span></div>
-                <div style={{display:'flex',alignItems:'flex-end',gap:6,padding:'12px 4px',minHeight:120}}>
-                  {hourKeys.length === 0 ? <div className="sub">אין נתונים</div> : hourKeys.map(h => (
-                    <div key={h} style={{flex:1,textAlign:'center'}}>
-                      <div style={{fontSize:11,marginBottom:4}}>{_hours[h]}</div>
-                      <div style={{height:Math.round((_hours[h]/maxH)*90)+6,background:'#7c6cf5',borderRadius:4}}></div>
-                      <div className="sub" style={{fontSize:11,marginTop:4}}>{h}:00</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="section">
-                <div className="section-head">{ICO('sky', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z")}<h2>ימי תיאום פגישות</h2><span className="sub">לפי יום בשבוע</span></div>
-                <div style={{display:'flex',alignItems:'flex-end',gap:10,padding:'12px 4px',minHeight:120}}>
-                  {dayOrder.filter(d => _days[d]).length === 0 ? <div className="sub">אין נתונים</div> : dayOrder.map(d => _days[d] ? (
-                    <div key={d} style={{flex:1,textAlign:'center'}}>
-                      <div style={{fontSize:11,marginBottom:4}}>{_days[d]}</div>
-                      <div style={{height:Math.round((_days[d]/maxD)*90)+6,background:'#38bdf8',borderRadius:4}}></div>
-                      <div className="sub" style={{fontSize:11,marginTop:4}}>{d}</div>
-                    </div>
-                  ) : null)}
-                </div>
-              </div>
-              <div className="section">
-                <div className="section-head">{ICO('rose', "M12 6v6l4 2")}<h2>זמני טיפול בליד</h2><span className="sub">מיצירת הליד עד הטיפול הראשון</span></div>
-                {_rt.measured ? (
-                  <div style={{display:'flex',gap:28,flexWrap:'wrap',padding:'8px 4px',fontSize:14}}>
-                    <div>ממוצע <b>{_rt.avgHours}ש׳</b></div>
-                    <div>חציון <b>{_rt.medianHours}ש׳</b></div>
-                    <div>תוך שעה <b>{_rt.within1h}%</b></div>
-                    <div>תוך 4ש׳ <b>{_rt.within4h}%</b></div>
-                    <div>תוך 24ש׳ <b>{_rt.within24h}%</b></div>
-                    <div className="sub">({formatNum(_rt.measured)} לידים)</div>
+            const _tBar = (title, subtitle, ico, items, color, opts) => {
+              opts = opts || {}
+              const vals = items.map(it => (it.value == null ? 0 : it.value))
+              const max = Math.max(1, ...vals)
+              let peakI = -1
+              if (opts.highlightMax) { let mv = -1; items.forEach((it, i) => { if (it.value != null && it.value > mv) { mv = it.value; peakI = i } }) }
+              return (
+                <div className="section">
+                  <div className="section-head">{ICO(ico[0], ico[1])}<h2>{title}</h2><span className="sub">{subtitle}</span></div>
+                  {opts.takeaway && peakI >= 0 ? <div style={{padding:'0 2px 6px',fontSize:13}}><b style={{color}}>{opts.takeaway}: {items[peakI].label}{opts.suffix && items[peakI].value != null ? ' (' + items[peakI].value + opts.suffix + ')' : ''}</b></div> : null}
+                  <div style={{display:'flex',alignItems:'flex-end',gap:opts.tight?3:8,padding:'6px 2px',minHeight:130,overflowX:'auto'}}>
+                    {items.map((it, i) => (
+                      <div key={i} style={{flex:'1 0 auto',minWidth:opts.tight?16:26,textAlign:'center'}}>
+                        <div style={{fontSize:10,marginBottom:3,color:'#334155',fontWeight:i===peakI?700:400}}>{it.value==null?'':formatNum(it.value)}{it.value!=null&&opts.suffix?opts.suffix:''}</div>
+                        <div style={{height:Math.round((it.value||0)/max*104)+3,background:(opts.colors?opts.colors[i]:color),borderRadius:'3px 3px 0 0',opacity:(opts.highlightMax&&i!==peakI)?0.45:1}}></div>
+                        <div className="sub" style={{fontSize:10,marginTop:4,fontWeight:i===peakI?700:400}}>{it.label}</div>
+                      </div>
+                    ))}
                   </div>
-                ) : <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div>}
+                </div>
+              )
+            }
+            const _dayItems = (arr) => _tdays.map((d, i) => ({ label: d, value: (arr || [])[i] || 0 }))
+            const _hourItems = (arr, nullable) => Array.from({length:24}, (_, h) => ({ label: h, value: nullable ? ((arr||[])[h]) : ((arr||[])[h] || 0) }))
+            const _respColors = ['#10b981','#22c55e','#84cc16','#eab308','#f59e0b','#ef4444']
+            const timingSec = (!_timing.data) ? (<div className="section"><div className="sub" style={{padding:'10px 4px'}}>אין נתונים — לחצו "רענן CRM" למשיכת נתוני הזמנים.</div></div>) : (<>
+              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'2px 4px 14px'}}>
+                <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>זמנים לפי:</span>
+                <select value={_tb} onChange={(e)=>setSfTimeBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
+                  {_timeBranches.map(b => (<option key={b} value={b}>{b==='הכל'?'כל הרשת':b}</option>))}
+                </select>
               </div>
+              <h3 style={{margin:'6px 4px 2px',fontSize:15,color:'#0f172a'}}>כניסת לידים</h3>
+              {_tBar('כניסת לידים לפי יום', 'שעון ישראל', ['sky', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"], _dayItems(_td.leadDay), '#0ea5e9', { highlightMax: true, takeaway: 'היום החזק' })}
+              {_tBar('כניסת לידים לפי שעה', 'שעון ישראל', ['amber', "M12 6v6l4 2"], _hourItems(_td.leadHour), '#f59e0b', { highlightMax: true, takeaway: 'השעה החמה', tight: true })}
+              <h3 style={{margin:'14px 4px 2px',fontSize:15,color:'#0f172a'}}>פגישות</h3>
+              {_tBar('יום תיאום הפגישה', 'מתי הנציגים קובעים פגישות (פעולת התיאום)', ['violet', "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"], _dayItems(_td.bookDay), '#7c6cf5', { highlightMax: true, takeaway: 'היום שמתאמים בו הכי הרבה' })}
+              {_tBar('היום המבוקש לפגישה', 'באיזה יום הלקוחות רוצים להגיע', ['emerald', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"], _dayItems(_td.mtgDay), '#10b981', { highlightMax: true, takeaway: 'היום המבוקש' })}
+              <h3 style={{margin:'14px 4px 2px',fontSize:15,color:'#0f172a'}}>המרה וזמן טיפול</h3>
+              {_tBar('אחוז המרה לתיאום פגישה לפי שעת כניסה', 'מתוך הלידים שנכנסו בשעה זו — כמה הגיעו לפגישה', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true })}
+              {_tBar('זמן טיפול בליד', (_td.respMeasured ? formatNum(_td.respMeasured) + ' לידים · ' : '') + 'מכניסה עד מגע ראשון', ['rose', "M12 6v6l4 2"], _tRespLabels.map((lb, i) => ({ label: lb, value: (_td.resp || [])[i] || 0 })), '#e24b4a', { colors: _respColors })}
             </>)
 
             const peopleSec = (<>
@@ -4064,7 +4074,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
