@@ -643,6 +643,30 @@ export async function GET(request) {
     return Response.json(rb, { status })
   }
   const { searchParams } = new URL(request.url)
+  if (searchParams.get('cov2')) {
+    try {
+      const a = await getAuth()
+      const qy = async (q) => { let url = `${a.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`; let rows = []; for (let i = 0; i < 25 && url; i++) { const r = await fetch(url, { headers: { Authorization: `Bearer ${a.token}` } }); const j = await r.json(); if (j.records) rows = rows.concat(j.records); url = j.nextRecordsUrl ? `${a.instance}${j.nextRecordsUrl}` : null } return rows }
+      const norm = (p) => { if (!p) return null; let d = String(p).replace(/[^0-9]/g, ''); if (d.startsWith('972')) d = '0' + d.slice(3); if (d.length === 9) d = '0' + d; return d.length >= 9 ? d.slice(-10) : null }
+      const paidRows = await qy(`SELECT OpportunityId FROM OpportunityHistory WHERE Opportunity.Cahin_Name__c='קלוס' AND StageName='הזמנה - שולמה מקדמה' AND CreatedDate>=2026-07-01T00:00:00Z AND CreatedDate<=2026-07-31T23:59:59Z`)
+      const oppIds = [...new Set(paidRows.map(r => r.OpportunityId))]
+      const oppN = {}; const vset = new Set()
+      for (let i = 0; i < oppIds.length; i += 200) {
+        const inList = oppIds.slice(i, i + 200).map(x => `'${x}'`).join(',')
+        const orr = await qy(`SELECT Id, Mobile__c FROM Opportunity WHERE Id IN (${inList})`)
+        for (const r of orr) { const n = norm(r.Mobile__c); oppN[r.Id] = n; if (n) { const b9 = n.slice(1); vset.add(n); vset.add(b9); vset.add('972' + b9); vset.add('+972' + b9) } }
+      }
+      const va = [...vset]; const leadN = new Set()
+      for (let i = 0; i < va.length; i += 150) {
+        const inList = va.slice(i, i + 150).map(x => `'${x.replace(/'/g, "")}'`).join(',')
+        const lr = await qy(`SELECT Phone, MobilePhone FROM Lead WHERE Chain_Name__c='קלוס' AND (MobilePhone IN (${inList}) OR Phone IN (${inList}))`)
+        for (const r of lr) for (const ph of [norm(r.MobilePhone), norm(r.Phone)]) if (ph) leadN.add(ph)
+      }
+      let withPhone = 0, matched = 0
+      for (const id of oppIds) { const n = oppN[id]; if (n) withPhone++; if (n && leadN.has(n)) matched++ }
+      return Response.json({ julyDeposits: oppIds.length, oppWithPhone: withPhone, matchedNow_rawMethod_was92: matched })
+    } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
+  }
   if (searchParams.get('diagphone')) {
     try {
       const a = await getAuth()
