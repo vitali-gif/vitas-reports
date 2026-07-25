@@ -347,7 +347,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
     const GOOGLE_SCHEMA_VERSION = 2;  // keep in sync with google route.js
     const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google') && (r.summary?.schemaVersion || 0) >= GOOGLE_SCHEMA_VERSION);
-    const CRM_SCHEMA_VERSION = 12;  // keep in sync with route.js + useEffect below
+    const CRM_SCHEMA_VERSION = 13;  // keep in sync with route.js + useEffect below
     const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
     const haveCrm = !!crmRow && (isClientView || (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION); // client: don't force re-fetch on version bump (cron re-warms)
     const haveAll = haveFb && haveGoog && haveCrm;
@@ -843,7 +843,7 @@ const selectProject = async (client, project) => {
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
     const hasGoogle = reports.some(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-    const CRM_SCHEMA_VERSION = 12  // must match server-side route in api/bmby/fetch
+    const CRM_SCHEMA_VERSION = 13  // must match server-side route in api/bmby/fetch
     const crmRow = reports.find(r => r.month === selectedMonth && r.source === 'crm')
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
     const hasCrm = !!crmRow && (isClientView || cachedCrmVersion >= CRM_SCHEMA_VERSION); // client: cached CRM of any version counts (avoids heavy client live-fetch + clobber)
@@ -1403,6 +1403,39 @@ const selectProject = async (client, project) => {
             );
           })}
         </ul>
+      </div>
+    );
+  }, [selectedMonth, reports]);
+
+  const renderCrmMeetingsDashboard = useCallback(() => {
+    if (!selectedMonth || reports.length === 0) return null;
+    destroyCharts();
+    const crmRows = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
+    let meetings = [];
+    crmRows.forEach(r => { if (r.summary && Array.isArray(r.summary.completedMeetings)) meetings = meetings.concat(r.summary.completedMeetings); });
+    meetings = meetings.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    if (meetings.length === 0) {
+      return <div className="welcome-center"><div className="icon">📅</div><h3>{'אין פגישות שבוצעו לתקופה זו'}</h3></div>;
+    }
+    const fmtDate = (d) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/); if (!m) return String(d || ''); return m[3] + '/' + m[2] + '/' + m[1] + (m[4] ? '  ' + m[4] + ':' + m[5] : ''); };
+    return (
+      <div className="section">
+        <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>{'פגישות שבוצעו'}</h2><span className="sub">{meetings.length + ' פגישות בתקופה'}</span></div>
+        <div className="table-wrapper">
+          <table className="data-table">
+            <thead><tr><th>{'שם מלא'}</th><th>{'טלפון'}</th><th>{'תאריך פגישה'}</th><th>{'תיאור'}</th></tr></thead>
+            <tbody>
+              {meetings.map((m, i) => (
+                <tr key={i}>
+                  <td style={{fontWeight:600,whiteSpace:'nowrap'}}>{m.name || '—'}</td>
+                  <td style={{whiteSpace:'nowrap',direction:'ltr',textAlign:'right'}}>{m.phone || '—'}</td>
+                  <td style={{whiteSpace:'nowrap'}}>{fmtDate(m.date)}</td>
+                  <td style={{whiteSpace:'pre-wrap',lineHeight:1.5,maxWidth:520,minWidth:220}}>{m.description || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }, [selectedMonth, reports]);
@@ -3373,8 +3406,9 @@ const selectProject = async (client, project) => {
               <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
               <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
               <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
+              <button className={`client-tab ${crmSubTab === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>📅 פגישות שבוצעו</button>
             </div>
-            {crmSubTab === 'sources' ? renderCrmDashboard() : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : renderCrmReportDashboard()}
+            {crmSubTab === 'sources' ? renderCrmDashboard() : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : crmSubTab === 'meetings' ? renderCrmMeetingsDashboard() : renderCrmReportDashboard()}
           </>)
         })() : (displayReports.length === 0 && dashTab !== 'all') ? (
           <div className="welcome-center" style={{padding:'60px 20px',textAlign:'center'}}>
@@ -4030,7 +4064,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 

@@ -389,7 +389,11 @@ async function runSync(opts = {}) {
     const _meetUntil = (until && until > _todayStr) ? _todayStr : until // BMBY counts meetings only up to today (not future-scheduled)
     const cidToMedia = new Map() // client_id -> media_title (from any lead), for attributing meetings to source
     for (const _t of tasks) { if ((_t.type || '').toString().toLowerCase() === 'lid') { const _c = String(_t.client_id || ''); const _md = (_t.media_title || '').trim(); if (_c && _md && !cidToMedia.has(_c)) cidToMedia.set(_c, _md) } }
+    // client_id -> phone (mobile preferred) for the "פגישות שבוצעו" detail list
+    const cidToPhone = new Map()
+    for (const _c of clients) { const _id = String(_c.client_id || ''); if (!_id) continue; const _ph = (_c.phone_mobile || _c.phone_home || _c.phone_work || '').toString().trim(); if (_ph && !cidToPhone.has(_id)) cidToPhone.set(_id, _ph) }
     const _meetRecs = { sched: [], comp: [], canc: [] } // per-appointment {cid,name} — matches the BMBY meeting count
+    const _completedMeetings = [] // full detail of completed meetings in window: {name, phone, date, description}
     for (const t of tasks) {
       const tyRaw = (t.type || '').toString()
       const ty = tyRaw.toLowerCase()
@@ -407,7 +411,7 @@ async function runSync(opts = {}) {
         _apptByDate.total++
         const _rec = { cid, name: (t.client_name || '').toString().trim() }
         if (!isCanc) { _apptByDate.scheduled++; _meetRecs.sched.push(_rec) }
-        if (isDone)  { _apptByDate.completed++; _meetRecs.comp.push(_rec) }
+        if (isDone)  { _apptByDate.completed++; _meetRecs.comp.push(_rec); _completedMeetings.push({ name: _rec.name, phone: cidToPhone.get(cid) || '', date: (t.start_date || '').toString(), description: (t.message || '').toString().trim() }) }
         if (isCanc)  { _apptByDate.cancelled++; _meetRecs.canc.push(_rec) }
       }
       // Debug: count raw appointment status values
@@ -1014,7 +1018,8 @@ async function runSync(opts = {}) {
     totals.meetingsScheduled = _apptByDate.scheduled
     totals.meetingsCompleted = _apptByDate.completed
     totals.meetingsCancelled = _apptByDate.cancelled
-    const CRM_SCHEMA_VERSION = 12  // v12: meetings drill-down names + per-source breakdown also per-appointment (match BMBY)
+    _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
+    const CRM_SCHEMA_VERSION = 13  // v13: summary.completedMeetings (name/phone/date/description) for the 'פגישות שבוצעו' sub-tab
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
@@ -1042,7 +1047,7 @@ async function runSync(opts = {}) {
         source: 'crm',
         month: m,
         data: xlsxRows,
-        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, namedLeads, schemaVersion: CRM_SCHEMA_VERSION },
+        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, namedLeads, completedMeetings: _completedMeetings, schemaVersion: CRM_SCHEMA_VERSION },
         file_name: 'BMBY API (live)',
         row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
       }, { onConflict: 'project_id,source,month' })
