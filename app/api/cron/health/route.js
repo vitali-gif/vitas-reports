@@ -103,5 +103,25 @@ export async function GET(request) {
     }
   } catch { /* health branch is best-effort; never fail the watchdog */ }
 
-  return Response.json({ ok: true, utcH, inActiveWindow, status, alerted: stale.length, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
+  // ── Daily reports pruning: delete stale date-range report rows so the table never re-bloats.
+  // Unbounded daily-shifting keys (currentMonth/last7/today...) accumulate ~10-15 rows/project/day
+  // and were never overwritten → 1000s of rows → the by-project index ballooned and exhausted the
+  // DB's Disk IO budget (Cloudflare 522/525 on every cron). Runs at most ~once/day (heartbeat-gated,
+  // robust to GitHub Actions lateness). The heavy DELETE runs IN the DB via an RPC (minimal IO/transfer).
+  // Requires the SQL function prune_old_reports() to exist; if it doesn't yet, this is a no-op (error
+  // caught, heartbeat not written → retried next hour). Never breaks the watchdog.
+  let pruned = null
+  try {
+    const clRow = beats.find(b => b.job === 'reports_cleanup')
+    const clAgeH = clRow?.last_run ? (Date.now() - new Date(clRow.last_run).getTime()) / 3.6e6 : Infinity
+    if (clAgeH > 20) {
+      const { data, error } = await sb.rpc('prune_old_reports', { retain_days: 14 })
+      if (!error) {
+        pruned = data
+        await sb.from('cron_heartbeat').upsert({ job: 'reports_cleanup', last_run: new Date().toISOString() }, { onConflict: 'job' })
+      }
+    }
+  } catch { /* best-effort; never fail the watchdog */ }
+
+  return Response.json({ ok: true, utcH, inActiveWindow, status, alerted: stale.length, pruned, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
 }
