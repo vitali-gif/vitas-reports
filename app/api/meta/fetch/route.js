@@ -437,7 +437,7 @@ async function runSync(opts = {}) {
     // leads, drop age/gender/adText). The dashboard's campaign→adset→ad tree already sums to
     // ad-level, so the display is identical; the demographics come from summary.demographics
     // above. Other clients (BCureLaser/ISMOOTH) keep the full rows until this is proven.
-    const SLIM_PROJECTS = ['hi park', 'once', 'rehavia']
+    const SLIM_PROJECTS = ['hi park', 'once', 'rehavia', 'ismooth']
     const isSlim = SLIM_PROJECTS.includes((p.name || '').toLowerCase().trim())
     let dataToStore = mine
     if (isSlim) {
