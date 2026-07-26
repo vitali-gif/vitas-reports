@@ -160,6 +160,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [sfNoteModal, setSfNoteModal] = useState(null) // {kind:'lead'|'opp', ...record}
   const [sfObjBranch, setSfObjBranch] = useState('all') // objections branch filter
   const [sfTimeBranch, setSfTimeBranch] = useState('הכל') // timing tab branch filter
+  const [sfSrcBranch, setSfSrcBranch] = useState('הכל') // sources tab branch filter
   const [sortConfig, setSortConfig] = useState({});
   const [expandedCampaigns, setExpandedCampaigns] = useState(new Set());
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
@@ -3183,6 +3184,68 @@ const selectProject = async (client, project) => {
               {_tBar('זמן טיפול בליד', (_td.respMeasured ? formatNum(_td.respMeasured) + ' לידים · ' : '') + 'מכניסה עד מגע ראשון · שעות פעילות בלבד (א׳-ה׳ 9-21, ו׳ 9-13:30)', ['rose', "M12 6v6l4 2"], _tRespLabels.map((lb, i) => ({ label: lb, value: (_td.resp || [])[i] || 0 })), '#e24b4a', { colors: _respColors })}
             </>)
 
+            const _srcFunnel = _s.sourceFunnelByBranch || {}
+            const _srcBr = (_srcFunnel[sfSrcBranch]) ? sfSrcBranch : 'הכל'
+            const _srcData = _srcFunnel[_srcBr] || {}
+            const _srcRows = Object.entries(_srcData).map(([src, o]) => ({ src, ...o })).sort((a, b) => b.leads - a.leads)
+            const _srcTotLeads = (o) => Object.values(o || {}).reduce((x, v) => x + v.leads, 0)
+            const _srcBranchList = ['הכל', ...Object.keys(_srcFunnel).filter(b => b !== 'הכל').sort((a, b) => _srcTotLeads(_srcFunnel[b]) - _srcTotLeads(_srcFunnel[a]))]
+            const _pcS = (a, b) => b > 0 ? Math.round(a / b * 100) : 0
+            const _srcChart = _srcRows.slice(0, 8)
+            const _srcMax = Math.max(1, ..._srcChart.map(r => Math.max(_pcS(r.scheduled, r.leads), _pcS(r.paid, r.leads))))
+            const sourcesSec = (
+              <div className="section">
+                <div className="section-head">{ICO('sky', "M3 3v18h18M7 14l4-4 3 3 5-6")}<h2>מקורות הגעה</h2><span className="sub">משפך מלא לפי מקור · {_srcBr === 'הכל' ? 'כל הרשת' : _srcBr}</span></div>
+                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'2px 2px 14px'}}>
+                  <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>מקורות לפי:</span>
+                  <select value={_srcBr} onChange={(e)=>setSfSrcBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
+                    {_srcBranchList.map(b => (<option key={b} value={b}>{b==='הכל'?'כל הרשת':b}</option>))}
+                  </select>
+                </div>
+                {_srcRows.length === 0 ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div> : (<>
+                  <div style={{display:'flex',gap:16,fontSize:12,margin:'0 2px 10px',color:'#475569',flexWrap:'wrap'}}>
+                    <span><span style={{display:'inline-block',width:10,height:10,background:'#0d9488',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>% המרה לתיאום</span>
+                    <span><span style={{display:'inline-block',width:10,height:10,background:'#7c6cf5',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>% המרה לעסקה</span>
+                  </div>
+                  <div style={{display:'flex',alignItems:'flex-end',gap:14,overflowX:'auto',paddingBottom:6,minHeight:170,marginBottom:8}}>
+                    {_srcChart.map(r => { const p1 = _pcS(r.scheduled, r.leads), p2 = _pcS(r.paid, r.leads); return (
+                      <div key={r.src} style={{flex:'1 0 auto',minWidth:90,textAlign:'center'}}>
+                        <div style={{display:'flex',alignItems:'flex-end',justifyContent:'center',gap:6,height:130}}>
+                          {[[p1,'#0d9488'],[p2,'#7c6cf5']].map(([p,col],i)=>(
+                            <div key={i} style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
+                              <span style={{fontSize:11,fontWeight:600,color:'#334155',marginBottom:2}}>{p}%</span>
+                              <div style={{width:22,height:Math.round(p/_srcMax*118)+3,background:col,borderRadius:'4px 4px 0 0'}}></div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{borderTop:'2px solid #e2e8f0',marginTop:6,paddingTop:6,fontSize:12,fontWeight:600,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}} title={r.src}>{r.src}</div>
+                        <div className="sub" style={{fontSize:11}}>{formatNum(r.leads)} לידים</div>
+                      </div>
+                    )})}
+                  </div>
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead><tr><th>מקור</th><th>לידים</th><th>תיאמו</th><th>הגיעו</th><th>הזדמנויות</th><th>רכשו</th><th>שווי</th><th>%תיאום</th><th>%ביצוע</th><th>%עסקה</th></tr></thead>
+                      <tbody>{_srcRows.map(r => (
+                        <tr key={r.src}>
+                          <td style={{fontWeight:600}}>{r.src}</td>
+                          <td>{formatNum(r.leads)}</td>
+                          <td>{formatNum(r.scheduled)}</td>
+                          <td>{formatNum(r.arrived)}</td>
+                          <td>{formatNum(r.opportunities)}</td>
+                          <td style={{fontWeight:600}}>{formatNum(r.paid)}</td>
+                          <td>{formatCurrencyCompact(r.value)}</td>
+                          <td style={{color:'#0d9488'}}>{_pcS(r.scheduled,r.leads)}%</td>
+                          <td style={{color:'#0284c7'}}>{_pcS(r.arrived,r.leads)}%</td>
+                          <td style={{color:'var(--violet)',fontWeight:600}}>{_pcS(r.paid,r.leads)}%</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </>)}
+              </div>
+            )
+
             const peopleSec = (<>
               <div className="section">
                 <div className="section-head">{ICO('violet', "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2")}<h2>ביצועי אנשי מכירות</h2><span className="sub">כלל הרשת</span></div>
@@ -3280,10 +3343,9 @@ const selectProject = async (client, project) => {
                 : sfTab === 'people' ? peopleSec
                 : sfTab === 'timing' ? timingSec
                 : (<>
-                    {simple('מקורות הגעה', ent(_s.bySource), 'מקור', 'לידים', 'sky')}
+                    {sourcesSec}
                     {simple('סטטוסי לידים', ent(_s.byStatus), 'סטטוס', 'לידים', 'amber')}
                     {simple('סיבות אי-המרה', ent(_s.reasons), 'סיבה', 'לידים', 'rose')}
-                    {simple('מתחרים', ent(_s.competitors), 'מתחרה', 'לידים', 'violet')}
                   </>)}
             </>)
           }
@@ -4093,7 +4155,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 

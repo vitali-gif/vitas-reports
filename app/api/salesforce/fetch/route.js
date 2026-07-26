@@ -560,6 +560,19 @@ async function runSync(opts = {}) {
   }))
 
 
+  // ===== source funnel (per source, per branch) =====
+  let sourceFunnelByBranch = {}, srcFunnelErr = null
+  try {
+    const [srcStatusR, srcOppR] = await Promise.all([
+      soql(auth, `SELECT LeadSource k, Branch_Name__c b, Status st, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY LeadSource, Branch_Name__c, Status`, 6),
+      soql(auth, `SELECT LeadSource k, Branch_Name__c b, ConvertedOpportunity.StageName st, COUNT(Id) c, SUM(ConvertedOpportunity.TotalPrice_Opp_Product__c) v FROM Lead WHERE ${LW} AND IsConverted=true GROUP BY LeadSource, Branch_Name__c, ConvertedOpportunity.StageName`, 6),
+    ])
+    const srcMeet = new Set(STATUS_MEET)
+    const sfGet = (b, s) => { sourceFunnelByBranch[b] = sourceFunnelByBranch[b] || {}; sourceFunnelByBranch[b][s] = sourceFunnelByBranch[b][s] || { leads: 0, scheduled: 0, arrived: 0, opportunities: 0, paid: 0, value: 0 }; return sourceFunnelByBranch[b][s] }
+    for (const r of (srcStatusR || [])) { const src = r.k || 'לא ידוע', st = r.st || '', c = r.c; for (const bk of [bkey(r.b), 'הכל']) { const o = sfGet(bk, src); o.leads += c; if (srcMeet.has(st)) o.scheduled += c; if (STATUS_ARRIVED.includes(st)) o.arrived += c } }
+    for (const r of (srcOppR || [])) { const src = r.k || 'לא ידוע', st = r.st || '', c = r.c, v = r0(r.v); for (const bk of [bkey(r.b), 'הכל']) { const o = sfGet(bk, src); o.opportunities += c; if (st === STAGE_PAID) { o.paid += c; o.value += v } } }
+  } catch (e) { srcFunnelErr = e.message }
+
   const summary = {
     crmType: 'salesforce',
     chain: CHAIN,
@@ -579,6 +592,8 @@ async function runSync(opts = {}) {
     salesmen,
     responseTime,
     timing,
+    sourceFunnelByBranch,
+    _srcFunnelErr: srcFunnelErr,
     funnelCohort,
     funnelPeriod,
     branchDetail,
