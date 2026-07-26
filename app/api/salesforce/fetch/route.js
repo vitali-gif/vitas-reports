@@ -643,6 +643,20 @@ export async function GET(request) {
     return Response.json(rb, { status })
   }
   const { searchParams } = new URL(request.url)
+  if (searchParams.get('bookcheck')) {
+    try {
+      const a = await getAuth()
+      const cnt = async (q) => { const r = await fetch(`${a.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`, { headers: { Authorization: `Bearer ${a.token}` } }); const j = await r.json(); return j.totalSize != null ? j.totalSize : j }
+      const qy = async (q) => { let url = `${a.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`; let rows = []; for (let i = 0; i < 10 && url; i++) { const r = await fetch(url, { headers: { Authorization: `Bearer ${a.token}` } }); const j = await r.json(); if (j.records) rows = rows.concat(j.records); url = j.nextRecordsUrl ? `${a.instance}${j.nextRecordsUrl}` : null } return rows }
+      const F = '2026-07-26T00:00:00+03:00', T = '2026-07-26T23:59:59+03:00'
+      const leadsToday = await cnt(`SELECT COUNT() FROM Lead WHERE Chain_Name__c='קלוס' AND CreatedDate>=${F} AND CreatedDate<=${T}`)
+      const mtgChangesToday = await cnt(`SELECT COUNT() FROM LeadHistory WHERE Field='meetingDate__c' AND Lead.Chain_Name__c='קלוס' AND CreatedDate>=${F} AND CreatedDate<=${T}`)
+      const newBookings = await cnt(`SELECT COUNT() FROM LeadHistory WHERE Field='meetingDate__c' AND Lead.Chain_Name__c='קלוס' AND OldValue=null AND CreatedDate>=${F} AND CreatedDate<=${T}`)
+      const rows = await qy(`SELECT LeadId FROM LeadHistory WHERE Field='meetingDate__c' AND Lead.Chain_Name__c='קלוס' AND CreatedDate>=${F} AND CreatedDate<=${T}`)
+      const distinctLeads = new Set(rows.map(r => r.LeadId)).size
+      return Response.json({ date: '2026-07-26 (Sun)', leadsToday, mtgChangesToday_bookDay: mtgChangesToday, newBookings_new: newBookings, reschedules: mtgChangesToday - newBookings, distinctLeadsBooked: distinctLeads })
+    } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
+  }
   if (searchParams.get('describe')) {
     try {
       const a = await getAuth()
