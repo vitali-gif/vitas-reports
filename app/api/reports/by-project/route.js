@@ -49,15 +49,27 @@ export async function GET(request) {
   if (!lite || lite.length === 0) return NextResponse.json([], { headers: NO_STORE })
 
   // 2) HEAVY `data` only for the requested month-keys.
+  // Fetched ONE report at a time (bounded concurrency), NOT `.in('month', keys)` in a single
+  // query. A single facebook report's `data` JSONB can be several MB (ad-level age×gender
+  // rows), so a whole-month/quarter query exceeded Postgres' statement_timeout (8s) and
+  // returned 500 — which left the dashboard's detail tables stuck on "loading" forever.
+  // Per-report selects each stay well under the timeout; we assemble them here.
   const heavyById = {}
   if (dataForMonths.length > 0) {
-    const { data: heavy, error: heavyErr } = await supabaseAdmin
-      .from('reports')
-      .select('id, data')
-      .eq('project_id', projectId)
-      .in('month', dataForMonths)
+    const wanted = new Set(dataForMonths)
+    const heavyIds = lite.filter(r => wanted.has(r.month)).map(r => r.id)  // reuse the light index — no extra query
+    const CONCURRENCY = 4
+    let heavyErr = null
+    const fetchOne = async (id) => {
+      const { data, error } = await supabaseAdmin.from('reports').select('data').eq('id', id).single()
+      if (error) { heavyErr = error; return }
+      heavyById[id] = data?.data ?? null
+    }
+    const queue = [...heavyIds]
+    while (queue.length > 0 && !heavyErr) {
+      await Promise.all(queue.splice(0, CONCURRENCY).map(fetchOne))
+    }
     if (heavyErr) return NextResponse.json({ error: heavyErr.message }, { status: 500 })
-    for (const r of heavy || []) heavyById[r.id] = r.data
   }
 
   const out = lite.map(r => ({ ...r, data: heavyById[r.id] ?? null }))
