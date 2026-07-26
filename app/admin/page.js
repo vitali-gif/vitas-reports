@@ -3183,30 +3183,28 @@ const selectProject = async (client, project) => {
               {_tBar('אחוז המרה לתיאום פגישה לפי שעת מגע ראשון', 'מתוך הלידים שטופלו בשעה זו — לכמה נקבעה פגישה', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true })}
               {(() => {
                 const _rz = _td.resp || [], _rm = _td.respMeet || []
-                const _rmax = Math.max(1, ..._rz)
+                const _cd = _tRespLabels.map((lb, i) => { const L = _rz[i]||0, M = _rm[i]||0; return { lb, L, M, pc: L>0?Math.round(M/L*100):0 } })
+                const _best = Math.max(0, ..._cd.map(c => c.pc))
+                const _col = (pc) => pc>=30 ? {c:'#0f9d58',bg:'#e1f5ee'} : pc>=20 ? {c:'#b45309',bg:'#fef3c7'} : {c:'#dc2626',bg:'#fee2e2'}
                 return (
                   <div className="section">
-                    <div className="section-head">{ICO('rose', "M12 6v6l4 2")}<h2>זמן טיפול בליד ← תיאום פגישה</h2><span className="sub">{(_td.respMeasured?formatNum(_td.respMeasured)+' לידים · ':'')}שעות פעילות בלבד · ככל שמטפלים מהר יותר, אחוז התיאום גבוה יותר</span></div>
-                    <div style={{display:'flex',gap:16,fontSize:12,margin:'0 2px 10px',color:'#475569',flexWrap:'wrap'}}>
-                      <span><span style={{display:'inline-block',width:10,height:10,background:'#cbd5e1',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>לידים שטופלו</span>
-                      <span><span style={{display:'inline-block',width:10,height:10,background:'#10b981',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>נקבעה פגישה</span>
-                      <span style={{color:'#7c6cf5'}}>המספר למטה = % המרה לתיאום</span>
-                    </div>
-                    <div style={{display:'flex',alignItems:'flex-end',gap:14,overflowX:'auto',paddingBottom:4,minHeight:170}}>
-                      {_tRespLabels.map((lb, i) => { const L = _rz[i]||0, M = _rm[i]||0, pc = L>0?Math.round(M/L*100):0; return (
-                        <div key={lb} style={{flex:'1 0 auto',minWidth:80,textAlign:'center'}}>
-                          <div style={{display:'flex',alignItems:'flex-end',justifyContent:'center',gap:6,height:120}}>
-                            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
-                              <span style={{fontSize:11,fontWeight:600,color:'#334155',marginBottom:2}}>{formatNum(L)}</span>
-                              <div style={{width:22,height:Math.round(L/_rmax*106)+3,background:'#cbd5e1',borderRadius:'4px 4px 0 0'}}></div>
-                            </div>
-                            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
-                              <span style={{fontSize:11,fontWeight:600,color:'#059669',marginBottom:2}}>{formatNum(M)}</span>
-                              <div style={{width:22,height:Math.round(M/_rmax*106)+3,background:'#10b981',borderRadius:'4px 4px 0 0'}}></div>
-                            </div>
+                    <div className="section-head">{ICO('rose', "M12 6v6l4 2")}<h2>זמן טיפול בליד ← תיאום פגישה</h2><span className="sub">{(_td.respMeasured?formatNum(_td.respMeasured)+' לידים · ':'')}שעות פעילות בלבד · טיפול מהיר יותר = יותר תיאומים</span></div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}}>
+                      {_cd.map(c => { const cc = _col(c.pc); const best = c.pc === _best && _best > 0; return (
+                        <div key={c.lb} style={{background:'var(--surface-2, #fff)',border: best ? '2px solid '+cc.c : '1px solid var(--border)',borderRadius:14,padding:'14px 16px'}}>
+                          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                            <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>{c.lb}</span>
+                            {best ? <span style={{fontSize:10,fontWeight:700,color:cc.c,background:cc.bg,padding:'2px 8px',borderRadius:20}}>הכי גבוה</span> : null}
                           </div>
-                          <div style={{borderTop:'2px solid #e2e8f0',marginTop:6,paddingTop:6,fontSize:12,fontWeight:600,color:'#0f172a'}}>{lb}</div>
-                          <div style={{fontSize:13,fontWeight:700,color:'#7c6cf5'}}>{pc}%</div>
+                          <div style={{display:'flex',alignItems:'baseline',gap:6}}>
+                            <span style={{fontSize:30,fontWeight:700,color:cc.c,lineHeight:1}}>{c.pc}%</span>
+                            <span style={{fontSize:11,color:'#94a3b8'}}>המרה לתיאום</span>
+                          </div>
+                          <div style={{background:'#f1f5f9',borderRadius:6,height:7,overflow:'hidden',margin:'10px 0'}}><div style={{width:c.pc+'%',height:'100%',background:cc.c,borderRadius:6}}></div></div>
+                          <div style={{display:'flex',justifyContent:'space-between',fontSize:12}}>
+                            <span style={{color:'#059669',fontWeight:600}}>{formatNum(c.M)} פגישות</span>
+                            <span style={{color:'#64748b'}}>{formatNum(c.L)} לידים</span>
+                          </div>
                         </div>
                       )})}
                     </div>
