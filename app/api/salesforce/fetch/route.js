@@ -232,7 +232,7 @@ async function runSync(opts = {}) {
     const _roff = israelOffsetHours(since)
     for (const v of Object.values(first)) {
       const hh = businessHoursBetween(new Date(v.lc).getTime(), new Date(v.hc).getTime(), _roff)
-      if (hh >= 0) { const i = _ri(hh); for (const key of [v.br, 'הכל']) { const o = respByBranch[key] || (respByBranch[key] = { resp: [0, 0, 0, 0, 0, 0], measured: 0 }); o.resp[i]++; o.measured++ } }
+      if (hh >= 0) { const i = _ri(hh); for (const key of [v.br, 'הכל']) { const o = respByBranch[key] || (respByBranch[key] = { resp: [0, 0, 0, 0, 0, 0], respMeet: [0, 0, 0, 0, 0, 0], measured: 0 }); o.resp[i]++; if (v.hasM) o.respMeet[i]++; o.measured++ } }
       const uh = new Date(v.hc).getUTCHours()
       for (const key of [v.br, 'הכל']) { const o = contactConv[key] || (contactConv[key] = { leads: Array(24).fill(0), meetings: Array(24).fill(0) }); o.leads[uh]++; if (v.hasM) o.meetings[uh]++ }
     }
@@ -492,8 +492,8 @@ async function runSync(opts = {}) {
     const clLeads = Array(24).fill(0), clMeet = Array(24).fill(0)
     for (let uh = 0; uh < 24; uh++) { const lh = ((uh + OFF) % 24 + 24) % 24; clLeads[lh] += cc.leads[uh]; clMeet[lh] += cc.meetings[uh] }
     const conv = clLeads.map((n, i) => n > 0 ? Math.round(clMeet[i] / n * 100) : null)
-    const rb = respByBranch[b] || { resp: [0, 0, 0, 0, 0, 0], measured: 0 }
-    timingData[b] = { leadDay: t.leadDay, leadHour: t.leadHour, mtgDay: t.mtgDay, bookDay: t.bookDay, conv, resp: rb.resp, respMeasured: rb.measured }
+    const rb = respByBranch[b] || { resp: [0, 0, 0, 0, 0, 0], respMeet: [0, 0, 0, 0, 0, 0], measured: 0 }
+    timingData[b] = { leadDay: t.leadDay, leadHour: t.leadHour, mtgDay: t.mtgDay, bookDay: t.bookDay, conv, resp: rb.resp, respMeet: rb.respMeet || [0, 0, 0, 0, 0, 0], respMeasured: rb.measured }
   }
   const _sumT = (b) => timingData[b].leadDay.reduce((x, y) => x + y, 0)
   const timingBranches = ['הכל', ...Object.keys(T).filter(b => b !== 'הכל').sort((a, b) => _sumT(b) - _sumT(a))]
