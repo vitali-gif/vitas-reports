@@ -3986,7 +3986,11 @@ const selectProject = async (client, project) => {
 
         {/* ASSET GROUPS SECTION (Google PMax) */}
         {(dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'all') && (() => {
-          const groups = gReports.flatMap(r => r.summary?.assetGroups || []);
+          const allGroups = gReports.flatMap(r => r.summary?.assetGroups || []);
+          // Hide dead asset groups: not-active AND zero activity in the period (old paused/removed groups
+          // with 0 spend that clutter the view and confuse clients). Keep active groups + any with activity.
+          const _agActivity = (g) => (g.spend || 0) + (g.impressions || 0) + (g.clicks || 0) + (g.conversions || g.leads || 0);
+          const groups = allGroups.filter(g => (g.status === 'ENABLED') || _agActivity(g) > 0);
           if (groups.length === 0) return null;
           return (
             <div className="section section-asset-gallery">
