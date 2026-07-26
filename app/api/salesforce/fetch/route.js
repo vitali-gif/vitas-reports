@@ -61,6 +61,24 @@ function israelOffsetHours(dateStr) {
     return m ? parseInt(m[1], 10) : 3
   } catch { return 3 }
 }
+// Business-hours between two UTC timestamps, in Israel local time.
+// Sun-Thu 09:00-21:00, Fri 09:00-13:30, Sat closed.
+function businessHoursBetween(startMs, endMs, off) {
+  if (!(endMs > startMs)) return 0
+  const s = startMs + off * 3600000, e = endMs + off * 3600000 // shift to Israel wall-clock (read via getUTC*)
+  const OPEN = 9 * 3600000
+  let total = 0
+  let t0 = new Date(s); t0.setUTCHours(0, 0, 0, 0)
+  for (let t = t0.getTime(); t <= e; t += 86400000) {
+    const dow = new Date(t).getUTCDay() // 0=Sun..6=Sat
+    if (dow === 6) continue // Saturday closed
+    const close = (dow === 5 ? 13.5 : 21) * 3600000 // Fri 13:30, else 21:00
+    const winStart = t + OPEN, winEnd = t + close
+    const ovS = Math.max(s, winStart), ovE = Math.min(e, winEnd)
+    if (ovE > ovS) total += (ovE - ovS)
+  }
+  return total / 3600000
+}
 function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n }
 function r0(v) { return Math.round(num(v)) }
 
@@ -211,13 +229,14 @@ async function runSync(opts = {}) {
     const first = {}
     for (const h of hist) if (!(h.LeadId in first)) first[h.LeadId] = { lc: h.Lead && h.Lead.CreatedDate, hc: h.CreatedDate, br: (h.Lead && h.Lead.Branch_Name__c) || 'לא ידוע', hasM: !!(h.Lead && h.Lead.meetingDate__c) }
     const _ri = (hh) => hh <= 1 ? 0 : hh <= 4 ? 1 : hh <= 12 ? 2 : hh <= 24 ? 3 : hh <= 48 ? 4 : 5
+    const _roff = israelOffsetHours(since)
     for (const v of Object.values(first)) {
-      const hh = (new Date(v.hc) - new Date(v.lc)) / 3.6e6
+      const hh = businessHoursBetween(new Date(v.lc).getTime(), new Date(v.hc).getTime(), _roff)
       if (hh >= 0) { const i = _ri(hh); for (const key of [v.br, 'הכל']) { const o = respByBranch[key] || (respByBranch[key] = { resp: [0, 0, 0, 0, 0, 0], measured: 0 }); o.resp[i]++; o.measured++ } }
       const uh = new Date(v.hc).getUTCHours()
       for (const key of [v.br, 'הכל']) { const o = contactConv[key] || (contactConv[key] = { leads: Array(24).fill(0), meetings: Array(24).fill(0) }); o.leads[uh]++; if (v.hasM) o.meetings[uh]++ }
     }
-    const hrs = Object.values(first).map(v => (new Date(v.hc) - new Date(v.lc)) / 3.6e6).filter(h => h >= 0).sort((a, b) => a - b)
+    const hrs = Object.values(first).map(v => businessHoursBetween(new Date(v.lc).getTime(), new Date(v.hc).getTime(), _roff)).filter(h => h >= 0).sort((a, b) => a - b)
     const n = hrs.length
     if (n) {
       responseTime = {

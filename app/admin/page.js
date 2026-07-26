@@ -3180,7 +3180,7 @@ const selectProject = async (client, project) => {
               {_tBar('היום המבוקש לפגישה', 'באיזה יום הלקוחות רוצים להגיע', ['emerald', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"], _dayItems(_td.mtgDay), '#10b981', { highlightMax: true, takeaway: 'היום המבוקש' })}
               <h3 style={{margin:'14px 4px 2px',fontSize:15,color:'#0f172a'}}>המרה וזמן טיפול</h3>
               {_tBar('אחוז המרה לתיאום פגישה לפי שעת מגע ראשון', 'מתוך הלידים שטופלו בשעה זו — לכמה נקבעה פגישה', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true })}
-              {_tBar('זמן טיפול בליד', (_td.respMeasured ? formatNum(_td.respMeasured) + ' לידים · ' : '') + 'מכניסה עד מגע ראשון', ['rose', "M12 6v6l4 2"], _tRespLabels.map((lb, i) => ({ label: lb, value: (_td.resp || [])[i] || 0 })), '#e24b4a', { colors: _respColors })}
+              {_tBar('זמן טיפול בליד', (_td.respMeasured ? formatNum(_td.respMeasured) + ' לידים · ' : '') + 'מכניסה עד מגע ראשון · שעות פעילות בלבד (א׳-ה׳ 9-21, ו׳ 9-13:30)', ['rose', "M12 6v6l4 2"], _tRespLabels.map((lb, i) => ({ label: lb, value: (_td.resp || [])[i] || 0 })), '#e24b4a', { colors: _respColors })}
             </>)
 
             const peopleSec = (<>
