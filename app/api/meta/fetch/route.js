@@ -415,8 +415,48 @@ async function runSync(opts = {}) {
       .filter(a => (a.campaign || '').toLowerCase().includes(needle))
       .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
 
+    // ── Server-side demographics aggregate ─────────────────────────────────────────
+    // The dashboard's gender/age tables only need per-gender and per-age TOTALS (two separate
+    // 1-D breakdowns, not per-ad and not the age×gender cross). Keyed identically to
+    // lib/helpers.js aggregateRows (empty → 'לא ידוע'), so the numbers are byte-for-byte the
+    // same as before. Stored in summary so the heavy per-ad×age×gender rows in `data` can be
+    // collapsed to ad-level for slim projects without losing these tables.
+    const demographics = { genders: {}, ages: {} }
+    for (const r of mine) {
+      const gk = r.gender || 'לא ידוע'
+      const ak = r.age || 'לא ידוע'
+      if (!demographics.genders[gk]) demographics.genders[gk] = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 }
+      if (!demographics.ages[ak])    demographics.ages[ak]    = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 }
+      const G = demographics.genders[gk], A = demographics.ages[ak]
+      G.spend += r.spend; G.impressions += r.impressions; G.reach += r.reach; G.clicks += r.clicks; G.leads += r.leads
+      A.spend += r.spend; A.impressions += r.impressions; A.reach += r.reach; A.clicks += r.clicks; A.leads += r.leads
+    }
+
+    // ── Slim `data` to ad-level — ש.ברוך projects ONLY (staged rollout) ────────────
+    // Collapse the per-ad×age×gender rows into one row per ad (sum spend/impr/reach/clicks/
+    // leads, drop age/gender/adText). The dashboard's campaign→adset→ad tree already sums to
+    // ad-level, so the display is identical; the demographics come from summary.demographics
+    // above. Other clients (BCureLaser/ISMOOTH) keep the full rows until this is proven.
+    const SLIM_PROJECTS = ['hi park', 'once', 'rehavia']
+    const isSlim = SLIM_PROJECTS.includes((p.name || '').toLowerCase().trim())
+    let dataToStore = mine
+    if (isSlim) {
+      const byAd = new Map()
+      for (const r of mine) {
+        const key = (r.campaign || '') + '\u0000' + (r.adSet || '') + '\u0000' + (r.adName || '')
+        let row = byAd.get(key)
+        if (!row) {
+          row = { campaign: r.campaign, adSet: r.adSet, adName: r.adName, spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0, campaignStatus: r.campaignStatus, adSetStatus: r.adSetStatus, adStatus: r.adStatus }
+          byAd.set(key, row)
+        }
+        row.spend += r.spend; row.impressions += r.impressions; row.reach += r.reach; row.clicks += r.clicks; row.leads += r.leads
+      }
+      dataToStore = Array.from(byAd.values())
+    }
+
     const summaryWithAds = {
       ...pt,
+      demographics,
       activeAds: projectActiveAds,
       activeAdNames: projectActiveAds.map(a => a.name).filter(Boolean),
     }
@@ -425,10 +465,10 @@ async function runSync(opts = {}) {
       project_id: p.id,
       source: 'facebook',
       month: m,
-      data: mine,
+      data: dataToStore,
       summary: summaryWithAds,
       file_name: 'Meta API (live)',
-      row_count: mine.length,
+      row_count: dataToStore.length,
     }, { onConflict: 'project_id,source,month' })
 
     if (upsertError) {

@@ -1930,6 +1930,21 @@ const selectProject = async (client, project) => {
     let allRows = [];
     displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
     const data = aggregateRows(allRows);
+    // Prefer server-computed demographics (summary.demographics) when present. Lets slim reports
+    // store ad-level `data` rows (no age/gender) with ZERO change to the gender/age tables — they
+    // read the same totals from summary instead of re-deriving them from raw rows. Fully
+    // backward-compatible: older "fat" reports have no summary.demographics → we keep whatever
+    // aggregateRows already computed from their raw rows.
+    {
+      const _demoReps = displayReports.filter(r => r && r.summary && r.summary.demographics);
+      if (_demoReps.length) {
+        const _mg = {}, _ma = {};
+        const _addB = (dst, src) => { for (const k in (src || {})) { const v = src[k] || {}; if (!dst[k]) dst[k] = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 }; dst[k].spend += v.spend || 0; dst[k].impressions += v.impressions || 0; dst[k].reach += v.reach || 0; dst[k].clicks += v.clicks || 0; dst[k].leads += v.leads || 0; } };
+        _demoReps.forEach(r => { _addB(_mg, r.summary.demographics.genders); _addB(_ma, r.summary.demographics.ages); });
+        data.genders = _mg;
+        data.ages = _ma;
+      }
+    }
     // True while the heavy per-campaign/breakdown rows for the shown period are still
     // downloading (KPI cards already render from the light summary). Used to show a
     // loading placeholder for the detail tables instead of a blank/"missing" area.
