@@ -20,7 +20,7 @@ const supabaseAdmin = createClient(
 )
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300  // heavy per-month `data` (facebook age×gender rows) can be ~25MB → needs >60s
 export const revalidate = 0            // never cache this route
 export const fetchCache = 'force-no-store'
 
@@ -58,7 +58,7 @@ export async function GET(request) {
   if (dataForMonths.length > 0) {
     const wanted = new Set(dataForMonths)
     const heavyIds = lite.filter(r => wanted.has(r.month)).map(r => r.id)  // reuse the light index — no extra query
-    const CONCURRENCY = 4
+    const CONCURRENCY = 2
     let heavyErr = null
     const fetchOne = async (id) => {
       const { data, error } = await supabaseAdmin.from('reports').select('data').eq('id', id).single()
