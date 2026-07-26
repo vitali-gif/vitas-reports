@@ -3164,7 +3164,7 @@ const selectProject = async (client, project) => {
               {_tBar('יום תיאום הפגישה', 'מתי הנציגים קובעים פגישות (פעולת התיאום)', ['violet', "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"], _dayItems(_td.bookDay), '#7c6cf5', { highlightMax: true, takeaway: 'היום שמתאמים בו הכי הרבה' })}
               {_tBar('היום המבוקש לפגישה', 'באיזה יום הלקוחות רוצים להגיע', ['emerald', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"], _dayItems(_td.mtgDay), '#10b981', { highlightMax: true, takeaway: 'היום המבוקש' })}
               <h3 style={{margin:'14px 4px 2px',fontSize:15,color:'#0f172a'}}>המרה וזמן טיפול</h3>
-              {_tBar('אחוז המרה לתיאום פגישה לפי שעת כניסה', 'מתוך הלידים שנכנסו בשעה זו — כמה הגיעו לפגישה', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true })}
+              {_tBar('אחוז המרה לתיאום פגישה לפי שעת מגע ראשון', 'מתוך הלידים שטופלו בשעה זו — לכמה נקבעה פגישה', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true })}
               {_tBar('זמן טיפול בליד', (_td.respMeasured ? formatNum(_td.respMeasured) + ' לידים · ' : '') + 'מכניסה עד מגע ראשון', ['rose', "M12 6v6l4 2"], _tRespLabels.map((lb, i) => ({ label: lb, value: (_td.resp || [])[i] || 0 })), '#e24b4a', { colors: _respColors })}
             </>)
 

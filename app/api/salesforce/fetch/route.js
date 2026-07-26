@@ -204,13 +204,19 @@ async function runSync(opts = {}) {
   // ===== response time from LeadHistory =====
   let responseTime = { avgHours: 0, medianHours: 0, within1h: 0, within4h: 0, within24h: 0, measured: 0 }
   let respByBranch = {}
+  let contactConv = {}
   try {
     const hist = await soql(auth,
-      `SELECT LeadId, Lead.CreatedDate, Lead.Branch_Name__c, CreatedDate FROM LeadHistory WHERE Field='Status' AND Lead.Chain_Name__c='${CHAIN}' AND Lead.CreatedDate>=${FROM} AND Lead.CreatedDate<=${TO} ORDER BY LeadId, CreatedDate`, 8)
+      `SELECT LeadId, Lead.CreatedDate, Lead.Branch_Name__c, Lead.meetingDate__c, CreatedDate FROM LeadHistory WHERE Field='Status' AND Lead.Chain_Name__c='${CHAIN}' AND Lead.CreatedDate>=${FROM} AND Lead.CreatedDate<=${TO} ORDER BY LeadId, CreatedDate`, 8)
     const first = {}
-    for (const h of hist) if (!(h.LeadId in first)) first[h.LeadId] = { lc: h.Lead && h.Lead.CreatedDate, hc: h.CreatedDate, br: (h.Lead && h.Lead.Branch_Name__c) || 'לא ידוע' }
+    for (const h of hist) if (!(h.LeadId in first)) first[h.LeadId] = { lc: h.Lead && h.Lead.CreatedDate, hc: h.CreatedDate, br: (h.Lead && h.Lead.Branch_Name__c) || 'לא ידוע', hasM: !!(h.Lead && h.Lead.meetingDate__c) }
     const _ri = (hh) => hh <= 1 ? 0 : hh <= 4 ? 1 : hh <= 12 ? 2 : hh <= 24 ? 3 : hh <= 48 ? 4 : 5
-    for (const v of Object.values(first)) { const hh = (new Date(v.hc) - new Date(v.lc)) / 3.6e6; if (hh < 0) continue; const i = _ri(hh); for (const key of [v.br, 'הכל']) { const o = respByBranch[key] || (respByBranch[key] = { resp: [0, 0, 0, 0, 0, 0], measured: 0 }); o.resp[i]++; o.measured++ } }
+    for (const v of Object.values(first)) {
+      const hh = (new Date(v.hc) - new Date(v.lc)) / 3.6e6
+      if (hh >= 0) { const i = _ri(hh); for (const key of [v.br, 'הכל']) { const o = respByBranch[key] || (respByBranch[key] = { resp: [0, 0, 0, 0, 0, 0], measured: 0 }); o.resp[i]++; o.measured++ } }
+      const uh = new Date(v.hc).getUTCHours()
+      for (const key of [v.br, 'הכל']) { const o = contactConv[key] || (contactConv[key] = { leads: Array(24).fill(0), meetings: Array(24).fill(0) }); o.leads[uh]++; if (v.hasM) o.meetings[uh]++ }
+    }
     const hrs = Object.values(first).map(v => (new Date(v.hc) - new Date(v.lc)) / 3.6e6).filter(h => h >= 0).sort((a, b) => a - b)
     const n = hrs.length
     if (n) {
@@ -442,14 +448,13 @@ async function runSync(opts = {}) {
 
   // ===== timing analytics (network + per-branch) =====
   const RESP_LABELS = ['תוך שעה', '1-4ש׳', '4-12ש׳', '12-24ש׳', '24-48ש׳', '48ש׳+']
-  const mkT = () => ({ leadDay: Array(7).fill(0), leadHour: Array(24).fill(0), wmHour: Array(24).fill(0), mtgDay: Array(7).fill(0), bookDay: Array(7).fill(0) })
+  const mkT = () => ({ leadDay: Array(7).fill(0), leadHour: Array(24).fill(0), mtgDay: Array(7).fill(0), bookDay: Array(7).fill(0) })
   const T = { 'הכל': mkT() }
   const getT = (b) => T[b] || (T[b] = mkT())
   let timingErr = null
   try {
-    const [leadGridR, wmGridR, mtgDayBrR, bookDayR] = await Promise.all([
+    const [leadGridR, mtgDayBrR, bookDayR] = await Promise.all([
       soql(auth, `SELECT Branch_Name__c b, DAY_IN_WEEK(CreatedDate) d, HOUR_IN_DAY(CreatedDate) h, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Branch_Name__c, DAY_IN_WEEK(CreatedDate), HOUR_IN_DAY(CreatedDate)`, 6),
-      soql(auth, `SELECT Branch_Name__c b, HOUR_IN_DAY(CreatedDate) h, COUNT(Id) c FROM Lead WHERE ${LW} AND meetingDate__c!=null GROUP BY Branch_Name__c, HOUR_IN_DAY(CreatedDate)`, 4),
       soql(auth, `SELECT Branch_Name__c b, DAY_IN_WEEK(meetingDate__c) d, COUNT(Id) c FROM Lead WHERE ${LW} AND meetingDate__c!=null GROUP BY Branch_Name__c, DAY_IN_WEEK(meetingDate__c)`, 4),
       soql(auth, `SELECT Lead.Branch_Name__c b, DAY_IN_WEEK(CreatedDate) d, COUNT(Id) c FROM LeadHistory WHERE Field='meetingDate__c' AND Lead.Chain_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO} GROUP BY Lead.Branch_Name__c, DAY_IN_WEEK(CreatedDate)`, 6),
     ])
@@ -459,13 +464,15 @@ async function runSync(opts = {}) {
       const localD = (((d - 1) + Math.floor((h + OFF) / 24)) % 7 + 7) % 7
       for (const key of [bkey(r.b), 'הכל']) { const t = getT(key); t.leadDay[localD] += c; t.leadHour[localH] += c }
     }
-    for (const r of (wmGridR || [])) { const localH = ((Number(r.h) + OFF) % 24 + 24) % 24; for (const key of [bkey(r.b), 'הכל']) getT(key).wmHour[localH] += r.c }
     for (const r of (mtgDayBrR || [])) { const i = (Number(r.d) || 1) - 1; for (const key of [bkey(r.b), 'הכל']) getT(key).mtgDay[i] += r.c }
     for (const r of (bookDayR || [])) { const i = (Number(r.d) || 1) - 1; for (const key of [bkey(r.b), 'הכל']) getT(key).bookDay[i] += r.c }
   } catch (e) { timingErr = e.message }
   const timingData = {}
   for (const [b, t] of Object.entries(T)) {
-    const conv = t.leadHour.map((n, i) => n > 0 ? Math.round(t.wmHour[i] / n * 100) : null)
+    const cc = contactConv[b] || { leads: Array(24).fill(0), meetings: Array(24).fill(0) }
+    const clLeads = Array(24).fill(0), clMeet = Array(24).fill(0)
+    for (let uh = 0; uh < 24; uh++) { const lh = ((uh + OFF) % 24 + 24) % 24; clLeads[lh] += cc.leads[uh]; clMeet[lh] += cc.meetings[uh] }
+    const conv = clLeads.map((n, i) => n > 0 ? Math.round(clMeet[i] / n * 100) : null)
     const rb = respByBranch[b] || { resp: [0, 0, 0, 0, 0, 0], measured: 0 }
     timingData[b] = { leadDay: t.leadDay, leadHour: t.leadHour, mtgDay: t.mtgDay, bookDay: t.bookDay, conv, resp: rb.resp, respMeasured: rb.measured }
   }
