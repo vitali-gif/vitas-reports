@@ -561,65 +561,6 @@ export async function GET(request) {
     return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
   }
   // TEMP diagnostic (gated): reveal which token identity / ad accounts this server token can see.
-  const _campFor = new URL(request.url).searchParams.get('campaigns')
-  if (_campFor) {
-    const tk = process.env['META_ACCESS_TOKEN_' + _campFor] || token
-    try {
-      const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/act_${_campFor}/campaigns?fields=name,effective_status&limit=200&access_token=${encodeURIComponent(tk)}`)
-      const j = await r.json()
-      const names = (j.data || []).map(c => ({ name: c.name, status: c.effective_status }))
-      const kw = { leadgen_or_leads: names.filter(n => /leadgen|leads/i.test(n.name)).length, kloss: names.filter(n => /kloss/i.test(n.name)).length }
-      return Response.json({ account: _campFor, ok: r.ok, count: names.length, matchCounts: kw, campaigns: names, error: j.error && j.error.message })
-    } catch (e) { return Response.json({ ok: false, error: String(e.message || e) }, { status: 500 }) }
-  }
-  const _sp = new URL(request.url).searchParams
-  if (_sp.get('synckloss') === '1' || _sp.get('klossfb') === '1') {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
-    const { data: projects } = await supabase.from('projects').select('id,name')
-    const kp = (projects || []).find(p => (p.name || '').toLowerCase().includes('kloss'))
-    if (!kp) return Response.json({ error: 'no KLOSS project found' }, { status: 404 })
-    if (_sp.get('synckloss') === '1') {
-      const { body: rb } = await runSync({ projectId: kp.id })
-      return Response.json({ triggered: true, klossProjectId: kp.id, result: rb })
-    }
-    const { data: reps } = await supabase.from('reports').select('month,summary,row_count,file_name').eq('project_id', kp.id).eq('source', 'facebook').order('month', { ascending: false }).limit(3)
-    const out = (reps || []).map(r => ({ month: r.month, rows: r.row_count, spend: r.summary && r.summary.spend, leads: r.summary && r.summary.leads, byAgency: r.summary && r.summary.byAgency }))
-    return Response.json({ klossProjectId: kp.id, facebookReports: out })
-  }
-  if (new URL(request.url).searchParams.get('accountids') === '1') {
-    const ids = (process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || '').split(',').map(x => x.trim()).filter(Boolean)
-    const perAccountTokens = ids.filter(id => process.env['META_ACCESS_TOKEN_' + id])
-    return Response.json({ current_META_AD_ACCOUNT_IDS: ids, count: ids.length, accountsWithPerAccountToken: perAccountTokens })
-  }
-  const _listFor = new URL(request.url).searchParams.get('listaccts')
-  if (_listFor) {
-    const tk = process.env['META_ACCESS_TOKEN_' + _listFor] || token
-    try {
-      const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me/adaccounts?fields=account_id,name,account_status,currency&limit=100&access_token=${encodeURIComponent(tk)}`)
-      const j = await r.json()
-      const accounts = (j.data || []).map((a) => ({ id: a.account_id, name: a.name, status: a.account_status, currency: a.currency }))
-      return Response.json({ ok: r.ok, usingPerAccountToken: Boolean(process.env['META_ACCESS_TOKEN_' + _listFor]), count: accounts.length, accounts, error: j.error && j.error.message })
-    } catch (e) { return Response.json({ ok: false, error: String(e.message || e) }, { status: 500 }) }
-  }
-  if (new URL(request.url).searchParams.get('bizinfo') === '1') {
-    const out = {}
-    try { const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me/businesses?fields=id,name&access_token=${encodeURIComponent(token)}`); out.me_businesses = await r.json() } catch (e) { out.me_businesses_err = String(e.message || e) }
-    try { const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}?fields=name,business&access_token=${encodeURIComponent(token)}`); out.account_business = await r.json() } catch (e) { out.account_business_err = String(e.message || e) }
-    return Response.json({ note: 'Share the Sigavi account TO the business id shown here', ...out })
-  }
-  const _testAcct = new URL(request.url).searchParams.get('testacct')
-  if (_testAcct) {
-    const results = {}
-    for (const id of _testAcct.split(',').map(x => x.trim()).filter(Boolean)) {
-      const tk = process.env['META_ACCESS_TOKEN_' + id] || token
-      try {
-        const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/act_${id}?fields=name,account_status,currency&access_token=${encodeURIComponent(tk)}`)
-        const j = await r.json()
-        results[id] = r.ok ? { ok: true, name: j.name, status: j.account_status, currency: j.currency } : { ok: false, error: j.error && j.error.message }
-      } catch (e) { results[id] = { ok: false, error: String(e.message || e) } }
-    }
-    return Response.json({ token_identity: 'VITAS', results })
-  }
   if (new URL(request.url).searchParams.get('whoami') === '1') {
     try {
       const meRes = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me?fields=id,name&access_token=${encodeURIComponent(token)}`)
