@@ -9,6 +9,19 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // was 60 — full-quarter fetches (q1-q4) exceeded 60s and returned 504
 
 const GOOGLE_ADS_API_VERSION = 'v22'
+
+// KLOSS multi-agency (Google): both accounts hold Kloss campaigns mixed with sister brands
+// (Zula / Novo). Match by customer + campaign contains 'kloss', tag by agency.
+const KLOSS_GOOGLE_SOURCES = [
+  { customer: '9483793370', agency: 'סיגאווי', any: ['kloss'] },
+  { customer: '4733225739', agency: 'VITAS', any: ['kloss'] },
+]
+function klossGoogleAgencyOf(r) {
+  const camp = (r && r.campaign || '').toLowerCase()
+  const cust = String(r && r.account)
+  const sc = KLOSS_GOOGLE_SOURCES.find(s => s.customer === cust && (!s.any || s.any.some(k => camp.includes(k))))
+  return sc ? sc.agency : null
+}
 const GOOGLE_SCHEMA_VERSION = 2  // bump when stored summary shape changes
 
 // ===== helpers =====
@@ -348,7 +361,7 @@ async function runSync(opts = {}) {
   }
 
     // accumulate this customer's results into the merged set, then close the per-customer loop
-    for (const r of allRows) _allRowsMerged.push(r)
+    for (const r of allRows) { r.account = customerId; _allRowsMerged.push(r) }
     for (const [k, arr] of Object.entries(assetGroupsByCampaign)) {
       if (!_assetGroupsMerged[k]) _assetGroupsMerged[k] = []
       for (const ag of arr) _assetGroupsMerged[k].push(ag)
@@ -377,7 +390,8 @@ async function runSync(opts = {}) {
   for (const p of projectsList) {
     const needle = (p.name || '').toLowerCase().trim()
     if (!needle) continue
-    const mine = allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
+    const isKloss = needle === 'kloss'
+    const mine = isKloss ? allRows.filter(r => klossGoogleAgencyOf(r) !== null) : allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
     if (mine.length === 0) {
       results.push({ project: p.name, skipped: true, reason: 'no matching campaigns' })
       continue
@@ -391,7 +405,17 @@ async function runSync(opts = {}) {
       if (campLower.includes(needle)) projectAssetGroups.push(...groups)
     }
 
-    const summaryWithAssetGroups = { ...pt, assetGroups: projectAssetGroups }
+    let byAgency = null
+    if (isKloss) {
+      byAgency = {}
+      for (const r of mine) {
+        const ag = klossGoogleAgencyOf(r) || 'אחר'
+        const o = byAgency[ag] || (byAgency[ag] = { spend: 0, impressions: 0, clicks: 0, leads: 0 })
+        o.spend += r.spend; o.impressions += r.impressions; o.clicks += r.clicks; o.leads += r.leads
+      }
+      for (const ag of Object.keys(byAgency)) { const o = byAgency[ag]; o.cpl = o.leads>0?o.spend/o.leads:0; o.cpc = o.clicks>0?o.spend/o.clicks:0; o.ctr = o.impressions>0?(o.clicks/o.impressions)*100:0 }
+    }
+    const summaryWithAssetGroups = { ...pt, ...(byAgency ? { byAgency } : {}), assetGroups: projectAssetGroups }
 
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
@@ -458,6 +482,16 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
+  const _gsp = new URL(request.url).searchParams
+  if (_gsp.get('synckloss') === '1' || _gsp.get('klossfb') === '1') {
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
+    const { data: projects } = await supabase.from('projects').select('id,name')
+    const kp = (projects || []).find(p => (p.name || '').toLowerCase().includes('kloss'))
+    if (!kp) return Response.json({ error: 'no KLOSS project' }, { status: 404 })
+    if (_gsp.get('synckloss') === '1') { const { body: rb } = await runSync({ projectId: kp.id }); return Response.json({ triggered: true, result: rb }) }
+    const { data: reps } = await supabase.from('reports').select('month,summary').eq('project_id', kp.id).eq('source', 'google').order('month', { ascending: false }).limit(3)
+    return Response.json({ googleReports: (reps || []).map(r => ({ month: r.month, spend: r.summary && r.summary.spend, leads: r.summary && r.summary.leads, byAgency: r.summary && r.summary.byAgency })) })
+  }
   const _campCust = new URL(request.url).searchParams.get('gcampaigns')
   if (_campCust) {
     try {
