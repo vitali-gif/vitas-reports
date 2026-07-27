@@ -13,8 +13,8 @@ const META_GRAPH_VERSION = 'v21.0'
 // KLOSS multi-agency attribution: rows are matched to the KLOSS project by ad-account + campaign-name
 // keywords (its campaigns don't contain "kloss" in the agency accounts), and tagged by agency for the breakdown.
 const KLOSS_SOURCES = [
-  { account: '295378394595304', agency: 'סיגאווי', keywords: ['leadgen', 'leads'] },
-  { account: '143725504579407', agency: 'סיגאווי — באר שבע', keywords: ['leadgen', 'leads'] },
+  { account: '295378394595304', agency: 'סיגאווי', keywords: ['leadg', 'leads'] },
+  { account: '143725504579407', agency: 'סיגאווי — באר שבע', keywords: ['leadg', 'leads'] },
   { account: '1933376664223119', agency: 'VITAS', keywords: ['kloss'] },
 ]
 function klossAgencyOf(r) {
