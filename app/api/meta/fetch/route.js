@@ -536,6 +536,16 @@ export async function GET(request) {
     return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
   }
   // TEMP diagnostic (gated): reveal which token identity / ad accounts this server token can see.
+  const _listFor = new URL(request.url).searchParams.get('listaccts')
+  if (_listFor) {
+    const tk = process.env['META_ACCESS_TOKEN_' + _listFor] || token
+    try {
+      const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me/adaccounts?fields=account_id,name,account_status,currency&limit=100&access_token=${encodeURIComponent(tk)}`)
+      const j = await r.json()
+      const accounts = (j.data || []).map((a) => ({ id: a.account_id, name: a.name, status: a.account_status, currency: a.currency }))
+      return Response.json({ ok: r.ok, usingPerAccountToken: Boolean(process.env['META_ACCESS_TOKEN_' + _listFor]), count: accounts.length, accounts, error: j.error && j.error.message })
+    } catch (e) { return Response.json({ ok: false, error: String(e.message || e) }, { status: 500 }) }
+  }
   if (new URL(request.url).searchParams.get('bizinfo') === '1') {
     const out = {}
     try { const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me/businesses?fields=id,name&access_token=${encodeURIComponent(token)}`); out.me_businesses = await r.json() } catch (e) { out.me_businesses_err = String(e.message || e) }
