@@ -349,7 +349,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
     const GOOGLE_SCHEMA_VERSION = 2;  // keep in sync with google route.js
     const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google') && (r.summary?.schemaVersion || 0) >= GOOGLE_SCHEMA_VERSION);
-    const CRM_SCHEMA_VERSION = 13;  // keep in sync with route.js + useEffect below
+    const CRM_SCHEMA_VERSION = 14;  // keep in sync with route.js + useEffect below
     const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
     const haveCrm = !!crmRow && (isClientView || (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION); // client: don't force re-fetch on version bump (cron re-warms)
     const haveAll = haveFb && haveGoog && haveCrm;
@@ -845,7 +845,7 @@ const selectProject = async (client, project) => {
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
     const hasGoogle = reports.some(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-    const CRM_SCHEMA_VERSION = 13  // must match server-side route in api/bmby/fetch
+    const CRM_SCHEMA_VERSION = 14  // must match server-side route in api/bmby/fetch
     const crmRow = reports.find(r => r.month === selectedMonth && r.source === 'crm')
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
     const hasCrm = !!crmRow && (isClientView || cachedCrmVersion >= CRM_SCHEMA_VERSION); // client: cached CRM of any version counts (avoids heavy client live-fetch + clobber)
@@ -1086,6 +1086,8 @@ const selectProject = async (client, project) => {
     const bySourceMerged = {};
     const hourMerged = Array.from({ length: 24 }, () => 0);
     const leadHourMerged = Array.from({ length: 24 }, () => 0);
+    const contactHourMerged = Array.from({ length: 24 }, () => 0);       // first-contact by hour
+    const contactMeetingMerged = Array.from({ length: 24 }, () => 0);    // of those, matured to a scheduled meeting
     for (const r of crmRows) {
       const rt = r.summary && r.summary.responseTimeStats;
       if (!rt) continue;
@@ -1114,6 +1116,10 @@ const selectProject = async (client, project) => {
       if (Array.isArray(_hrs)) for (let _i = 0; _i < 24; _i++) hourMerged[_i] += _hrs[_i] || 0;
       const _lhrs = r.summary && r.summary.hourlyLeadStats;
       if (Array.isArray(_lhrs)) for (let _j = 0; _j < 24; _j++) leadHourMerged[_j] += _lhrs[_j] || 0;
+      const _chrs = r.summary && r.summary.hourlyContactStats;
+      if (Array.isArray(_chrs)) for (let _k = 0; _k < 24; _k++) contactHourMerged[_k] += _chrs[_k] || 0;
+      const _cmhrs = r.summary && r.summary.hourlyContactMeeting;
+      if (Array.isArray(_cmhrs)) for (let _m = 0; _m < 24; _m++) contactMeetingMerged[_m] += _cmhrs[_m] || 0;
       const bUser = (rt.business && rt.business.byUser) || {};
       const bSource = (rt.business && rt.business.bySource) || {};
       for (const [k, v] of Object.entries(rt.byUser || {})) {
@@ -1205,17 +1211,25 @@ const selectProject = async (client, project) => {
     // Hour-of-day: when meetings were COORDINATED (create_date), Israel time
     const hourTotal = hourMerged.reduce((a, b) => a + b, 0);
     const leadHourTotal = leadHourMerged.reduce((a, b) => a + b, 0);
-    const hourHasData = hourTotal > 0 || leadHourTotal > 0;
+    const contactHourTotal = contactHourMerged.reduce((a, b) => a + b, 0);
+    const hourHasData = hourTotal > 0 || leadHourTotal > 0 || contactHourTotal > 0;
+    // Success rate per contact-hour: of leads first contacted at hour h, what % reached a scheduled meeting.
+    // null where there were no contacts that hour, so the line skips empty hours instead of dropping to 0.
+    const contactRate = contactHourMerged.map((c, h) => c > 0 ? Math.round((contactMeetingMerged[h] / c) * 100) : null);
     if (hourHasData) {
       pendingChartsRef.current.push(setTimeout(() => {
         const hLabels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
         createChart('apptHourChart', 'bar', hLabels, [
-          { label: 'לידים', type: 'bar', data: leadHourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 2 },
+          { label: 'לידים', type: 'bar', data: leadHourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 3 },
+          { label: 'יצירת קשר', type: 'bar', data: contactHourMerged.slice(), backgroundColor: '#F59E0B', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 2 },
           { label: 'פגישות שתואמו', type: 'bar', data: hourMerged.slice(), backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
+          { label: '% הבשלה לפגישה', type: 'line', data: contactRate, borderColor: '#EF4444', backgroundColor: '#EF4444', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, spanGaps: true, yAxisID: 'y1', order: 0 },
         ], {
           x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' }, maxRotation: 0, autoSkip: false } },
           y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
-               title: { display: true, text: 'מספר פגישות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: 'כמות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+          y1: { beginAtZero: true, max: 100, position: 'left', grid: { display: false }, ticks: { precision: 0, callback: (v) => v + '%' },
+               title: { display: true, text: '% הבשלה', font: { size: 10.5, weight: '700' }, color: '#EF4444' } },
         });
       }, 350));
     }

@@ -740,6 +740,10 @@ async function runSync(opts = {}) {
     }
 
     const responseTimes = []
+    // Hour-of-day (Israel) of the FIRST salesperson contact per lead, and how many of those
+    // matured into a scheduled meeting — to compare "when she calls" vs "when it converts".
+    const hourlyContactStats = Array.from({ length: 24 }, () => 0)   // first-contacts bucketed by contact hour
+    const hourlyContactMeeting = Array.from({ length: 24 }, () => 0) // of those, that led to a scheduled meeting
     for (const lid of aprilLids) {
       const cid = String(lid.client_id || '')
       if (!cid) continue
@@ -774,6 +778,7 @@ async function runSync(opts = {}) {
       const apptList = clientApptList.get(cid) || []
       const postLidAppts = apptList.filter(a => !a.date || a.date >= lidDateOnly)
       const scheduledHit = postLidAppts.length > 0 && postLidAppts.some(a => !a.cancelled)
+      { const _ch = _hourOfDay(first.create_date || first.start_date); if (_ch !== null && _ch >= 0 && _ch <= 23) { hourlyContactStats[_ch]++; if (scheduledHit) hourlyContactMeeting[_ch]++ } }
       responseTimes.push({
         source,
         responseMinutes: deltaMin,
@@ -1019,7 +1024,7 @@ async function runSync(opts = {}) {
     totals.meetingsCompleted = _apptByDate.completed
     totals.meetingsCancelled = _apptByDate.cancelled
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 13  // v13: summary.completedMeetings (name/phone/date/description) for the 'פגישות שבוצעו' sub-tab
+    const CRM_SCHEMA_VERSION = 14  // v14: hourlyContactStats + hourlyContactMeeting (contact-hour + meeting-conversion by hour)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
@@ -1047,7 +1052,7 @@ async function runSync(opts = {}) {
         source: 'crm',
         month: m,
         data: xlsxRows,
-        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, namedLeads, completedMeetings: _completedMeetings, schemaVersion: CRM_SCHEMA_VERSION },
+        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, hourlyContactStats, hourlyContactMeeting, namedLeads, completedMeetings: _completedMeetings, schemaVersion: CRM_SCHEMA_VERSION },
         file_name: 'BMBY API (live)',
         row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
       }, { onConflict: 'project_id,source,month' })
