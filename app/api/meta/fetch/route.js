@@ -537,11 +537,10 @@ export async function GET(request) {
   }
   // TEMP diagnostic (gated): reveal which token identity / ad accounts this server token can see.
   if (new URL(request.url).searchParams.get('bizinfo') === '1') {
-    try {
-      const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}?fields=name,business{id,name}&access_token=${encodeURIComponent(token)}`)
-      const j = await r.json()
-      return Response.json({ ok: r.ok, ownerAccount: adAccountId, ownerAccountName: j.name, tokenBusiness: j.business || null, note: 'tokenBusiness = the Business your System User belongs to. Share the Sigavi account TO this Business ID.' })
-    } catch (e) { return Response.json({ ok: false, error: String(e.message || e) }, { status: 500 }) }
+    const out = {}
+    try { const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me/businesses?fields=id,name&access_token=${encodeURIComponent(token)}`); out.me_businesses = await r.json() } catch (e) { out.me_businesses_err = String(e.message || e) }
+    try { const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}?fields=name,business&access_token=${encodeURIComponent(token)}`); out.account_business = await r.json() } catch (e) { out.account_business_err = String(e.message || e) }
+    return Response.json({ note: 'Share the Sigavi account TO the business id shown here', ...out })
   }
   const _testAcct = new URL(request.url).searchParams.get('testacct')
   if (_testAcct) {
