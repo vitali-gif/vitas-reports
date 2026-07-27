@@ -458,6 +458,17 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
+  const _campCust = new URL(request.url).searchParams.get('gcampaigns')
+  if (_campCust) {
+    try {
+      const token = await getAccessToken()
+      const id = _campCust.trim().replace(/-/g, '')
+      const rows = await gaqlSearch(token, id, "SELECT campaign.name, campaign.status FROM campaign ORDER BY campaign.name")
+      const names = rows.map(r => ({ name: r.campaign && r.campaign.name, status: r.campaign && r.campaign.status }))
+      const kloss = names.filter(n => /kloss|קלוס/i.test(n.name || '')).length
+      return Response.json({ customer: id, count: names.length, klossMatches: kloss, campaigns: names.slice(0, 120) })
+    } catch (e) { return Response.json({ ok: false, error: String(e.message || e).slice(0, 400) }, { status: 500 }) }
+  }
   const _testCust = new URL(request.url).searchParams.get('testcust')
   if (_testCust) {
     const out = {}
