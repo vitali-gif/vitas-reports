@@ -113,7 +113,7 @@ export async function GET(req) {
   if (email) {
     const { data, error } = await supabaseAdmin
       .from('client_access')
-      .select('*, projects(id, name, client_id, clients(name, color))')
+      .select('*, projects(id, name, client_id, is_demo, clients(name, color))')
       .eq('email', email.toLowerCase().trim())
       .order('created_at', { ascending: true })
     if (error) return NextResponse.json({ error: error.message }, { status: 404 })
@@ -121,7 +121,7 @@ export async function GET(req) {
   }
   const { data, error } = await supabaseAdmin
     .from('client_access')
-    .select('*, projects(id, name, client_id, clients(name, color))')
+    .select('*, projects(id, name, client_id, is_demo, clients(name, color))')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data || [])

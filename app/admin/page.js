@@ -92,8 +92,8 @@ function InfoTip({ text }) {
 
 
 export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null }) {
-  const DEMO_CLIENT_NAME  = 'קבוצת אורבן'
-  const DEMO_PROJECT_NAME = 'מטרופוליס'
+  // שמות הדמו מגיעים מה-DB (הפרויקט/הלקוח שסומנו is_demo) ולא מקודדים בקוד,
+  // אחרת הכותרת והסיידבר מציגים שני שמות שונים.
   const [session, setSession] = useState(null)
   const [lastMetaSync, setLastMetaSync] = useState(null)
   const [lastGoogleSync, setLastGoogleSync] = useState(null)
@@ -841,6 +841,10 @@ const selectProject = async (client, project) => {
   // for the selected period, fetch it automatically (with debounce).
   useEffect(() => {
     if (isClientView && activePreset !== 'custom') return; // client: cron covers presets; only fetch for custom ranges
+    // פרויקט דמו: הנתונים קפואים ונזרעים ע"י /api/demo. אסור למשוך חי — הקריאות
+    // ייכשלו בשקט (אין מיפוי BMBY, אין קמפיין תואם) אבל יציגו באנר "מושך נתונים
+    // חיים" באמצע הדגמה ללקוח.
+    if (selectedProject?.is_demo) return;
     if (!selectedMonth || !selectedProject) return;
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
@@ -2484,7 +2488,7 @@ const selectProject = async (client, project) => {
                         {rec.assets.best.videoUrl ? (
                           <video src={rec.assets.best.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={rec.assets.best.imageUrl || undefined} />
                         ) : rec.assets.best.imageUrl ? (
-                          <img src={rec.assets.best.imageUrl} className="rec-ad-media" alt={rec.assets.best.adName} loading="lazy" style={isDemoProject ? {filter:'blur(8px)'} : undefined} />
+                          <img src={rec.assets.best.imageUrl} className="rec-ad-media" alt={rec.assets.best.adName} loading="lazy" style={(isDemoProject && !String(rec.assets.best.imageUrl || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined} />
                         ) : (
                           <div className="rec-ad-noimg">אין תמונה זמינה</div>
                         )}
@@ -2500,7 +2504,7 @@ const selectProject = async (client, project) => {
                         {rec.assets.worst.videoUrl ? (
                           <video src={rec.assets.worst.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={rec.assets.worst.imageUrl || undefined} />
                         ) : rec.assets.worst.imageUrl ? (
-                          <img src={rec.assets.worst.imageUrl} className="rec-ad-media" alt={rec.assets.worst.adName} loading="lazy" style={isDemoProject ? {filter:'blur(8px)'} : undefined} />
+                          <img src={rec.assets.worst.imageUrl} className="rec-ad-media" alt={rec.assets.worst.adName} loading="lazy" style={(isDemoProject && !String(rec.assets.worst.imageUrl || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined} />
                         ) : (
                           <div className="rec-ad-noimg">אין תמונה זמינה</div>
                         )}
@@ -4015,7 +4019,8 @@ const selectProject = async (client, project) => {
                   const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
                   const hasVideo = Boolean(ad.videoUrl);
                   const previewImg = ad.imageUrl || ad.thumbnailUrl;
-                  const demoBlur = isDemoProject ? {filter:'blur(8px)'} : undefined;
+                  // קריאייטיב מקומי של הדמו (/demo/...) מוצג חד; כל מקור חיצוני מטושטש.
+                  const demoBlur = (isDemoProject && !String(previewImg || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined;
                   return (
                     <div key={ad.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
                       {/* Media: video if available, else image */}
@@ -4304,8 +4309,8 @@ const selectProject = async (client, project) => {
             )}
             <TitleBar
               crumb={['סקירה', selectedProject?.name || '', '']}
-              client={isDemoProject ? DEMO_CLIENT_NAME : selectedClient?.name}
-              project={isDemoProject ? DEMO_PROJECT_NAME : selectedProject?.name}
+              client={selectedClient?.name}
+              project={selectedProject?.name}
               activePreset={activePreset}
               since={customSince}
               until={customUntil}

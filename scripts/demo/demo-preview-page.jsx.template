@@ -1,0 +1,39 @@
+'use client'
+/**
+ * app/demo-preview/page.js — עמוד QA מקומי בלבד
+ * ─────────────────────────────────────────────────────────────────────────────
+ * מרנדר את הדשבורד עם פרויקט הדמו בלי צורך בהתחברות, כדי לצלם ולבדוק
+ * ויזואלית את כל הטאבים לפני שנוגעים ב-DB של הייצור.
+ *
+ * ⚠️ מוגן ב-NODE_ENV: בפרודקשן העמוד מחזיר 404 בפועל (מסך ריק).
+ *    אין לצרף אותו ל-main בלי לוודא את ההגנה הזו.
+ */
+import dynamicImport from 'next/dynamic'
+import { DEMO_DATASET } from '../../lib/demo-dataset'
+
+const AdminPage = dynamicImport(() => import('../admin/page'), { ssr: false })
+
+export const dynamic = 'force-dynamic'
+
+const DEMO_PROJECT_ID = '00000000-0000-4000-8000-000000000001'
+
+export default function DemoPreviewPage() {
+  if (process.env.NODE_ENV === 'production') return null
+
+  const meta = DEMO_DATASET.meta
+  const clients = [{
+    id: '00000000-0000-4000-8000-000000000002',
+    name: meta.client,
+    color: meta.color,
+    projects: [{ id: DEMO_PROJECT_ID, name: meta.project, is_demo: true, monthly_budgets: null }],
+  }]
+
+  return (
+    <AdminPage
+      isClientView={true}
+      allowedProjectIds={[DEMO_PROJECT_ID]}
+      initialClients={clients}
+      initialProjectId={DEMO_PROJECT_ID}
+    />
+  )
+}

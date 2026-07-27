@@ -19,7 +19,7 @@ function buildClients(accessList) {
     const cColor = a.projects?.clients?.color || '#5B5EF4';
     const cId    = a.projects?.client_id;
     if (!map.has(cName)) map.set(cName, { id: cId, name: cName, color: cColor, projects: [] });
-    map.get(cName).projects.push({ id: a.project_id, name: a.projects?.name, is_demo: false });
+    map.get(cName).projects.push({ id: a.project_id, name: a.projects?.name, is_demo: !!a.projects?.is_demo });
   }
   return Array.from(map.values());
 }
