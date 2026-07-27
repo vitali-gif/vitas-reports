@@ -561,6 +561,11 @@ export async function GET(request) {
     return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
   }
   // TEMP diagnostic (gated): reveal which token identity / ad accounts this server token can see.
+  if (new URL(request.url).searchParams.get('accountids') === '1') {
+    const ids = (process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || '').split(',').map(x => x.trim()).filter(Boolean)
+    const perAccountTokens = ids.filter(id => process.env['META_ACCESS_TOKEN_' + id])
+    return Response.json({ current_META_AD_ACCOUNT_IDS: ids, count: ids.length, accountsWithPerAccountToken: perAccountTokens })
+  }
   const _listFor = new URL(request.url).searchParams.get('listaccts')
   if (_listFor) {
     const tk = process.env['META_ACCESS_TOKEN_' + _listFor] || token
