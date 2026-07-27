@@ -10,6 +10,19 @@ export const maxDuration = 300  // was 60 — full-quarter fetches (q1-q4) excee
 
 const META_GRAPH_VERSION = 'v21.0'
 
+// KLOSS multi-agency attribution: rows are matched to the KLOSS project by ad-account + campaign-name
+// keywords (its campaigns don't contain "kloss" in the agency accounts), and tagged by agency for the breakdown.
+const KLOSS_SOURCES = [
+  { account: '295378394595304', agency: 'סיגאווי', keywords: ['leadgen', 'leads'] },
+  { account: '143725504579407', agency: 'סיגאווי — באר שבע', keywords: ['leadgen', 'leads'] },
+  { account: '1933376664223119', agency: 'VITAS', keywords: ['kloss'] },
+]
+function klossAgencyOf(r) {
+  const camp = (r && r.campaign || '').toLowerCase()
+  const sc = KLOSS_SOURCES.find(s => s.account === String(r && r.account) && s.keywords.some(k => camp.includes(k)))
+  return sc ? sc.agency : null
+}
+
 // ===== helpers =====
 
 function currentMonth() {
@@ -355,8 +368,8 @@ async function runSync(opts = {}) {
   totals.frequency = totals.reach > 0 ? totals.impressions / totals.reach : 0
 
     // accumulate this account's results into the merged set, then close the per-account loop
-    for (const r of allRows) _allRowsMerged.push(r)
-    for (const a of activeAdsAll) _activeAdsMerged.push(a)
+    for (const r of allRows) { r.account = adAccountId; _allRowsMerged.push(r) }
+    for (const a of activeAdsAll) { a.account = adAccountId; _activeAdsMerged.push(a) }
     _mergedTotals.spend += totals.spend; _mergedTotals.impressions += totals.impressions
     _mergedTotals.reach += totals.reach; _mergedTotals.clicks += totals.clicks; _mergedTotals.leads += totals.leads
     _accountDiag.push({ account: adAccountId, rows: allRows.length, activeAds: activeAdsAll.length, adsIndexed: adsRaw.length, adsFetchError, videosResolved: Object.keys(videoUrlById).length, postsResolved: Object.keys(fullPictureByPost).length })
@@ -388,7 +401,8 @@ async function runSync(opts = {}) {
   for (const p of projectsList) {
     const needle = (p.name || '').toLowerCase().trim()
     if (!needle) continue
-    const mine = allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
+    const isKloss = needle === 'kloss'
+    const mine = isKloss ? allRows.filter(r => klossAgencyOf(r) !== null) : allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
     if (mine.length === 0) {
       results.push({ project: p.name, skipped: true, reason: 'no matching campaigns' })
       continue
@@ -412,7 +426,7 @@ async function runSync(opts = {}) {
     // We use this list as a membership filter — only ads whose effective_status
     // is currently ACTIVE should be considered by the recommendations engine.
     const projectActiveAds = activeAdsAll
-      .filter(a => (a.campaign || '').toLowerCase().includes(needle))
+      .filter(a => isKloss ? klossAgencyOf(a) !== null : (a.campaign || '').toLowerCase().includes(needle))
       .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
 
     // ── Server-side demographics aggregate ─────────────────────────────────────────
@@ -454,8 +468,19 @@ async function runSync(opts = {}) {
       dataToStore = Array.from(byAd.values())
     }
 
+    let byAgency = null
+    if (isKloss) {
+      byAgency = {}
+      for (const r of mine) {
+        const ag = klossAgencyOf(r) || 'אחר'
+        const o = byAgency[ag] || (byAgency[ag] = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 })
+        o.spend += r.spend; o.impressions += r.impressions; o.reach += r.reach; o.clicks += r.clicks; o.leads += r.leads
+      }
+      for (const ag of Object.keys(byAgency)) { const o = byAgency[ag]; o.cpl = o.leads>0?o.spend/o.leads:0; o.cpc = o.clicks>0?o.spend/o.clicks:0; o.cpm = o.impressions>0?(o.spend/o.impressions)*1000:0; o.ctr = o.impressions>0?(o.clicks/o.impressions)*100:0 }
+    }
     const summaryWithAds = {
       ...pt,
+      ...(byAgency ? { byAgency } : {}),
       demographics,
       activeAds: projectActiveAds,
       activeAdNames: projectActiveAds.map(a => a.name).filter(Boolean),
