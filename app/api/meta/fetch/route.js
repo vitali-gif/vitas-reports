@@ -536,6 +536,13 @@ export async function GET(request) {
     return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
   }
   // TEMP diagnostic (gated): reveal which token identity / ad accounts this server token can see.
+  if (new URL(request.url).searchParams.get('bizinfo') === '1') {
+    try {
+      const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/act_${adAccountId}?fields=name,business{id,name}&access_token=${encodeURIComponent(token)}`)
+      const j = await r.json()
+      return Response.json({ ok: r.ok, ownerAccount: adAccountId, ownerAccountName: j.name, tokenBusiness: j.business || null, note: 'tokenBusiness = the Business your System User belongs to. Share the Sigavi account TO this Business ID.' })
+    } catch (e) { return Response.json({ ok: false, error: String(e.message || e) }, { status: 500 }) }
+  }
   const _testAcct = new URL(request.url).searchParams.get('testacct')
   if (_testAcct) {
     const results = {}
