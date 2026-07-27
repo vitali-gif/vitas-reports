@@ -458,6 +458,21 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
+  const _testCust = new URL(request.url).searchParams.get('testcust')
+  if (_testCust) {
+    const out = {}
+    try {
+      const token = await getAccessToken()
+      for (const id of _testCust.split(',').map(x => x.trim().replace(/-/g, '')).filter(Boolean)) {
+        try {
+          const rows = await gaqlSearch(token, id, 'SELECT customer.id, customer.descriptive_name, customer.currency_code FROM customer')
+          const c = rows[0] && rows[0].customer
+          out[id] = { ok: true, name: c && c.descriptiveName, currency: c && c.currencyCode }
+        } catch (e) { out[id] = { ok: false, error: String(e.message || e).slice(0, 300) } }
+      }
+    } catch (e) { return Response.json({ ok: false, error: 'token: ' + String(e.message || e) }, { status: 500 }) }
+    return Response.json({ loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID, results: out })
+  }
   // Health check: verify we can get an access token
   try {
     const token = await getAccessToken()
