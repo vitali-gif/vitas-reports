@@ -536,6 +536,19 @@ export async function GET(request) {
     return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
   }
   // TEMP diagnostic (gated): reveal which token identity / ad accounts this server token can see.
+  const _testAcct = new URL(request.url).searchParams.get('testacct')
+  if (_testAcct) {
+    const results = {}
+    for (const id of _testAcct.split(',').map(x => x.trim()).filter(Boolean)) {
+      const tk = process.env['META_ACCESS_TOKEN_' + id] || token
+      try {
+        const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/act_${id}?fields=name,account_status,currency&access_token=${encodeURIComponent(tk)}`)
+        const j = await r.json()
+        results[id] = r.ok ? { ok: true, name: j.name, status: j.account_status, currency: j.currency } : { ok: false, error: j.error && j.error.message }
+      } catch (e) { results[id] = { ok: false, error: String(e.message || e) } }
+    }
+    return Response.json({ token_identity: 'VITAS', results })
+  }
   if (new URL(request.url).searchParams.get('whoami') === '1') {
     try {
       const meRes = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me?fields=id,name&access_token=${encodeURIComponent(token)}`)
