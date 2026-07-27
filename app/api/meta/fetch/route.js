@@ -13,13 +13,15 @@ const META_GRAPH_VERSION = 'v21.0'
 // KLOSS multi-agency attribution: rows are matched to the KLOSS project by ad-account + campaign-name
 // keywords (its campaigns don't contain "kloss" in the agency accounts), and tagged by agency for the breakdown.
 const KLOSS_SOURCES = [
-  { account: '295378394595304', agency: 'סיגאווי', keywords: ['leadg', 'leads'] },
-  { account: '143725504579407', agency: 'סיגאווי — באר שבע', keywords: ['leadg', 'leads'] },
-  { account: '1933376664223119', agency: 'VITAS', keywords: ['kloss'] },
+  { account: '295378394595304', agency: 'סיגאווי', any: ['leadg', 'leads'] },
+  { account: '143725504579407', agency: 'VITAS', all: ['kloss'], any: ['leadg', 'leads'] },
 ]
 function klossAgencyOf(r) {
   const camp = (r && r.campaign || '').toLowerCase()
-  const sc = KLOSS_SOURCES.find(s => s.account === String(r && r.account) && s.keywords.some(k => camp.includes(k)))
+  const acct = String(r && r.account)
+  const sc = KLOSS_SOURCES.find(s => s.account === acct
+    && (!s.all || s.all.every(k => camp.includes(k)))
+    && (!s.any || s.any.some(k => camp.includes(k))))
   return sc ? sc.agency : null
 }
 
@@ -561,6 +563,16 @@ export async function GET(request) {
     return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
   }
   // TEMP diagnostic (gated): reveal which token identity / ad accounts this server token can see.
+  const _sp = new URL(request.url).searchParams
+  if (_sp.get('synckloss') === '1' || _sp.get('klossfb') === '1') {
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
+    const { data: projects } = await supabase.from('projects').select('id,name')
+    const kp = (projects || []).find(p => (p.name || '').toLowerCase().includes('kloss'))
+    if (!kp) return Response.json({ error: 'no KLOSS project found' }, { status: 404 })
+    if (_sp.get('synckloss') === '1') { const { body: rb } = await runSync({ projectId: kp.id }); return Response.json({ triggered: true, result: rb }) }
+    const { data: reps } = await supabase.from('reports').select('month,summary').eq('project_id', kp.id).eq('source', 'facebook').order('month', { ascending: false }).limit(3)
+    return Response.json({ facebookReports: (reps || []).map(r => ({ month: r.month, spend: r.summary && r.summary.spend, leads: r.summary && r.summary.leads, byAgency: r.summary && r.summary.byAgency })) })
+  }
   if (new URL(request.url).searchParams.get('whoami') === '1') {
     try {
       const meRes = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/me?fields=id,name&access_token=${encodeURIComponent(token)}`)
