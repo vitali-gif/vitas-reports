@@ -561,6 +561,17 @@ export async function GET(request) {
     return Response.json({ ok: false, error: 'Missing env vars' }, { status: 500 })
   }
   // TEMP diagnostic (gated): reveal which token identity / ad accounts this server token can see.
+  const _campFor = new URL(request.url).searchParams.get('campaigns')
+  if (_campFor) {
+    const tk = process.env['META_ACCESS_TOKEN_' + _campFor] || token
+    try {
+      const r = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/act_${_campFor}/campaigns?fields=name,effective_status&limit=200&access_token=${encodeURIComponent(tk)}`)
+      const j = await r.json()
+      const names = (j.data || []).map(c => ({ name: c.name, status: c.effective_status }))
+      const kw = { leadgen_or_leads: names.filter(n => /leadgen|leads/i.test(n.name)).length, kloss: names.filter(n => /kloss/i.test(n.name)).length }
+      return Response.json({ account: _campFor, ok: r.ok, count: names.length, matchCounts: kw, campaigns: names, error: j.error && j.error.message })
+    } catch (e) { return Response.json({ ok: false, error: String(e.message || e) }, { status: 500 }) }
+  }
   const _sp = new URL(request.url).searchParams
   if (_sp.get('synckloss') === '1' || _sp.get('klossfb') === '1') {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
