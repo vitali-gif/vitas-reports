@@ -1,0 +1,81 @@
+name: זריעת פרויקט הדמו
+
+# ─────────────────────────────────────────────────────────────────────────────
+# כותב את דאטהסט הדמו ("אופק ים" / נוף אדמה בע״מ) ל-DB.
+#
+# למה workflow ולא הרצה ידנית: ה-CRON_SECRET ב-Vercel מסומן Sensitive ולא ניתן
+# להעתקה, אבל הוא כבר קיים כאן כ-repository secret (אותו אחד ש-vitas-cron
+# משתמש בו). כך אפשר להריץ seed בלחיצת כפתור בלי להחזיק את הסוד ביד.
+#
+# הרצה ידנית:  Actions ← "זריעת פרויקט הדמו" ← Run workflow ← בוחרים פעולה
+#   seed    — כותב/מרענן את 9 הדוחות (ברירת מחדל)
+#   status  — רק בודק מה קיים, לא כותב כלום
+#   unseed  — מוחק את דוחות הדמו (הפרויקט עצמו נשאר)
+#
+# הרצה אוטומטית: כל יום ב-03:20 UTC (06:20 שעון ישראל).
+# למה יומי ולא חודשי — ה-seeder ממפה את תאריכי החודש הנוכחי לטווח
+# [1 בחודש .. היום]. הרצה חודשית בלבד הייתה מציגה, ב-20 בחודש, את כל הלידים
+# מרוכזים בתאריכי תחילת החודש. ההרצה זולה: 9 upserts.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    - cron: '20 3 * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'פעולה'
+        required: true
+        default: 'seed'
+        type: choice
+        options: [seed, status, unseed]
+
+concurrency:
+  group: vitas-demo-seed
+  cancel-in-progress: false
+
+jobs:
+  demo-seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/demo
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          ACTION: ${{ github.event.inputs.action || 'seed' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::חסר repository secret בשם CRON_SECRET"
+            exit 1
+          fi
+          url="https://reports.vitas.co.il/api/demo"
+
+          if [ "$ACTION" = "status" ]; then
+            echo "::error::status דורש את ה-anon key ולא את CRON_SECRET — הרץ seed כדי לראות מה נכתב"
+            exit 1
+          fi
+
+          echo "פעולה: $ACTION"
+          code=$(curl -sS -o /tmp/demo.json -w '%{http_code}' --max-time 300 \
+            -X POST "$url" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H 'Content-Type: application/json' \
+            -d "{\"action\":\"$ACTION\"}" || echo 000)
+
+          echo "HTTP $code"
+          cat /tmp/demo.json 2>/dev/null | head -c 4000; echo
+
+          if [ "$code" != "200" ]; then
+            echo "::error::/api/demo החזיר HTTP $code"
+            exit 1
+          fi
+
+          # אימות: seed מוצלח חייב לכתוב בדיוק 9 דוחות (3 תקופות × crm/facebook/google)
+          if [ "$ACTION" = "seed" ]; then
+            n=$(grep -o '"[0-9-]*_\?[0-9-]*\/\(crm\|facebook\|google\)"' /tmp/demo.json | wc -l)
+            echo "נכתבו $n דוחות"
+            if [ "$n" -ne 9 ]; then
+              echo "::error::צפויים 9 דוחות, נכתבו $n — בדוק את הפלט למעלה"
+              exit 1
+            fi
+            echo "::notice::הדמו נזרע בהצלחה (9/9). רענן את reports.vitas.co.il/admin"
+          fi
