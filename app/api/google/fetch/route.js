@@ -482,16 +482,6 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
-  const _gsp = new URL(request.url).searchParams
-  if (_gsp.get('synckloss') === '1' || _gsp.get('klossfb') === '1') {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
-    const { data: projects } = await supabase.from('projects').select('id,name')
-    const kp = (projects || []).find(p => (p.name || '').toLowerCase().includes('kloss'))
-    if (!kp) return Response.json({ error: 'no KLOSS project' }, { status: 404 })
-    if (_gsp.get('synckloss') === '1') { const { body: rb } = await runSync({ projectId: kp.id }); return Response.json({ triggered: true, result: rb }) }
-    const { data: reps } = await supabase.from('reports').select('month,summary').eq('project_id', kp.id).eq('source', 'google').order('month', { ascending: false }).limit(3)
-    return Response.json({ googleReports: (reps || []).map(r => ({ month: r.month, spend: r.summary && r.summary.spend, leads: r.summary && r.summary.leads, byAgency: r.summary && r.summary.byAgency })) })
-  }
   // Health check: verify we can get an access token
   try {
     const token = await getAccessToken()
