@@ -130,41 +130,64 @@ export async function GET(req) {
 export async function POST(req) {
   if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
-  const { email, client_id } = body
+  // project_ids אופציונלי: אם נשלח — מעניקים גישה רק לפרויקטים שנבחרו.
+  // בלעדיו נשמרת ההתנהגות הישנה (כל הפרויקטים של הלקוח), כדי לא לשבור
+  // קריאות קיימות.
+  // notify=false → עדכון היקף גישה בלבד: לא מאפסים סיסמה ולא שולחים מייל.
+  // בלי זה, כל שינוי בהרשאות היה מנתק את הלקוח (upsertAuthUser מאפס את
+  // הסיסמה הקיימת) ושולח לו מייל מיותר.
+  const { email, client_id, project_ids, notify } = body
+  const shouldNotify = notify !== false
   if (!email || !client_id) return NextResponse.json({ error: 'email and client_id required' }, { status: 400 })
 
   const cleanEmail = email.toLowerCase().trim()
 
-  const { data: projects, error: projErr } = await supabaseAdmin
+  const { data: allProjects, error: projErr } = await supabaseAdmin
     .from('projects').select('id, name, clients(name)').eq('client_id', client_id)
-  if (projErr || !projects?.length)
+  if (projErr || !allProjects?.length)
     return NextResponse.json({ error: projErr?.message || 'No projects found' }, { status: 400 })
 
-  const existingProjectIds = projects.map(p => p.id)
-  await supabaseAdmin.from('client_access').delete().eq('email', cleanEmail).in('project_id', existingProjectIds)
+  // סינון לפי הבחירה — תמיד מול הפרויקטים של הלקוח הזה, כדי ש-project_ids
+  // שרירותי לא יוכל להעניק גישה לפרויקט של לקוח אחר.
+  const wanted = Array.isArray(project_ids) && project_ids.length
+    ? allProjects.filter(p => project_ids.includes(p.id))
+    : allProjects
+  if (!wanted.length)
+    return NextResponse.json({ error: 'לא נבחרו פרויקטים תקפים עבור הלקוח הזה' }, { status: 400 })
 
+  // מוחקים את כל השורות הקיימות של המייל בתוך הלקוח הזה ואז כותבים מחדש —
+  // כך שליחה חוזרת עם בחירה אחרת גם *מסירה* פרויקטים, ולא רק מוסיפה.
+  const clientProjectIds = allProjects.map(p => p.id)
+  await supabaseAdmin.from('client_access').delete().eq('email', cleanEmail).in('project_id', clientProjectIds)
+
+  const projects = wanted
   const rows = projects.map(p => ({ email: cleanEmail, project_id: p.id }))
   const { error: insertErr } = await supabaseAdmin.from('client_access').insert(rows)
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 })
 
   const clientName = projects[0]?.clients?.name || ''
-  const tempPassword = generateTempPassword()
 
-  // Create or update Supabase auth user
-  const authResult = await upsertAuthUser(cleanEmail, tempPassword)
-
-  // Send email with password
   let emailSent = false
   let emailError = null
-  if (authResult.ok) {
-    const result = await sendPasswordEmail(cleanEmail, tempPassword, clientName)
-    emailSent = result.ok
-    emailError = result.error || null
-  } else {
-    emailError = authResult.error
+  if (shouldNotify) {
+    const tempPassword = generateTempPassword()
+    const authResult = await upsertAuthUser(cleanEmail, tempPassword)
+    if (authResult.ok) {
+      const result = await sendPasswordEmail(cleanEmail, tempPassword, clientName)
+      emailSent = result.ok
+      emailError = result.error || null
+    } else {
+      emailError = authResult.error
+    }
   }
 
-  return NextResponse.json({ client_id, clientName, projectCount: projects.length, emailSent, emailError }, { status: 201 })
+  return NextResponse.json({
+    client_id, clientName,
+    projectCount: projects.length,
+    projectNames: projects.map(p => p.name),
+    notified: shouldNotify,
+    emailSent, emailError,
+  }, { status: 201 })
 }
 
 export async function DELETE(req) {
