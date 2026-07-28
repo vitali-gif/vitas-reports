@@ -2262,7 +2262,7 @@ const selectProject = async (client, project) => {
       if (!items || Object.keys(items).length === 0) return null;
       const cols = [{key:'name',label:labelName,get:(_,n)=>n},{key:'clicks',label:'קליקים',get:d=>d.clicks,higher:true},{key:'impressions',label:'חשיפות',get:d=>d.impressions,higher:true},{key:'cpc',label:'עלות לקליק',get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},{key:'ctr',label:'CTR',get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},{key:'cpm',label:'CPM',get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},{key:'leads',label:'לידים',get:d=>d.leads,higher:true},{key:'cpl',label:'עלות לליד',get:d=>d.leads>0?d.spend/d.leads:0,higher:false},{key:'spend',label:'תקציב שנוצל',get:d=>d.spend}];
       const sc = sortConfig[tableId];
-      let entries = Object.entries(items);
+      let entries = Object.entries(items).filter(([, d]) => ((d.spend||0) > 0 || (d.impressions||0) > 0 || (d.clicks||0) > 0));
       if (sc) { const col = cols.find(c=>c.key===sc.key); if(col){entries.sort((a,b)=>{const va=col.get(a[1],a[0]),vb=col.get(b[1],b[0]);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}} else { entries.sort((a, b) => b[1].spend - a[1].spend); }
       const showCh = compareEnabled && prevItems;
       const ch = (cur, prev, isCost) => {
@@ -3873,7 +3873,8 @@ const selectProject = async (client, project) => {
             const va = treeSortVal(get(na), treeSort.key), vb = treeSortVal(get(nb), treeSort.key);
             return treeSort.dir === 'asc' ? va - vb : vb - va;
           };
-          const campaignNames = Object.keys(tree).sort((a,b) => treeCmp(a, b, n => tree[n]));
+          const _hasActivity = (d) => ((d && d.spend) || 0) > 0 || ((d && d.impressions) || 0) > 0 || ((d && d.clicks) || 0) > 0;
+          const campaignNames = Object.keys(tree).filter(n => _hasActivity(tree[n])).sort((a,b) => treeCmp(a, b, n => tree[n]));
           const toggleCampaign = (c) => setExpandedCampaigns(prev => { const next = new Set(prev); if (next.has(c)) next.delete(c); else next.add(c); return next; });
           const toggleAdSet = (k) => setExpandedAdSets(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
           const cols = [
