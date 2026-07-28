@@ -3636,6 +3636,37 @@ const selectProject = async (client, project) => {
           </>)}
         </div>
 
+        {(() => {
+          const _ab = dashTab === 'facebook' ? (fbReports[0]?.summary?.byAgency)
+            : (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') ? (gReports[0]?.summary?.byAgency) : null
+          if (!_ab || !Object.keys(_ab).length) return null
+          const _rows = Object.entries(_ab).sort((a, b) => (b[1].spend || 0) - (a[1].spend || 0))
+          const _tot = _rows.reduce((s2, [, o]) => s2 + (o.spend || 0), 0)
+          return (
+            <div className="section">
+              <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><h2>פילוח לפי משרד פרסום</h2><span className="sub">{dashTab === 'facebook' ? 'Facebook' : 'Google'}</span></div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:12}}>
+                {_rows.map(([ag, o]) => { const pc = _tot > 0 ? Math.round((o.spend || 0) / _tot * 100) : 0; return (
+                  <div key={ag} style={{background:'var(--surface-2, #fff)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                      <span style={{fontSize:15,fontWeight:600,color:'#0f172a'}}>{ag}</span>
+                      <span style={{fontSize:11,fontWeight:600,color:'#0369a1',background:'#e0f2fe',padding:'2px 8px',borderRadius:20}}>{pc}% מהתקציב</span>
+                    </div>
+                    <div style={{fontSize:24,fontWeight:700,color:'#0f172a',lineHeight:1.1}}>{formatCurrency(o.spend || 0)}</div>
+                    <div style={{fontSize:11,color:'#94a3b8',marginBottom:12}}>הוצאה</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 10px',fontSize:13}}>
+                      <div><span style={{color:'#64748b'}}>לידים </span><b style={{color:'#0f172a'}}>{formatNum(Math.round(o.leads || 0))}</b></div>
+                      <div><span style={{color:'#64748b'}}>עלות לליד </span><b style={{color:'#7c3aed'}}>{formatCurrency(o.cpl || 0)}</b></div>
+                      <div><span style={{color:'#64748b'}}>קליקים </span><b style={{color:'#0f172a'}}>{formatNum(o.clicks || 0)}</b></div>
+                      <div><span style={{color:'#64748b'}}>CTR </span><b style={{color:'#0f172a'}}>{(o.ctr || 0).toFixed(2)}%</b></div>
+                    </div>
+                  </div>
+                )})}
+              </div>
+            </div>
+          )
+        })()}
+
         {/* FUNNEL */}
         <div className="section">
           <div className="section-head">
