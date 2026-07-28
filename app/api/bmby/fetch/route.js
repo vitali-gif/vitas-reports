@@ -20,7 +20,7 @@ import { normalizeCity } from '../../../../lib/city-normalize.js'
 import { businessMinutesBetween } from '../../../../lib/business-hours.js'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300 // was 60 — HI PARK monthly tasks fetch needs headroom (avoids 0-leads skips)
 
 const BMBY_BASE = 'https://www.bmby.com/WebServices/srv/v3'
 const ENDPOINTS = {
@@ -287,10 +287,10 @@ async function runSync(opts = {}) {
     const _stagesOnly = !!opts.stagesOnly
     const _apptDump = !!opts.apptDump  // fast: clients+tasks only, dump raw appointment rows
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
-      withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4), 45000, 'clients'),
-      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 10), 45000, 'tasks'),
-      (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 45000, 'price_offers'),
-      (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 45000, 'contracts'),
+      withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4), 120000, 'clients'),
+      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 10), 120000, 'tasks'),
+      (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 120000, 'price_offers'),
+      (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 120000, 'contracts'),
     ])
 
     const safeRows = (r) => (r.status === 'fulfilled' && Array.isArray(r.value?.rows)) ? r.value.rows : []
