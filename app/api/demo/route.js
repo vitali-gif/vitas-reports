@@ -174,7 +174,7 @@ export async function GET(req) {
 
   const { data: reports } = await supabaseAdmin
     .from('reports')
-    .select('source, month, created_at')
+    .select('source, month, created_at, summary')
     .eq('project_id', project.id)
 
   const present = new Set((reports || []).map(r => `${r.month}|${r.source}`))
@@ -191,7 +191,8 @@ export async function GET(req) {
     expectedKeys: keys,
     reportCount: (reports || []).length,
     missing,
-    lastSeededAt: (reports || []).map(r => r.created_at).sort().pop() || null,
+    lastSeededAt: (reports || []).map(r => r.summary?._seededAt).filter(Boolean).sort().pop()
+      || (reports || []).map(r => r.created_at).sort().pop() || null,
     datasetBaseMonth: DEMO_DATASET.meta.baseMonth,
   })
 }
@@ -303,7 +304,10 @@ export async function POST(req) {
       source: report.source,
       month: targetMonth,
       data: shiftDates(report.data, offset, post),
-      summary: shiftDates(report.summary, offset, post),
+      // _seededAt: חותמת זמן אמיתית. אי אפשר להסתמך על created_at — upsert
+      // לא מעדכן אותו, כך ש-GET היה מדווח על ה-seed הראשון לנצח ונראה כאילו
+      // הזריעה לא רצה.
+      summary: { ...shiftDates(report.summary, offset, post), _seededAt: new Date().toISOString() },
       file_name: report.file_name,
       row_count: report.row_count,
     }
