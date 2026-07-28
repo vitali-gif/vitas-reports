@@ -73,9 +73,21 @@ for (const viewport of [{ name: 'desktop', width: 1440, height: 1000 }, { name: 
     timezoneId: 'Asia/Jerusalem',
   })
 
-  // כל קריאה ל-by-project מוחזרת מהדאטהסט המקומי — אין DB בלולאה.
-  await ctx.route('**/api/reports/by-project*', (route) => {
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(REPORT_ROWS) })
+  // ברירת מחדל: הדאטהסט המקומי (בודק את מה שנבנה).
+  // PROD=1: פרוקסי ל-reports.vitas.co.il עבור פרויקט הדמו — בודק בדיוק את מה
+  // שהלקוח הפוטנציאלי יראה, כולל ה-seed שכבר נכתב ל-DB.
+  const PROD = process.env.PROD === '1'
+  const PROD_PID = process.env.PROD_PID || ''
+  const ANON = process.env.ANON || ''
+  await ctx.route('**/api/reports/by-project*', async (route) => {
+    if (!PROD) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(REPORT_ROWS) })
+    const u = new URL(route.request().url())
+    u.searchParams.set('projectId', PROD_PID)
+    const res = await fetch('https://reports.vitas.co.il/api/reports/by-project' + u.search, { headers: { 'x-client-key': ANON } })
+    const body = await res.text()
+    // מזהה הפרויקט בתשובה חייב להתאים לזה שהעמוד המקומי מצפה לו
+    route.fulfill({ status: res.status, contentType: 'application/json',
+      body: body.split(PROD_PID).join(DEMO_PROJECT_ID) })
   })
   // חוסמים כל ניסיון משיכה חיה (כך גם מוודאים שהדמו לא תלוי בהם).
   for (const p of ['**/api/meta/**', '**/api/google/**', '**/api/bmby/**', '**/api/zoho/**', '**/api/salesforce/**', '**/api/ga4/**']) {

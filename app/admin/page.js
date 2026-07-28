@@ -1047,7 +1047,13 @@ const selectProject = async (client, project) => {
       }
     };
     if (!isDoughnut) {
-      config.options.scales = scalesConfig || {
+      // `indexAxis` הוא אופציה של הגרף, לא ציר. עד כה הוא הועבר בתוך
+      // scalesConfig ולכן נחת ב-options.scales — Chart.js פירש אותו כשם של ציר,
+      // זרק "Invalid scale configuration for scale: indexAxis" בכל רינדור,
+      // וגרף "Top 10 יישובים" נשאר אנכי במקום אופקי אצל כל הלקוחות.
+      const { indexAxis, ..._scaleAxes } = scalesConfig || {};
+      if (indexAxis) config.options.indexAxis = indexAxis;
+      config.options.scales = scalesConfig ? _scaleAxes : {
         y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
              ticks: { font: { size: 11 }, color: '#6B7280' } },
         x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#6B7280' } }
