@@ -482,6 +482,10 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
+  if (new URL(request.url).searchParams.get('customerids') === '1') {
+    const merged = [...new Set([...(process.env.GOOGLE_ADS_CUSTOMER_ID || '').split(','), ...(process.env.GOOGLE_ADS_CUSTOMER_IDS || '').split(',')].map(x => x.trim()).filter(Boolean))]
+    return Response.json({ GOOGLE_ADS_CUSTOMER_ID: process.env.GOOGLE_ADS_CUSTOMER_ID || null, GOOGLE_ADS_CUSTOMER_IDS: process.env.GOOGLE_ADS_CUSTOMER_IDS || null, effective_merged: merged })
+  }
   const _gsp = new URL(request.url).searchParams
   if (_gsp.get('synckloss') === '1' || _gsp.get('klossfb') === '1') {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
