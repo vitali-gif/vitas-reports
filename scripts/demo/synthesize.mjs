@@ -453,9 +453,11 @@ function buildCrmReport(profile, period, monthKey, dateRange, rng) {
   const DOW_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
   const dayOfWeekStats = {}
   DOW_NAMES.forEach((name, i) => { dayOfWeekStats[i] = { name, leads: 0, scheduled: 0 } })
-  const hourlyLeadStats = {}
-  const hourlyApptStats = {}
-  for (let h = 0; h < 24; h++) { hourlyLeadStats[h] = 0; hourlyApptStats[h] = 0 }
+  // ⚠️ **מערכים**, לא אובייקטים. app/admin/page.js מסנן ב-Array.isArray
+  // ומדלג בשקט על אובייקט — מה שהותיר את הסדרות "לידים" ו"פגישות שתואמו"
+  // ריקות לגמרי בגרף השעות, בלי שום שגיאה. bmby/fetch פולט Array.from(24).
+  const hourlyLeadStats = Array.from({ length: 24 }, () => 0)
+  const hourlyApptStats = Array.from({ length: 24 }, () => 0)
 
   // v14: שעת יצירת הקשר הראשונה, וכמה מתוכן הבשילו לפגישה.
   // הצורה חייבת להיות **מערך** באורך 24 — admin/page.js בודק Array.isArray

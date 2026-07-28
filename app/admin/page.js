@@ -304,6 +304,16 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     showToast(`✓ גישה נמחקה (${toDelete.length} פרויקטים)`)
   }
 
+  // פרויקט הדמו נזרע לשלוש תקופות בלבד. כל תקופה אחרת אין לה דוח, והדשבורד
+  // היה נופל בשקט חזרה לחודש האחרון (loadProjectReports מאפס את selectedMonth
+  // ל-data[0].month כשהמפתח שנבחר לא קיים) — כלומר מציג נתונים של תקופה אחרת
+  // ממה שכתוב בתגית התאריכים. מסתירים את שאר התקופות וגם חוסמים בקוד.
+  const DEMO_PRESETS = ['currentMonth', 'lastMonth', 'q2']
+
+  // ── Demo mode detection ────────────────────────────────────────────────
+  // מוגדר כאן ולא למטה, כי applyPreset/applyCustomRange צריכים אותו.
+  const isDemoProject = !!(selectedProject?.is_demo)
+
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
     const today = new Date();
@@ -431,6 +441,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       setActivePreset('custom'); // mark as already-loaded custom
       return;
     }
+    if (isDemoProject && !DEMO_PRESETS.includes(preset)) {
+      showToast('בפרויקט הדגמה זמינות שלוש תקופות בלבד: החודש הנוכחי, חודש שעבר ו-Q2');
+      return;
+    }
     setActivePreset(preset);
     if (preset === 'custom') return; // UI shows custom date inputs - user must click הצג
     const r = presetToPayload(preset);
@@ -453,6 +467,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   };
 
   const applyCustomRange = async (sinceParam, untilParam) => {
+    if (isDemoProject) {
+      showToast('בפרויקט הדגמה זמינות שלוש תקופות בלבד: החודש הנוכחי, חודש שעבר ו-Q2');
+      return;
+    }
     const s = sinceParam || customSince;
     const u = untilParam || customUntil;
     if (!s || !u) return;
@@ -1352,7 +1370,7 @@ const selectProject = async (client, project) => {
 
         {hourHasData && (
           <div className="section">
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2><span className="sub">באיזו שעה ביום (שעון ישראל) נכנסו לידים ותואמו פגישות</span></div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2><span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, מתי אנשי המכירות יצרו קשר, וכמה פגישות תואמו. הקו האדום = מתוך הלידים שנוצר איתם קשר באותה שעה, איזה אחוז הגיע לפגישה</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="apptHourChart"></canvas></div></div>
           </div>
         )}
@@ -4306,9 +4324,6 @@ const selectProject = async (client, project) => {
     return client?.projects || [];
   };
 
-  // ── Demo mode detection ─────────────────────────────────────────────────────
-  const isDemoProject = !!(selectedProject?.is_demo)
-
   // ── visibleClients: filter by allowedProjectIds in client view ──────────
   const visibleClients = (isClientView && allowedProjectIds)
     ? clients
@@ -4395,6 +4410,7 @@ const selectProject = async (client, project) => {
               comparisonOn={compareEnabled}
               onToggleComparison={() => onComparisonToggle(!compareEnabled)}
               showQuarters={!(/bcurelaser|ismooth/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
+              allowedPresets={isDemoProject ? DEMO_PRESETS : undefined}
             />
             {(() => {
               // Budget bar shown for all projects (ש.ברוך + BCureLaser). Inert until a budget is set.

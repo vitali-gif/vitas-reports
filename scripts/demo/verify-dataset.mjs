@@ -206,6 +206,14 @@ function checkCrmIntegrity(r) {
   const contractRows = s.crmRepRows.filter(x => x.hasContract).length
   if (contractRows !== s.contracts) fail(at(`crmRepRows.hasContract=${contractRows} ≠ contracts=${s.contracts}`))
 
+  // כל מערכי השעות חייבים להיות **מערכים** — admin/page.js מסנן ב-Array.isArray
+  // ומדלג בשקט על אובייקט, כך שהסדרה נעלמת מהגרף בלי שום שגיאה.
+  for (const f of ['hourlyLeadStats', 'hourlyApptStats', 'hourlyContactStats', 'hourlyContactMeeting']) {
+    if (!Array.isArray(s[f]) || s[f].length !== 24) {
+      fail(at(`${f} חייב להיות מערך באורך 24 (הדשבורד מסנן ב-Array.isArray)`))
+    }
+  }
+
   // v14
   if (!Array.isArray(s.hourlyContactStats) || s.hourlyContactStats.length !== 24) {
     fail(at('v14: hourlyContactStats חייב להיות מערך באורך 24 (admin/page.js בודק Array.isArray)'))

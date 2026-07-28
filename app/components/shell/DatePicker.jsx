@@ -196,11 +196,18 @@ function CalGrid({ year, month, tempStart, tempEnd, pickMode, hoverYmd, todayYmd
 }
 
 // ─── Main DatePicker component ───────────────────────────────────────────────
-export default function DatePicker({ activePreset, since, until, onApplyPreset, onApplyRange, showQuarters = true }) {
+export default function DatePicker({ activePreset, since, until, onApplyPreset, onApplyRange, showQuarters = true, allowedPresets = null }) {
   // When showQuarters is false (e.g. BCureLaser / Zoho — quarters aren't used and they
   // trip Zoho's 2000-record fetch limit) drop q1-q4 from the preset list and collapse any
   // separators that would be left dangling.
   const presetList = (() => {
+    // allowedPresets: רשימה סגורה של תקופות (פרויקט דמו — רק התקופות שנזרעו).
+    // בלעדיה הלקוח היה בוחר "היום", לא היה נתון לאותו מפתח, והדשבורד היה
+    // נופל בשקט חזרה לחודש האחרון — כלומר מציג תקופה אחרת ממה שהתגית אומרת.
+    if (Array.isArray(allowedPresets)) {
+      const out = PRESET_LIST.filter(p => p.key && allowedPresets.includes(p.key))
+      return out.length ? out : PRESET_LIST
+    }
     if (showQuarters) return PRESET_LIST
     const QUARTER_KEYS = ['q1', 'q2', 'q3', 'q4']
     const out = []
@@ -502,7 +509,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                     }}
                   >{p.label}</button>
                 ))}
-                <button
+                {!Array.isArray(allowedPresets) && <button
                   key="custom"
                   type="button"
                   onClick={() => selectPreset('custom')}
@@ -515,7 +522,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
                     textAlign: 'center', gridColumn: 'span 3',
                     fontFamily: 'var(--font)',
                   }}
-                >טווח מותאם אישית</button>
+                >טווח מותאם אישית</button>}
               </div>
 
               {/* Single calendar */}
