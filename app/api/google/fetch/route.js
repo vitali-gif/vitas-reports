@@ -482,46 +482,6 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
-  if (new URL(request.url).searchParams.get('customerids') === '1') {
-    const merged = [...new Set([...(process.env.GOOGLE_ADS_CUSTOMER_ID || '').split(','), ...(process.env.GOOGLE_ADS_CUSTOMER_IDS || '').split(',')].map(x => x.trim()).filter(Boolean))]
-    return Response.json({ GOOGLE_ADS_CUSTOMER_ID: process.env.GOOGLE_ADS_CUSTOMER_ID || null, GOOGLE_ADS_CUSTOMER_IDS: process.env.GOOGLE_ADS_CUSTOMER_IDS || null, effective_merged: merged })
-  }
-  const _gsp = new URL(request.url).searchParams
-  if (_gsp.get('synckloss') === '1' || _gsp.get('klossfb') === '1') {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } })
-    const { data: projects } = await supabase.from('projects').select('id,name')
-    const kp = (projects || []).find(p => (p.name || '').toLowerCase().includes('kloss'))
-    if (!kp) return Response.json({ error: 'no KLOSS project' }, { status: 404 })
-    if (_gsp.get('synckloss') === '1') { const { body: rb } = await runSync({ projectId: kp.id }); return Response.json({ triggered: true, result: rb }) }
-    const { data: reps } = await supabase.from('reports').select('month,summary').eq('project_id', kp.id).eq('source', 'google').order('month', { ascending: false }).limit(3)
-    return Response.json({ googleReports: (reps || []).map(r => ({ month: r.month, spend: r.summary && r.summary.spend, leads: r.summary && r.summary.leads, byAgency: r.summary && r.summary.byAgency })) })
-  }
-  const _campCust = new URL(request.url).searchParams.get('gcampaigns')
-  if (_campCust) {
-    try {
-      const token = await getAccessToken()
-      const id = _campCust.trim().replace(/-/g, '')
-      const rows = await gaqlSearch(token, id, "SELECT campaign.name, campaign.status FROM campaign ORDER BY campaign.name")
-      const names = rows.map(r => ({ name: r.campaign && r.campaign.name, status: r.campaign && r.campaign.status }))
-      const kloss = names.filter(n => /kloss|קלוס/i.test(n.name || '')).length
-      return Response.json({ customer: id, count: names.length, klossMatches: kloss, campaigns: names.slice(0, 120) })
-    } catch (e) { return Response.json({ ok: false, error: String(e.message || e).slice(0, 400) }, { status: 500 }) }
-  }
-  const _testCust = new URL(request.url).searchParams.get('testcust')
-  if (_testCust) {
-    const out = {}
-    try {
-      const token = await getAccessToken()
-      for (const id of _testCust.split(',').map(x => x.trim().replace(/-/g, '')).filter(Boolean)) {
-        try {
-          const rows = await gaqlSearch(token, id, 'SELECT customer.id, customer.descriptive_name, customer.currency_code FROM customer')
-          const c = rows[0] && rows[0].customer
-          out[id] = { ok: true, name: c && c.descriptiveName, currency: c && c.currencyCode }
-        } catch (e) { out[id] = { ok: false, error: String(e.message || e).slice(0, 300) } }
-      }
-    } catch (e) { return Response.json({ ok: false, error: 'token: ' + String(e.message || e) }, { status: 500 }) }
-    return Response.json({ loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID, results: out })
-  }
   // Health check: verify we can get an access token
   try {
     const token = await getAccessToken()
