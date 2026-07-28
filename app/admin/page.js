@@ -3265,17 +3265,19 @@ const selectProject = async (client, project) => {
               {(() => {
                 const _rz = _td.resp || [], _rm = _td.respMeet || []
                 const _cd = _tRespLabels.map((lb, i) => { const L = _rz[i]||0, M = _rm[i]||0; return { lb, L, M, pc: L>0?Math.round(M/L*100):0 } })
-                const _best = Math.max(0, ..._cd.map(c => c.pc))
+                const _MINS = 10
+                const _eligible = _cd.filter(c => c.L >= _MINS)
+                const _best = _eligible.length ? Math.max(..._eligible.map(c => c.pc)) : -1
                 const _col = (pc) => pc>=30 ? {c:'#0f9d58',bg:'#e1f5ee'} : pc>=20 ? {c:'#b45309',bg:'#fef3c7'} : {c:'#dc2626',bg:'#fee2e2'}
                 return (
                   <div className="section">
                     <div className="section-head">{ICO('rose', "M12 6v6l4 2")}<h2>זמן טיפול בליד ← תיאום פגישה</h2><span className="sub">{(_td.respMeasured?formatNum(_td.respMeasured)+' לידים · ':'')}שעות פעילות בלבד · טיפול מהיר יותר = יותר תיאומים</span></div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}}>
-                      {_cd.map(c => { const cc = _col(c.pc); const best = c.pc === _best && _best > 0; return (
-                        <div key={c.lb} style={{background:'var(--surface-2, #fff)',border: best ? '2px solid '+cc.c : '1px solid var(--border)',borderRadius:14,padding:'14px 16px'}}>
+                      {_cd.map(c => { const small = c.L < _MINS; const cc = small ? {c:'#94a3b8',bg:'#f1f5f9'} : _col(c.pc); const best = !small && c.pc === _best && _best >= 0; return (
+                        <div key={c.lb} style={{background:'var(--surface-2, #fff)',border: best ? '2px solid '+cc.c : '1px solid var(--border)',borderRadius:14,padding:'14px 16px',opacity: small ? 0.7 : 1}}>
                           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                             <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>{c.lb}</span>
-                            {best ? <span style={{fontSize:10,fontWeight:700,color:cc.c,background:cc.bg,padding:'2px 8px',borderRadius:20}}>הכי גבוה</span> : null}
+                            {best ? <span style={{fontSize:10,fontWeight:700,color:cc.c,background:cc.bg,padding:'2px 8px',borderRadius:20}}>הכי גבוה</span> : (small ? <span style={{fontSize:10,fontWeight:600,color:'#94a3b8',background:'#f1f5f9',padding:'2px 8px',borderRadius:20}}>מדגם קטן</span> : null)}
                           </div>
                           <div style={{display:'flex',alignItems:'baseline',gap:6}}>
                             <span style={{fontSize:30,fontWeight:700,color:cc.c,lineHeight:1}}>{c.pc}%</span>
