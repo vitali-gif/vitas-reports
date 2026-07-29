@@ -211,6 +211,7 @@ async function runSync(opts = {}) {
     adSet: r.adGroup?.name || '',
     adSetStatus: r.adGroup?.status || '',
     adName: r.adGroupAd?.ad?.name || (r.adGroupAd?.ad?.id ? `Ad ${r.adGroupAd.ad.id}` : ''),
+    adId: r.adGroupAd?.ad?.id ? String(r.adGroupAd.ad.id) : '',
     adStatus: r.adGroupAd?.status || '',
     adText: extractAdText(r.adGroupAd?.ad),
     gender: '',

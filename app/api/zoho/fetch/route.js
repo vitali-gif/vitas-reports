@@ -221,7 +221,7 @@ async function runSync(opts = {}) {
     'Lead_Status', 'Lead_Source', 'Sub_Lead_Source', 'Created_Time',
     'timeOfLastCall', 'sumCalls', 'sumAnswerCalls',
     'field9', 'field20', 'segment', 'Owner', 'City1',
-    'UTM_Campaign',
+    'UTM_Campaign', 'UTM_Term', 'UTM_Content',
   ].join(',')
 
   const leadCriteria =
@@ -371,31 +371,58 @@ async function runSync(opts = {}) {
       else c.netRevenue += num(d.Amount || 0)
     }
   }
-  // ===== Per-channel campaign breakdown (CRM-side, grouped by normalized UTM_Campaign) =====
-  const campAgg = {}
-  const NO_CAMP = '(ללא קמפיין)'
-  const ensureCamp = (ch, cmp) => { const k = ch + '||' + cmp; return campAgg[k] || (campAgg[k] = { channel: ch, campaign: cmp, leads: 0, purchased: 0, cancellations: 0, netRevenue: 0, _oppLeads: new Set() }) }
-  for (const l of leads) ensureCamp(normChan(l), normUtm(l.UTM_Campaign) || NO_CAMP).leads++
+  // ===== 4-level drill: channel -> campaign(UTM_Campaign) -> adset(UTM_Term) -> ad(UTM_Content) =====
+  // normUtm strips the 'Geek-' prefix + bidi chars from every UTM field. For Google, UTM_Term is
+  // the search keyword and UTM_Content is the numeric ad-id (resolved to a name in the UI).
+  const NO_CAMP = '(ללא קמפיין)', NO_AST = '(ללא adset)', NO_AD = '(ללא מודעה)'
+  const _mkNode = () => ({ leads: 0, purchased: 0, cancellations: 0, netRevenue: 0, _opp: new Set(), children: {} })
+  const _root = {}
+  const _descend = (parts) => {
+    const out = []
+    let level = _root
+    for (const p of parts) {
+      level[p] = level[p] || _mkNode()
+      out.push(level[p])
+      level = level[p].children
+    }
+    return out
+  }
+  const _partsOf = (l) => [normChan(l), normUtm(l.UTM_Campaign) || NO_CAMP, normUtm(l.UTM_Term) || NO_AST, normUtm(l.UTM_Content) || NO_AD]
+  for (const l of leads) { for (const n of _descend(_partsOf(l))) n.leads++ }
   for (const d of linkedDeals) {
     const l = leadById[d.LidID]; if (!l) continue
-    const e = ensureCamp(normChan(l), normUtm(l.UTM_Campaign) || NO_CAMP)
-    e._oppLeads.add(d.LidID)
-    if (d.Closing_Date) {
-      e.purchased++
-      if (d.cancellation_date) e.cancellations++
-      else e.netRevenue += num(d.Amount || 0)
+    const nodes = _descend(_partsOf(l))
+    const buy = !!d.Closing_Date, cancelled = !!d.cancellation_date, amt = num(d.Amount || 0)
+    for (const n of nodes) {
+      n._opp.add(d.LidID)
+      if (buy) { n.purchased++; if (cancelled) n.cancellations++; else n.netRevenue += amt }
     }
   }
+  const _fmt = (node, labelKey, label, childKey, childArr) => ({
+    [labelKey]: label, leads: node.leads, opportunities: node._opp.size, purchased: node.purchased,
+    cancellations: node.cancellations, netRevenue: Math.round(node.netRevenue),
+    conversionRate: node.leads > 0 ? Math.round((node.purchased / node.leads) * 1000) / 10 : 0,
+    ...(childKey ? { [childKey]: childArr } : {}),
+  })
   const campsByChannel = {}
-  for (const k in campAgg) {
-    const e = campAgg[k]
-    ;(campsByChannel[e.channel] || (campsByChannel[e.channel] = [])).push({
-      campaign: e.campaign, leads: e.leads, opportunities: e._oppLeads.size, purchased: e.purchased,
-      cancellations: e.cancellations, netRevenue: Math.round(e.netRevenue),
-      conversionRate: e.leads > 0 ? Math.round((e.purchased / e.leads) * 1000) / 10 : 0,
-    })
+  for (const ch in _root) {
+    const camps = []
+    for (const cmpName in _root[ch].children) {
+      const cmpNode = _root[ch].children[cmpName]
+      const adSets = []
+      for (const astName in cmpNode.children) {
+        const astNode = cmpNode.children[astName]
+        const ads = []
+        for (const adName in astNode.children) ads.push(_fmt(astNode.children[adName], 'ad', adName))
+        ads.sort((a, b) => b.leads - a.leads)
+        adSets.push(_fmt(astNode, 'adset', astName, 'ads', ads))
+      }
+      adSets.sort((a, b) => b.leads - a.leads)
+      camps.push(_fmt(cmpNode, 'campaign', cmpName, 'adSets', adSets))
+    }
+    camps.sort((a, b) => b.leads - a.leads)
+    campsByChannel[ch] = camps
   }
-  for (const ch in campsByChannel) campsByChannel[ch].sort((a, b) => b.leads - a.leads)
 
   // ===== Per-agent performance (Owner), with per-source breakdown =====
   const _agentName = (l) => (l && (typeof l.Owner === 'object' ? (l.Owner && l.Owner.name) : l.Owner)) || 'לא ידוע'
