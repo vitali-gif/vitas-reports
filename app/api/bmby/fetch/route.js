@@ -224,6 +224,23 @@ function bucketSource(raw) {
   return s // return the raw value as its own bucket
 }
 
+// BMBY living_status (English) → Hebrew label for the "מצב דיור" distribution (HI PARK).
+const LIVING_STATUS_HE = {
+  'Upgrading': 'משפר דיור',
+  'Downgrading': 'מקטין דיור',
+  'No home': 'חסר דיור',
+  'Local Investor': 'משקיע מקומי',
+  'Non-resident Investor': 'משקיע תושב חוץ',
+  'Purchase for children': 'רכישה לילדים',
+  'Purchase for relatives': 'רכישה לקרובים',
+  'Contractor Initiated': 'יזום קבלן',
+}
+function translateLivingStatus(raw) {
+  const s = (raw || '').toString().trim()
+  if (!s) return ''
+  return LIVING_STATUS_HE[s] || s
+}
+
 // ===== main sync logic =====
 
 async function runSync(opts = {}) {
@@ -317,27 +334,6 @@ async function runSync(opts = {}) {
 
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
-      if (opts.findName) {
-        const needle = String(opts.findName)
-        const hit = clients.filter(c => {
-          const blob = [c.fname,c.lname,c.name,c.fname2,c.fullname,c.title].map(x=>(x||'').toString()).join(' ')
-          return blob.includes(needle)
-        }).slice(0,5)
-        const trimmed = hit.map(c => Object.fromEntries(Object.entries(c).filter(([k,v])=>String(v).trim())))
-        return { project: p.name, findName: needle, totalClients: clients.length, matches: trimmed.length, rows: trimmed }
-      }
-      if (opts.fieldScan) {
-        const dist = (key) => { const o={}; for (const c of clients){ const v=(c[key]||'').toString().trim()||'(empty)'; o[v]=(o[v]||0)+1 } return Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,25) }
-        const keyCov = {}; for (const c of clients){ for (const k of Object.keys(c)){ const v=(c[k]||'').toString().trim(); if(v){ keyCov[k]=(keyCov[k]||0)+1 } } }
-        const topKeys = Object.entries(keyCov).sort((a,b)=>b[1]-a[1])
-        return { project: p.name, fieldScan: true, totalClients: clients.length,
-          living_status: dist('living_status'), appartment_type: dist('appartment_type'),
-          model_name: dist('model_name'), property_city: dist('property_city'),
-          min_rooms: dist('min_rooms'), max_rooms: dist('max_rooms'),
-          title: dist('title'), value: dist('value'), objection: dist('objection'),
-          sampleRows: clients.filter(c => (c.title||c.value||c.living_status)).slice(0,3),
-          keyCoverage: topKeys }
-      }
       const _dist = {}, _stageXstatus = {}
       for (const c of clients) {
         const st = String(c.client_stage || '(empty)')
@@ -492,6 +488,8 @@ async function runSync(opts = {}) {
     const clientCity = new Map()       // for "התפלגות לפי יישוב"
     const clientAddress = new Map()
     const clientObjection = new Map()  // for "התנגדויות"
+    const clientLivingStatus = new Map()  // for "מצב דיור" (HI PARK) — translated living_status
+    const clientPropertyType = new Map()  // for "סוג נכס" (HI PARK) — value where title=='סוג נכס'
     for (const c of clients) {
       if (!c.client_id) continue
       const cid = String(c.client_id)
@@ -505,6 +503,15 @@ async function runSync(opts = {}) {
       if (normAddr) clientAddress.set(cid, normAddr)
       const obj = (c.objection || '').toString().trim()
       if (obj) clientObjection.set(cid, obj)
+      const ls = translateLivingStatus(c.living_status)
+      if (ls) clientLivingStatus.set(cid, ls)
+      // Property type is stored as a title/value pair on the client row:
+      // title === 'סוג נכס' → value holds the type (e.g. 'דירת 4 חדרים', 'דופלקס', 'פנטהאוז').
+      // (title can also be 'שם מודעה' → value = ad name, so we must gate on title.)
+      if (String(c.title || '').trim() === 'סוג נכס') {
+        const pt = (c.value || '').toString().trim()
+        if (pt) clientPropertyType.set(cid, pt)
+      }
       // Collect client profile samples for debug
       if (clientProfileSamples.length < 10) {
         clientProfileSamples.push({
@@ -735,6 +742,8 @@ async function runSync(opts = {}) {
         objections: objection,
         lastMeeting,
         hasContract: contractClientSet.has(cid),
+        livingStatus: clientLivingStatus.get(cid) || '',
+        propertyType: clientPropertyType.get(cid) || '',
       })
     }
     // Add contract-only rows: clients who signed a contract this period but whose lead
@@ -1062,7 +1071,7 @@ async function runSync(opts = {}) {
     totals.meetingsCompleted = _apptByDate.completed
     totals.meetingsCancelled = _apptByDate.cancelled
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 14  // v14: hourlyContactStats + hourlyContactMeeting (contact-hour + meeting-conversion by hour)
+    const CRM_SCHEMA_VERSION = 15  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
@@ -1197,8 +1206,6 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
-      fieldScan: body.fieldScan,
-      findName: body.findName,
     })
     return Response.json(responseBody, { status })
   } catch (err) {

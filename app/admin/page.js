@@ -1088,6 +1088,23 @@ const selectProject = async (client, project) => {
     const cityNames = cityEntries.map(([n]) => n);
     const cityCounts = cityEntries.map(([, c]) => c[metricKey] || 0);
 
+    // HI PARK only: מצב דיור (living_status) + סוג נכס (property type) distributions.
+    // Each crmRepRow carries .livingStatus (already Hebrew) and .propertyType (may be a
+    // comma-separated multi-select, e.g. 'דירת 3 חדרים,דירת 4 חדרים' → split & count each).
+    const isHiPark = (selectedProject?.name || '').toUpperCase().includes('HI PARK');
+    const lsDist = {}, ptDist = {};
+    if (isHiPark) {
+      for (const row of allRows) {
+        if (row.contractOnly) continue;
+        const ls = (row.livingStatus || '').toString().trim();
+        if (ls) lsDist[ls] = (lsDist[ls] || 0) + 1;
+        const pt = (row.propertyType || '').toString().trim();
+        if (pt) for (const part of pt.split(',').map(x => x.trim()).filter(Boolean)) ptDist[part] = (ptDist[part] || 0) + 1;
+      }
+    }
+    const lsEntries = Object.entries(lsDist).sort((a, b) => b[1] - a[1]);
+    const ptEntries = Object.entries(ptDist).sort((a, b) => b[1] - a[1]).slice(0, 12);
+
     pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
       if (cityNames.length > 0) {
@@ -1100,6 +1117,16 @@ const selectProject = async (client, project) => {
           indexAxis: 'y',
         });
       }
+      if (isHiPark && lsEntries.length > 0) {
+        createChart('crmLivingStatusChart', 'doughnut', lsEntries.map(e => e[0]), [{
+          data: lsEntries.map(e => e[1]), backgroundColor: COLORS.slice(0, lsEntries.length),
+        }]);
+      }
+      if (isHiPark && ptEntries.length > 0) {
+        createChart('crmPropertyTypeChart', 'doughnut', ptEntries.map(e => e[0]), [{
+          data: ptEntries.map(e => e[1]), backgroundColor: COLORS.slice(0, ptEntries.length),
+        }]);
+      }
     }, 200));
 
     if (cityEntries.length === 0) {
@@ -1107,6 +1134,7 @@ const selectProject = async (client, project) => {
     }
 
     return (
+      <>
       <div className="section">
         <div className="section-head">
           <div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
@@ -1140,8 +1168,59 @@ const selectProject = async (client, project) => {
           </div>
         </div>
       </div>
+      {isHiPark && lsEntries.length > 0 && (
+        <div className="section">
+          <div className="section-head">
+            <div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+            <h2>מצב דיור</h2>
+            <span className="sub">לפי לידים</span>
+          </div>
+          <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
+            <div className="chart-card"><div className="chart-container" style={{height: 360}}><canvas id="crmLivingStatusChart"></canvas></div></div>
+            <div className="chart-card" style={{padding: '20px'}}>
+              <ol style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '15px'}}>
+                {lsEntries.map(([name, count], i) => (
+                  <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',borderBottom: i < lsEntries.length-1 ? '1px solid var(--border)' : 'none'}}>
+                    <span style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                      <span style={{display:'inline-block',width:24,height:24,borderRadius:'50%',background:COLORS[i] || 'var(--accent)',color:'#fff',fontSize:12,fontWeight:700,textAlign:'center',lineHeight:'24px'}}>{i + 1}</span>
+                      <span style={{fontWeight: 600}}>{name}</span>
+                    </span>
+                    <span style={{color: 'var(--accent)', fontWeight: 700}}>{count}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </div>
+      )}
+      {isHiPark && ptEntries.length > 0 && (
+        <div className="section">
+          <div className="section-head">
+            <div className="ico rose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+            <h2>סוג נכס</h2>
+            <span className="sub">באיזו דירה מתעניינים</span>
+          </div>
+          <div className="chart-grid" style={{gridTemplateColumns: '2fr 1fr'}}>
+            <div className="chart-card"><div className="chart-container" style={{height: 360}}><canvas id="crmPropertyTypeChart"></canvas></div></div>
+            <div className="chart-card" style={{padding: '20px'}}>
+              <ol style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '15px'}}>
+                {ptEntries.map(([name, count], i) => (
+                  <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',borderBottom: i < ptEntries.length-1 ? '1px solid var(--border)' : 'none'}}>
+                    <span style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                      <span style={{display:'inline-block',width:24,height:24,borderRadius:'50%',background:COLORS[i] || 'var(--accent)',color:'#fff',fontSize:12,fontWeight:700,textAlign:'center',lineHeight:'24px'}}>{i + 1}</span>
+                      <span style={{fontWeight: 600}}>{name}</span>
+                    </span>
+                    <span style={{color: 'var(--accent)', fontWeight: 700}}>{count}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     );
-  }, [selectedMonth, reports, cityMetric, setCityMetric]);
+  }, [selectedMonth, reports, cityMetric, setCityMetric, selectedProject]);
 
   // ==================== CRM RESPONSE TIME SUB-TAB ====================
   const renderCrmResponseDashboard = useCallback(() => {
