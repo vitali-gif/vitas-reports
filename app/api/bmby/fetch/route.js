@@ -222,12 +222,15 @@ async function callBmbyServiceChunked(service, commonParams, maxPages) {
   if (!(spanDays > 45)) {
     return callBmbyGetAllJsonPaginated(service, commonParams, maxPages)
   }
+  // SEQUENTIAL, not parallel: firing all months at once (each up to 10 paged SOAP
+  // calls) overloads BMBY and returns HTTP 502. One month at a time stays well under
+  // the 120s budget and keeps BMBY happy.
   const wins = _monthWindows(since, until)
-  const parts = await Promise.all(wins.map(([a, b]) =>
-    callBmbyGetAllJsonPaginated(service, { ...commonParams, FromDate: a, ToDate: b, UniqID: 1, Dynamic: 1 }, maxPages)
-  ))
   const rows = []
-  for (const pt of parts) if (pt?.rows?.length) rows.push(...pt.rows)
+  for (const [a, b] of wins) {
+    const pt = await callBmbyGetAllJsonPaginated(service, { ...commonParams, FromDate: a, ToDate: b, UniqID: 1, Dynamic: 1 }, maxPages)
+    if (pt?.rows?.length) rows.push(...pt.rows)
+  }
   return { rows, foundRows: rows.length, lastUniqID: 0, chunked: wins.length }
 }
 
