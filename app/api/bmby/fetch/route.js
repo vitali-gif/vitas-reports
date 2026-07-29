@@ -206,50 +206,6 @@ async function callBmbyGetAllJsonPaginated(service, params, maxPages = 10) {
   }
 }
 
-// Split [since,until] into calendar-month windows (disjoint, inclusive).
-function _monthWindows(since, until) {
-  const out = []
-  let curStart = since
-  let guard = 0
-  while (curStart <= until && guard++ < 60) {
-    const [cy, cm] = curStart.split('-').map(Number)
-    const lastDay = new Date(cy, cm, 0).getDate()
-    let curEnd = `${cy}-${String(cm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-    if (curEnd > until) curEnd = until
-    out.push([curStart, curEnd])
-    const nm = cm === 12 ? 1 : cm + 1
-    const ny = cm === 12 ? cy + 1 : cy
-    curStart = `${ny}-${String(nm).padStart(2, '0')}-01`
-  }
-  return out
-}
-
-// Fetch a BMBY service that IS date-bound (e.g. `tasks`, the LIDs/leads source).
-// For long ranges (quarters) a single 3-month SOAP call for `tasks` reliably times
-// out at 120s and returns 0 rows -> the integrity guard then flags the whole report
-// broken and skips the write, leaving quarterly reports stale. We split long ranges
-// into per-month windows (each known to succeed) and run them in parallel, so total
-// time is ~the slowest single month, not the sum. Windows are disjoint -> no dupes.
-// NOTE: only use for date-bound services. `clients` ignores the range (returns ALL
-// clients) so chunking it would triple-count -> never chunk clients here.
-async function callBmbyServiceChunked(service, commonParams, maxPages) {
-  const since = commonParams.FromDate, until = commonParams.ToDate
-  const spanDays = Math.round((new Date(until) - new Date(since)) / 86400000)
-  if (!(spanDays > 45)) {
-    return callBmbyGetAllJsonPaginated(service, commonParams, maxPages)
-  }
-  // SEQUENTIAL, not parallel: firing all months at once (each up to 10 paged SOAP
-  // calls) overloads BMBY and returns HTTP 502. One month at a time stays well under
-  // the 120s budget and keeps BMBY happy.
-  const wins = _monthWindows(since, until)
-  const rows = []
-  for (const [a, b] of wins) {
-    const pt = await callBmbyGetAllJsonPaginated(service, { ...commonParams, FromDate: a, ToDate: b, UniqID: 1, Dynamic: 1 }, maxPages)
-    if (pt?.rows?.length) rows.push(...pt.rows)
-  }
-  return { rows, foundRows: rows.length, lastUniqID: 0, chunked: wins.length }
-}
-
 // ===== source detection =====
 // Map a raw BMBY source/entry-channel string to a canonical bucket used in the dashboard.
 const SOURCE_BUCKETS = [
@@ -348,7 +304,7 @@ async function runSync(opts = {}) {
     const _apptDump = !!opts.apptDump  // fast: clients+tasks only, dump raw appointment rows
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
       withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4), 120000, 'clients'),
-      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyServiceChunked('tasks',        commonParams, 10), 240000, 'tasks'),  // long ranges chunk+retry sequentially → allow more time (maxDuration=300)
+      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 10), 120000, 'tasks'),
       (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 120000, 'price_offers'),
       (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 120000, 'contracts'),
     ])
