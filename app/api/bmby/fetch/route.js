@@ -1185,6 +1185,7 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
+      fieldScan: body.fieldScan,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
