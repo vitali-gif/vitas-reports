@@ -317,6 +317,15 @@ async function runSync(opts = {}) {
 
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
+      if (opts.findName) {
+        const needle = String(opts.findName)
+        const hit = clients.filter(c => {
+          const blob = [c.fname,c.lname,c.name,c.fname2,c.fullname,c.title].map(x=>(x||'').toString()).join(' ')
+          return blob.includes(needle)
+        }).slice(0,5)
+        const trimmed = hit.map(c => Object.fromEntries(Object.entries(c).filter(([k,v])=>String(v).trim())))
+        return { project: p.name, findName: needle, totalClients: clients.length, matches: trimmed.length, rows: trimmed }
+      }
       if (opts.fieldScan) {
         const dist = (key) => { const o={}; for (const c of clients){ const v=(c[key]||'').toString().trim()||'(empty)'; o[v]=(o[v]||0)+1 } return Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,25) }
         const keyCov = {}; for (const c of clients){ for (const k of Object.keys(c)){ const v=(c[k]||'').toString().trim(); if(v){ keyCov[k]=(keyCov[k]||0)+1 } } }
@@ -1189,6 +1198,7 @@ export async function POST(request) {
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
       fieldScan: body.fieldScan,
+      findName: body.findName,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
