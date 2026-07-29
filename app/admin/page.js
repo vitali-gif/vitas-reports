@@ -168,6 +168,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
   const [expandedCrmSources, setExpandedCrmSources] = useState(new Set());
   const [expandedFunnelCh, setExpandedFunnelCh] = useState(new Set());
+  const [expandedFunnelCamp, setExpandedFunnelCamp] = useState(new Set());
+  const [expandedFunnelAst, setExpandedFunnelAst] = useState(new Set());
   const [sfInfo, setSfInfo] = useState(null);
   const [sfTab, setSfTab] = useState('network');
   const [sfBranchLens, setSfBranchLens] = useState('cohort');
@@ -3475,6 +3477,11 @@ const selectProject = async (client, project) => {
             const _fn = _zs.funnel || {}
             const _ch = _fn.byChannel || []
             const toggleFunnelCh = (ch) => setExpandedFunnelCh(prev => { const n = new Set(prev); if (n.has(ch)) n.delete(ch); else n.add(ch); return n; })
+    const toggleFunnelCamp = (k) => setExpandedFunnelCamp(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; })
+    const toggleFunnelAst = (k) => setExpandedFunnelAst(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; })
+    const _gAdIdName = {}
+    reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google')).forEach(r => { (r.data || []).forEach(row => { if (row && row.adId && row.adName) _gAdIdName[String(row.adId)] = row.adName }) })
+    const _resolveAd = (channel, label) => (/google|גוגל/i.test(channel || '') && _gAdIdName[label]) ? _gAdIdName[label] : label
             const _agents = _zs.agentPerformance || []
             const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
             const _byStatus = Object.entries(_zs.byStatus || {}).sort((a,b) => b[1]-a[1])
@@ -3536,28 +3543,58 @@ const selectProject = async (client, project) => {
                 </div>
                 <div className="section">
                   <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2></div>
-                  <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:10,textAlign:'right'}}>💡 לחץ על ערוץ כדי לראות אילו קמפיינים הביאו לידים והמרות</div>
+                  <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:10,textAlign:'right'}}>💡 לחץ על ערוץ ← קמפיין ← adset ← מודעה כדי לצלול פנימה</div>
                   <div className="table-wrapper">
                     <table className="data-table">
                       <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th></tr></thead>
                       <tbody>
-                        {_ch.flatMap(c => {
-                          const camps = c.campaigns || [];
-                          const isOpen = expandedFunnelCh.has(c.channel);
-                          const rows = [
-                            <tr key={c.channel} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
-                              <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{camps.length ? (isOpen ? '\u25bc' : '\u25c0') : ''}</span>{c.channel}</td>
-                              <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>
-                            </tr>
-                          ];
-                          if (isOpen) camps.forEach(cm => rows.push(
-                            <tr key={c.channel+'|'+cm.campaign} style={{background:'rgba(59,130,246,0.05)'}}>
-                              <td style={{paddingRight:30,fontSize:'0.9em',unicodeBidi:'plaintext',textAlign:'right'}}>{cm.campaign}</td>
-                              <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>
-                            </tr>
-                          ));
-                          return rows;
-                        })}
+                        {(() => {
+                          const out = [];
+                          _ch.forEach(c => {
+                            const camps = c.campaigns || [];
+                            const chOpen = expandedFunnelCh.has(c.channel);
+                            out.push(
+                              <tr key={c.channel} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
+                                <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{camps.length ? (chOpen ? '▼' : '◀') : ''}</span>{c.channel}</td>
+                                <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>
+                              </tr>
+                            );
+                            if (!chOpen) return;
+                            camps.forEach(cm => {
+                              const campKey = c.channel + '|' + cm.campaign;
+                              const adSets = cm.adSets || [];
+                              const cmOpen = expandedFunnelCamp.has(campKey);
+                              out.push(
+                                <tr key={campKey} style={{background:'rgba(59,130,246,0.05)', cursor: adSets.length ? 'pointer' : 'default'}} onClick={adSets.length ? () => toggleFunnelCamp(campKey) : undefined}>
+                                  <td style={{paddingRight:24,fontSize:'0.9em',unicodeBidi:'plaintext',textAlign:'right'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{adSets.length ? (cmOpen ? '▼' : '◀') : ''}</span>{cm.campaign}</td>
+                                  <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>
+                                </tr>
+                              );
+                              if (!cmOpen) return;
+                              adSets.forEach(as => {
+                                const astKey = campKey + '|' + as.adset;
+                                const ads = as.ads || [];
+                                const asOpen = expandedFunnelAst.has(astKey);
+                                out.push(
+                                  <tr key={astKey} style={{background:'rgba(59,130,246,0.09)', cursor: ads.length ? 'pointer' : 'default'}} onClick={ads.length ? () => toggleFunnelAst(astKey) : undefined}>
+                                    <td style={{paddingRight:44,fontSize:'0.85em',unicodeBidi:'plaintext',textAlign:'right',color:'#475569'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{ads.length ? (asOpen ? '▼' : '◀') : ''}</span>{as.adset}</td>
+                                    <td style={{fontSize:'0.85em'}}>{formatNum(as.leads)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.opportunities)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.purchased)}</td><td style={{fontSize:'0.85em',color:'var(--violet)'}}>{(as.conversionRate||0)+'%'}</td><td style={{fontSize:'0.85em'}}>{formatCurrency(as.netRevenue||0)}</td>
+                                  </tr>
+                                );
+                                if (!asOpen) return;
+                                ads.forEach(ad => {
+                                  out.push(
+                                    <tr key={astKey+'|'+ad.ad} style={{background:'rgba(59,130,246,0.13)'}}>
+                                      <td style={{paddingRight:62,fontSize:'0.8em',unicodeBidi:'plaintext',textAlign:'right',color:'#64748b'}}>{_resolveAd(c.channel, ad.ad)}</td>
+                                      <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>
+                                    </tr>
+                                  );
+                                });
+                              });
+                            });
+                          });
+                          return out;
+                        })()}
                       </tbody>
                       <tfoot>
                         <tr style={{fontWeight:700, borderTop:'2px solid rgba(99,102,241,0.35)', background:'rgba(99,102,241,0.06)'}}>
@@ -4306,7 +4343,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
