@@ -324,7 +324,10 @@ async function runSync(opts = {}) {
         return { project: p.name, fieldScan: true, totalClients: clients.length,
           living_status: dist('living_status'), appartment_type: dist('appartment_type'),
           model_name: dist('model_name'), property_city: dist('property_city'),
-          min_rooms: dist('min_rooms'), max_rooms: dist('max_rooms'), keyCoverage: topKeys }
+          min_rooms: dist('min_rooms'), max_rooms: dist('max_rooms'),
+          title: dist('title'), value: dist('value'), objection: dist('objection'),
+          sampleRows: clients.filter(c => (c.title||c.value||c.living_status)).slice(0,3),
+          keyCoverage: topKeys }
       }
       const _dist = {}, _stageXstatus = {}
       for (const c of clients) {
