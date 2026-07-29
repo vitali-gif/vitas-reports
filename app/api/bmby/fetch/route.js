@@ -316,6 +316,16 @@ async function runSync(opts = {}) {
     const contracts = safeRows(contractsR)
 
     if (_stagesOnly) {
+      // TEMP field-scan diagnostic (design living_status/property-type feature)
+      if (opts.fieldScan) {
+        const dist = (key) => { const o={}; for (const c of clients){ const v=(c[key]||'').toString().trim()||'(empty)'; o[v]=(o[v]||0)+1 } return Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,25) }
+        const keyCov = {}; for (const c of clients){ for (const k of Object.keys(c)){ const v=(c[k]||'').toString().trim(); if(v){ keyCov[k]=(keyCov[k]||0)+1 } } }
+        const topKeys = Object.entries(keyCov).sort((a,b)=>b[1]-a[1])
+        return { project: p.name, fieldScan: true, totalClients: clients.length,
+          living_status: dist('living_status'), appartment_type: dist('appartment_type'),
+          model_name: dist('model_name'), property_city: dist('property_city'),
+          min_rooms: dist('min_rooms'), max_rooms: dist('max_rooms'), keyCoverage: topKeys }
+      }
       const _dist = {}, _stageXstatus = {}
       for (const c of clients) {
         const st = String(c.client_stage || '(empty)')
