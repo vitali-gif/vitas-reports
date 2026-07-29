@@ -3348,7 +3348,41 @@ const selectProject = async (client, project) => {
               {_tBar('כניסת לידים לפי שעה', 'שעון ישראל', ['amber', "M12 6v6l4 2"], _hourItems(_td.leadHour), '#f59e0b', { highlightMax: true, takeaway: 'השעה החמה', tight: true })}
               <h3 style={{margin:'14px 4px 2px',fontSize:15,color:'#0f172a'}}>פגישות</h3>
               {_tBar('יום תיאום הפגישה', 'מתי הנציגים קובעים פגישות (פעולת התיאום)', ['violet', "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"], _dayItems(_td.bookDay), '#7c6cf5', { highlightMax: true, takeaway: 'היום שמתאמים בו הכי הרבה' })}
-              {_tBar('היום המבוקש לפגישה', 'באיזה יום הלקוחות רוצים להגיע', ['emerald', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"], _dayItems(_td.mtgDay), '#10b981', { highlightMax: true, takeaway: 'היום המבוקש' })}
+              {(() => {
+                const _md = _td.mtgDay || [], _mp = _td.mtgDayPaid || []
+                const _mmax = Math.max(1, ..._md)
+                const _cv = _tdays.map((d, i) => ({ d, m: _md[i]||0, p: _mp[i]||0, pc: (_md[i]||0)>0 ? Math.round((_mp[i]||0)/(_md[i]||0)*100) : 0 }))
+                const _peakBuy = _cv.reduce((mx, c) => c.p > mx ? c.p : mx, 0)
+                const _peakConv = Math.max(0, ..._cv.filter(c => c.m >= 5).map(c => c.pc))
+                return (
+                  <div className="section">
+                    <div className="section-head">{ICO('emerald', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z")}<h2>היום המבוקש לפגישה ← עסקה</h2><span className="sub">ביקוש לפגישה, כמה רכשו, ואחוז המרה לעסקה — לכל יום</span></div>
+                    <div style={{display:'flex',gap:16,fontSize:12,margin:'0 2px 10px',color:'#475569',flexWrap:'wrap'}}>
+                      <span><span style={{display:'inline-block',width:10,height:10,background:'#3b82f6',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>פגישות</span>
+                      <span><span style={{display:'inline-block',width:10,height:10,background:'#10b981',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>עסקאות</span>
+                      <span style={{color:'#7c6cf5'}}>המספר למטה = % המרה לעסקה</span>
+                    </div>
+                    <div style={{display:'flex',alignItems:'flex-end',gap:14,overflowX:'auto',paddingBottom:4,minHeight:170}}>
+                      {_cv.map(c => (
+                        <div key={c.d} style={{flex:'1 0 auto',minWidth:80,textAlign:'center'}}>
+                          <div style={{display:'flex',alignItems:'flex-end',justifyContent:'center',gap:6,height:120}}>
+                            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
+                              <span style={{fontSize:11,fontWeight:600,color:'#334155',marginBottom:2}}>{formatNum(c.m)}</span>
+                              <div style={{width:22,height:Math.round(c.m/_mmax*106)+3,background:'#3b82f6',borderRadius:'4px 4px 0 0'}}></div>
+                            </div>
+                            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
+                              <span style={{fontSize:11,fontWeight:600,color:'#059669',marginBottom:2}}>{formatNum(c.p)}</span>
+                              <div style={{width:22,height:Math.round(c.p/_mmax*106)+3,background:'#10b981',borderRadius:'4px 4px 0 0'}}></div>
+                            </div>
+                          </div>
+                          <div style={{borderTop:'2px solid #e2e8f0',marginTop:6,paddingTop:6,fontSize:12,fontWeight:600,color:c.p===_peakBuy&&_peakBuy>0?'#059669':'#0f172a'}}>{c.d}</div>
+                          <div style={{fontSize:13,fontWeight:700,color:(c.m>=5&&c.pc===_peakConv&&_peakConv>0)?'#7c6cf5':'#94a3b8'}}>{c.pc}%</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
               <h3 style={{margin:'14px 4px 2px',fontSize:15,color:'#0f172a'}}>המרה וזמן טיפול</h3>
               {_tBar('אחוז המרה לתיאום פגישה לפי שעת מגע ראשון', 'מתוך הלידים שטופלו בשעה זו — לכמה נקבעה פגישה', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true })}
               {(() => {

@@ -467,15 +467,16 @@ async function runSync(opts = {}) {
 
   // ===== timing analytics (network + per-branch) =====
   const RESP_LABELS = ['תוך שעה', '1-4ש׳', '4-12ש׳', '12-24ש׳', '24-48ש׳', '48ש׳+']
-  const mkT = () => ({ leadDay: Array(7).fill(0), leadHour: Array(24).fill(0), mtgDay: Array(7).fill(0), bookDay: Array(7).fill(0) })
+  const mkT = () => ({ leadDay: Array(7).fill(0), leadHour: Array(24).fill(0), mtgDay: Array(7).fill(0), mtgDayPaid: Array(7).fill(0), bookDay: Array(7).fill(0) })
   const T = { 'הכל': mkT() }
   const getT = (b) => T[b] || (T[b] = mkT())
   let timingErr = null
   try {
-    const [leadGridR, mtgDayBrR, bookDayR] = await Promise.all([
+    const [leadGridR, mtgDayBrR, bookDayR, mtgDayPaidR] = await Promise.all([
       soql(auth, `SELECT Branch_Name__c b, DAY_IN_WEEK(CreatedDate) d, HOUR_IN_DAY(CreatedDate) h, COUNT(Id) c FROM Lead WHERE ${LW} GROUP BY Branch_Name__c, DAY_IN_WEEK(CreatedDate), HOUR_IN_DAY(CreatedDate)`, 6),
       soql(auth, `SELECT Branch_Name__c b, DAY_IN_WEEK(meetingDate__c) d, COUNT(Id) c FROM Lead WHERE ${LW} AND meetingDate__c!=null GROUP BY Branch_Name__c, DAY_IN_WEEK(meetingDate__c)`, 4),
       soql(auth, `SELECT Lead.Branch_Name__c b, DAY_IN_WEEK(CreatedDate) d, COUNT(Id) c FROM LeadHistory WHERE Field='meetingDate__c' AND Lead.Chain_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO} GROUP BY Lead.Branch_Name__c, DAY_IN_WEEK(CreatedDate)`, 6),
+      soql(auth, `SELECT Branch_Name__c b, DAY_IN_WEEK(meetingDate__c) d, COUNT(Id) c FROM Lead WHERE ${LW} AND meetingDate__c!=null AND IsConverted=true AND ConvertedOpportunity.StageName='${STAGE_PAID}' GROUP BY Branch_Name__c, DAY_IN_WEEK(meetingDate__c)`, 4),
     ])
     for (const r of (leadGridR || [])) {
       const h = Number(r.h) || 0, d = Number(r.d) || 1, c = r.c
@@ -485,6 +486,7 @@ async function runSync(opts = {}) {
     }
     for (const r of (mtgDayBrR || [])) { const i = (Number(r.d) || 1) - 1; for (const key of [bkey(r.b), 'הכל']) getT(key).mtgDay[i] += r.c }
     for (const r of (bookDayR || [])) { const i = (Number(r.d) || 1) - 1; for (const key of [bkey(r.b), 'הכל']) getT(key).bookDay[i] += r.c }
+    for (const r of (mtgDayPaidR || [])) { const i = (Number(r.d) || 1) - 1; for (const key of [bkey(r.b), 'הכל']) getT(key).mtgDayPaid[i] += r.c }
   } catch (e) { timingErr = e.message }
   const timingData = {}
   for (const [b, t] of Object.entries(T)) {
@@ -493,7 +495,7 @@ async function runSync(opts = {}) {
     for (let uh = 0; uh < 24; uh++) { const lh = ((uh + OFF) % 24 + 24) % 24; clLeads[lh] += cc.leads[uh]; clMeet[lh] += cc.meetings[uh] }
     const conv = clLeads.map((n, i) => n > 0 ? Math.round(clMeet[i] / n * 100) : null)
     const rb = respByBranch[b] || { resp: [0, 0, 0, 0, 0, 0], respMeet: [0, 0, 0, 0, 0, 0], measured: 0 }
-    timingData[b] = { leadDay: t.leadDay, leadHour: t.leadHour, mtgDay: t.mtgDay, bookDay: t.bookDay, conv, resp: rb.resp, respMeet: rb.respMeet || [0, 0, 0, 0, 0, 0], respMeasured: rb.measured }
+    timingData[b] = { leadDay: t.leadDay, leadHour: t.leadHour, mtgDay: t.mtgDay, mtgDayPaid: t.mtgDayPaid, bookDay: t.bookDay, conv, resp: rb.resp, respMeet: rb.respMeet || [0, 0, 0, 0, 0, 0], respMeasured: rb.measured }
   }
   const _sumT = (b) => timingData[b].leadDay.reduce((x, y) => x + y, 0)
   const timingBranches = ['הכל', ...Object.keys(T).filter(b => b !== 'הכל').sort((a, b) => _sumT(b) - _sumT(a))]
