@@ -3566,7 +3566,7 @@ const selectProject = async (client, project) => {
                               const cmOpen = expandedFunnelCamp.has(campKey);
                               out.push(
                                 <tr key={campKey} style={{background:'rgba(59,130,246,0.05)', cursor: adSets.length ? 'pointer' : 'default'}} onClick={adSets.length ? () => toggleFunnelCamp(campKey) : undefined}>
-                                  <td style={{paddingRight:24,fontSize:'0.9em',unicodeBidi:'plaintext',textAlign:'right'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{adSets.length ? (cmOpen ? '▼' : '◀') : ''}</span>{cm.campaign}</td>
+                                  <td style={{paddingRight:24,fontSize:'0.9em',textAlign:'right',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{adSets.length ? (cmOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{cm.campaign}</span></td>
                                   <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>
                                 </tr>
                               );
@@ -3577,7 +3577,7 @@ const selectProject = async (client, project) => {
                                 const asOpen = expandedFunnelAst.has(astKey);
                                 out.push(
                                   <tr key={astKey} style={{background:'rgba(59,130,246,0.09)', cursor: ads.length ? 'pointer' : 'default'}} onClick={ads.length ? () => toggleFunnelAst(astKey) : undefined}>
-                                    <td style={{paddingRight:44,fontSize:'0.85em',unicodeBidi:'plaintext',textAlign:'right',color:'#475569'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{ads.length ? (asOpen ? '▼' : '◀') : ''}</span>{as.adset}</td>
+                                    <td style={{paddingRight:44,fontSize:'0.85em',textAlign:'right',color:'#475569',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{ads.length ? (asOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{as.adset}</span></td>
                                     <td style={{fontSize:'0.85em'}}>{formatNum(as.leads)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.opportunities)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.purchased)}</td><td style={{fontSize:'0.85em',color:'var(--violet)'}}>{(as.conversionRate||0)+'%'}</td><td style={{fontSize:'0.85em'}}>{formatCurrency(as.netRevenue||0)}</td>
                                   </tr>
                                 );
