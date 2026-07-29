@@ -3482,6 +3482,24 @@ const selectProject = async (client, project) => {
     const _gAdIdName = {}
     reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google')).forEach(r => { (r.data || []).forEach(row => { if (row && row.adId && row.adName) _gAdIdName[String(row.adId)] = row.adName }) })
     const _resolveAd = (channel, label) => (/google|גוגל/i.test(channel || '') && _gAdIdName[label]) ? _gAdIdName[label] : label
+    // ── Facebook spend maps for the CRM funnel (FB only; matched by name to Zoho UTM) ──
+    const _normName = (v) => v==null ? '' : String(v).replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\u00ad\u200b\ufeff]/g,'').replace(/^geek[-_\s]+/i,'').trim()
+    const _fbCampSpend = {}; const _fbAdsetArr = []; const _fbAdArr = []; let _fbTotalSpend = 0
+    { const acc = {}, adAcc = {}
+      reports.filter(r => r.month === selectedMonth && r.source === 'facebook').forEach(r => { (r.data || []).forEach(row => {
+        const camp=_normName(row.campaign), adset=_normName(row.adSet), adn=_normName(row.adName), sp=Number(row.spend)||0
+        _fbTotalSpend+=sp; _fbCampSpend[camp]=(_fbCampSpend[camp]||0)+sp
+        acc[camp+'\u0000'+adset]=(acc[camp+'\u0000'+adset]||0)+sp
+        adAcc[camp+'\u0000'+adn]=(adAcc[camp+'\u0000'+adn]||0)+sp
+      })})
+      for (const k in acc){ const p=k.split('\u0000'); _fbAdsetArr.push({camp:p[0],adset:p[1],spend:acc[k]}) }
+      for (const k in adAcc){ const p=k.split('\u0000'); _fbAdArr.push({camp:p[0],adName:p[1],spend:adAcc[k]}) }
+    }
+    const _isFb = (ch) => /facebook|פייס/i.test(ch||'')
+    const _spCamp = (ch,camp) => _isFb(ch) ? (_fbCampSpend[_normName(camp)]||0) : null
+    const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; const c=_normName(camp), t=_normName(adset); if(!t||t.indexOf('ללא')>=0) return null; const m=_fbAdsetArr.filter(x=>x.camp===c && (x.adset===t || x.adset.includes(t))); if(!m.length) return null; return {spend:m.reduce((a,x)=>a+x.spend,0), approx: m.length>1 || m[0].adset!==t} }
+    const _spAd = (ch,camp,label) => { if(!_isFb(ch)) return null; const c=_normName(camp); const tok=(_normName(label).match(/AD\s*\d+/i)||[])[0]; if(!tok) return null; const tk=tok.toLowerCase().replace(/\s+/g,' '); const m=_fbAdArr.filter(x=>x.camp===c && x.adName.toLowerCase().replace(/\s+/g,' ').indexOf(tk)===0); if(!m.length) return null; return {spend:m.reduce((a,x)=>a+x.spend,0), approx: m.length>1} }
+    const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
             const _agents = _zs.agentPerformance || []
             const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
             const _byStatus = Object.entries(_zs.byStatus || {}).sort((a,b) => b[1]-a[1])
@@ -3543,10 +3561,10 @@ const selectProject = async (client, project) => {
                 </div>
                 <div className="section">
                   <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2></div>
-                  <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:10,textAlign:'right'}}>💡 לחץ על ערוץ ← קמפיין ← adset ← מודעה כדי לצלול פנימה</div>
+                  <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:10,textAlign:'right'}}>💡 לחץ על ערוץ ← קמפיין ← adset ← מודעה כדי לצלול פנימה · תקציב FB: קמפיין מדויק, adset/מודעה משוער (~)</div>
                   <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th></tr></thead>
+                      <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th><th>תקציב FB</th></tr></thead>
                       <tbody>
                         {(() => {
                           const out = [];
@@ -3556,7 +3574,7 @@ const selectProject = async (client, project) => {
                             out.push(
                               <tr key={c.channel} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
                                 <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{camps.length ? (chOpen ? '▼' : '◀') : ''}</span>{c.channel}</td>
-                                <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>
+                                <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>{_fbCell(_isFb(c.channel) ? _fbTotalSpend : null)}
                               </tr>
                             );
                             if (!chOpen) return;
@@ -3567,7 +3585,7 @@ const selectProject = async (client, project) => {
                               out.push(
                                 <tr key={campKey} style={{background:'rgba(59,130,246,0.05)', cursor: adSets.length ? 'pointer' : 'default'}} onClick={adSets.length ? () => toggleFunnelCamp(campKey) : undefined}>
                                   <td style={{paddingRight:24,fontSize:'0.9em',textAlign:'right',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{adSets.length ? (cmOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{cm.campaign}</span></td>
-                                  <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>
+                                  <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>{_fbCell(_spCamp(c.channel, cm.campaign), '0.9em')}
                                 </tr>
                               );
                               if (!cmOpen) return;
@@ -3578,7 +3596,7 @@ const selectProject = async (client, project) => {
                                 out.push(
                                   <tr key={astKey} style={{background:'rgba(59,130,246,0.09)', cursor: ads.length ? 'pointer' : 'default'}} onClick={ads.length ? () => toggleFunnelAst(astKey) : undefined}>
                                     <td style={{paddingRight:44,fontSize:'0.85em',textAlign:'right',color:'#475569',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{ads.length ? (asOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{as.adset}</span></td>
-                                    <td style={{fontSize:'0.85em'}}>{formatNum(as.leads)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.opportunities)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.purchased)}</td><td style={{fontSize:'0.85em',color:'var(--violet)'}}>{(as.conversionRate||0)+'%'}</td><td style={{fontSize:'0.85em'}}>{formatCurrency(as.netRevenue||0)}</td>
+                                    <td style={{fontSize:'0.85em'}}>{formatNum(as.leads)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.opportunities)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.purchased)}</td><td style={{fontSize:'0.85em',color:'var(--violet)'}}>{(as.conversionRate||0)+'%'}</td><td style={{fontSize:'0.85em'}}>{formatCurrency(as.netRevenue||0)}</td>{_fbCell(_spAdset(c.channel, cm.campaign, as.adset), '0.85em')}
                                   </tr>
                                 );
                                 if (!asOpen) return;
@@ -3586,7 +3604,7 @@ const selectProject = async (client, project) => {
                                   out.push(
                                     <tr key={astKey+'|'+ad.ad} style={{background:'rgba(59,130,246,0.13)'}}>
                                       <td style={{paddingRight:62,fontSize:'0.8em',unicodeBidi:'plaintext',textAlign:'right',color:'#64748b'}}>{_resolveAd(c.channel, ad.ad)}</td>
-                                      <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>
+                                      <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>{_fbCell(_spAd(c.channel, cm.campaign, ad.ad), '0.8em')}
                                     </tr>
                                   );
                                 });
@@ -3603,7 +3621,7 @@ const selectProject = async (client, project) => {
                           <td style={{fontWeight:700}}>{formatNum(_fn.opportunities||0)}</td>
                           <td style={{fontWeight:700}}>{formatNum(_fn.purchased||0)}</td>
                           <td style={{fontWeight:700,color:'var(--violet)'}}>{(_fn.conversionRate||0)+'%'}</td>
-                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td>
+                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}}>{formatCurrency(_fbTotalSpend)}</td>
                         </tr>
                       </tfoot>
                     </table>
