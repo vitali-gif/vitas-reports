@@ -88,17 +88,33 @@ async function callBmbyGetAllJson(service, params) {
   const { file } = ENDPOINTS[service]
   const url = file ? `${BMBY_BASE}/${file}` : `${BMBY_BASE}/`
   const body = buildSoapGetAllJson(service, params)
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/xml; charset=utf-8',
-      'SOAPAction': '"GetAllJson"',
-    },
-    body,
-  })
-  const text = await res.text()
-  if (!res.ok) {
+  // BMBY intermittently returns 502/503/504 (Cloudflare) or drops the connection
+  // ("terminated") under load — especially on the heavier `tasks` call. These are
+  // transient, so retry a few times with backoff before giving up. A single failed
+  // page here is what makes the integrity guard flag a whole report broken.
+  let text, res, lastErr
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await new Promise(r => setTimeout(r, 800 * attempt))  // 0, .8s, 1.6s, 2.4s
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"GetAllJson"' },
+        body,
+      })
+      text = await res.text()
+    } catch (e) {
+      lastErr = e; res = null; continue  // network drop / terminated → retry
+    }
+    if (res.ok) { lastErr = null; break }
+    // Retry transient gateway errors; fail fast on real 4xx (bad request/auth)
+    if ([429, 500, 502, 503, 504].includes(res.status)) {
+      lastErr = new Error(`BMBY ${service} HTTP ${res.status}: ${text.slice(0, 200)}`)
+      continue
+    }
     throw new Error(`BMBY ${service} HTTP ${res.status}: ${text.slice(0, 300)}`)
+  }
+  if (!res || !res.ok) {
+    throw lastErr || new Error(`BMBY ${service} failed after retries`)
   }
 
   // BMBY format: SOAP envelope wraps <GetAllJsonReturn> which contains a JSON STRING
@@ -332,7 +348,7 @@ async function runSync(opts = {}) {
     const _apptDump = !!opts.apptDump  // fast: clients+tasks only, dump raw appointment rows
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
       withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4), 120000, 'clients'),
-      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyServiceChunked('tasks',        commonParams, 10), 120000, 'tasks'),
+      _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyServiceChunked('tasks',        commonParams, 10), 240000, 'tasks'),  // long ranges chunk+retry sequentially → allow more time (maxDuration=300)
       (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 120000, 'price_offers'),
       (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 120000, 'contracts'),
     ])
