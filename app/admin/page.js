@@ -3424,6 +3424,7 @@ const selectProject = async (client, project) => {
             const _srcBr = (_srcFunnel[sfSrcBranch]) ? sfSrcBranch : 'הכל'
             const _srcData = _srcFunnel[_srcBr] || {}
             const _srcRows = Object.entries(_srcData).map(([src, o]) => ({ src, ...o })).sort((a, b) => b.leads - a.leads)
+            const _srcTotalLeadsN = _srcRows.reduce((a, r) => a + (r.leads || 0), 0)
             const _srcTotLeads = (o) => Object.values(o || {}).reduce((x, v) => x + v.leads, 0)
             const _srcBranchList = ['הכל', ...Object.keys(_srcFunnel).filter(b => b !== 'הכל').sort((a, b) => _srcTotLeads(_srcFunnel[b]) - _srcTotLeads(_srcFunnel[a]))]
             const _pcS = (a, b) => b > 0 ? Math.round(a / b * 100) : 0
@@ -3439,6 +3440,18 @@ const selectProject = async (client, project) => {
                   </select>
                 </div>
                 {_srcRows.length === 0 ? <div className="sub" style={{padding:'8px 4px'}}>אין נתונים</div> : (<>
+                  <div style={{marginBottom:20}}>
+                    <div style={{fontSize:13,fontWeight:600,color:'#334155',marginBottom:8}}>התפלגות לידים לפי מקור</div>
+                    {_srcRows.slice(0, 10).map(r => { const pc = _srcTotalLeadsN > 0 ? Math.round(r.leads / _srcTotalLeadsN * 100) : 0; return (
+                      <div key={r.src} style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
+                        <span style={{fontSize:12,color:'#334155',width:140,flexShrink:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textAlign:'start'}} title={r.src}>{r.src}</span>
+                        <div style={{flex:1,background:'#f1f5f9',borderRadius:5,height:18,overflow:'hidden'}}><div style={{width:Math.max(2,pc)+'%',height:'100%',background:'#0ea5e9',borderRadius:5}}></div></div>
+                        <span style={{fontSize:13,fontWeight:600,color:'#0f172a',width:46,textAlign:'start',flexShrink:0}}>{formatNum(r.leads)}</span>
+                        <span style={{fontSize:11,color:'#94a3b8',width:36,textAlign:'start',flexShrink:0}}>{pc}%</span>
+                      </div>
+                    )})}
+                  </div>
+                  <div style={{fontSize:13,fontWeight:600,color:'#334155',margin:'0 2px 6px'}}>אחוזי המרה לפי מקור</div>
                   <div style={{display:'flex',gap:16,fontSize:12,margin:'0 2px 10px',color:'#475569',flexWrap:'wrap'}}>
                     <span><span style={{display:'inline-block',width:10,height:10,background:'#0d9488',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>% המרה לתיאום</span>
                     <span><span style={{display:'inline-block',width:10,height:10,background:'#7c6cf5',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>% המרה לעסקה</span>
@@ -3580,8 +3593,7 @@ const selectProject = async (client, project) => {
                 : sfTab === 'timing' ? timingSec
                 : (<>
                     {sourcesSec}
-                    {simple('סטטוסי לידים', ent(_s.byStatus), 'סטטוס', 'לידים', 'amber')}
-                    {simple('סיבות אי-המרה', ent(_s.reasons), 'סיבה', 'לידים', 'rose')}
+                    {simple('סטטוסי לידים', ent(_s.byStatus).map(([k, v]) => [({ 'New': 'חדש', 'Working': 'נוצר קשר ראשוני', 'Nurturing': 'תואמה פגישה', 'Qualified': 'הומר', 'Unqualified': 'לא הומר' })[k] || k, v]), 'סטטוס', 'לידים', 'amber')}
                   </>)}
             </>)
           }
