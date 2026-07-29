@@ -3496,9 +3496,11 @@ const selectProject = async (client, project) => {
       for (const k in adAcc){ const p=k.split('\u0000'); _fbAdArr.push({camp:p[0],adName:p[1],spend:adAcc[k]}) }
     }
     const _isFb = (ch) => /facebook|פייס/i.test(ch||'')
-    const _spCamp = (ch,camp) => _isFb(ch) ? (_fbCampSpend[_normName(camp)]||0) : null
-    const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; const c=_normName(camp), t=_normName(adset); if(!t||t.indexOf('ללא')>=0) return null; const m=_fbAdsetArr.filter(x=>x.camp===c && (x.adset===t || x.adset.includes(t))); if(!m.length) return null; return {spend:m.reduce((a,x)=>a+x.spend,0), approx: m.length>1 || m[0].adset!==t} }
-    const _spAd = (ch,camp,label) => { if(!_isFb(ch)) return null; const c=_normName(camp); const tok=(_normName(label).match(/AD\s*\d+/i)||[])[0]; if(!tok) return null; const tk=tok.toLowerCase().replace(/\s+/g,' '); const m=_fbAdArr.filter(x=>x.camp===c && x.adName.toLowerCase().replace(/\s+/g,' ').indexOf(tk)===0); if(!m.length) return null; return {spend:m.reduce((a,x)=>a+x.spend,0), approx: m.length>1} }
+    let _fbQnSpend = 0; for (const k in _fbCampSpend) { if (/questionnaire/i.test(k)) _fbQnSpend += _fbCampSpend[k] }
+    const _isGeel = (camp) => /geel[\s_-]*remarketing/i.test(_normName(camp))
+    const _spCamp = (ch,camp) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return _fbQnSpend; return _fbCampSpend[_normName(camp)]||0 }
+    const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), t=_normName(adset); if(!t||t.indexOf('ללא')>=0) return null; const m=_fbAdsetArr.filter(x=>x.camp===c && (x.adset===t || x.adset.includes(t))); if(!m.length) return null; return {spend:m.reduce((a,x)=>a+x.spend,0), approx: m.length>1 || m[0].adset!==t} }
+    const _spAd = (ch,camp,label) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp); const tok=(_normName(label).match(/AD\s*\d+/i)||[])[0]; if(!tok) return null; const tk=tok.toLowerCase().replace(/\s+/g,' '); const m=_fbAdArr.filter(x=>x.camp===c && x.adName.toLowerCase().replace(/\s+/g,' ').indexOf(tk)===0); if(!m.length) return null; return {spend:m.reduce((a,x)=>a+x.spend,0), approx: m.length>1} }
     const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
             const _agents = _zs.agentPerformance || []
             const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
