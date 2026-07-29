@@ -307,7 +307,17 @@ async function runSync(opts = {}) {
         const k = st + ' | ' + String(c.status || '(empty)') + ' | relevant=' + String(c.relevant || '')
         _stageXstatus[k] = (_stageXstatus[k] || 0) + 1
       }
-      return { project: p.name, stagesOnly: true, totalClients: clients.length, stageDist: _dist, stageXstatus: _stageXstatus }
+      // city-field coverage diagnostic (why 'יישובים' tab may be empty)
+      let _wCity=0,_wCityId=0,_wAddr=0,_wPropCity=0; const _citySample={}
+      for (const c of clients) {
+        const cy=(c.city||'').toString().trim(); const cid=(c.city_id||'').toString().trim(); const ad=(c.address||'').toString().trim(); const pc=(c.property_city||'').toString().trim()
+        if (cy){_wCity++; _citySample[cy]=(_citySample[cy]||0)+1}
+        if (cid && cid!=='0') _wCityId++
+        if (ad) _wAddr++
+        if (pc) _wPropCity++
+      }
+      const _topCities=Object.entries(_citySample).sort((a,b)=>b[1]-a[1]).slice(0,8)
+      return { project: p.name, stagesOnly: true, totalClients: clients.length, stageDist: _dist, stageXstatus: _stageXstatus, cityCoverage: { withCity:_wCity, withCityId:_wCityId, withAddress:_wAddr, withPropertyCity:_wPropCity, topCities:_topCities } }
     }
 
     if (_apptDump) {
