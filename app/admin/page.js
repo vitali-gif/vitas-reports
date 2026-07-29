@@ -1367,9 +1367,11 @@ const selectProject = async (client, project) => {
     const leadHourTotal = leadHourMerged.reduce((a, b) => a + b, 0);
     const contactHourTotal = contactHourMerged.reduce((a, b) => a + b, 0);
     const hourHasData = hourTotal > 0 || leadHourTotal > 0 || contactHourTotal > 0;
-    // Success rate per contact-hour: of leads first contacted at hour h, what % reached a scheduled meeting.
-    // null where there were no contacts that hour, so the line skips empty hours instead of dropping to 0.
-    const contactRate = contactHourMerged.map((c, h) => c > 0 ? Math.round((contactMeetingMerged[h] / c) * 100) : null);
+    // Conversion per hour (per user request): meetings SCHEDULED at hour h ÷ first-contacts made at hour h.
+    // e.g. 10:00 → 2 meetings scheduled / 15 contacts = 13%. null where there were no contacts that hour
+    // (so the line skips empty hours). Note: numerator counts meetings by their scheduling hour, which may
+    // include meetings for leads first-contacted in a different hour — this is the simple same-hour ratio.
+    const contactRate = contactHourMerged.map((c, h) => c > 0 ? Math.round((hourMerged[h] / c) * 100) : null);
     if (hourHasData) {
       pendingChartsRef.current.push(setTimeout(() => {
         const hLabels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
@@ -1377,13 +1379,13 @@ const selectProject = async (client, project) => {
           { label: 'לידים', type: 'bar', data: leadHourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 3 },
           { label: 'יצירת קשר', type: 'bar', data: contactHourMerged.slice(), backgroundColor: '#F59E0B', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 2 },
           { label: 'פגישות שתואמו', type: 'bar', data: hourMerged.slice(), backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
-          { label: '% הבשלה לפגישה', type: 'line', data: contactRate, borderColor: '#EF4444', backgroundColor: '#EF4444', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, spanGaps: true, yAxisID: 'y1', order: 0 },
+          { label: '% המרה לפגישה', type: 'line', data: contactRate, borderColor: '#EF4444', backgroundColor: '#EF4444', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, spanGaps: true, yAxisID: 'y1', order: 0 },
         ], {
           x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' }, maxRotation: 0, autoSkip: false } },
           y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
                title: { display: true, text: 'כמות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
-          y1: { beginAtZero: true, max: 100, position: 'left', grid: { display: false }, ticks: { precision: 0, callback: (v) => v + '%' },
-               title: { display: true, text: '% הבשלה', font: { size: 10.5, weight: '700' }, color: '#EF4444' } },
+          y1: { beginAtZero: true, suggestedMax: 100, position: 'left', grid: { display: false }, ticks: { precision: 0, callback: (v) => v + '%' },
+               title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#EF4444' } },
         });
       }, 350));
     }
@@ -1457,7 +1459,7 @@ const selectProject = async (client, project) => {
 
         {hourHasData && (
           <div className="section">
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2><span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, מתי אנשי המכירות יצרו קשר, וכמה פגישות תואמו. הקו האדום = מתוך הלידים שנוצר איתם קשר באותה שעה, איזה אחוז הגיע לפגישה</span></div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2><span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, מתי אנשי המכירות יצרו קשר, וכמה פגישות תואמו. הקו האדום = פגישות שנקבעו באותה שעה חלקי יצירות הקשר באותה שעה (אחוז המרה)</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="apptHourChart"></canvas></div></div>
           </div>
         )}
