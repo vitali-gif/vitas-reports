@@ -3316,7 +3316,8 @@ const selectProject = async (client, project) => {
               const vals = items.map(it => (it.value == null ? 0 : it.value))
               const max = Math.max(1, ...vals)
               let peakI = -1
-              if (opts.highlightMax) { let mv = -1; items.forEach((it, i) => { if (it.value != null && it.value > mv) { mv = it.value; peakI = i } }) }
+              const _elig = (i) => !opts.samples || (opts.samples[i] || 0) >= (opts.minSample || 0)
+              if (opts.highlightMax) { let mv = -1; items.forEach((it, i) => { if (_elig(i) && it.value != null && it.value > mv) { mv = it.value; peakI = i } }) }
               return (
                 <div className="section">
                   <div className="section-head">{ICO(ico[0], ico[1])}<h2>{title}</h2><span className="sub">{subtitle}</span></div>
@@ -3384,7 +3385,7 @@ const selectProject = async (client, project) => {
                 )
               })()}
               <h3 style={{margin:'14px 4px 2px',fontSize:15,color:'#0f172a'}}>המרה וזמן טיפול</h3>
-              {_tBar('אחוז המרה לתיאום פגישה לפי שעת מגע ראשון', 'מתוך הלידים שטופלו בשעה זו — לכמה נקבעה פגישה', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true })}
+              {_tBar('אחוז המרה לתיאום פגישה לפי שעת מגע ראשון', 'מתוך הלידים שטופלו בשעה זו — לכמה נקבעה פגישה (שעות עם מעט לידים מוזנחות)', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true, samples: (_td.convLeads || []), minSample: 10 })}
               {(() => {
                 const _rz = _td.resp || [], _rm = _td.respMeet || []
                 const _cd = _tRespLabels.map((lb, i) => { const L = _rz[i]||0, M = _rm[i]||0; return { lb, L, M, pc: L>0?Math.round(M/L*100):0 } })
@@ -3396,11 +3397,11 @@ const selectProject = async (client, project) => {
                   <div className="section">
                     <div className="section-head">{ICO('rose', "M12 6v6l4 2")}<h2>זמן טיפול בליד ← תיאום פגישה</h2><span className="sub">{(_td.respMeasured?formatNum(_td.respMeasured)+' לידים · ':'')}שעות פעילות בלבד · טיפול מהיר יותר = יותר תיאומים</span></div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12}}>
-                      {_cd.map(c => { const small = c.L < _MINS; const cc = small ? {c:'#94a3b8',bg:'#f1f5f9'} : _col(c.pc); const best = !small && c.pc === _best && _best >= 0; return (
+                      {_cd.map((c, _ci) => { const small = c.L < _MINS; const cc = small ? {c:'#94a3b8',bg:'#f1f5f9'} : _col(c.pc); const best = _ci === 0; return (
                         <div key={c.lb} style={{background:'var(--surface-2, #fff)',border: best ? '2px solid '+cc.c : '1px solid var(--border)',borderRadius:14,padding:'14px 16px',opacity: small ? 0.7 : 1}}>
                           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                             <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>{c.lb}</span>
-                            {best ? <span style={{fontSize:10,fontWeight:700,color:cc.c,background:cc.bg,padding:'2px 8px',borderRadius:20}}>הכי גבוה</span> : (small ? <span style={{fontSize:10,fontWeight:600,color:'#94a3b8',background:'#f1f5f9',padding:'2px 8px',borderRadius:20}}>מדגם קטן</span> : null)}
+                            {best ? null : (small ? <span style={{fontSize:10,fontWeight:600,color:'#94a3b8',background:'#f1f5f9',padding:'2px 8px',borderRadius:20}}>מדגם קטן</span> : null)}
                           </div>
                           <div style={{display:'flex',alignItems:'baseline',gap:6}}>
                             <span style={{fontSize:30,fontWeight:700,color:cc.c,lineHeight:1}}>{c.pc}%</span>

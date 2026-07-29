@@ -495,7 +495,7 @@ async function runSync(opts = {}) {
     for (let uh = 0; uh < 24; uh++) { const lh = ((uh + OFF) % 24 + 24) % 24; clLeads[lh] += cc.leads[uh]; clMeet[lh] += cc.meetings[uh] }
     const conv = clLeads.map((n, i) => n > 0 ? Math.round(clMeet[i] / n * 100) : null)
     const rb = respByBranch[b] || { resp: [0, 0, 0, 0, 0, 0], respMeet: [0, 0, 0, 0, 0, 0], measured: 0 }
-    timingData[b] = { leadDay: t.leadDay, leadHour: t.leadHour, mtgDay: t.mtgDay, mtgDayPaid: t.mtgDayPaid, bookDay: t.bookDay, conv, resp: rb.resp, respMeet: rb.respMeet || [0, 0, 0, 0, 0, 0], respMeasured: rb.measured }
+    timingData[b] = { leadDay: t.leadDay, leadHour: t.leadHour, mtgDay: t.mtgDay, mtgDayPaid: t.mtgDayPaid, bookDay: t.bookDay, conv, convLeads: clLeads, resp: rb.resp, respMeet: rb.respMeet || [0, 0, 0, 0, 0, 0], respMeasured: rb.measured }
   }
   const _sumT = (b) => timingData[b].leadDay.reduce((x, y) => x + y, 0)
   const timingBranches = ['הכל', ...Object.keys(T).filter(b => b !== 'הכל').sort((a, b) => _sumT(b) - _sumT(a))]
