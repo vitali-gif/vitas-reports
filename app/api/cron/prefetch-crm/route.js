@@ -106,12 +106,25 @@ export async function GET(request) {
 
   // Concurrency 2 — gentle on BMBY SOAP
   const CONCURRENCY = 4  // was 2 — with real (uncached) fetching the run exceeded 300s and 504'd
+  // Wall-clock deadline: return BEFORE Vercel's 300s hard kill. A 504 (kill) makes the GitHub
+  // Actions job fail ("all jobs have failed" email). Instead we stop starting new jobs past the
+  // budget and resolve at the deadline with whatever finished — any unfinished range simply keeps
+  // its previous-good report and gets refreshed on the next run. Endpoint returns HTTP 200.
+  const DEADLINE_MS = 275000
   const queue = [...jobs]
   const inFlight = new Set()
-  while (queue.length > 0 || inFlight.size > 0) {
-    while (queue.length > 0 && inFlight.size < CONCURRENCY) { const p = run(queue.shift()).finally(() => inFlight.delete(p)); inFlight.add(p) }
-    if (inFlight.size > 0) await Promise.race(inFlight)
-  }
+  const loop = (async () => {
+    while (queue.length > 0 || inFlight.size > 0) {
+      while (queue.length > 0 && inFlight.size < CONCURRENCY && (Date.now() - startedAt) < DEADLINE_MS) {
+        const p = run(queue.shift()).finally(() => inFlight.delete(p)); inFlight.add(p)
+      }
+      if (inFlight.size > 0) await Promise.race(inFlight)
+      else break  // queue non-empty but budget exhausted → stop
+    }
+  })()
+  let deadlineHit = false
+  await Promise.race([loop, new Promise(r => setTimeout(() => { deadlineHit = true; r() }, DEADLINE_MS))])
+  const deferredCount = queue.length + inFlight.size
 
   const failed = results.filter(r => !r.ok)
   // Collect projects whose CRM write was skipped because the fetch looked broken.
@@ -145,5 +158,5 @@ export async function GET(request) {
       await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-crm', last_run: new Date().toISOString() }, { onConflict: 'job' })
     }
   } catch {}
-  return Response.json({ ok: failed.length === 0 && brokenProjects.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, brokenSkipped: brokenProjects.length, elapsedMs: Date.now()-startedAt }, brokenProjects, results })
+  return Response.json({ ok: failed.length === 0 && brokenProjects.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, brokenSkipped: brokenProjects.length, deferred: deferredCount, deadlineHit, elapsedMs: Date.now()-startedAt }, brokenProjects, results })
 }

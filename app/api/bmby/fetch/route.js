@@ -93,8 +93,8 @@ async function callBmbyGetAllJson(service, params) {
   // transient, so retry a few times with backoff before giving up. A single failed
   // page here is what makes the integrity guard flag a whole report broken.
   let text, res, lastErr
-  for (let attempt = 0; attempt < 4; attempt++) {
-    if (attempt) await new Promise(r => setTimeout(r, 800 * attempt))  // 0, .8s, 1.6s, 2.4s
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise(r => setTimeout(r, 400 * attempt))  // 0, .4s, .8s — cheaper so cron aggregate stays < Vercel 300s
     try {
       res = await fetch(url, {
         method: 'POST',
