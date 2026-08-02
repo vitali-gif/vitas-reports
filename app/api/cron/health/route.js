@@ -95,11 +95,27 @@ export async function GET(request) {
         await sendAlert({ subject: `📊 VITAS בריאות מערכת (ערב) — ${health.anyRed ? '⚠️ יש בעיות' : '✔️ הכל תקין'}`, html: renderHealthEmail(health, { digest: true }) })
         lastEvening = dateIL; sentDigest = true
       }
-      if (!sentDigest && health.anyRed) {
-        const newReds = health.reds.filter(r => !prevReds.includes(r))
-        if (newReds.length) await sendAlert({ subject: `🔴 VITAS: ${newReds.length} ענפים נשברו`, html: renderHealthEmail({ ...health, reds: newReds }, { digest: false }) })
+      // Per-client IMMEDIATE alerts: a client whose data didn't update as expected (even one day),
+      // but ONLY when the relevant cron itself ran fresh — otherwise it's a system-wide cron outage
+      // that the heartbeat watchdog above already covers (avoids double alerts + morning false alarms
+      // before the day's first run has landed).
+      const _freshOf = (job) => { const b = beats.find(x => x.job === job); return !!(b && b.last_run && ((Date.now() - new Date(b.last_run).getTime()) / 3.6e6) <= STALE_HOURS) }
+      const _jobFresh = { ads: _freshOf('prefetch-ads'), crm: _freshOf('prefetch-crm') }
+      const liveIssues = (health.issues || []).filter(i => _jobFresh[i.job])
+      const liveKeys = liveIssues.map(i => `${i.name} — ${i.label}`)
+      if (!sentDigest && liveKeys.length) {
+        const newIssues = liveIssues.filter(i => !prevReds.includes(`${i.name} — ${i.label}`))
+        if (newIssues.length) {
+          const rows = newIssues.map(i => `<li><b>${i.name}</b> — ${i.label} <span style="color:#888">(${i.detail})</span></li>`).join('')
+          const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
+            <h2>⚠️ VITAS: נתונים לא עודכנו אצל לקוח</h2>
+            <p>הקרון רץ, אך לפריטים הבאים הנתונים לא עודכנו כמצופה (ייתכן שיום בודד לא נמשך אצל הלקוח):</p>
+            <ul>${rows}</ul>
+            <p style="color:#888;font-size:12px">VITAS · חיישני בריאות פר-לקוח</p></div>`
+          await sendAlert({ subject: `⚠️ VITAS: בעיה בנתונים אצל ${newIssues.length} לקוח/פרויקט`, html })
+        }
       }
-      await sb.from('health_state').upsert({ id: 1, reds: health.reds, last_morning: lastMorning, last_evening: lastEvening, updated_at: new Date().toISOString() })
+      await sb.from('health_state').upsert({ id: 1, reds: liveKeys, last_morning: lastMorning, last_evening: lastEvening, updated_at: new Date().toISOString() })
     }
   } catch { /* health branch is best-effort; never fail the watchdog */ }
 
