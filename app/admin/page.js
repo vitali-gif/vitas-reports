@@ -611,6 +611,7 @@ const loadClients = async () => {
     }
     // data === null ⇒ read FAILED. Keep whatever is on screen (cache or prior) — never blank.
     setPeriodLoading(false);
+    return { hasData: !!((cached && cached.length) || (data && data.length > 0)), failed: !data };
   };
 
   // Lazy-load the heavy `data` only for the month-keys actually needed (viewed period +
@@ -856,8 +857,19 @@ const selectProject = async (client, project) => {
     setSelectedClient(client); setSelectedProject(project); setView('dashboard'); setCompareEnabled(false);
     if (typeof window !== 'undefined' && project?.id) { try { localStorage.setItem('vitas_last_project', project.id) } catch {} }
     setVitasTasks([]); setRecSubTab('new');
-    await loadProjectReports(project.id);
+    const _loadRes = await loadProjectReports(project.id);
     await loadProjectTasks(project.id);
+    // Client view: alert the owner if the dashboard opened with NO data (broken pipeline / cron)
+    if (isClientView && _loadRes && !_loadRes.hasData && typeof window !== 'undefined') {
+      try {
+        window.__vitasNoDataAlerted = window.__vitasNoDataAlerted || new Set();
+        if (!window.__vitasNoDataAlerted.has(project.id)) {
+          window.__vitasNoDataAlerted.add(project.id);
+          fetch('/api/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event: 'no_data', email: (session && session.user && session.user.email) || null, clientName: (client && client.name) || null, projectName: (project && project.name) || null, projectId: project.id, reason: _loadRes.failed ? 'by-project read failed' : 'no reports for project' }) }).catch(() => {});
+        }
+      } catch {}
+    }
     // Log project selection for client view
     if (isClientView) {
       const sid = typeof window !== 'undefined' ? window.__vitasSessionId : null

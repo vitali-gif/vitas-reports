@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendAlert } from '../../../lib/alert'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -56,6 +57,24 @@ export async function POST(req) {
         duration_sec: durationSec || 0,
       })
       .eq('id', sessionId)
+    return NextResponse.json({ ok: true })
+  }
+
+  if (event === 'no_data') {
+    // A client opened the dashboard but no data loaded (broken pipeline / cron). Alert the owner.
+    const when = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })
+    const html = `<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#0B0F1E">
+      <h2 style="margin:0 0 10px">\u26a0\ufe0f \u05dc\u05e7\u05d5\u05d7 \u05e0\u05db\u05e0\u05e1 \u05dc\u05d3\u05e9\u05d1\u05d5\u05e8\u05d3 \u05e8\u05d9\u05e7</h2>
+      <p style="margin:0 0 12px;color:#5E6478">\u05dc\u05e7\u05d5\u05d7 \u05e0\u05db\u05e0\u05e1 \u05dc\u05de\u05e2\u05e8\u05db\u05ea \u05d0\u05da \u05dc\u05d0 \u05e0\u05d8\u05e2\u05e0\u05d5 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd (\u05d9\u05d9\u05ea\u05db\u05df \u05e7\u05e8\u05d5\u05df/\u05e4\u05d9\u05d9\u05e4\u05dc\u05d9\u05d9\u05df).</p>
+      <table style="border-collapse:collapse">
+        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05de\u05d9\u05d9\u05dc</td><td style="padding:3px 0"><b>${email || '\u2014'}</b></td></tr>
+        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05dc\u05e7\u05d5\u05d7</td><td style="padding:3px 0">${clientName || '\u2014'}</td></tr>
+        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8</td><td style="padding:3px 0">${body.projectName || '\u2014'}</td></tr>
+        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05e1\u05d9\u05d1\u05d4</td><td style="padding:3px 0">${body.reason || '\u2014'}</td></tr>
+        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05d6\u05de\u05df</td><td style="padding:3px 0">${when}</td></tr>
+      </table>
+    </div>`
+    try { await sendAlert({ subject: `\u26a0\ufe0f VITAS: \u05dc\u05e7\u05d5\u05d7 \u05e8\u05d0\u05d4 \u05d3\u05e9\u05d1\u05d5\u05e8\u05d3 \u05e8\u05d9\u05e7 \u2014 ${clientName || email || ''}`, html }) } catch {}
     return NextResponse.json({ ok: true })
   }
 
