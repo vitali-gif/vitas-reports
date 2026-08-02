@@ -4400,10 +4400,18 @@ const selectProject = async (client, project) => {
         {/* ASSET GROUPS SECTION (Google PMax) */}
         {(dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'all') && (() => {
           const allGroups = gReports.flatMap(r => r.summary?.assetGroups || []);
+          // CURRENT live status per asset-group id, taken from the most-recent google report's summary.
+          // The light by-project index carries every month's summary, so this reflects the latest fetch
+          // even when an older month is being viewed — fixes paused/removed groups still showing "פעיל".
+          const _agCur = {};
+          reports.filter(r => r.source && r.source.startsWith('google') && /^\d{4}-\d{2}$/.test(r.month || ''))
+            .sort((a, b) => (String(a.month) < String(b.month) ? 1 : -1))
+            .forEach(r => (r.summary?.assetGroups || []).forEach(g => { if (g && g.id != null && !(g.id in _agCur)) _agCur[g.id] = g.status; }));
+          const _agStatusOf = (g) => (g && g.id != null && _agCur[g.id]) ? _agCur[g.id] : (g.status || '');
           // Hide dead asset groups: not-active AND zero activity in the period (old paused/removed groups
           // with 0 spend that clutter the view and confuse clients). Keep active groups + any with activity.
           const _agActivity = (g) => (g.spend || 0) + (g.impressions || 0) + (g.clicks || 0) + (g.conversions || g.leads || 0);
-          const groups = allGroups.filter(g => (g.status === 'ENABLED') || _agActivity(g) > 0);
+          const groups = allGroups.filter(g => (_agStatusOf(g) === 'ENABLED') || _agActivity(g) > 0);
           if (groups.length === 0) return null;
           return (
             <div className="section section-asset-gallery">
@@ -4439,7 +4447,7 @@ const selectProject = async (client, project) => {
                         <div style={{width:'100%',aspectRatio:'16/9',background:'linear-gradient(135deg,#dbeafe,#cffafe)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5em',color:'#64748b'}}>{'\ud83c\udfaf'}</div>
                       )}
                       <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'10px'}}>
-                        {(() => { const agSt = ag.status || ''; const isAgA = agSt === 'ENABLED'; const isAgP = agSt === 'PAUSED'; const agC = isAgA ? '#059669' : isAgP ? '#d97706' : '#64748b'; const agL = isAgA ? 'פעיל' : isAgP ? 'מושהה' : agSt || 'לא ידוע'; return <div style={{fontSize:'0.75em',color:agC,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {agL}</div>; })()}
+                        {(() => { const agSt = _agStatusOf(ag); const isAgA = agSt === 'ENABLED'; const isAgP = agSt === 'PAUSED'; const agC = isAgA ? '#059669' : isAgP ? '#d97706' : '#64748b'; const agL = isAgA ? 'פעיל' : isAgP ? 'מושהה' : agSt || 'לא ידוע'; return <div style={{fontSize:'0.75em',color:agC,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {agL}</div>; })()}
                         <div style={{fontWeight:700,fontSize:'1em',color:'#0f172a'}}>{ag.name}</div>
                         <div style={{fontSize:'0.72em',color:'#94a3b8',unicodeBidi:'plaintext'}}>{'\ud83d\udcca'} {ag.campaign || '-'}</div>
                         {headlines.length > 0 && (
