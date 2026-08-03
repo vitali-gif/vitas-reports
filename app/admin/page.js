@@ -4284,11 +4284,13 @@ const selectProject = async (client, project) => {
         {(dashTab === 'facebook' || dashTab === 'all') && (() => {
           const activeAdsList = fbReports.flatMap(r => r.summary?.activeAds || []);
           if (activeAdsList.length === 0) return null;
-          // activeAds are already sorted + trimmed to top 5 by the API, but re-sort defensively
+          // activeAds hold ALL active ads (API no longer trims); we dedupe by name + take the top by leads below
           const _isZohoClient = crmReports[0]?.summary?.crmType === 'zoho';
           let _adsPool = activeAdsList;
-          if (_isZohoClient) {
-            // Dedupe the same creative shown across multiple campaigns/adsets — group by normalized name, sum metrics
+          {
+            // Dedupe the same creative shown across multiple campaigns/adsets — group by normalized name, sum metrics.
+            // Applied to ALL clients (was Zoho-only): ש.ברוך FB data is ad-level with the SAME creative duplicated
+            // across adsets, so without this the top-5 collapsed to ~3 distinct ads. Merging by name restores distinct creatives.
             const _normAdName = (n) => (n || '').replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\ufeff]/g, '').replace(/\s*[-\u2013]\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/,'').replace(/\s*#\d+$/,'').trim();
             const _byName = {};
             for (const ad of activeAdsList) {
@@ -4305,7 +4307,7 @@ const selectProject = async (client, project) => {
           }
           const topAds = [..._adsPool]
             .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
-            .slice(0, _isZohoClient ? 10 : 5);
+            .slice(0, _isZohoClient ? 10 : 6);
           return (
             <div className="section section-top-ads">
               <div className="section-head">
