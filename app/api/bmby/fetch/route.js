@@ -332,6 +332,19 @@ async function runSync(opts = {}) {
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
 
+    if (opts.findLead) {
+      const needles = (Array.isArray(opts.findLead) ? opts.findLead : [opts.findLead]).map(x => String(x).toLowerCase())
+      const hay = (o) => [o.phone_mobile,o.phone_home,o.phone_work,o.email,o.fname,o.lname,o.name,o.client_name,o.client_fname,o.client_lname].map(v=>(v||'').toString().toLowerCase()).join(' ')
+      const matchCids = new Set()
+      const cRows = clients.filter(c => { const h=hay(c); const hit=needles.some(n=>h.includes(n)); if(hit) matchCids.add(String(c.client_id||'')); return hit })
+      // include ALL rows for matched client_ids (multi custom-field rows)
+      const allRowsForCids = clients.filter(c => matchCids.has(String(c.client_id||'')))
+      const tRows = tasks.filter(t => matchCids.has(String(t.client_id||'')) || needles.some(n=>hay(t).includes(n)))
+      const trim = (o)=>Object.fromEntries(Object.entries(o).filter(([k,v])=>String(v).trim()))
+      return { project: p.name, findLead: needles, totalClients: clients.length,
+        matchedClientRows: allRowsForCids.map(trim),
+        matchedTasks: tRows.map(trim) }
+    }
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
       const _dist = {}, _stageXstatus = {}
@@ -1192,6 +1205,7 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
+      findLead: body.findLead,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
