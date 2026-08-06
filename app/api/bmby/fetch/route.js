@@ -332,6 +332,20 @@ async function runSync(opts = {}) {
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
 
+    if (opts.rawKeys) {
+      const re = /plat|cam|add|adset|series|creativ|_f$|_n$|utm/i
+      // global: any key (client or task) matching the pattern, with non-empty coverage + samples
+      const scan = (rows) => { const cov={}, samp={}; for(const r of rows){ for(const k of Object.keys(r)){ if(re.test(k)){ const v=(r[k]||'').toString().trim(); cov[k]=cov[k]||{present:0,nonEmpty:0}; cov[k].present++; if(v){cov[k].nonEmpty++; (samp[k]=samp[k]||new Set()).add(v.slice(0,40))} } } } return { cov, samp: Object.fromEntries(Object.entries(samp).map(([k,v])=>[k,[...v].slice(0,5)])) } }
+      const cScan=scan(clients), tScan=scan(tasks)
+      // ALL distinct keys present anywhere (incl empty) on client + task
+      const allCK=new Set(); for(const c of clients) for(const k of Object.keys(c)) allCK.add(k)
+      const allTK=new Set(); for(const t of tasks) for(const k of Object.keys(t)) allTK.add(k)
+      // full raw rows (no trim) of the 2 newest clients by client_date + 2 newest LID tasks
+      const byDate=(a,b,f)=>String(b[f]||'').localeCompare(String(a[f]||''))
+      const newestClients=[...clients].sort((a,b)=>byDate(a,b,'client_date')).slice(0,2)
+      const newestLids=[...tasks].filter(t=>(t.type||'').toString().toLowerCase()==='lid').sort((a,b)=>byDate(a,b,'create_date')).slice(0,2)
+      return { project: p.name, rawKeys:true, clientMatch:cScan, taskMatch:tScan, allClientKeys:[...allCK].sort(), allTaskKeys:[...allTK].sort(), newestClients, newestLids }
+    }
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
       const _dist = {}, _stageXstatus = {}
@@ -1192,6 +1206,7 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
+      rawKeys: body.rawKeys,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
