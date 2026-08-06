@@ -1607,12 +1607,13 @@ const selectProject = async (client, project) => {
         <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>{'פגישות שבוצעו'}</h2><span className="sub">{meetings.length + ' פגישות בתקופה'}</span></div>
         <div className="table-wrapper">
           <table className="data-table">
-            <thead><tr><th>{'שם מלא'}</th><th>{'טלפון'}</th><th>{'תאריך פגישה'}</th><th>{'תיאור'}</th></tr></thead>
+            <thead><tr><th>{'שם מלא'}</th><th>{'טלפון'}</th><th>{'מקור הגעה'}</th><th>{'תאריך פגישה'}</th><th>{'תיאור'}</th></tr></thead>
             <tbody>
               {meetings.map((m, i) => (
                 <tr key={i}>
                   <td style={{fontWeight:600,whiteSpace:'nowrap'}}>{m.name || '—'}</td>
                   <td style={{whiteSpace:'nowrap',direction:'ltr',textAlign:'right'}}>{m.phone || '—'}</td>
+                  <td style={{whiteSpace:'nowrap'}}>{m.source || '—'}</td>
                   <td style={{whiteSpace:'nowrap'}}>{fmtDate(m.date)}</td>
                   <td style={{whiteSpace:'pre-wrap',lineHeight:1.5,maxWidth:520,minWidth:220}}>{m.description || '—'}</td>
                 </tr>
@@ -4936,12 +4937,21 @@ const selectProject = async (client, project) => {
               <p style={{color:'#94a3b8',textAlign:'center',margin:'24px 0'}}>אין נתונים להצגה</p>
             ) : (
               <ul style={{margin:0,padding:0,listStyle:'none',overflowY:'auto',flex:1}}>
-                {namedLeadsModal.names.map((name, i) => (
+                {namedLeadsModal.names.map((entry, i) => {
+                  const _n = typeof entry === 'string' ? entry : (entry && entry.name) || '—';
+                  const _p = (entry && typeof entry === 'object') ? (entry.phone || '') : '';
+                  const _s = (entry && typeof entry === 'object') ? (entry.source || '') : '';
+                  const _v = (entry && typeof entry === 'object' && entry.value) ? entry.value : null;
+                  return (
                   <li key={i} style={{padding:'9px 12px',borderBottom:'1px solid var(--border)',fontSize:14,display:'flex',alignItems:'center',gap:10}}>
                     <span style={{width:22,height:22,borderRadius:'50%',background:'var(--indigo-50)',color:'var(--indigo)',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
-                    {name}
+                    <div style={{display:'flex',flexDirection:'column',gap:2,minWidth:0,flex:1}}>
+                      <span style={{fontWeight:600}}>{_n}{_v ? ` (₪${Number(_v).toLocaleString('he-IL')})` : ''}</span>
+                      {(_p || _s) && <span style={{fontSize:12,color:'#94a3b8'}}>{_p ? <span style={{unicodeBidi:'plaintext'}}>{_p}</span> : null}{_p && _s ? ' · ' : ''}{_s}</span>}
+                    </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
             <div style={{marginTop:14,textAlign:'left'}}>

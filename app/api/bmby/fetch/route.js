@@ -426,6 +426,9 @@ async function runSync(opts = {}) {
     // client_id -> phone (mobile preferred) for the "פגישות שבוצעו" detail list
     const cidToPhone = new Map()
     for (const _c of clients) { const _id = String(_c.client_id || ''); if (!_id) continue; const _ph = (_c.phone_mobile || _c.phone_home || _c.phone_work || '').toString().trim(); if (_ph && !cidToPhone.has(_id)) cidToPhone.set(_id, _ph) }
+    // Arrival-source label per client (KPI-card modal + completed-meetings table)
+    const _srcHe = { Facebook: 'פייסבוק', Google: 'גוגל', Organic: 'אורגני', Phone: 'טלפון', Referral: 'הפניה', Unknown: 'לא ידוע' }
+    const _leadSource = (cid) => { const b = bucketSource(cidToMedia.get(String(cid)) || ''); return _srcHe[b] || b }
     const _meetRecs = { sched: [], comp: [], canc: [] } // per-appointment {cid,name} — matches the BMBY meeting count
     const _completedMeetings = [] // full detail of completed meetings in window: {name, phone, date, description}
     for (const t of tasks) {
@@ -445,7 +448,7 @@ async function runSync(opts = {}) {
         _apptByDate.total++
         const _rec = { cid, name: (t.client_name || '').toString().trim() }
         if (!isCanc) { _apptByDate.scheduled++; _meetRecs.sched.push(_rec) }
-        if (isDone)  { _apptByDate.completed++; _meetRecs.comp.push(_rec); _completedMeetings.push({ name: _rec.name, phone: cidToPhone.get(cid) || '', date: (t.start_date || '').toString(), description: (t.message || '').toString().trim() }) }
+        if (isDone)  { _apptByDate.completed++; _meetRecs.comp.push(_rec); _completedMeetings.push({ name: _rec.name, phone: cidToPhone.get(cid) || '', source: _leadSource(cid), date: (t.start_date || '').toString(), description: (t.message || '').toString().trim() }) }
         if (isCanc)  { _apptByDate.cancelled++; _meetRecs.canc.push(_rec) }
       }
       // Debug: count raw appointment status values
@@ -1003,38 +1006,20 @@ async function runSync(opts = {}) {
     }
     const _lidScheduled = (lid) => { const ps = _postLidAppts(lid); return ps.length > 0 && ps.some(a => !a.cancelled) }
     const _lidCompleted = (lid) => _postLidAppts(lid).some(a => a.completed)
+    const _entry = (cid, name) => ({ name: name || clientName.get(String(cid)) || `ליד #${cid}`, phone: cidToPhone.get(String(cid)) || '', source: _leadSource(cid) })
     const _buildGroup = (lids, regs, conts) => ({
-      meetingsScheduled: lids
-        .filter(_lidScheduled)
-        .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
-        .filter(Boolean),
-      meetingsCompleted: lids
-        .filter(_lidCompleted)
-        .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
-        .filter(Boolean),
-      registrations: regs
-        .map(po => {
-          return ((po.client_fname || '') + ' ' + (po.client_lname || '')).trim()
-            || clientName.get(String(po.client_id || ''))
-            || `\u05dc\u05d9\u05d3 #${po.client_id}`
-        })
-        .filter(Boolean),
-      contracts: conts
-        .map(k => {
-          const name = ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim()
-            || clientName.get(String(k.client_id || ''))
-            || `\u05dc\u05d9\u05d3 #${k.client_id}`
-          const val = k.price_agreement_inc_vat || k.final_price_inc_vat || k.list_price || k.price_agreement || k.final_price || null
-          return val ? `${name} (\u20aa${Number(val).toLocaleString('he-IL')})` : name
-        })
-        .filter(Boolean),
-      noResponse: lids
-        .filter(lid => _noResponseCids.has(String(lid.client_id || '')))
-        .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
-        .filter(Boolean),
-      allLeads: lids
-        .map(lid => clientName.get(String(lid.client_id || '')) || `\u05dc\u05d9\u05d3 #${lid.client_id}`)
-        .filter(Boolean),
+      meetingsScheduled: lids.filter(_lidScheduled).map(lid => _entry(lid.client_id)),
+      meetingsCompleted: lids.filter(_lidCompleted).map(lid => _entry(lid.client_id)),
+      registrations: regs.map(po => _entry(po.client_id, ((po.client_fname || '') + ' ' + (po.client_lname || '')).trim())),
+      contracts: conts.map(k => {
+        const _nm = ((k.client_fname || '') + ' ' + (k.client_lname || '')).trim() || clientName.get(String(k.client_id || '')) || `ליד #${k.client_id}`
+        const _val = k.price_agreement_inc_vat || k.final_price_inc_vat || k.list_price || k.price_agreement || k.final_price || null
+        const _e = _entry(k.client_id, _nm)
+        if (_val) _e.value = Number(_val)
+        return _e
+      }),
+      noResponse: lids.filter(lid => _noResponseCids.has(String(lid.client_id || ''))).map(lid => _entry(lid.client_id)),
+      allLeads: lids.map(lid => _entry(lid.client_id)),
     })
 
     const _fbLids  = aprilLids.filter(_isFbLid)
@@ -1053,12 +1038,12 @@ async function runSync(opts = {}) {
     const _mediaSrc = (md) => /פייסבוק|facebook/i.test(md || '') ? 'facebook' : /גוגל|google|pmax|search/i.test(md || '') ? 'google' : 'other'
     const _mName = (r) => r.name || clientName.get(r.cid) || `ליד #${r.cid}`
     const _recMedia = (r) => cidToMedia.get(r.cid) || ''
-    namedLeads.all.meetingsScheduled      = _meetRecs.sched.map(_mName).filter(Boolean)
-    namedLeads.all.meetingsCompleted      = _meetRecs.comp.map(_mName).filter(Boolean)
-    namedLeads.facebook.meetingsScheduled = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(_mName).filter(Boolean)
-    namedLeads.facebook.meetingsCompleted = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(_mName).filter(Boolean)
-    namedLeads.google.meetingsScheduled   = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(_mName).filter(Boolean)
-    namedLeads.google.meetingsCompleted   = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(_mName).filter(Boolean)
+    namedLeads.all.meetingsScheduled      = _meetRecs.sched.map(r => _entry(r.cid, r.name))
+    namedLeads.all.meetingsCompleted      = _meetRecs.comp.map(r => _entry(r.cid, r.name))
+    namedLeads.facebook.meetingsScheduled = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name))
+    namedLeads.facebook.meetingsCompleted = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name))
+    namedLeads.google.meetingsScheduled   = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
+    namedLeads.google.meetingsCompleted   = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
 
     // Single upsert: store source-level rows in `data`, and per-LID city/objection
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
@@ -1071,7 +1056,7 @@ async function runSync(opts = {}) {
     totals.meetingsCompleted = _apptByDate.completed
     totals.meetingsCancelled = _apptByDate.cancelled
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 15  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 16  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
