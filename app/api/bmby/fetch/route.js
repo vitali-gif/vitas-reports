@@ -332,25 +332,6 @@ async function runSync(opts = {}) {
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
 
-    if (opts.lidScan) {
-      const _lids = tasks.filter(t => (t.type || '').toString().toLowerCase() === 'lid')
-      const kc = {}; for (const t of _lids) for (const k of Object.keys(t)) { if (String(t[k]||'').trim()) kc[k]=(kc[k]||0)+1 }
-      const cc = {}; for (const c of clients) for (const k of Object.keys(c)) { if (String(c[k]||'').trim()) cc[k]=(cc[k]||0)+1 }
-      const trim = (o) => Object.fromEntries(Object.entries(o).filter(([k,v])=>String(v).trim()))
-      const byCid = {}; for (const c of clients){ const id=String(c.client_id||''); if(!id) continue; (byCid[id]=byCid[id]||[]).push(c) }
-      const titleSet={}; for (const c of clients){ const tt=(c.title||'').toString().trim(); if(tt) titleSet[tt]=(titleSet[tt]||0)+1 }
-      const multi = Object.entries(byCid).filter(([id,rw])=>rw.length>1).slice(0,2).map(([id,rw])=>({cid:id, rows:rw.map(r=>({title:r.title,value:r.value}))}))
-      const adNameCnt={}; for(const c of clients){ if(String(c.title||'').trim()==='שם מודעה'){ const v=(c.value||'').toString().trim(); if(v) adNameCnt[v]=(adNameCnt[v]||0)+1 } }
-      const mtCnt={}; for(const t of _lids){ const v=(t.media_title||'').toString().trim(); if(v) mtCnt[v]=(mtCnt[v]||0)+1 }
-      return { project: p.name, lidScan: true, totalLids: _lids.length, clientRows: clients.length, distinctClientIds: Object.keys(byCid).length,
-        distinctTitles: Object.entries(titleSet).sort((a,b)=>b[1]-a[1]),
-        multiRowSample: multi,
-        adNameValues: Object.entries(adNameCnt).sort((a,b)=>b[1]-a[1]).slice(0,25),
-        mediaTitles: Object.entries(mtCnt).sort((a,b)=>b[1]-a[1]).slice(0,25),
-        lidKeys: Object.entries(kc).sort((a,b)=>b[1]-a[1]),
-        clientKeys: Object.entries(cc).sort((a,b)=>b[1]-a[1]),
-        sampleLids: _lids.slice(0,3).map(trim) }
-    }
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
       const _dist = {}, _stageXstatus = {}
@@ -1211,7 +1192,6 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
-      lidScan: body.lidScan,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
