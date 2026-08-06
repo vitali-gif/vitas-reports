@@ -426,9 +426,10 @@ async function runSync(opts = {}) {
     // client_id -> phone (mobile preferred) for the "פגישות שבוצעו" detail list
     const cidToPhone = new Map()
     for (const _c of clients) { const _id = String(_c.client_id || ''); if (!_id) continue; const _ph = (_c.phone_mobile || _c.phone_home || _c.phone_work || '').toString().trim(); if (_ph && !cidToPhone.has(_id)) cidToPhone.set(_id, _ph) }
-    // Arrival-source label per client (KPI-card modal + completed-meetings table)
-    const _srcHe = { Facebook: 'פייסבוק', Google: 'גוגל', Organic: 'אורגני', Phone: 'טלפון', Referral: 'הפניה', Unknown: 'לא ידוע' }
-    const _leadSource = (cid) => { const b = bucketSource(cidToMedia.get(String(cid)) || ''); return _srcHe[b] || b }
+    // Arrival-source per client (KPI-card modal + completed-meetings table): the FULL media_title
+    // (e.g. 'hi park | דופלקסים 170 מר | פייסבוק'), same value the מקורות-הגעה funnel groups by —
+    // NOT the collapsed platform bucket.
+    const _leadSource = (cid) => (cidToMedia.get(String(cid)) || '').toString().trim() || 'ללא מקור'
     const _meetRecs = { sched: [], comp: [], canc: [] } // per-appointment {cid,name} — matches the BMBY meeting count
     const _completedMeetings = [] // full detail of completed meetings in window: {name, phone, date, description}
     for (const t of tasks) {
