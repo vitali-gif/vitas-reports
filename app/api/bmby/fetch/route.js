@@ -337,10 +337,15 @@ async function runSync(opts = {}) {
       const kc = {}; for (const t of _lids) for (const k of Object.keys(t)) { if (String(t[k]||'').trim()) kc[k]=(kc[k]||0)+1 }
       const cc = {}; for (const c of clients) for (const k of Object.keys(c)) { if (String(c[k]||'').trim()) cc[k]=(cc[k]||0)+1 }
       const trim = (o) => Object.fromEntries(Object.entries(o).filter(([k,v])=>String(v).trim()))
-      return { project: p.name, lidScan: true, totalLids: _lids.length, totalClients: clients.length,
+      const byCid = {}; for (const c of clients){ const id=String(c.client_id||''); if(!id) continue; (byCid[id]=byCid[id]||[]).push(c) }
+      const titleSet={}; for (const c of clients){ const tt=(c.title||'').toString().trim(); if(tt) titleSet[tt]=(titleSet[tt]||0)+1 }
+      const multi = Object.entries(byCid).filter(([id,rw])=>rw.length>1).slice(0,2).map(([id,rw])=>({cid:id, rows:rw.map(r=>({title:r.title,value:r.value}))}))
+      return { project: p.name, lidScan: true, totalLids: _lids.length, clientRows: clients.length, distinctClientIds: Object.keys(byCid).length,
+        distinctTitles: Object.entries(titleSet).sort((a,b)=>b[1]-a[1]),
+        multiRowSample: multi,
         lidKeys: Object.entries(kc).sort((a,b)=>b[1]-a[1]),
         clientKeys: Object.entries(cc).sort((a,b)=>b[1]-a[1]),
-        sampleLids: _lids.slice(0,4).map(trim) }
+        sampleLids: _lids.slice(0,3).map(trim) }
     }
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
