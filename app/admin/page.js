@@ -1723,7 +1723,7 @@ const selectProject = async (client, project) => {
     const ct = crmData.totals;
     const cp = prevCrmData?.totals;
 
-    const crmKpi = (label, value, color, current, prev, isCost, tip, namesArr) => {
+    const crmKpi = (label, value, color, current, prev, isCost, tip, namesArr, subNote) => {
       const ch = (prev != null && prev !== 0) ? changePercent(current, prev, isCost)
         : (prev === 0 && current > 0) ? { pct: null, isGood: !isCost, newVal: true }
         : null;
@@ -1771,6 +1771,7 @@ const selectProject = async (client, project) => {
           </div>
           <div className="kpi-label">{label}{tip ? <InfoTip text={tip} /> : null}</div>
           <div className="kpi-value">{value}</div>
+          {subNote ? <div style={{fontSize:10.5,color:'#64748b',marginTop:3,lineHeight:1.3,fontWeight:600}}>{subNote}</div> : null}
           <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>
         </div>
       );
@@ -1903,8 +1904,8 @@ const selectProject = async (client, project) => {
         <div className="kpi-grid">
           {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
-          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, '\u05de\u05e1\u05e4\u05e8 \u05d4\u05dc\u05d9\u05d3\u05d9\u05dd \u05e9\u05e7\u05d1\u05e2\u05d5 \u05e4\u05d2\u05d9\u05e9\u05d4', _crmLeads?.meetingsScheduled)}
-          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, '\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5 \u05d1\u05e4\u05d5\u05e2\u05dc', _crmLeads?.meetingsCompleted)}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, '\u05de\u05e1\u05e4\u05e8 \u05d4\u05dc\u05d9\u05d3\u05d9\u05dd \u05e9\u05e7\u05d1\u05e2\u05d5 \u05e4\u05d2\u05d9\u05e9\u05d4', _crmLeads?.meetingsScheduled, (ct.meetingsScheduledSplit && (ct.meetingsScheduledSplit.fromNewLeads+ct.meetingsScheduledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsScheduledSplit.fromNewLeads+' · קודמים '+ct.meetingsScheduledSplit.fromOldLeads) : null))}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, '\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5 \u05d1\u05e4\u05d5\u05e2\u05dc', _crmLeads?.meetingsCompleted, (ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null))}
           {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations)}
           {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts)}
           {_platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
