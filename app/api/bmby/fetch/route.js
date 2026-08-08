@@ -418,6 +418,7 @@ async function runSync(opts = {}) {
     const clientsWithCancelledAppt = new Set()  // window + cancelled
     // NEW (verify-first debug): per-APPOINTMENT counts in range (not per-lead), to match BMBY.
     const _apptByCoord = { total: 0, scheduled: 0, completed: 0, cancelled: 0 } // by create_date (coordination date)
+    let _apptFuture = 0  // עתידיות: coordinated this period, still open (not done/cancelled), future date
     const _apptByDate  = { total: 0, scheduled: 0, completed: 0, cancelled: 0 } // by start_date (meeting date)
     const _todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
     const _meetUntil = (until && until > _todayStr) ? _todayStr : until // BMBY counts meetings only up to today (not future-scheduled)
@@ -430,7 +431,7 @@ async function runSync(opts = {}) {
     // (e.g. 'hi park | דופלקסים 170 מר | פייסבוק'), same value the מקורות-הגעה funnel groups by —
     // NOT the collapsed platform bucket.
     const _leadSource = (cid) => (cidToMedia.get(String(cid)) || '').toString().trim() || 'ללא מקור'
-    const _meetRecs = { sched: [], comp: [], canc: [] } // per-appointment {cid,name} — matches the BMBY meeting count
+    const _meetRecs = { sched: [], comp: [], canc: [], future: [] } // per-appointment {cid,name} — matches the BMBY meeting count
     const _completedMeetings = [] // full detail of completed meetings in window: {name, phone, date, description}
     for (const t of tasks) {
       const tyRaw = (t.type || '').toString()
@@ -444,16 +445,18 @@ async function runSync(opts = {}) {
       const isDone = /done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)
       const isCanc = /cancel|בוטל/.test(status)
       const _rec = { cid, name: (t.client_name || '').toString().trim() }
-      // "תואמו" = meetings COORDINATED (create_date) in the period — matches BMBY + the hourly chart,
-      // and shows meetings booked this month even if scheduled for a future date.
+      const _sd = (t.start_date || t.create_date || '').toString().slice(0, 10)
+      // "תואמו" = ALL meetings COORDINATED (create_date) this period, any status. Its status
+      // breakdown — עתידיות (open+future) / בוטלו (cancelled) — shares this coordination anchor so they reconcile.
       if (inRangeDate(t.create_date)) {
         _apptByCoord.total++
-        if (!isCanc) { _apptByCoord.scheduled++; _meetRecs.sched.push(_rec) }
+        _meetRecs.sched.push(_rec)                                    // תואמו (all statuses)
+        if (!isCanc) _apptByCoord.scheduled++
         if (isDone) _apptByCoord.completed++
-        if (isCanc) { _apptByCoord.cancelled++; _meetRecs.canc.push(_rec) }
+        if (isCanc) { _apptByCoord.cancelled++; _meetRecs.canc.push(_rec) }                     // בוטלו
+        else if (!isDone && _sd && _sd > _todayStr) { _apptFuture++; _meetRecs.future.push(_rec) }  // עתידיות
       }
-      // "בוצעו" = meetings HELD (start_date reached, up to today) + marked done — regardless of lead month.
-      const _sd = (t.start_date || t.create_date || '').toString().slice(0, 10)
+      // "בוצעו" = meetings HELD (start_date reached, up to today) + done — regardless of when coordinated (incl. old-month leads).
       if (_sd && _sd >= since && _sd <= _meetUntil) {
         _apptByDate.total++
         if (!isCanc) _apptByDate.scheduled++
@@ -1053,6 +1056,12 @@ async function runSync(opts = {}) {
     namedLeads.facebook.meetingsCompleted = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name))
     namedLeads.google.meetingsScheduled   = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
     namedLeads.google.meetingsCompleted   = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
+    namedLeads.all.meetingsUpcoming       = _meetRecs.future.map(r => _entry(r.cid, r.name))
+    namedLeads.all.meetingsCancelled      = _meetRecs.canc.map(r => _entry(r.cid, r.name))
+    namedLeads.facebook.meetingsUpcoming  = _meetRecs.future.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name))
+    namedLeads.facebook.meetingsCancelled = _meetRecs.canc.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name))
+    namedLeads.google.meetingsUpcoming    = _meetRecs.future.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
+    namedLeads.google.meetingsCancelled   = _meetRecs.canc.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
 
     // Single upsert: store source-level rows in `data`, and per-LID city/objection
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
@@ -1061,16 +1070,18 @@ async function runSync(opts = {}) {
     // === Meetings now match BMBY exactly: counted per APPOINTMENT by meeting date (start_date),
     // up to today (BMBY excludes future-scheduled). Replaces the per-lead attribution for the
     // top KPI totals. Verified vs BMBY (ONCE July): 4 scheduled / 4 completed.
-    totals.meetingsScheduled = _apptByCoord.scheduled   // תואמו = coordinated this period
+    totals.meetingsScheduled = _apptByCoord.total       // תואמו = ALL meetings coordinated this period
     totals.meetingsCompleted = _apptByDate.completed     // בוצעו = held this period (incl. old-month leads)
-    totals.meetingsCancelled = _apptByCoord.cancelled
-    // Split each meeting metric by whether the meeting's lead entered THIS period (new) or earlier (old).
+    totals.meetingsCancelled = _apptByCoord.cancelled    // בוטלו = coordinated this period + cancelled
+    totals.meetingsUpcoming  = _apptFuture               // עתידיות = coordinated this period, open, future date
     const _periodLeadCids = new Set(aprilLids.map(l => String(l.client_id || '')))
     const _mSplit = (recs) => { let nw=0, od=0; for (const r of recs) { if (_periodLeadCids.has(String(r.cid))) nw++; else od++ } return { fromNewLeads: nw, fromOldLeads: od } }
     totals.meetingsScheduledSplit = _mSplit(_meetRecs.sched)
     totals.meetingsCompletedSplit = _mSplit(_meetRecs.comp)
+    totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
+    totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 17  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 18  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
