@@ -16,7 +16,7 @@ import Sparkline from '../components/Sparkline'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
-function InfoTip({ text }) {
+function InfoTip({ text, icon = 'i' }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef(null)
   const [pos, setPos] = useState({ top: 0, right: 0 })
@@ -32,21 +32,23 @@ function InfoTip({ text }) {
     return () => document.removeEventListener('click', handler)
   }, [open])
 
+  const computePos = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right - 4) })
+    }
+  }
   const handleClick = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setPos({
-        top: rect.bottom + 8,
-        right: Math.max(8, window.innerWidth - rect.right - 4),
-      })
-    }
+    computePos()
     setOpen(!open)
   }
+  const handleEnter = () => { computePos(); setOpen(true) }
+  const handleLeave = () => setOpen(false)
 
   return (
-    <span className="info-tip-wrapper" style={{ position: 'relative', display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }}>
+    <span className="info-tip-wrapper" onMouseEnter={handleEnter} onMouseLeave={handleLeave} style={{ position: 'relative', display: 'inline-block', marginRight: 6, verticalAlign: 'middle' }}>
       <span
         ref={triggerRef}
         onClick={handleClick}
@@ -59,7 +61,7 @@ function InfoTip({ text }) {
           transition: 'all 0.15s ease',
         }}
         title=""
-      >i</span>
+      >{icon}</span>
       {open && typeof document !== 'undefined' && createPortal(
         <div className="info-tip-popover" style={{
           position: 'fixed',
@@ -1769,7 +1771,7 @@ const selectProject = async (client, project) => {
               );
             })() : null}
           </div>
-          <div className="kpi-label">{label}{tip ? <InfoTip text={tip} /> : null}</div>
+          <div className="kpi-label">{label}{tip ? <InfoTip text={tip} icon="!" /> : null}</div>
           <div className="kpi-value">{value}</div>
           {subNote ? <div style={{fontSize:10.5,color:'#64748b',marginTop:3,lineHeight:1.3,fontWeight:600}}>{subNote}</div> : null}
           <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>
@@ -1904,10 +1906,10 @@ const selectProject = async (client, project) => {
         <div className="kpi-grid">
           {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
-          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, '\u05de\u05e1\u05e4\u05e8 \u05d4\u05dc\u05d9\u05d3\u05d9\u05dd \u05e9\u05e7\u05d1\u05e2\u05d5 \u05e4\u05d2\u05d9\u05e9\u05d4', _crmLeads?.meetingsScheduled, (ct.meetingsScheduledSplit && (ct.meetingsScheduledSplit.fromNewLeads+ct.meetingsScheduledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsScheduledSplit.fromNewLeads+' · קודמים '+ct.meetingsScheduledSplit.fromOldLeads) : null))}
-          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, '\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d4\u05ea\u05e7\u05d9\u05d9\u05de\u05d5 \u05d1\u05e4\u05d5\u05e2\u05dc', _crmLeads?.meetingsCompleted, (ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null))}
-          {crmKpi('פגישות עתידיות', formatNum(ct.meetingsUpcoming||0), 'cyan', ct.meetingsUpcoming||0, cp?.meetingsUpcoming, false, 'פגישות שנקבעו וטרם התקיימו (מועד עתידי)', _crmLeads?.meetingsUpcoming, (ct.meetingsUpcomingSplit && (ct.meetingsUpcomingSplit.fromNewLeads+ct.meetingsUpcomingSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsUpcomingSplit.fromNewLeads+' · קודמים '+ct.meetingsUpcomingSplit.fromOldLeads) : null))}
-          {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled||0), 'red', ct.meetingsCancelled||0, cp?.meetingsCancelled, false, 'פגישות שנקבעו החודש ובוטלו', _crmLeads?.meetingsCancelled, (ct.meetingsCancelledSplit && (ct.meetingsCancelledSplit.fromNewLeads+ct.meetingsCancelledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCancelledSplit.fromNewLeads+' · קודמים '+ct.meetingsCancelledSplit.fromOldLeads) : null))}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, 'תואמו = כל הפגישות שנקבעו החודש.\nנספר לפי תאריך התיאום (מתי נקבעה הפגישה), בכל סטטוס: עתידיות + שבוצעו + שבוטלו.\nהשורה למטה: כמה מלידים שנכנסו החודש (חדשים) וכמה מלידים מחודשים קודמים.', _crmLeads?.meetingsScheduled, (ct.meetingsScheduledSplit && (ct.meetingsScheduledSplit.fromNewLeads+ct.meetingsScheduledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsScheduledSplit.fromNewLeads+' · קודמים '+ct.meetingsScheduledSplit.fromOldLeads) : null))}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה — רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, (ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null))}
+          {crmKpi('פגישות עתידיות', formatNum(ct.meetingsUpcoming||0), 'cyan', ct.meetingsUpcoming||0, cp?.meetingsUpcoming, false, 'עתידיות = פגישות שנקבעו וטרם התקיימו.\nמועד הפגישה עתידי (אחרי היום) והיא עדיין פתוחה. כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsUpcoming, (ct.meetingsUpcomingSplit && (ct.meetingsUpcomingSplit.fromNewLeads+ct.meetingsUpcomingSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsUpcomingSplit.fromNewLeads+' · קודמים '+ct.meetingsUpcomingSplit.fromOldLeads) : null))}
+          {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled||0), 'red', ct.meetingsCancelled||0, cp?.meetingsCancelled, false, 'בוטלו = פגישות שנקבעו החודש ובוטלו.\nנספר לפי תאריך התיאום, כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsCancelled, (ct.meetingsCancelledSplit && (ct.meetingsCancelledSplit.fromNewLeads+ct.meetingsCancelledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCancelledSplit.fromNewLeads+' · קודמים '+ct.meetingsCancelledSplit.fromOldLeads) : null))}
           {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations)}
           {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts)}
           {_platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
