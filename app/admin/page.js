@@ -1627,6 +1627,47 @@ const selectProject = async (client, project) => {
     );
   }, [selectedMonth, reports]);
 
+    const renderCrmAdsDashboard = useCallback(() => {
+      if (!selectedMonth || reports.length === 0) return null;
+      destroyCharts();
+      const crmReports = reports.filter(r => r.month === selectedMonth && r.source === 'crm');
+      const ab = crmReports[0]?.summary?.adBreakdown || [];
+      const _norm = (n) => (n || '').replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\ufeff]/g, '').replace(/\s*[-\u2013]\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').replace(/\s*#\d+$/, '').trim();
+      const fbReports = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
+      const spendByAd = {};
+      fbReports.forEach(r => (r.summary?.activeAds || []).forEach(a => { const k = _norm(a.name); if (!k) return; spendByAd[k] = (spendByAd[k] || 0) + ((a.metrics && a.metrics.spend) || 0); }));
+      const byAd = {};
+      ab.forEach(n => { const k = _norm(n.ad) || '\u05dc\u05dc\u05d0 \u05de\u05d5\u05d3\u05e2\u05d4'; if (!byAd[k]) byAd[k] = { ad: k, platform: n.platform || '', campaign: n.campaign || '', adset: n.adset || '', leads: 0, meetings: 0, registrations: 0, contracts: 0 }; const b = byAd[k]; b.leads += n.leads || 0; b.meetings += n.meetings || 0; b.registrations += n.registrations || 0; b.contracts += n.contracts || 0; if (n.platform && !b.platform) b.platform = n.platform; if (n.campaign && !b.campaign) b.campaign = n.campaign; if (n.adset && !b.adset) b.adset = n.adset; });
+      const rowsArr = Object.values(byAd).map(b => { const spend = spendByAd[b.ad] || 0; return { ...b, spend, cpl: b.leads ? spend / b.leads : 0, cpMe: b.meetings ? spend / b.meetings : 0, cpR: b.registrations ? spend / b.registrations : 0, cpD: b.contracts ? spend / b.contracts : 0 }; }).sort((a, b) => (b.spend - a.spend) || (b.leads - a.leads));
+      if (rowsArr.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udcca'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05dc\u05ea\u05e7\u05d5\u05e4\u05d4 \u05d6\u05d5'}</h3><p style={{color:'#64748b',marginTop:8}}>{'\u05d4\u05e9\u05d3\u05d5\u05ea \u05de\u05ea\u05de\u05dc\u05d0\u05d9\u05dd \u05e2\u05dc \u05dc\u05d9\u05d3\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd \u05de\u05e4\u05d9\u05d9\u05e1\u05d1\u05d5\u05e7 \u05d5\u05de\u05e6\u05d8\u05d1\u05e8\u05d9\u05dd \u05e2\u05dd \u05d4\u05d6\u05de\u05df'}</p></div>;
+      const money = (v) => '\u20aa' + Math.round(v || 0).toLocaleString('he-IL');
+      return (
+        <div className="section">
+          <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>{'\u05e2\u05dc\u05d5\u05ea \u05dc\u05ea\u05d5\u05e6\u05d0\u05d4 \u05dc\u05e4\u05d9 \u05de\u05d5\u05d3\u05e2\u05d4'}</h2><span className="sub">{'\u05e4\u05d9\u05d9\u05e1\u05d1\u05d5\u05e7 \u00b7 ' + rowsArr.length + ' \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</span></div>
+          <div className="table-wrapper"><table className="data-table">
+            <thead><tr><th>{'\u05de\u05d5\u05d3\u05e2\u05d4'}</th><th>{'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4'}</th><th>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05df'}</th><th>{'\u05e1\u05d3\u05e8\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</th><th>{'\u05d4\u05d5\u05e6\u05d0\u05d4'}</th><th>{'\u05dc\u05d9\u05d3\u05d9\u05dd'}</th><th>{'\u05e2\u05dc\u05d5\u05ea/\u05dc\u05d9\u05d3'}</th><th>{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea'}</th><th>{'\u05e2\u05dc\u05d5\u05ea/\u05e4\u05d2\u05d9\u05e9\u05d4'}</th><th>{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</th><th>{'\u05e2\u05dc\u05d5\u05ea/\u05d4\u05e8\u05e9\u05de\u05d4'}</th><th>{'\u05e2\u05e1\u05e7\u05d0\u05d5\u05ea'}</th><th>{'\u05e2\u05dc\u05d5\u05ea/\u05e2\u05e1\u05e7\u05d4'}</th></tr></thead>
+            <tbody>
+              {rowsArr.map((r, i) => (<tr key={i}>
+                <td style={{fontWeight:600,unicodeBidi:'plaintext',minWidth:150}}>{r.ad}</td>
+                <td>{r.platform || '\u2014'}</td>
+                <td style={{unicodeBidi:'plaintext',maxWidth:150,fontSize:'0.85em'}}>{r.campaign || '\u2014'}</td>
+                <td style={{unicodeBidi:'plaintext',maxWidth:150,fontSize:'0.85em'}}>{r.adset || '\u2014'}</td>
+                <td style={{whiteSpace:'nowrap'}}>{r.spend ? money(r.spend) : '\u2014'}</td>
+                <td style={{fontWeight:600}}>{r.leads}</td>
+                <td style={{whiteSpace:'nowrap'}}>{(r.leads && r.spend) ? money(r.cpl) : '\u2014'}</td>
+                <td>{r.meetings}</td>
+                <td style={{whiteSpace:'nowrap'}}>{(r.meetings && r.spend) ? money(r.cpMe) : '\u2014'}</td>
+                <td>{r.registrations}</td>
+                <td style={{whiteSpace:'nowrap'}}>{(r.registrations && r.spend) ? money(r.cpR) : '\u2014'}</td>
+                <td>{r.contracts}</td>
+                <td style={{whiteSpace:'nowrap'}}>{(r.contracts && r.spend) ? money(r.cpD) : '\u2014'}</td>
+              </tr>))}
+            </tbody>
+          </table></div>
+        </div>
+      );
+    }, [selectedMonth, reports]);
+
     const renderCrmDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
     destroyCharts();
@@ -3815,8 +3856,9 @@ const selectProject = async (client, project) => {
               <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
               <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
               <button className={`client-tab ${crmSubTab === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>📅 פגישות שבוצעו</button>
+              {reports.find(r => r.month === selectedMonth && r.source === 'crm')?.summary?.adBreakdown ? <button className={`client-tab ${crmSubTab === 'ads' ? 'active' : ''}`} onClick={() => setCrmSubTab('ads')}>📊 מודעות</button> : null}
             </div>
-            {crmSubTab === 'sources' ? renderCrmDashboard() : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : crmSubTab === 'meetings' ? renderCrmMeetingsDashboard() : renderCrmReportDashboard()}
+            {crmSubTab === 'sources' ? renderCrmDashboard() : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : crmSubTab === 'meetings' ? renderCrmMeetingsDashboard() : crmSubTab === 'ads' ? renderCrmAdsDashboard() : renderCrmReportDashboard()}
           </>)
         })() : (displayReports.length === 0 && dashTab !== 'all') ? (
           <div className="welcome-center" style={{padding:'60px 20px',textAlign:'center'}}>
