@@ -142,8 +142,20 @@ async function callBmbyGetAllJson(service, params) {
 
   // Parse the XML-as-string in `Data` into row objects
   const rows = []
-  const dataXml = parsed.Data || ''
+  let dataXml = parsed.Data || ''
   if (dataXml) {
+    // BMBY nests custom fields in a <Dynamic> block of <row><title>/<value> pairs INSIDE each
+    // client <row>. Pull them into one JSON field FIRST so the nested <row> tags don't break
+    // client-row splitting — and so we capture ALL custom fields (סוג נכס / שם מודעה / שם קמפיין /
+    // שם סדרת מודעות / פלטפורמת פרסום), not just the last one.
+    dataXml = dataXml.replace(/<Dynamic>([\s\S]*?)<\/Dynamic>/g, (whole, inner) => {
+      const cf = {}
+      const unc = (v) => { const c = String(v).match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/); return (c ? c[1] : v).trim() }
+      const pairRe = /<title>([\s\S]*?)<\/title>\s*<value>([\s\S]*?)<\/value>/g
+      let pm
+      while ((pm = pairRe.exec(inner)) !== null) { const t = unc(pm[1]); if (t) cf[t] = unc(pm[2]) }
+      return '<customfields>' + JSON.stringify(cf).replace(/</g, '\\u003c') + '</customfields>'
+    })
     const rowRegex = /<row>([\s\S]*?)<\/row>/g
     let m
     while ((m = rowRegex.exec(dataXml)) !== null) {
@@ -157,6 +169,7 @@ async function callBmbyGetAllJson(service, params) {
         if (cdataMatch) val = cdataMatch[1]
         obj[fm[1]] = val
       }
+      if (obj.customfields) { try { obj._cf = JSON.parse(obj.customfields) } catch { obj._cf = {} } delete obj.customfields }
       rows.push(obj)
     }
   }
@@ -332,6 +345,19 @@ async function runSync(opts = {}) {
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
 
+    if (opts.cfScan) {
+      const FIELDS = ['פלטפורמת פרסום','שם קמפיין','שם סדרת מודעות','שם מודעה','סוג נכס']
+      const cov = {}; const vals = {}
+      for (const f of FIELDS) { cov[f]=0; vals[f]={} }
+      let withAnyCf = 0
+      for (const c of clients) {
+        const cf = c._cf || {}
+        if (Object.keys(cf).length) withAnyCf++
+        for (const f of FIELDS) { const v=(cf[f]||'').toString().trim(); if (v){ cov[f]++; vals[f][v]=(vals[f][v]||0)+1 } }
+      }
+      const top = {}; for (const f of FIELDS) top[f]=Object.entries(vals[f]).sort((a,b)=>b[1]-a[1]).slice(0,12)
+      return { project: p.name, cfScan:true, totalClients: clients.length, withAnyCustomField: withAnyCf, coverage: cov, topValues: top }
+    }
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
       const _dist = {}, _stageXstatus = {}
@@ -523,10 +549,8 @@ async function runSync(opts = {}) {
       // Property type is stored as a title/value pair on the client row:
       // title === 'סוג נכס' → value holds the type (e.g. 'דירת 4 חדרים', 'דופלקס', 'פנטהאוז').
       // (title can also be 'שם מודעה' → value = ad name, so we must gate on title.)
-      if (String(c.title || '').trim() === 'סוג נכס') {
-        const pt = (c.value || '').toString().trim()
-        if (pt) clientPropertyType.set(cid, pt)
-      }
+      const pt = ((c._cf && c._cf['סוג נכס']) || '').toString().trim()
+      if (pt) clientPropertyType.set(cid, pt)
       // Collect client profile samples for debug
       if (clientProfileSamples.length < 10) {
         clientProfileSamples.push({
@@ -1216,6 +1240,7 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
+      cfScan: body.cfScan,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
