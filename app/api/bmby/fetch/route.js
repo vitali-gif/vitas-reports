@@ -56,6 +56,7 @@ function buildSoapGetAllJson(service, params) {
     { key: 'Login',      type: 'xsd:string' },
     { key: 'Password',   type: 'xsd:string' },
     { key: 'ProjectID',  type: 'xsd:int' },
+    { key: 'ClientID',   type: 'xsd:int' },
     { key: 'UniqID',     type: 'xsd:int' },
     { key: 'Dynamic',    type: 'xsd:int' },
     { key: 'FromDate',   type: 'xsd:string' },
@@ -287,6 +288,17 @@ async function runSync(opts = {}) {
     const lastDay = new Date(y, mm, 0).getDate()
     until = `${y}-${String(mm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     m = mArg
+  }
+
+  if (opts.rawClientId) {
+    const _body = buildSoapGetAllJson('clients', { Login: login, Password: password, ClientID: parseInt(opts.rawClientId), Dynamic: 1 })
+    const _res = await fetch(`${BMBY_BASE}/`, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"GetAllJson"' }, body: _body })
+    const _txt = await _res.text()
+    // unescape the inner JSON-string Data for readability
+    const m = _txt.match(/<GetAllJsonReturn[^>]*>([\s\S]*?)<\/GetAllJsonReturn>/)
+    let dataXml = ''
+    if (m) { try { const j = JSON.parse(m[1].replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&')); dataXml = (j.Data||'').slice(0, 8000) } catch(e){ dataXml = 'parse-err '+e.message } }
+    return { status: 200, body: { rawClientId: opts.rawClientId, httpStatus: _res.status, dataXml, rawHead: _txt.slice(0, 800) } }
   }
 
   // Load our projects list from Supabase
@@ -1216,6 +1228,7 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
+      rawClientId: body.rawClientId,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
