@@ -302,6 +302,36 @@ async function runSync(opts = {}) {
     m = mArg
   }
 
+  if (opts.getAllTest) {
+    const pid = parseInt(opts.getAllTest)
+    const mk = (uniq) => `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:v3="http://www.bmby.com/WebServices/srv/v3/">
+  <soapenv:Header/><soapenv:Body>
+    <v3:GetAll soapenv:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+      <Parameters xsi:type="v3:GetAllInput">
+        <Login xsi:type="xsd:string">${login}</Login>
+        <Password xsi:type="xsd:string">${password}</Password>
+        <ProjectID xsi:type="xsd:int">${pid}</ProjectID>
+        <UniqID xsi:type="xsd:int">${uniq}</UniqID>
+        <Dynamic xsi:type="xsd:int">1</Dynamic>
+      </Parameters>
+    </v3:GetAll>
+  </soapenv:Body></soapenv:Envelope>`
+    const call = async (uniq) => {
+      const r = await fetch(`${BMBY_BASE}/`, { method:'POST', headers:{ 'Content-Type':'text/xml; charset=utf-8','SOAPAction':'"GetAll"' }, body: mk(uniq) })
+      const t = await r.text()
+      const clientIds = (t.match(/<client_id>/g)||[]).length
+      const dyn = (t.match(/<Dynamic>/g)||[]).length
+      const fr = (t.match(/<FoundRows[^>]*>([^<]*)</)||[])[1]
+      const lu = (t.match(/<LastUniqID[^>]*>([^<]*)</)||[])[1]
+      // any top-level element names that look like metadata
+      const meta = [...new Set((t.match(/<(FoundRows|LastUniqID|Count|Total|Limit|Offset)[ >]/gi)||[]))]
+      return { status:r.status, len:t.length, clientRows:clientIds, dynamicBlocks:dyn, FoundRows:fr, LastUniqID:lu, metaTags:meta, tail: t.slice(-600) }
+    }
+    const first = await call(1)
+    return { status:200, body: { getAllTest: pid, first } }
+  }
+
   // Load our projects list from Supabase
   const { data: projects, error: projectsError } = await supabase
     .from('projects')
@@ -1227,6 +1257,7 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
+      getAllTest: body.getAllTest,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
