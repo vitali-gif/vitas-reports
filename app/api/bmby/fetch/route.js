@@ -543,6 +543,7 @@ async function runSync(opts = {}) {
     const clientObjection = new Map()  // for "התנגדויות"
     const clientLivingStatus = new Map()  // for "מצב דיור" (HI PARK) — translated living_status
     const clientPropertyType = new Map()  // for "סוג נכס" (HI PARK) — value where title=='סוג נכס'
+    const clientPlatform = new Map(), clientCampaign = new Map(), clientAdset = new Map(), clientAdName = new Map()  // FB ad hierarchy from _cf
     for (const c of clients) {
       if (!c.client_id) continue
       const cid = String(c.client_id)
@@ -563,6 +564,12 @@ async function runSync(opts = {}) {
       // (title can also be 'שם מודעה' → value = ad name, so we must gate on title.)
       const pt = ((c._cf && c._cf['סוג נכס']) || '').toString().trim()
       if (pt) clientPropertyType.set(cid, pt)
+      if (c._cf) {
+        const _p = (c._cf['פלטפורמת פרסום'] || '').toString().trim(); if (_p) clientPlatform.set(cid, _p)
+        const _ca = (c._cf['שם קמפיין'] || '').toString().trim(); if (_ca) clientCampaign.set(cid, _ca)
+        const _as = (c._cf['שם סדרת מודעות'] || '').toString().trim(); if (_as) clientAdset.set(cid, _as)
+        const _ad = (c._cf['שם מודעה'] || '').toString().trim(); if (_ad) clientAdName.set(cid, _ad)
+      }
       // Collect client profile samples for debug
       if (clientProfileSamples.length < 10) {
         clientProfileSamples.push({
@@ -1054,6 +1061,25 @@ async function runSync(opts = {}) {
     }
     const _lidScheduled = (lid) => { const ps = _postLidAppts(lid); return ps.length > 0 && ps.some(a => !a.cancelled) }
     const _lidCompleted = (lid) => _postLidAppts(lid).some(a => a.completed)
+    // ── Per-ad breakdown (פלטפורמה → קמפיין → סדרת מודעות → מודעה) from BMBY custom fields (_cf).
+    // Populated for FB leads (where Zapier fills the fields). Each period-LID adds its lead +
+    // outcomes to its ad node; the frontend joins Meta spend for cost-per-lead/meeting/הרשמה/עסקה.
+    const _regCidSet = new Set(registrationsInRange.map(k => String(k.client_id || '')).filter(Boolean))
+    const _rtl = (v) => (v || '').toString().replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\ufeff]/g, '').trim()
+    const _adAgg = new Map()
+    for (const lid of aprilLids) {
+      const cid = String(lid.client_id || '')
+      const platform = _rtl(clientPlatform.get(cid)), campaign = _rtl(clientCampaign.get(cid)), adset = _rtl(clientAdset.get(cid)), ad = _rtl(clientAdName.get(cid))
+      if (!platform && !campaign && !adset && !ad) continue
+      const key = [platform, campaign, adset, ad].join('\u0001')
+      let a = _adAgg.get(key)
+      if (!a) { a = { platform, campaign, adset, ad, leads: 0, meetings: 0, registrations: 0, contracts: 0 }; _adAgg.set(key, a) }
+      a.leads++
+      if (_lidScheduled(lid)) a.meetings++
+      if (_regCidSet.has(cid)) a.registrations++
+      if (contractClientSet.has(cid)) a.contracts++
+    }
+    const adBreakdown = [..._adAgg.values()]
     const _entry = (cid, name) => ({ name: name || clientName.get(String(cid)) || `ליד #${cid}`, phone: cidToPhone.get(String(cid)) || '', source: _leadSource(cid) })
     const _buildGroup = (lids, regs, conts) => ({
       meetingsScheduled: lids.filter(_lidScheduled).map(lid => _entry(lid.client_id)),
@@ -1117,7 +1143,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 18  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 19  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
@@ -1145,7 +1171,7 @@ async function runSync(opts = {}) {
         source: 'crm',
         month: m,
         data: xlsxRows,
-        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, hourlyContactStats, hourlyContactMeeting, namedLeads, completedMeetings: _completedMeetings, schemaVersion: CRM_SCHEMA_VERSION },
+        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, hourlyContactStats, hourlyContactMeeting, namedLeads, completedMeetings: _completedMeetings, adBreakdown, schemaVersion: CRM_SCHEMA_VERSION },
         file_name: 'BMBY API (live)',
         row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
       }, { onConflict: 'project_id,source,month' })
