@@ -1635,7 +1635,14 @@ const selectProject = async (client, project) => {
       const _norm = (n) => (n || '').replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\ufeff]/g, '').replace(/\s*[-\u2013]\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').replace(/\s*#\d+$/, '').trim();
       const fbReports = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
       const spendByAd = {};
-      fbReports.forEach(r => (r.summary?.activeAds || []).forEach(a => { const k = _norm(a.name); if (!k) return; spendByAd[k] = (spendByAd[k] || 0) + ((a.metrics && a.metrics.spend) || 0); }));
+      fbReports.forEach(r => {
+        const dataRows = r.data || [];
+        if (dataRows.length) {
+          dataRows.forEach(row => { const k = _norm(row.adName || row.adname || row.name); if (!k) return; spendByAd[k] = (spendByAd[k] || 0) + (Number(row.spend) || 0); });
+        } else {
+          (r.summary?.activeAds || []).forEach(a => { const k = _norm(a.name); if (!k) return; spendByAd[k] = (spendByAd[k] || 0) + ((a.metrics && a.metrics.spend) || 0); });
+        }
+      });
       const byAd = {};
       ab.forEach(n => { const k = _norm(n.ad) || '\u05dc\u05dc\u05d0 \u05de\u05d5\u05d3\u05e2\u05d4'; if (!byAd[k]) byAd[k] = { ad: k, platform: n.platform || '', campaign: n.campaign || '', adset: n.adset || '', leads: 0, meetings: 0, registrations: 0, contracts: 0 }; const b = byAd[k]; b.leads += n.leads || 0; b.meetings += n.meetings || 0; b.registrations += n.registrations || 0; b.contracts += n.contracts || 0; if (n.platform && !b.platform) b.platform = n.platform; if (n.campaign && !b.campaign) b.campaign = n.campaign; if (n.adset && !b.adset) b.adset = n.adset; });
       const rowsArr = Object.values(byAd).map(b => { const spend = spendByAd[b.ad] || 0; return { ...b, spend, cpl: b.leads ? spend / b.leads : 0, cpMe: b.meetings ? spend / b.meetings : 0, cpR: b.registrations ? spend / b.registrations : 0, cpD: b.contracts ? spend / b.contracts : 0 }; }).sort((a, b) => (b.spend - a.spend) || (b.leads - a.leads));
