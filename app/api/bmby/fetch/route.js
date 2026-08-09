@@ -345,19 +345,6 @@ async function runSync(opts = {}) {
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
 
-    if (opts.cfScan) {
-      const FIELDS = ['פלטפורמת פרסום','שם קמפיין','שם סדרת מודעות','שם מודעה','סוג נכס']
-      const cov = {}; const vals = {}
-      for (const f of FIELDS) { cov[f]=0; vals[f]={} }
-      let withAnyCf = 0
-      for (const c of clients) {
-        const cf = c._cf || {}
-        if (Object.keys(cf).length) withAnyCf++
-        for (const f of FIELDS) { const v=(cf[f]||'').toString().trim(); if (v){ cov[f]++; vals[f][v]=(vals[f][v]||0)+1 } }
-      }
-      const top = {}; for (const f of FIELDS) top[f]=Object.entries(vals[f]).sort((a,b)=>b[1]-a[1]).slice(0,12)
-      return { project: p.name, cfScan:true, totalClients: clients.length, withAnyCustomField: withAnyCf, coverage: cov, topValues: top }
-    }
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
       const _dist = {}, _stageXstatus = {}
@@ -1240,7 +1227,6 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
-      cfScan: body.cfScan,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
