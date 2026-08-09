@@ -302,34 +302,6 @@ async function runSync(opts = {}) {
     m = mArg
   }
 
-  if (opts.rawGetAll) {
-    const _cid = parseInt(opts.rawGetAll)
-    const _env = `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:v3="http://www.bmby.com/WebServices/srv/v3/">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <v3:GetAll soapenv:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-      <Parameters xsi:type="v3:GetAllInput">
-        <Login xsi:type="xsd:string">${login}</Login>
-        <Password xsi:type="xsd:string">${password}</Password>
-        <ClientID xsi:type="xsd:int">${_cid}</ClientID>
-        <Dynamic xsi:type="xsd:int">1</Dynamic>
-      </Parameters>
-    </v3:GetAll>
-  </soapenv:Body>
-</soapenv:Envelope>`
-    let out = {}
-    for (const [label, action] of [['GetAll','"GetAll"'],['GetAll_noaction','']]) {
-      try {
-        const _r = await fetch(`${BMBY_BASE}/`, { method: 'POST', headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': action }, body: _env })
-        const _t = await _r.text()
-        out[label] = { status: _r.status, len: _t.length, hasDynamic: _t.includes('Dynamic'), snippet: _t.slice(0, 2500) }
-        if (_t.includes('Dynamic') || _t.length > 1500) break
-      } catch(e){ out[label] = { err: String(e) } }
-    }
-    return { status: 200, body: { rawGetAll: _cid, out } }
-  }
-
   // Load our projects list from Supabase
   const { data: projects, error: projectsError } = await supabase
     .from('projects')
@@ -1255,7 +1227,6 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
-      rawGetAll: body.rawGetAll,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
