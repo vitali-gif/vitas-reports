@@ -83,11 +83,69 @@ function buildSoapGetAllJson(service, params) {
 </soapenv:Envelope>`
 }
 
+// Parse BMBY "Data" XML (<clients>/<tasks>/... rows) into row objects. Shared by GetAllJson & GetAll.
+// Custom fields nested in a <Dynamic> block become obj._cf = {title: value, ...}.
+function parseDataXmlRows(dataXml) {
+  const rows = []
+  if (!dataXml) return rows
+  dataXml = dataXml.replace(/<Dynamic>([\s\S]*?)<\/Dynamic>/g, (whole, inner) => {
+    const cf = {}
+    const unc = (v) => { const c = String(v).match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/); return (c ? c[1] : v).trim() }
+    const pairRe = /<title>([\s\S]*?)<\/title>\s*<value>([\s\S]*?)<\/value>/g
+    let pm
+    while ((pm = pairRe.exec(inner)) !== null) { const t = unc(pm[1]); if (t) cf[t] = unc(pm[2]) }
+    return '<customfields>' + JSON.stringify(cf).replace(/</g, '\\u003c') + '</customfields>'
+  })
+  const rowRegex = /<row>([\s\S]*?)<\/row>/g
+  let m
+  while ((m = rowRegex.exec(dataXml)) !== null) {
+    const rowXml = m[1]
+    const obj = {}
+    const fieldRegex = /<(\w+)>([\s\S]*?)<\/\1>/g
+    let fm
+    while ((fm = fieldRegex.exec(rowXml)) !== null) {
+      let val = fm[2]
+      const cdataMatch = val.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/)
+      if (cdataMatch) val = cdataMatch[1]
+      obj[fm[1]] = val
+    }
+    if (obj.customfields) { try { obj._cf = JSON.parse(obj.customfields) } catch { obj._cf = {} } delete obj.customfields }
+    rows.push(obj)
+  }
+  return rows
+}
+
+// GetAll envelope (native XML method). Unlike GetAllJson it returns the <Dynamic> custom-field
+// block IMMEDIATELY for fresh leads (GetAllJson lags it by days). Same FoundRows/LastUniqID paging.
+function buildSoapGetAll(params) {
+  const keys = [
+    { key: 'Login', type: 'xsd:string' }, { key: 'Password', type: 'xsd:string' },
+    { key: 'ProjectID', type: 'xsd:int' }, { key: 'ClientID', type: 'xsd:int' },
+    { key: 'UniqID', type: 'xsd:int' }, { key: 'Dynamic', type: 'xsd:int' },
+    { key: 'FromDate', type: 'xsd:string' }, { key: 'ToDate', type: 'xsd:string' },
+  ]
+  const paramXml = keys.map(({ key, type }) => {
+    const v = params[key]
+    return `<${key} xsi:type="${type}">${v !== undefined && v !== null ? xmlEscape(v) : ''}</${key}>`
+  }).join('\n        ')
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:v3="http://www.bmby.com/WebServices/srv/v3/">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <v3:GetAll soapenv:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+      <Parameters xsi:type="v3:GetAllInput">
+        ${paramXml}
+      </Parameters>
+    </v3:GetAll>
+  </soapenv:Body>
+</soapenv:Envelope>`
+}
+
 // Call BMBY SOAP service, return parsed Data (array or object) + metadata
-async function callBmbyGetAllJson(service, params) {
+async function callBmbyGetAllJson(service, params, useGetAll = false) {
   const { file } = ENDPOINTS[service]
   const url = file ? `${BMBY_BASE}/${file}` : `${BMBY_BASE}/`
-  const body = buildSoapGetAllJson(service, params)
+  const body = useGetAll ? buildSoapGetAll(params) : buildSoapGetAllJson(service, params)
   // BMBY intermittently returns 502/503/504 (Cloudflare) or drops the connection
   // ("terminated") under load — especially on the heavier `tasks` call. These are
   // transient, so retry a few times with backoff before giving up. A single failed
@@ -98,7 +156,7 @@ async function callBmbyGetAllJson(service, params) {
     try {
       res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '"GetAllJson"' },
+        headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': useGetAll ? '"GetAll"' : '"GetAllJson"' },
         body,
       })
       text = await res.text()
@@ -117,82 +175,49 @@ async function callBmbyGetAllJson(service, params) {
     throw lastErr || new Error(`BMBY ${service} failed after retries`)
   }
 
-  // BMBY format: SOAP envelope wraps <GetAllJsonReturn> which contains a JSON STRING
-  // (HTML-entity-encoded). That JSON parses to { FoundRows, LastUniqID, Data, Error }.
-  // `Data` is XML-as-string with <clients>/<tasks>/... root and <row>...</row> children.
-  // Each <row> field is wrapped in CDATA.
+  // Extract payload — GetAll (raw XML wrapper) or GetAllJson (JSON-string wrapper). Same rows parser.
+  if (useGetAll) {
+    const retMatch = text.match(/<GetAllReturn[^>]*>([\s\S]*?)<\/GetAllReturn>/)
+    if (!retMatch) {
+      const faultMatch = text.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/)
+      if (faultMatch) throw new Error(`BMBY ${service} fault: ${faultMatch[1].slice(0, 200)}`)
+      return { rows: [], foundRows: 0, lastUniqID: 0, rawSnippet: text.slice(0, 500) }
+    }
+    const inner = retMatch[1]
+    const errM = inner.match(/<Error[^>]*>([\s\S]*?)<\/Error>/)
+    if (errM && errM[1].trim()) throw new Error(`BMBY ${service} error: ${errM[1].slice(0, 200)}`)
+    const foundRows = parseInt((inner.match(/<FoundRows[^>]*>([^<]*)<\/FoundRows>/) || [])[1] || '0', 10) || 0
+    const lastUniqID = parseInt((inner.match(/<LastUniqID[^>]*>([^<]*)<\/LastUniqID>/) || [])[1] || '0', 10) || 0
+    let dataXml = (inner.match(/<Data[^>]*>([\s\S]*?)<\/Data>/) || [])[1] || ''
+    dataXml = dataXml.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+    return { rows: parseDataXmlRows(dataXml), foundRows, lastUniqID }
+  }
+  // GetAllJson: SOAP wraps <GetAllJsonReturn> = a JSON string { FoundRows, LastUniqID, Data, Error }.
   const retMatch = text.match(/<GetAllJsonReturn[^>]*>([\s\S]*?)<\/GetAllJsonReturn>/)
   if (!retMatch) {
     const faultMatch = text.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/)
     if (faultMatch) throw new Error(`BMBY ${service} fault: ${faultMatch[1].slice(0, 200)}`)
     return { rows: [], foundRows: 0, lastUniqID: 0, rawSnippet: text.slice(0, 500) }
   }
-  const jsonStr = retMatch[1]
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+  const jsonStr = retMatch[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
   let parsed
-  try {
-    parsed = JSON.parse(jsonStr)
-  } catch (e) {
-    return { rows: [], foundRows: 0, lastUniqID: 0, parseError: e.message, rawSnippet: jsonStr.slice(0, 400) }
-  }
-  if (parsed.Error && String(parsed.Error).trim()) {
-    throw new Error(`BMBY ${service} error: ${String(parsed.Error).slice(0, 200)}`)
-  }
-
-  // Parse the XML-as-string in `Data` into row objects
-  const rows = []
-  let dataXml = parsed.Data || ''
-  if (dataXml) {
-    // BMBY nests custom fields in a <Dynamic> block of <row><title>/<value> pairs INSIDE each
-    // client <row>. Pull them into one JSON field FIRST so the nested <row> tags don't break
-    // client-row splitting — and so we capture ALL custom fields (סוג נכס / שם מודעה / שם קמפיין /
-    // שם סדרת מודעות / פלטפורמת פרסום), not just the last one.
-    dataXml = dataXml.replace(/<Dynamic>([\s\S]*?)<\/Dynamic>/g, (whole, inner) => {
-      const cf = {}
-      const unc = (v) => { const c = String(v).match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/); return (c ? c[1] : v).trim() }
-      const pairRe = /<title>([\s\S]*?)<\/title>\s*<value>([\s\S]*?)<\/value>/g
-      let pm
-      while ((pm = pairRe.exec(inner)) !== null) { const t = unc(pm[1]); if (t) cf[t] = unc(pm[2]) }
-      return '<customfields>' + JSON.stringify(cf).replace(/</g, '\\u003c') + '</customfields>'
-    })
-    const rowRegex = /<row>([\s\S]*?)<\/row>/g
-    let m
-    while ((m = rowRegex.exec(dataXml)) !== null) {
-      const rowXml = m[1]
-      const obj = {}
-      const fieldRegex = /<(\w+)>([\s\S]*?)<\/\1>/g
-      let fm
-      while ((fm = fieldRegex.exec(rowXml)) !== null) {
-        let val = fm[2]
-        const cdataMatch = val.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/)
-        if (cdataMatch) val = cdataMatch[1]
-        obj[fm[1]] = val
-      }
-      if (obj.customfields) { try { obj._cf = JSON.parse(obj.customfields) } catch { obj._cf = {} } delete obj.customfields }
-      rows.push(obj)
-    }
-  }
-
-  return {
-    rows,
-    foundRows: parsed.FoundRows || 0,
-    lastUniqID: parsed.LastUniqID || 0,
-  }
+  try { parsed = JSON.parse(jsonStr) } catch (e) { return { rows: [], foundRows: 0, lastUniqID: 0, parseError: e.message, rawSnippet: jsonStr.slice(0, 400) } }
+  if (parsed.Error && String(parsed.Error).trim()) throw new Error(`BMBY ${service} error: ${String(parsed.Error).slice(0, 200)}`)
+  return { rows: parseDataXmlRows(parsed.Data || ''), foundRows: parsed.FoundRows || 0, lastUniqID: parsed.LastUniqID || 0 }
 }
 
 // Paginate BMBY GetAllJson - BMBY caps each response at 3000 rows.
 // We page by using Dynamic=0 + UniqID = previous LastUniqID until FoundRows < 3000
 // or we exceed maxPages. ToDate is used as an early-stop signal if the last row's
 // create_date is already past the requested window.
-async function callBmbyGetAllJsonPaginated(service, params, maxPages = 10) {
+async function callBmbyGetAllJsonPaginated(service, params, maxPages = 10, useGetAll = false) {
   const allRows = []
   let uniqID = params.UniqID ?? 1
   let dynamic = params.Dynamic ?? 1
   let lastResp = null
   let pagesUsed = 0
   for (let page = 0; page < maxPages; page++) {
-    const resp = await callBmbyGetAllJson(service, { ...params, UniqID: uniqID, Dynamic: dynamic })
+    const resp = await callBmbyGetAllJson(service, { ...params, UniqID: uniqID, Dynamic: dynamic }, useGetAll)
     lastResp = resp
     pagesUsed++
     if (resp.rows.length) allRows.push(...resp.rows)
@@ -200,7 +225,7 @@ async function callBmbyGetAllJsonPaginated(service, params, maxPages = 10) {
     if (!resp.foundRows || resp.foundRows < 3000) break
     if (!resp.lastUniqID || resp.lastUniqID === uniqID) break
     uniqID = resp.lastUniqID
-    dynamic = 0
+    if (!useGetAll) dynamic = 0  // GetAll: keep Dynamic=1 so custom fields return on every page
     // Early stop: if the last row in this page is already past ToDate, no point continuing
     if (params.ToDate && resp.rows.length) {
       const candidates = ['client_date', 'create_date', 'start_date', 'task_date', 'date', 'offer_date', 'contract_date', 'signed_date']
@@ -333,7 +358,7 @@ async function runSync(opts = {}) {
     const _stagesOnly = !!opts.stagesOnly
     const _apptDump = !!opts.apptDump  // fast: clients+tasks only, dump raw appointment rows
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
-      withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4), 120000, 'clients'),
+      withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4, true), 120000, 'clients'),  // useGetAll=true → custom fields immediately
       _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 10), 120000, 'tasks'),
       (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 120000, 'price_offers'),
       (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 120000, 'contracts'),
@@ -345,6 +370,12 @@ async function runSync(opts = {}) {
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
 
+    if (opts.cfDate) {
+      const day = String(opts.cfDate)
+      const t2 = clients.filter(c => String(c.client_date||'').slice(0,10) === day)
+      const rows = t2.map(c => ({ name: c.fname||'', client_id: c.client_id, cfKeys: Object.keys(c._cf||{}), cf: c._cf||{} }))
+      return { project: p.name, cfDate: day, totalClientsFetched: clients.length, totalDay: rows.length, withPlatform: rows.filter(r=>r.cf['פלטפורמת פרסום']).length, rows: rows.slice(0,20) }
+    }
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
       const _dist = {}, _stageXstatus = {}
@@ -1227,6 +1258,7 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
+      cfDate: body.cfDate,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
