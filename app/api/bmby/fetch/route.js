@@ -348,10 +348,9 @@ async function runSync(opts = {}) {
     if (opts.cfDate) {
       const day = String(opts.cfDate)
       const todays = clients.filter(c => String(c.client_date||'').slice(0,10) === day)
-      const rows = todays.map(c => ({ name: c.fname||'', client_date: c.client_date, media: c.media||'',
-        platform: (c._cf&&c._cf['פלטפורמת פרסום'])||'', campaign: (c._cf&&c._cf['שם קמפיין'])||'',
-        adset: (c._cf&&c._cf['שם סדרת מודעות'])||'', ad: (c._cf&&c._cf['שם מודעה'])||'' }))
-      const withPlat = rows.filter(r=>r.platform).length
+      const rows = todays.map(c => ({ name: c.fname||'', client_id: c.client_id, client_date: c.client_date, media: c.media||'',
+        cfKeys: Object.keys(c._cf||{}), cf: c._cf||{} }))
+      const withPlat = rows.filter(r=>(r.cf&&r.cf['פלטפורמת פרסום'])).length
       return { project: p.name, cfDate: day, totalToday: rows.length, withPlatform: withPlat, rows: rows.slice(0,30) }
     }
     if (_stagesOnly) {
