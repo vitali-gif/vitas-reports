@@ -345,6 +345,13 @@ async function runSync(opts = {}) {
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
 
+    if (opts.cfDate) {
+      const day = String(opts.cfDate)
+      const todays = clients.filter(c => String(c.client_date||'').slice(0,10) === day)
+      const rows = todays.map(c => ({ name: c.fname||'', client_id: c.client_id, media: c.media||'', cfKeys: Object.keys(c._cf||{}), cf: c._cf||{} }))
+      const withPlat = rows.filter(r=>(r.cf&&r.cf['פלטפורמת פרסום'])).length
+      return { project: p.name, cfDate: day, totalToday: rows.length, withPlatform: withPlat, rows: rows.slice(0,40) }
+    }
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
       const _dist = {}, _stageXstatus = {}
@@ -1227,6 +1234,7 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
+      cfDate: body.cfDate,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
