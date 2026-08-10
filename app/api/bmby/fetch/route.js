@@ -1070,10 +1070,11 @@ async function runSync(opts = {}) {
     for (const lid of aprilLids) {
       const cid = String(lid.client_id || '')
       const platform = _rtl(clientPlatform.get(cid)), campaign = _rtl(clientCampaign.get(cid)), adset = _rtl(clientAdset.get(cid)), ad = _rtl(clientAdName.get(cid))
+      const source = (cidToMedia.get(cid) || 'ללא מקור').toString().trim() || 'ללא מקור'
       if (!platform && !campaign && !adset && !ad) continue
-      const key = [platform, campaign, adset, ad].join('\u0001')
+      const key = [source, platform, campaign, adset, ad].join('\u0001')
       let a = _adAgg.get(key)
-      if (!a) { a = { platform, campaign, adset, ad, leads: 0, meetings: 0, registrations: 0, contracts: 0 }; _adAgg.set(key, a) }
+      if (!a) { a = { source, platform, campaign, adset, ad, leads: 0, meetings: 0, registrations: 0, contracts: 0 }; _adAgg.set(key, a) }
       a.leads++
       if (_lidScheduled(lid)) a.meetings++
       if (_regCidSet.has(cid)) a.registrations++
@@ -1143,7 +1144,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 19  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 20  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
