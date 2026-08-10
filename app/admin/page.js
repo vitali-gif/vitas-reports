@@ -1635,18 +1635,35 @@ const selectProject = async (client, project) => {
       if (ab.length === 0) return null;
       const _norm = (n) => (n || '').replace(/[‎‏​‌‍‪-‮⁦-⁩﻿]/g, '').replace(/\s*[-–]\s*עותק\s*\d*$/, '').replace(/\s*#\d+$/, '').trim();
       const fbReports = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
-      const spendByAd = {};
-      fbReports.forEach(r => { const dr = r.data || []; if (dr.length) dr.forEach(row => { const k = _norm(row.adName || row.name); if (k) spendByAd[k] = (spendByAd[k] || 0) + (Number(row.spend) || 0); }); else (r.summary?.activeAds || []).forEach(a => { const k = _norm(a.name); if (k) spendByAd[k] = (spendByAd[k] || 0) + ((a.metrics && a.metrics.spend) || 0); }); });
+      // Meta spend joins at CAMPAIGN level (ad names between BMBY and Meta don't reliably match; campaign names do).
+      const spendByCampaign = {};
+      fbReports.forEach(r => {
+        const dr = r.data || [];
+        if (dr.length) dr.forEach(row => { const k = _norm(row.campaignName || row.campaign); if (k) spendByCampaign[k] = (spendByCampaign[k] || 0) + (Number(row.spend) || 0); });
+        else (r.summary?.activeAds || []).forEach(a => { const k = _norm(a.campaign || a.campaignName); if (k) spendByCampaign[k] = (spendByCampaign[k] || 0) + ((a.metrics && a.metrics.spend) || 0); });
+      });
       const _plat = (n) => { const p = (n.platform || '').toString().toLowerCase(); if (p === 'fb') return 'פייסבוק'; if (p === 'ig') return 'אינסטגרם'; const src = (n.source || '').toString(); if (/instagram|אינסטגרם/i.test(src)) return 'אינסטגרם'; if (/facebook|פייסבוק/i.test(src) || /fb/i.test(src)) return 'פייסבוק'; if (/google|גוגל|pmax|search/i.test(src)) return 'גוגל'; if (/yad2|יד ?2/i.test(src)) return 'יד2'; if (/כוכבית/.test(src)) return 'כוכבית'; return (src.split('|')[0].trim()) || 'אחר'; };
       const mkNode = (label) => ({ label, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, spend: 0, children: new Map() });
+      // total leads per campaign (across all platforms) — used to split campaign spend proportionally
+      const campLeadTotals = {};
+      ab.forEach(n => { const ck = _norm(n.campaign); if (ck) campLeadTotals[ck] = (campLeadTotals[ck] || 0) + (n.leads || 0); });
       const root = mkNode('');
       ab.forEach(n => {
         const parts = [_plat(n), n.campaign || '(ללא קמפיין)', n.adset || '(ללא קהל)', _norm(n.ad) || '(ללא מודעה)'];
         let node = root, path = '';
         parts.forEach((label) => { path += '' + label; if (!node.children.has(path)) node.children.set(path, { ...mkNode(label), path }); const child = node.children.get(path); child.leads += n.leads || 0; child.meetings += n.meetings || 0; child.meetingsCompleted += n.meetingsCompleted || 0; child.registrations += n.registrations || 0; child.contracts += n.contracts || 0; node = child; });
       });
-      const counted = new Set();
-      const rollup = (node, depth) => { let sp = 0; if (depth === 4) { const nm = node.label; if (nm && !counted.has(nm)) { counted.add(nm); sp = spendByAd[nm] || 0; } } node.children.forEach(c => { sp += rollup(c, depth + 1); }); node.spend = sp; return sp; };
+      const rollup = (node, depth) => {
+        let sp = 0;
+        if (depth === 2) { // campaign node: assign its Meta spend, split across platforms by this node's lead share
+          const ck = _norm(node.label);
+          const tot = spendByCampaign[ck] || 0;
+          const denom = campLeadTotals[ck] || 0;
+          if (tot > 0 && denom > 0) sp = tot * (node.leads / denom);
+        }
+        node.children.forEach(c => { sp += rollup(c, depth + 1); });
+        node.spend = sp; return sp;
+      };
       root.children.forEach(c => rollup(c, 1));
       const DEPTH_META = [
         { name: 'פלטפורמה', accent: '#7c3aed', bg: 'rgba(124,58,237,0.055)', chipBg: '#ede9fe', chipFg: '#6d28d9' },
