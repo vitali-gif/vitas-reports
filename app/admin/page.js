@@ -1648,34 +1648,70 @@ const selectProject = async (client, project) => {
       const counted = new Set();
       const rollup = (node, depth) => { let sp = 0; if (depth === 4) { const nm = node.label; if (nm && !counted.has(nm)) { counted.add(nm); sp = spendByAd[nm] || 0; } } node.children.forEach(c => { sp += rollup(c, depth + 1); }); node.spend = sp; return sp; };
       root.children.forEach(c => rollup(c, 1));
+      const DEPTH_META = [
+        { name: 'פלטפורמה', accent: '#7c3aed', bg: 'rgba(124,58,237,0.055)', chipBg: '#ede9fe', chipFg: '#6d28d9' },
+        { name: 'קמפיין', accent: '#2563eb', bg: 'rgba(37,99,235,0.05)', chipBg: '#dbeafe', chipFg: '#1d4ed8' },
+        { name: 'קהל', accent: '#0891b2', bg: 'rgba(8,145,178,0.05)', chipBg: '#cffafe', chipFg: '#0e7490' },
+        { name: 'מודעה', accent: '#059669', bg: 'rgba(5,150,105,0.045)', chipBg: '#dcfce7', chipFg: '#047857' },
+      ];
       const rowsOut = [];
-      const walk = (node, depth) => { const kids = [...node.children.values()].sort((a, b) => (b.spend - a.spend) || (b.leads - a.leads)); kids.forEach(c => { const hasKids = c.children.size > 0; const open = expandedAdTree.has(c.path); rowsOut.push({ label: c.label, path: c.path, depth, hasKids, open, leads: c.leads, meetings: c.meetings, meetingsCompleted: c.meetingsCompleted, registrations: c.registrations, contracts: c.contracts, spend: c.spend }); if (hasKids && open) walk(c, depth + 1); }); };
-      walk(root, 0);
+      const walk = (node, depth, trail) => {
+        const kids = [...node.children.values()].sort((a, b) => (b.spend - a.spend) || (b.leads - a.leads));
+        kids.forEach(c => {
+          const hasKids = c.children.size > 0;
+          const open = expandedAdTree.has(c.path);
+          rowsOut.push({ label: c.label, path: c.path, depth, hasKids, open, trail, leads: c.leads, meetings: c.meetings, meetingsCompleted: c.meetingsCompleted, registrations: c.registrations, contracts: c.contracts, spend: c.spend });
+          if (hasKids && open) walk(c, depth + 1, [...trail, c.label]);
+        });
+      };
+      walk(root, 0, []);
       const money = (v) => '₪' + Math.round(v || 0).toLocaleString('he-IL');
       const cost = (sp, cnt) => (sp && cnt) ? money(sp / cnt) : '—';
+      const num = (v) => (v || 0).toLocaleString('he-IL');
       const toggle = (path) => setExpandedAdTree(prev => { const nx = new Set(prev); if (nx.has(path)) nx.delete(path); else nx.add(path); return nx; });
+      const thSticky = { position: 'sticky', top: 0, zIndex: 1, background: '#f1f5f9' };
       return (
         <div className="section">
           <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>עלות לתוצאה לפי מודעה</h2><span className="sub">פלטפורמה → קמפיין → קהל → מודעה</span></div>
-          <div style={{fontSize:'0.82em',color:'#64748b',marginBottom:8,textAlign:'right'}}>{'💡 לחץ על שורה כדי לצלול פנימה. שדות "ללא..." = לידים שטרם קיבלו שיוך מלא (מתמלא על לידים חדשים מפייסבוק).'}</div>
-          <div className="table-wrapper"><table className="data-table">
-            <thead><tr><th>{'פלטפורמה / קמפיין / קהל / מודעה'}</th><th>{'הוצאה'}</th><th>{'לידים'}</th><th>{'עלות/ליד'}</th><th>{'תואמו'}</th><th>{'בוצעו'}</th><th>{'עלות/פגישה'}</th><th>{'הרשמות'}</th><th>{'עלות/הרשמה'}</th><th>{'עסקאות'}</th><th>{'עלות/עסקה'}</th></tr></thead>
+          <div style={{display:'flex',flexWrap:'wrap',gap:10,alignItems:'center',marginBottom:10}}>
+            <div style={{fontSize:'0.82em',color:'#64748b',flex:'1 1 220px',textAlign:'right'}}>{'💡 לחץ על שורה כדי לצלול פנימה. שדות "ללא..." = לידים ללא שיוך מלא (מתמלא על לידים חדשים מפייסבוק).'}</div>
+            <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+              {DEPTH_META.map((d,di)=>(<span key={di} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'0.74em',color:'#475569',fontWeight:600}}><span style={{width:11,height:11,borderRadius:3,background:d.accent,display:'inline-block'}}></span>{d.name}</span>))}
+            </div>
+          </div>
+          <div className="table-wrapper" style={{maxHeight:640,overflow:'auto'}}><table className="data-table ad-drill">
+            <thead><tr>
+              <th style={{...thSticky,textAlign:'right',minWidth:260}}>{'שיוך'}</th>
+              <th style={thSticky}>{'הוצאה'}</th><th style={thSticky}>{'לידים'}</th><th style={thSticky}>{'עלות/ליד'}</th>
+              <th style={thSticky}>{'תואמו'}</th><th style={thSticky}>{'בוצעו'}</th><th style={thSticky}>{'עלות/פגישה'}</th>
+              <th style={thSticky}>{'הרשמות'}</th><th style={thSticky}>{'עלות/הרשמה'}</th><th style={thSticky}>{'עסקאות'}</th><th style={thSticky}>{'עלות/עסקה'}</th>
+            </tr></thead>
             <tbody>
-              {rowsOut.map((r, i) => (
-                <tr key={i} style={{cursor: r.hasKids ? 'pointer' : undefined, background: r.depth >= 1 ? 'var(--bg-secondary)' : undefined, fontSize: r.depth >= 2 ? '0.9em' : undefined}} onClick={r.hasKids ? () => toggle(r.path) : undefined}>
-                  <td style={{whiteSpace: 'nowrap', maxWidth: 340, overflow: 'hidden', textOverflow: 'ellipsis', direction: 'rtl', textAlign: 'right'}}><span style={{float:'right',display:'inline-block',width:18,textAlign:'center',color:'#0f172a',fontWeight:700}}>{r.hasKids ? (r.open ? '▼' : '◀') : ''}</span><span style={{paddingRight: (r.depth * 18) + 'px', fontWeight: r.depth === 0 ? 600 : 400, unicodeBidi: 'plaintext'}}>{r.label}</span></td>
-                  <td style={{whiteSpace:'nowrap'}}>{r.spend ? money(r.spend) : '—'}</td>
-                  <td style={{fontWeight:600}}>{r.leads}</td>
-                  <td style={{whiteSpace:'nowrap'}}>{cost(r.spend, r.leads)}</td>
-                  <td>{r.meetings}</td>
-                  <td>{r.meetingsCompleted}</td>
-                  <td style={{whiteSpace:'nowrap'}}>{cost(r.spend, r.meetings)}</td>
-                  <td>{r.registrations}</td>
-                  <td style={{whiteSpace:'nowrap'}}>{cost(r.spend, r.registrations)}</td>
-                  <td>{r.contracts}</td>
-                  <td style={{whiteSpace:'nowrap'}}>{cost(r.spend, r.contracts)}</td>
+              {rowsOut.map((r, i) => {
+                const dm = DEPTH_META[r.depth] || DEPTH_META[3];
+                return (
+                <tr key={i} style={{cursor: r.hasKids ? 'pointer' : 'default', background: dm.bg}} onClick={r.hasKids ? () => toggle(r.path) : undefined}>
+                  <td style={{textAlign:'right',borderRight:'3px solid '+dm.accent}}>
+                    <div style={{display:'flex',alignItems:'center',gap:7,direction:'rtl',paddingRight:(r.depth*22)+'px'}}>
+                      <span style={{flex:'0 0 auto',width:16,textAlign:'center',color:dm.accent,fontWeight:700,fontSize:'0.8em',visibility:r.hasKids?'visible':'hidden'}}>{r.open?'▼':'◀'}</span>
+                      <span style={{flex:'0 0 auto',fontSize:'0.66em',fontWeight:700,padding:'2px 8px',borderRadius:20,background:dm.chipBg,color:dm.chipFg,whiteSpace:'nowrap'}}>{dm.name}</span>
+                      <span style={{fontWeight:r.depth===0?700:r.depth===1?600:500,color:r.depth<=1?'#0f172a':'#334155',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:260,unicodeBidi:'plaintext'}}>{r.label}</span>
+                    </div>
+                    {r.depth>=1 && r.trail.length>0 ? <div style={{direction:'rtl',paddingRight:(r.depth*22+23)+'px',fontSize:'0.68em',color:'#94a3b8',marginTop:3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:340,unicodeBidi:'plaintext'}}>{r.trail.join('  ›  ')}</div> : null}
+                  </td>
+                  <td style={{whiteSpace:'nowrap',fontWeight:600}}>{r.spend ? money(r.spend) : '—'}</td>
+                  <td style={{fontWeight:600}}>{num(r.leads)}</td>
+                  <td style={{whiteSpace:'nowrap',color:'#64748b'}}>{cost(r.spend, r.leads)}</td>
+                  <td>{num(r.meetings)}</td>
+                  <td>{num(r.meetingsCompleted)}</td>
+                  <td style={{whiteSpace:'nowrap',color:'#64748b'}}>{cost(r.spend, r.meetings)}</td>
+                  <td>{num(r.registrations)}</td>
+                  <td style={{whiteSpace:'nowrap',color:'#64748b'}}>{cost(r.spend, r.registrations)}</td>
+                  <td>{num(r.contracts)}</td>
+                  <td style={{whiteSpace:'nowrap',color:'#64748b'}}>{cost(r.spend, r.contracts)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table></div>
         </div>
