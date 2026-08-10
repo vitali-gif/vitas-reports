@@ -1637,10 +1637,11 @@ const selectProject = async (client, project) => {
       const fbReports = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
       const spendByAd = {};
       fbReports.forEach(r => { const dr = r.data || []; if (dr.length) dr.forEach(row => { const k = _norm(row.adName || row.name); if (k) spendByAd[k] = (spendByAd[k] || 0) + (Number(row.spend) || 0); }); else (r.summary?.activeAds || []).forEach(a => { const k = _norm(a.name); if (k) spendByAd[k] = (spendByAd[k] || 0) + ((a.metrics && a.metrics.spend) || 0); }); });
+      const _plat = (n) => { const p = (n.platform || '').toString().toLowerCase(); if (p === 'fb') return 'פייסבוק'; if (p === 'ig') return 'אינסטגרם'; const src = (n.source || '').toString(); if (/instagram|אינסטגרם/i.test(src)) return 'אינסטגרם'; if (/facebook|פייסבוק/i.test(src) || /fb/i.test(src)) return 'פייסבוק'; if (/google|גוגל|pmax|search/i.test(src)) return 'גוגל'; if (/yad2|יד ?2/i.test(src)) return 'יד2'; if (/כוכבית/.test(src)) return 'כוכבית'; return (src.split('|')[0].trim()) || 'אחר'; };
       const mkNode = (label) => ({ label, leads: 0, meetings: 0, registrations: 0, contracts: 0, spend: 0, children: new Map() });
       const root = mkNode('');
       ab.forEach(n => {
-        const parts = [n.source || '(ללא מקור)', n.campaign || '(ללא קמפיין)', n.adset || '(ללא סדרה)', _norm(n.ad) || '(ללא מודעה)'];
+        const parts = [_plat(n), n.campaign || '(ללא קמפיין)', n.adset || '(ללא קהל)', _norm(n.ad) || '(ללא מודעה)'];
         let node = root, path = '';
         parts.forEach((label) => { path += '' + label; if (!node.children.has(path)) node.children.set(path, { ...mkNode(label), path }); const child = node.children.get(path); child.leads += n.leads || 0; child.meetings += n.meetings || 0; child.registrations += n.registrations || 0; child.contracts += n.contracts || 0; node = child; });
       });
@@ -1655,14 +1656,14 @@ const selectProject = async (client, project) => {
       const toggle = (path) => setExpandedAdTree(prev => { const nx = new Set(prev); if (nx.has(path)) nx.delete(path); else nx.add(path); return nx; });
       return (
         <div className="section">
-          <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>עלות לתוצאה לפי מודעה</h2><span className="sub">מקור → קמפיין → סדרת מודעות → מודעה</span></div>
+          <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>עלות לתוצאה לפי מודעה</h2><span className="sub">פלטפורמה → קמפיין → קהל → מודעה</span></div>
           <div style={{fontSize:'0.82em',color:'#64748b',marginBottom:8,textAlign:'right'}}>{'💡 לחץ על שורה כדי לצלול פנימה. שדות "ללא..." = לידים שטרם קיבלו שיוך מלא (מתמלא על לידים חדשים מפייסבוק).'}</div>
           <div className="table-wrapper"><table className="data-table">
-            <thead><tr><th>{'מקור / קמפיין / סדרה / מודעה'}</th><th>{'הוצאה'}</th><th>{'לידים'}</th><th>{'עלות/ליד'}</th><th>{'פגישות'}</th><th>{'עלות/פגישה'}</th><th>{'הרשמות'}</th><th>{'עלות/הרשמה'}</th><th>{'עסקאות'}</th><th>{'עלות/עסקה'}</th></tr></thead>
+            <thead><tr><th>{'פלטפורמה / קמפיין / קהל / מודעה'}</th><th>{'הוצאה'}</th><th>{'לידים'}</th><th>{'עלות/ליד'}</th><th>{'פגישות'}</th><th>{'עלות/פגישה'}</th><th>{'הרשמות'}</th><th>{'עלות/הרשמה'}</th><th>{'עסקאות'}</th><th>{'עלות/עסקה'}</th></tr></thead>
             <tbody>
               {rowsOut.map((r, i) => (
                 <tr key={i} style={{cursor: r.hasKids ? 'pointer' : undefined, background: r.depth >= 1 ? 'var(--bg-secondary)' : undefined, fontSize: r.depth >= 2 ? '0.9em' : undefined}} onClick={r.hasKids ? () => toggle(r.path) : undefined}>
-                  <td style={{paddingRight: (8 + r.depth * 20) + 'px', fontWeight: r.depth === 0 ? 600 : 400, unicodeBidi: 'plaintext', whiteSpace: 'nowrap', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis'}}>{r.hasKids ? <span style={{color:'var(--accent)',marginLeft:4}}>{r.open ? '▼' : '◀'}</span> : null} {r.label}</td>
+                  <td style={{whiteSpace: 'nowrap', maxWidth: 340, overflow: 'hidden', textOverflow: 'ellipsis'}}><span style={{display:'inline-block',width:16,textAlign:'center',color:'#334155',fontWeight:700}}>{r.hasKids ? (r.open ? '▼' : '◀') : ''}</span><span style={{paddingRight: (r.depth * 18) + 'px', fontWeight: r.depth === 0 ? 600 : 400, unicodeBidi: 'plaintext'}}>{r.label}</span></td>
                   <td style={{whiteSpace:'nowrap'}}>{r.spend ? money(r.spend) : '—'}</td>
                   <td style={{fontWeight:600}}>{r.leads}</td>
                   <td style={{whiteSpace:'nowrap'}}>{cost(r.spend, r.leads)}</td>
