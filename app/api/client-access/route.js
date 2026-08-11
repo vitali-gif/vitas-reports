@@ -169,8 +169,9 @@ export async function POST(req) {
 
   let emailSent = false
   let emailError = null
+  let tempPassword = null
   if (shouldNotify) {
-    const tempPassword = generateTempPassword()
+    tempPassword = generateTempPassword()
     const authResult = await upsertAuthUser(cleanEmail, tempPassword)
     if (authResult.ok) {
       const result = await sendPasswordEmail(cleanEmail, tempPassword, clientName)
@@ -178,6 +179,7 @@ export async function POST(req) {
       emailError = result.error || null
     } else {
       emailError = authResult.error
+      tempPassword = null
     }
   }
 
@@ -187,6 +189,9 @@ export async function POST(req) {
     projectNames: projects.map(p => p.name),
     notified: shouldNotify,
     emailSent, emailError,
+    email: cleanEmail,
+    tempPassword,
+    loginUrl: 'https://reports.vitas.co.il',
   }, { status: 201 })
 }
 

@@ -131,6 +131,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     return () => document.body.classList.remove('no-scroll');
   }, [sidebarOpen])
   const [clientAccessList, setClientAccessList] = useState([])
+  const [accessCreds, setAccessCreds] = useState(null) // {email,password,loginUrl,emailSent,clientName}
   const [showClientAccess, setShowClientAccess] = useState(false)
   const [showSessionLogs, setShowSessionLogs] = useState(false)
   const [sessionLogs, setSessionLogs] = useState([])
@@ -278,16 +279,13 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       const result = await res.json()
       setCaEmail(''); setCaClientId(''); setCaProjectIds([])
       await loadClientAccess()
+      if (result.tempPassword) {
+        setAccessCreds({ email: result.email, password: result.tempPassword, loginUrl: result.loginUrl, emailSent: result.emailSent, clientName: result.clientName })
+      }
       if (result.emailSent) {
-        showToast(`✓ גישה נוספה ל-${result.clientName} (${result.projectCount} פרויקטים: ${(result.projectNames||[]).join(', ')}) — קישור נשלח במייל`)
+        showToast(`✓ גישה נוספה ל-${result.clientName} — קישור נשלח במייל`)
       } else {
-        const link = result.magicLink || ''
-        if (link) {
-          navigator.clipboard?.writeText(link).catch(() => {})
-          showToast('⚠️ המייל לא נשלח. קישור הועתק ללוח — שלח ללקוח ידנית.')
-        } else {
-          showToast('✓ גישה נוספה — אך שליחת המייל נכשלה: ' + (result.emailError || 'שגיאה לא ידועה'))
-        }
+        showToast('⚠️ המייל לא נשלח — פרטי הגישה מוצגים למטה להעברה ידנית')
       }
     } else {
       const err = await res.json()
@@ -5038,6 +5036,34 @@ const selectProject = async (client, project) => {
           </div>
         </div>
       )}
+
+      {accessCreds && (() => {
+        const _wa = `שלום 👋\nנוצרה עבורך גישה לדשבורד${accessCreds.clientName ? ' של ' + accessCreds.clientName : ''}.\n\nכתובת: ${accessCreds.loginUrl}\nאימייל: ${accessCreds.email}\nסיסמה: ${accessCreds.password}`
+        return (
+        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setAccessCreds(null); }} style={{zIndex:9999}}>
+          <div className="modal" style={{maxWidth:440,direction:'rtl'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700}}>פרטי גישה{accessCreds.clientName ? ' — ' + accessCreds.clientName : ''}</h3>
+              <button onClick={() => setAccessCreds(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
+            </div>
+            <div style={{fontSize:12,color: accessCreds.emailSent ? '#059669' : '#b45309',marginBottom:14}}>{accessCreds.emailSent ? '✓ נשלח גם במייל' : '⚠️ המייל לא נשלח — שלח את הפרטים ידנית (וואטסאפ)'}</div>
+            <div style={{background:'#f8fafc',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',marginBottom:14}}>
+              <table style={{width:'100%',fontSize:14}}>
+                <tbody>
+                  <tr><td style={{color:'#64748b',padding:'4px 0'}}>כתובת</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{accessCreds.loginUrl}</td></tr>
+                  <tr><td style={{color:'#64748b',padding:'4px 0'}}>אימייל</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{accessCreds.email}</td></tr>
+                  <tr><td style={{color:'#64748b',padding:'4px 0'}}>סיסמה</td><td style={{fontWeight:700,direction:'ltr',textAlign:'right',letterSpacing:'0.05em'}}>{accessCreds.password}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={() => { navigator.clipboard?.writeText(_wa).catch(()=>{}); showToast('✓ הודעת וואטסאפ הועתקה'); }} style={{flex:1,background:'#25D366',color:'#fff',border:'none',borderRadius:8,padding:'10px',fontSize:14,fontWeight:600,cursor:'pointer'}}>העתק הודעת וואטסאפ</button>
+              <button onClick={() => { navigator.clipboard?.writeText(accessCreds.password).catch(()=>{}); showToast('✓ הסיסמה הועתקה'); }} style={{background:'#fff',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px',fontSize:14,cursor:'pointer'}}>העתק סיסמה</button>
+            </div>
+          </div>
+        </div>
+        )
+      })()}
 
       {namedLeadsModal && (
         <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setNamedLeadsModal(null); }} style={{zIndex:9999}}>
