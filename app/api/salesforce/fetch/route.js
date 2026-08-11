@@ -679,26 +679,6 @@ export async function GET(request) {
     return Response.json(rb, { status })
   }
   const { searchParams } = new URL(request.url)
-  if (searchParams.get('quotecheck')) {
-    try {
-      const a = await getAuth()
-      const soqlR = async (q) => { const r = await fetch(`${a.instance}/services/data/${SF_API_VERSION}/query?q=${encodeURIComponent(q)}`, { headers: { Authorization: `Bearer ${a.token}` } }); return r.json() }
-      const F = '2026-07-01T00:00:00+03:00', T = '2026-07-31T23:59:59+03:00'
-      const byStage = await soqlR(`SELECT StageName k, COUNT(Id) c FROM Opportunity WHERE Cahin_Name__c='קלוס' AND CreatedDate>=${F} AND CreatedDate<=${T} GROUP BY StageName`)
-      const stages = {}; let total = 0
-      for (const r of (byStage.records || [])) { stages[r.k || 'ריק'] = r.c; total += r.c }
-      const everQuote = await soqlR(`SELECT COUNT_DISTINCT(OpportunityId) n FROM OpportunityHistory WHERE Opportunity.Cahin_Name__c='קלוס' AND Opportunity.CreatedDate>=${F} AND Opportunity.CreatedDate<=${T} AND StageName='קיבל הצעת מחיר'`)
-      const withPrice = await soqlR(`SELECT COUNT() FROM Opportunity WHERE Cahin_Name__c='קלוס' AND CreatedDate>=${F} AND CreatedDate<=${T} AND TotalPrice_Opp_Product__c>0`)
-      return Response.json({
-        period: 'יולי 2026 (לפי תאריך יצירת הזדמנות)',
-        totalOpportunities: total,
-        byCurrentStage: stages,
-        quotesByCurrentStage_ourMetric: (stages['קיבל הצעת מחיר'] || 0) + (stages['הזמנה - שולמה מקדמה'] || 0),
-        oppsEverReachedQuoteStage: (everQuote.records && everQuote.records[0] && everQuote.records[0].n) || 0,
-        oppsWithQuoteValue_gt0: withPrice.totalSize,
-      })
-    } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }
-  }
   if (searchParams.get('describe')) {
     try {
       const a = await getAuth()
