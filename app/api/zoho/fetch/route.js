@@ -235,7 +235,13 @@ async function runSync(opts = {}) {
     __allResults.push({ project: __proj.name, error: 'Leads fetch failed: ' + (err.message || String(err)) }); continue
   }
   // Keep only the approved digital sub-sources
-  const leads = rawLeads.filter(r => DIGITAL_SUBSOURCES.has((r.Sub_Lead_Source || '').toLowerCase()))
+  // Keep approved digital sub-sources. Besides the explicit whitelist, accept any facebook*/
+  // google* variant (e.g. facebook_minisite, google_minisite) so a NEW ad sub-source isn't
+  // silently dropped — the Zoho query already restricts to Lead_Source='דיגיטל'.
+  const leads = rawLeads.filter(r => {
+    const _s = (r.Sub_Lead_Source || '').toLowerCase().trim()
+    return DIGITAL_SUBSOURCES.has(_s) || _s.startsWith('facebook') || _s.startsWith('google') || _s.startsWith('פייסבוק') || _s.startsWith('גוגל')
+  })
   const leadIds = leads.map(l => l.id)
   const leadIdSet = new Set(leadIds)
 
