@@ -1067,6 +1067,7 @@ async function runSync(opts = {}) {
     const _regCidSet = new Set(registrationsInRange.map(k => String(k.client_id || '')).filter(Boolean))
     const _rtl = (v) => (v || '').toString().replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\ufeff]/g, '').trim()
     const _adAgg = new Map()
+    const _cidToAdNode = new Map()   // client_id -> its ad node (first period-lead wins)
     for (const lid of aprilLids) {
       const cid = String(lid.client_id || '')
       const platform = _rtl(clientPlatform.get(cid)), campaign = _rtl(clientCampaign.get(cid)), adset = _rtl(clientAdset.get(cid)), ad = _rtl(clientAdName.get(cid))
@@ -1075,10 +1076,25 @@ async function runSync(opts = {}) {
       let a = _adAgg.get(key)
       if (!a) { a = { source, platform, campaign, adset, ad, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0 }; _adAgg.set(key, a) }
       a.leads++
-      if (_lidScheduled(lid)) a.meetings++
-      if (_lidCompleted(lid)) a.meetingsCompleted++
+      if (cid && !_cidToAdNode.has(cid)) _cidToAdNode.set(cid, a)
       if (_regCidSet.has(cid)) a.registrations++
       if (contractClientSet.has(cid)) a.contracts++
+    }
+    // Meetings per ad — count MEETINGS (not leads-with-a-meeting) using the SAME anchors as the KPI cards:
+    //   תואמו (meetings)          = appt COORDINATED this period (create_date in range), ANY status → mirrors apptByCoord.total
+    //   בוצעו (meetingsCompleted) = appt HELD this period (start_date in range, up to today) + done  → mirrors apptByDate.completed
+    // Attributed to the ad node of the meeting's lead (period leads only). Cancelled/future meetings now
+    // correctly raise תואמו without raising בוצעו, so the two columns are no longer identical.
+    for (const t of tasks) {
+      if (!/appointment|meeting|פגישה/i.test((t.type || '').toString().toLowerCase())) continue
+      const cid = String(t.client_id || '')
+      const node = _cidToAdNode.get(cid)
+      if (!node) continue
+      const status = (t.status || '').toString().toLowerCase()
+      const isDone = /done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)
+      const _sd = (t.start_date || t.create_date || '').toString().slice(0, 10)
+      if (inRangeDate(t.create_date)) node.meetings++
+      if (_sd && _sd >= since && _sd <= _meetUntil && isDone) node.meetingsCompleted++
     }
     const adBreakdown = [..._adAgg.values()]
     const _entry = (cid, name) => ({ name: name || clientName.get(String(cid)) || `ליד #${cid}`, phone: cidToPhone.get(String(cid)) || '', source: _leadSource(cid) })
@@ -1144,7 +1160,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 21  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 22  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
