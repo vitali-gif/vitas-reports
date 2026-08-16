@@ -221,8 +221,12 @@ async function callBmbyGetAllJsonPaginated(service, params, maxPages = 10, useGe
     lastResp = resp
     pagesUsed++
     if (resp.rows.length) allRows.push(...resp.rows)
-    // No next page if we got less than the BMBY page cap
-    if (!resp.foundRows || resp.foundRows < 3000) break
+    // Stop only when a page comes back EMPTY or the cursor stops advancing. We deliberately do
+    // NOT stop on "foundRows < 3000": BMBY's GetAll (the clients call) caps each page at 1000,
+    // not 3000, so that test broke pagination after the first page → only the oldest 1000 clients
+    // were fetched and every newer lead lost its custom fields / profile. Paging by lastUniqID
+    // until it stops advancing is cap-agnostic (works for both GetAll=1000 and GetAllJson=3000).
+    if (!resp.rows.length) break
     if (!resp.lastUniqID || resp.lastUniqID === uniqID) break
     uniqID = resp.lastUniqID
     if (!useGetAll) dynamic = 0  // GetAll: keep Dynamic=1 so custom fields return on every page
@@ -358,7 +362,7 @@ async function runSync(opts = {}) {
     const _stagesOnly = !!opts.stagesOnly
     const _apptDump = !!opts.apptDump  // fast: clients+tasks only, dump raw appointment rows
     const [clientsR, tasksR, pricesR, contractsR] = await Promise.allSettled([
-      withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 4, true), 120000, 'clients'),  // useGetAll=true → custom fields immediately
+      withTimeout(callBmbyGetAllJsonPaginated('clients',      commonParams, 8, true), 120000, 'clients'),  // useGetAll=true → custom fields immediately
       _stagesOnly ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('tasks',        commonParams, 10), 120000, 'tasks'),
       (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('price_offers', commonParams, 4), 120000, 'price_offers'),
       (_stagesOnly || _apptDump) ? Promise.resolve({ rows: [] }) : withTimeout(callBmbyGetAllJsonPaginated('contracts',    commonParams, 4), 120000, 'contracts'),
@@ -1160,7 +1164,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 22  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 23  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
