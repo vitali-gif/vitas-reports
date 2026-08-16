@@ -152,7 +152,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [creatingRule, setCreatingRule] = useState(false)
   const chartsRef = useRef([])
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
-  const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was lazy-loaded
+  const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was SUCCESSFULLY lazy-loaded
+  const monthDataInFlight = useRef(new Set())  // month-keys with a heavy-data fetch currently in flight (dedupe)
   const projectReportsCache = useRef(new Map())  // projectId -> light reports (stale-while-revalidate for instant project switching)
   const [showAddClient, setShowAddClient] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
@@ -620,15 +621,22 @@ const loadClients = async () => {
   // months; this fetches the heavy rows on demand and merges them in.
   const loadMonthsData = async (projectId, monthKeys) => {
     if (!projectId || !monthKeys.length) return;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    const res = await fetch(`/api/reports/by-project?projectId=${projectId}&dataForMonths=${encodeURIComponent(monthKeys.join(','))}`, { headers: { 'x-client-key': anonKey } }).catch(() => null);
-    if (!res || !res.ok) return;
-    const rows = await res.json().catch(() => null);
-    if (!Array.isArray(rows)) return;
-    const dataById = {};
-    for (const r of rows) if (r.data != null) dataById[r.id] = r.data;
-    if (!Object.keys(dataById).length) return;
-    setReports(prev => prev.map(r => (dataById[r.id] !== undefined ? { ...r, data: dataById[r.id] } : r)));
+    monthKeys.forEach(m => monthDataInFlight.current.add(m));
+    try {
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+      const res = await fetch(`/api/reports/by-project?projectId=${projectId}&dataForMonths=${encodeURIComponent(monthKeys.join(','))}`, { headers: { 'x-client-key': anonKey } }).catch(() => null);
+      if (!res || !res.ok) return;                 // transient — leave keys UN-marked so a later render retries
+      const rows = await res.json().catch(() => null);
+      if (!Array.isArray(rows)) return;
+      const dataById = {};
+      for (const r of rows) if (r.data != null) dataById[r.id] = r.data;
+      if (!Object.keys(dataById).length) return;   // no heavy rows yet — retry later (don't get stuck on detailPending)
+      setReports(prev => prev.map(r => (dataById[r.id] !== undefined ? { ...r, data: dataById[r.id] } : r)));
+      // Only NOW mark as loaded (a prior attempt that raced/failed must be retryable).
+      monthKeys.forEach(m => monthDataLoaded.current.add(m));
+    } finally {
+      monthKeys.forEach(m => monthDataInFlight.current.delete(m));
+    }
   };
 
   useEffect(() => {
@@ -640,10 +648,9 @@ const loadClients = async () => {
     // data that isn't displayed — making tables/breakdowns appear late and switching slow.
     if (dashTab === 'recommendations') { try { getRecommendationsWindowMonths(60).forEach(m => needed.add(m)); } catch {} }
     if (compareEnabled && selectedMonth) { const pm = getPrevMonth(selectedMonth); if (pm) needed.add(pm); }
-    const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && reports.some(r => r.month === m && r.data == null));
+    const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && !monthDataInFlight.current.has(m) && reports.some(r => r.month === m && r.data == null));
     if (!toLoad.length) return;
-    toLoad.forEach(m => monthDataLoaded.current.add(m));
-    loadMonthsData(selectedProject.id, toLoad);
+    loadMonthsData(selectedProject.id, toLoad);   // marks monthDataLoaded only on SUCCESS (inside)
   }, [selectedProject, selectedMonth, compareEnabled, reports, dashTab]);
 
   const loadProjectTasks = async (projectId) => {
