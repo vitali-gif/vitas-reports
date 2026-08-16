@@ -941,7 +941,10 @@ const selectProject = async (client, project) => {
       triggerFetch(payload);
     }, 800);
     return () => clearTimeout(tm);
-  }, [selectedMonth, selectedProject?.id, reports.length]);
+    // include refreshing/refreshingCrm: when the initial project refresh finishes, re-run this
+    // effect so a period the user selected mid-refresh (e.g. a custom date range) gets fetched
+    // automatically instead of showing 0 until a manual page refresh.
+  }, [selectedMonth, selectedProject?.id, reports.length, refreshing, refreshingCrm]);
 
   // ── Mobile: browser/hardware back navigates one internal step, never closes the dashboard ──
   useEffect(() => {
