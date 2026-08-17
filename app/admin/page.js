@@ -932,6 +932,7 @@ const selectProject = async (client, project) => {
     return () => clearInterval(interval);
   }, [refreshStartTime]);
 
+  const autoFetchAttempted = useRef(new Set());
   // Auto-fetch any missing data sources when user picks a period.
   // Replaces the old manual refresh buttons - if Meta/Google/BMBY data is missing
   // for the selected period, fetch it automatically (with debounce).
@@ -950,7 +951,12 @@ const selectProject = async (client, project) => {
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
     const hasCrm = !!crmRow && (isClientView || cachedCrmVersion >= CRM_SCHEMA_VERSION); // client: cached CRM of any version counts (avoids heavy client live-fetch + clobber)
     if (hasMeta && hasGoogle && hasCrm) return; // fully cached
+    // Auto-fetch each period at most ONCE per session — prevents a re-fetch loop when a source
+    // never fully caches (e.g. a custom range with no Google/CRM data), now that refreshing is a dep.
+    const _autoKey = selectedProject.id + '|' + selectedMonth;
+    if (autoFetchAttempted.current.has(_autoKey)) return;
     const tm = setTimeout(() => {
+      autoFetchAttempted.current.add(_autoKey);
       // Unified: triggerFetch handles whichever sources are missing, in PARALLEL.
       // This replaces the previous sequential meta+google → then-bmby flow.
       const payload = selectedMonth.includes('_')
