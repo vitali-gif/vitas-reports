@@ -164,6 +164,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [toast, setToast] = useState('')
   const [namedLeadsModal, setNamedLeadsModal] = useState(null) // {title, names:[]}
   const [leadsModal, setLeadsModal] = useState(null) // {title, leads:[]} — per-source leads + rep note
+  const [leadsFilter, setLeadsFilter] = useState('all') // all | relevant | irrelevant — filter for the leads modal
   const [sfNoteModal, setSfNoteModal] = useState(null) // {kind:'lead'|'opp', ...record}
   const [sfObjBranch, setSfObjBranch] = useState('all') // objections branch filter
   const [sfTimeBranch, setSfTimeBranch] = useState('הכל') // timing tab branch filter
@@ -2122,7 +2123,7 @@ const selectProject = async (client, project) => {
                         {name}
                         {hasChildren && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginRight:'6px'}}>({children.length})</span>}
                       </td>
-                      <td style={(d.leads && d.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(d.leads && d.leads.length) ? (e) => { e.stopPropagation(); setLeadsModal({title: name, leads: d.leads}); } : undefined}>{formatNum(d.totalLeads)}</td>
+                      <td style={(d.leads && d.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(d.leads && d.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: name, leads: d.leads}); } : undefined}>{formatNum(d.totalLeads)}</td>
                       <td>{formatNum(d.relevantLeads)}</td>
                       <td>{formatNum(d.irrelevantLeads)}</td>
                       <td>{formatNum(d.meetingsScheduled)}</td>
@@ -2141,7 +2142,7 @@ const selectProject = async (client, project) => {
                       return (
                         <tr key={`${name}::${ch.name}`} style={{background:'var(--bg-secondary)',fontSize:'0.92em'}}>
                           <td style={{paddingRight:'42px',color:'#475569',unicodeBidi:'plaintext'}}>{ch.name}</td>
-                          <td style={(ch.leads && ch.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(ch.leads && ch.leads.length) ? (e) => { e.stopPropagation(); setLeadsModal({title: ch.name, leads: ch.leads}); } : undefined}>{formatNum(ch.totalLeads)}</td>
+                          <td style={(ch.leads && ch.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(ch.leads && ch.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: ch.name, leads: ch.leads}); } : undefined}>{formatNum(ch.totalLeads)}</td>
                           <td>{formatNum(ch.relevantLeads)}</td>
                           <td>{formatNum(ch.irrelevantLeads)}</td>
                           <td>{formatNum(ch.meetingsScheduled)}</td>
@@ -5119,12 +5120,21 @@ const selectProject = async (client, project) => {
               <h3 style={{margin:0,fontSize:16,fontWeight:700}}>לידים ממקור זה</h3>
               <button onClick={() => setLeadsModal(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
             </div>
-            <div style={{fontSize:12,color:'#94a3b8',marginBottom:12,unicodeBidi:'plaintext',wordBreak:'break-word'}}>{leadsModal.title}</div>
-            {(!leadsModal.leads || leadsModal.leads.length === 0) ? (
-              <p style={{color:'#94a3b8',textAlign:'center',margin:'24px 0'}}>אין נתונים להצגה</p>
-            ) : (
+            <div style={{fontSize:12,color:'#94a3b8',marginBottom:10,unicodeBidi:'plaintext',wordBreak:'break-word'}}>{leadsModal.title}</div>
+            {(() => { const _all = leadsModal.leads || []; const _rel = _all.filter(x => x.relevant === true).length; const _irr = _all.length - _rel; return (
+              <div style={{display:'flex',gap:6,marginBottom:12}}>
+                {[['all','הכל',_all.length],['relevant','רלוונטי',_rel],['irrelevant','לא רלוונטי',_irr]].map(([k,lbl,cnt]) => (
+                  <button key={k} onClick={() => setLeadsFilter(k)} style={{flex:1,padding:'6px 8px',borderRadius:8,border:'1px solid '+(leadsFilter===k?'var(--indigo,#6366f1)':'var(--border,#e2e8f0)'),background:leadsFilter===k?'var(--indigo,#6366f1)':'#fff',color:leadsFilter===k?'#fff':'#475569',fontSize:12.5,fontWeight:600,cursor:'pointer'}}>{lbl} <span style={{opacity:0.75,fontWeight:400}}>({cnt})</span></button>
+                ))}
+              </div>
+            ); })()}
+            {(() => {
+              const _list = (leadsModal.leads || []).filter(L => leadsFilter === 'all' ? true : leadsFilter === 'relevant' ? L.relevant === true : L.relevant !== true);
+              return (_list.length === 0) ? (
+              <p style={{color:'#94a3b8',textAlign:'center',margin:'24px 0'}}>אין לידים בסינון זה</p>
+            ) : (<>
               <div style={{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:8}}>
-                {leadsModal.leads.map((L, i) => (
+                {_list.map((L, i) => (
                   <div key={i} style={{border:'1px solid var(--border,#e2e8f0)',borderRadius:10,padding:'10px 12px',background:'#fff'}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                       <span style={{width:22,height:22,borderRadius:'50%',background:'var(--indigo-50,#eef2ff)',color:'var(--indigo,#6366f1)',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
@@ -5150,10 +5160,11 @@ const selectProject = async (client, project) => {
                   </div>
                 ))}
               </div>
-            )}
-            <div style={{marginTop:12,textAlign:'left'}}>
-              <span style={{fontSize:12,color:'#94a3b8'}}>{(leadsModal.leads || []).length} לידים</span>
-            </div>
+              <div style={{marginTop:12,textAlign:'left'}}>
+                <span style={{fontSize:12,color:'#94a3b8'}}>{_list.length} לידים{leadsFilter !== 'all' ? ' (מסונן)' : ''}</span>
+              </div>
+            </>);
+            })()}
           </div>
         </div>
       )}
