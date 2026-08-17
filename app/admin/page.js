@@ -10,6 +10,15 @@ import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact
 import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
 import Header from '../components/shell/Header'
+
+// BMBY note/remark fields arrive with HTML numeric entities (e.g. &#1493; = ו). Decode for display.
+const decodeHtmlEntities = (str) => {
+  if (!str) return str;
+  return String(str)
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; } })
+    .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; } })
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+};
 import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
@@ -5133,12 +5142,12 @@ const selectProject = async (client, project) => {
               return (_list.length === 0) ? (
               <p style={{color:'#94a3b8',textAlign:'center',margin:'24px 0'}}>אין לידים בסינון זה</p>
             ) : (<>
-              <div style={{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:8}}>
+              <div style={{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:8,overscrollBehavior:'contain',contain:'content'}}>
                 {_list.map((L, i) => (
                   <div key={i} style={{border:'1px solid var(--border,#e2e8f0)',borderRadius:10,padding:'10px 12px',background:'#fff'}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                       <span style={{width:22,height:22,borderRadius:'50%',background:'var(--indigo-50,#eef2ff)',color:'var(--indigo,#6366f1)',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
-                      <span style={{fontWeight:700,fontSize:14}}>{L.name || '—'}</span>
+                      <span style={{fontWeight:700,fontSize:14}}>{decodeHtmlEntities(L.name) || '—'}</span>
                       {L.phone ? <a href={'tel:'+L.phone} style={{fontSize:12.5,color:'var(--violet,#7c3aed)',unicodeBidi:'plaintext',textDecoration:'none'}}>{L.phone}</a> : null}
                       <span style={{flex:1}}></span>
                       {L.status ? <span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#f1f5f9',color:'#475569',whiteSpace:'nowrap'}}>{L.status}</span> : null}
@@ -5146,15 +5155,15 @@ const selectProject = async (client, project) => {
                     </div>
                     {(L.objection || L.propertyType || L.lastMeeting) ? (
                       <div style={{fontSize:12,color:'#64748b',marginTop:6,display:'flex',gap:12,flexWrap:'wrap'}}>
-                        {L.objection ? <span>🚧 {L.objection}</span> : null}
-                        {L.propertyType ? <span>🏠 {L.propertyType}</span> : null}
+                        {L.objection ? <span>🚧 {decodeHtmlEntities(L.objection)}</span> : null}
+                        {L.propertyType ? <span>🏠 {decodeHtmlEntities(L.propertyType)}</span> : null}
                         {L.lastMeeting ? <span>📅 {L.lastMeeting}</span> : null}
                       </div>
                     ) : null}
                     {(L.remark || L.lastNote) ? (
                       <div style={{fontSize:13,color:'#0f172a',marginTop:8,background:'#f8fafc',border:'1px solid #eef2f7',borderRadius:8,padding:'8px 10px',lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
                         <div style={{fontSize:10.5,fontWeight:700,color:'#64748b',marginBottom:3}}>הערת המכירן</div>
-                        {[L.remark, L.lastNote].filter(Boolean).filter((v,idx,arr)=>arr.indexOf(v)===idx).join('\n')}
+                        {[L.remark, L.lastNote].map(decodeHtmlEntities).filter(Boolean).filter((v,idx,arr)=>arr.indexOf(v)===idx).join('\n')}
                       </div>
                     ) : <div style={{fontSize:12,color:'#cbd5e1',marginTop:6}}>אין הערה</div>}
                   </div>

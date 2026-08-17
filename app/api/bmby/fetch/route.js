@@ -206,6 +206,15 @@ async function callBmbyGetAllJson(service, params, useGetAll = false) {
   return { rows: parseDataXmlRows(parsed.Data || ''), foundRows: parsed.FoundRows || 0, lastUniqID: parsed.LastUniqID || 0 }
 }
 
+// BMBY message/remark fields come with HTML numeric entities (e.g. &#1493; = ו). Decode + shrink.
+function decodeBmbyEntities(str) {
+  if (!str) return str
+  return String(str)
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)) } catch { return _ } })
+    .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)) } catch { return _ } })
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+}
+
 // Paginate BMBY GetAllJson - BMBY caps each response at 3000 rows.
 // We page by using Dynamic=0 + UniqID = previous LastUniqID until FoundRows < 3000
 // or we exceed maxPages. ToDate is used as an early-stop signal if the last row's
@@ -562,7 +571,7 @@ async function runSync(opts = {}) {
       if (normAddr) clientAddress.set(cid, normAddr)
       const obj = (c.objection || '').toString().trim()
       if (obj) clientObjection.set(cid, obj)
-      const _rem = (c.remark || '').toString().trim()
+      const _rem = decodeBmbyEntities((c.remark || '').toString().trim())
       if (_rem) clientRemark.set(cid, _rem.slice(0, 220))
       const ls = translateLivingStatus(c.living_status)
       if (ls) clientLivingStatus.set(cid, ls)
@@ -1023,7 +1032,7 @@ async function runSync(opts = {}) {
     const _cidLastNote = new Map()   // cid -> most recent non-empty task message (the rep's feedback)
     for (const t of tasks) {
       const cid = String(t.client_id || ''); if (!cid) continue
-      const msg = (t.message || '').toString().trim(); if (!msg) continue
+      const msg = decodeBmbyEntities((t.message || '').toString().trim()); if (!msg) continue
       const dt = (t.create_date || t.start_date || '').toString()
       const prev = _cidLastNote.get(cid)
       if (!prev || dt > prev.dt) _cidLastNote.set(cid, { dt, msg: msg.slice(0, 220) })
