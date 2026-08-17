@@ -545,6 +545,7 @@ async function runSync(opts = {}) {
     const clientCity = new Map()       // for "התפלגות לפי יישוב"
     const clientAddress = new Map()
     const clientObjection = new Map()  // for "התנגדויות"
+    const clientRemark = new Map()     // sales-rep note (הערה) — for the per-source leads modal
     const clientLivingStatus = new Map()  // for "מצב דיור" (HI PARK) — translated living_status
     const clientPropertyType = new Map()  // for "סוג נכס" (HI PARK) — value where title=='סוג נכס'
     const clientPlatform = new Map(), clientCampaign = new Map(), clientAdset = new Map(), clientAdName = new Map()  // FB ad hierarchy from _cf
@@ -561,6 +562,8 @@ async function runSync(opts = {}) {
       if (normAddr) clientAddress.set(cid, normAddr)
       const obj = (c.objection || '').toString().trim()
       if (obj) clientObjection.set(cid, obj)
+      const _rem = (c.remark || '').toString().trim()
+      if (_rem) clientRemark.set(cid, _rem.slice(0, 220))
       const ls = translateLivingStatus(c.living_status)
       if (ls) clientLivingStatus.set(cid, ls)
       // Property type is stored as a title/value pair on the client row:
@@ -1015,6 +1018,38 @@ async function runSync(opts = {}) {
     for (const k of contracts) { const cid = String(k.client_id || ''); const n = _nameFromObj(k); if (cid && n && !clientName.has(cid)) clientName.set(cid, n) }
     for (const po of prices)   { const cid = String(po.client_id || ''); const n = _nameFromObj(po); if (cid && n && !clientName.has(cid)) clientName.set(cid, n) }
 
+    // Per-lead detail for the "click a source → see its leads + the rep's note" modal.
+    // Attached to the HEAVY `data` rows (lazy-loaded per period) — NOT the light index.
+    const _cidLastNote = new Map()   // cid -> most recent non-empty task message (the rep's feedback)
+    for (const t of tasks) {
+      const cid = String(t.client_id || ''); if (!cid) continue
+      const msg = (t.message || '').toString().trim(); if (!msg) continue
+      const dt = (t.create_date || t.start_date || '').toString()
+      const prev = _cidLastNote.get(cid)
+      if (!prev || dt > prev.dt) _cidLastNote.set(cid, { dt, msg: msg.slice(0, 220) })
+    }
+    const leadsBySource = {}
+    for (const lid of aprilLids) {
+      const cid = String(lid.client_id || ''); if (!cid) continue
+      const src = (lid.media_title || 'ללא מקור').trim() || 'ללא מקור'
+      const apptDates = (clientApptList.get(cid) || []).map(a => a.date).filter(Boolean).sort()
+      const note = _cidLastNote.get(cid)
+      const entry = {
+        name: clientName.get(cid) || ('ליד #' + cid),
+        phone: cidToPhone.get(cid) || '',
+        status: clientStatus.get(cid) || '',
+        relevant: !!clientRelevant.get(cid),
+        objection: clientObjection.get(cid) || '',
+        remark: clientRemark.get(cid) || '',
+        lastMeeting: apptDates.length ? apptDates[apptDates.length - 1] : '',
+        lastNote: note ? note.msg : '',
+        propertyType: clientPropertyType.get(cid) || '',
+        date: (lid.start_date || lid.create_date || '').toString().slice(0, 10),
+      }
+      ;(leadsBySource[src] = leadsBySource[src] || []).push(entry)
+    }
+    xlsxRows.forEach(r => { r.leads = leadsBySource[r.source] || [] })
+
     // Build namedLeads arrays — used by the dashboard's clickable KPI cards modal
     const _noResponseCids = new Set()
     const _noRespInclUpdate = new Set() // variant: counts "Update Info Lead" as handling (to match BMBY "לידים לטיפול")
@@ -1164,7 +1199,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 23  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 24  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.

@@ -163,6 +163,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [newProjectName, setNewProjectName] = useState('')
   const [toast, setToast] = useState('')
   const [namedLeadsModal, setNamedLeadsModal] = useState(null) // {title, names:[]}
+  const [leadsModal, setLeadsModal] = useState(null) // {title, leads:[]} — per-source leads + rep note
   const [sfNoteModal, setSfNoteModal] = useState(null) // {kind:'lead'|'opp', ...record}
   const [sfObjBranch, setSfObjBranch] = useState('all') // objections branch filter
   const [sfTimeBranch, setSfTimeBranch] = useState('הכל') // timing tab branch filter
@@ -965,6 +966,7 @@ const selectProject = async (client, project) => {
     const onPop = () => {
       if (!isMobile()) { window.__vitasNavArmed = false; return; }
       if (namedLeadsModal) setNamedLeadsModal(null);
+      if (leadsModal) setLeadsModal(null);
       if (sfNoteModal) setSfNoteModal(null);
       else if (dashTab === 'crm' && crmSubTab !== 'sources') setCrmSubTab('sources');
       else if (dashTab !== 'all') setDashTab('all');
@@ -1779,15 +1781,15 @@ const selectProject = async (client, project) => {
     // Merge Facebook campaign sources into single 'Facebook' entry - children kept for drill-down
     const _fbCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('פייסבוק') || k.toLowerCase().includes('facebook'));
     if (_fbCrmKeys.length > 0) {
-      const _fbMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [] };
-      _fbCrmKeys.forEach(k => { Object.keys(_fbMerged).forEach(f => { if (f === 'children') return; _fbMerged[f] += crmData.sources[k][f] || 0; }); _fbMerged.children.push({ name: k, ...crmData.sources[k] }); delete crmData.sources[k]; });
+      const _fbMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [], leads: [] };
+      _fbCrmKeys.forEach(k => { Object.keys(_fbMerged).forEach(f => { if (f === 'children') return; if (f === 'leads') { _fbMerged.leads = _fbMerged.leads.concat(crmData.sources[k].leads || []); return; } _fbMerged[f] += crmData.sources[k][f] || 0; }); _fbMerged.children.push({ name: k, ...crmData.sources[k] }); delete crmData.sources[k]; });
       crmData.sources['Facebook'] = _fbMerged;
     }
     // Merge Google campaign sources into single 'Google' entry - children kept for drill-down
     const _gCrmKeys = Object.keys(crmData.sources).filter(k => k.includes('גוגל') || k.toLowerCase().includes('google'));
     if (_gCrmKeys.length > 0) {
-      const _gMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [] };
-      _gCrmKeys.forEach(k => { Object.keys(_gMerged).forEach(f => { if (f === 'children') return; _gMerged[f] += crmData.sources[k][f] || 0; }); _gMerged.children.push({ name: k, ...crmData.sources[k] }); delete crmData.sources[k]; });
+      const _gMerged = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, children: [], leads: [] };
+      _gCrmKeys.forEach(k => { Object.keys(_gMerged).forEach(f => { if (f === 'children') return; if (f === 'leads') { _gMerged.leads = _gMerged.leads.concat(crmData.sources[k].leads || []); return; } _gMerged[f] += crmData.sources[k][f] || 0; }); _gMerged.children.push({ name: k, ...crmData.sources[k] }); delete crmData.sources[k]; });
       crmData.sources['Google'] = _gMerged;
     }
 
@@ -1795,7 +1797,7 @@ const selectProject = async (client, project) => {
     let _platformSpend = 0, _fbSpend = 0, _gSpend = 0;
     const _fbR = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
     const _gR = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-    const _emptySource = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
+    const _emptySource = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, leads: [] };
     if (_fbR.length > 0) {
       let _fbRows = []; _fbR.forEach(r => { if (r.data) _fbRows = _fbRows.concat(r.data); });
       const _fbAgg = aggregateRows(_fbRows);
@@ -2120,7 +2122,7 @@ const selectProject = async (client, project) => {
                         {name}
                         {hasChildren && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginRight:'6px'}}>({children.length})</span>}
                       </td>
-                      <td>{formatNum(d.totalLeads)}</td>
+                      <td style={(d.leads && d.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(d.leads && d.leads.length) ? (e) => { e.stopPropagation(); setLeadsModal({title: name, leads: d.leads}); } : undefined}>{formatNum(d.totalLeads)}</td>
                       <td>{formatNum(d.relevantLeads)}</td>
                       <td>{formatNum(d.irrelevantLeads)}</td>
                       <td>{formatNum(d.meetingsScheduled)}</td>
@@ -2139,7 +2141,7 @@ const selectProject = async (client, project) => {
                       return (
                         <tr key={`${name}::${ch.name}`} style={{background:'var(--bg-secondary)',fontSize:'0.92em'}}>
                           <td style={{paddingRight:'42px',color:'#475569',unicodeBidi:'plaintext'}}>{ch.name}</td>
-                          <td>{formatNum(ch.totalLeads)}</td>
+                          <td style={(ch.leads && ch.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(ch.leads && ch.leads.length) ? (e) => { e.stopPropagation(); setLeadsModal({title: ch.name, leads: ch.leads}); } : undefined}>{formatNum(ch.totalLeads)}</td>
                           <td>{formatNum(ch.relevantLeads)}</td>
                           <td>{formatNum(ch.irrelevantLeads)}</td>
                           <td>{formatNum(ch.meetingsScheduled)}</td>
@@ -5105,6 +5107,52 @@ const selectProject = async (client, project) => {
             )}
             <div style={{marginTop:14,textAlign:'left'}}>
               <span style={{fontSize:12,color:'#94a3b8'}}>{namedLeadsModal.names.length} רשומות</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {leadsModal && (
+        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setLeadsModal(null); }} style={{zIndex:9999}}>
+          <div className="modal" style={{maxWidth:560,maxHeight:'82vh',display:'flex',flexDirection:'column',direction:'rtl'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700}}>לידים ממקור זה</h3>
+              <button onClick={() => setLeadsModal(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
+            </div>
+            <div style={{fontSize:12,color:'#94a3b8',marginBottom:12,unicodeBidi:'plaintext',wordBreak:'break-word'}}>{leadsModal.title}</div>
+            {(!leadsModal.leads || leadsModal.leads.length === 0) ? (
+              <p style={{color:'#94a3b8',textAlign:'center',margin:'24px 0'}}>אין נתונים להצגה</p>
+            ) : (
+              <div style={{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:8}}>
+                {leadsModal.leads.map((L, i) => (
+                  <div key={i} style={{border:'1px solid var(--border,#e2e8f0)',borderRadius:10,padding:'10px 12px',background:'#fff'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                      <span style={{width:22,height:22,borderRadius:'50%',background:'var(--indigo-50,#eef2ff)',color:'var(--indigo,#6366f1)',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
+                      <span style={{fontWeight:700,fontSize:14}}>{L.name || '—'}</span>
+                      {L.phone ? <a href={'tel:'+L.phone} style={{fontSize:12.5,color:'var(--violet,#7c3aed)',unicodeBidi:'plaintext',textDecoration:'none'}}>{L.phone}</a> : null}
+                      <span style={{flex:1}}></span>
+                      {L.status ? <span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#f1f5f9',color:'#475569',whiteSpace:'nowrap'}}>{L.status}</span> : null}
+                      {typeof L.relevant === 'boolean' ? <span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:L.relevant?'#dcfce7':'#fee2e2',color:L.relevant?'#166534':'#991b1b',whiteSpace:'nowrap'}}>{L.relevant?'רלוונטי':'לא רלוונטי'}</span> : null}
+                    </div>
+                    {(L.objection || L.propertyType || L.lastMeeting) ? (
+                      <div style={{fontSize:12,color:'#64748b',marginTop:6,display:'flex',gap:12,flexWrap:'wrap'}}>
+                        {L.objection ? <span>🚧 {L.objection}</span> : null}
+                        {L.propertyType ? <span>🏠 {L.propertyType}</span> : null}
+                        {L.lastMeeting ? <span>📅 {L.lastMeeting}</span> : null}
+                      </div>
+                    ) : null}
+                    {(L.remark || L.lastNote) ? (
+                      <div style={{fontSize:13,color:'#0f172a',marginTop:8,background:'#f8fafc',border:'1px solid #eef2f7',borderRadius:8,padding:'8px 10px',lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+                        <div style={{fontSize:10.5,fontWeight:700,color:'#64748b',marginBottom:3}}>הערת המכירן</div>
+                        {[L.remark, L.lastNote].filter(Boolean).filter((v,idx,arr)=>arr.indexOf(v)===idx).join('\n')}
+                      </div>
+                    ) : <div style={{fontSize:12,color:'#cbd5e1',marginTop:6}}>אין הערה</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{marginTop:12,textAlign:'left'}}>
+              <span style={{fontSize:12,color:'#94a3b8'}}>{(leadsModal.leads || []).length} לידים</span>
             </div>
           </div>
         </div>
