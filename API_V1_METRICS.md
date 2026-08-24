@@ -101,6 +101,19 @@ curl -s 'https://reports.vitas.co.il/api/v1/clients/sbaruch/metrics?project=hi-p
 }
 ```
 
+## Join model & attribution (v1.1)
+* **Meta** rows are joined by numeric **`ad_id` / `adset_id` / `campaign_id`** (from BMBY `_cf` `מזהה מודעה/סדרה/קמפיין`, live from ~2026-08-09), matched against the Meta report. If a lead has no id, it falls back to **normalized ad name** (as before). Same-name creatives in different ads now separate correctly by `ad_id`.
+* **Google** is name-based: `gclid` is stored on the lead but a raw gclid cannot be mapped to a campaign/asset-group without Google click data, so no id-join yet.
+* Each row includes:
+  * `ad_id` / `adset_id` / `campaign_id` — the numeric ids (null if name-only).
+  * **`attribution_rate`** — % of the row's leads that carried a real `ad_id` (id-based). Low value ⇒ CPL/cost figures lean on name-matching and are less certain.
+  * `join_method` — `"id"` (all leads id-matched), `"mixed"`, or `"name"`.
+
+## `relevant_leads`
+The BMBY client-level **`relevant`** flag (1/0), set by the sales rep during qualification —
+i.e. leads that are *not* spam / duplicate / wrong-number / out-of-scope. Often a better
+denominator than raw `leads` for judging real demand.
+
 ## Revoking / issuing tokens
 Revoke one session (others keep working):
 ```sql
