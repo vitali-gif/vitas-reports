@@ -383,6 +383,22 @@ async function runSync(opts = {}) {
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
 
+    if (opts.cfScan) {
+      const cfTitles = {}, rawKeys = {}
+      for (const c of clients) {
+        for (const t in (c._cf || {})) cfTitles[t] = (cfTitles[t] || 0) + 1
+        for (const k in c) rawKeys[k] = (rawKeys[k] || 0) + 1
+      }
+      const withCf = clients.filter(c => c._cf && Object.keys(c._cf).length)
+      const idRe = /(^id$)|_id$|gclid|gbraid|wbraid|\bad\b|adset|campaign|utm/i
+      const samples = withCf.slice(-4).map(c => ({
+        client_id: c.client_id,
+        _cf: c._cf,
+        idFields: Object.fromEntries(Object.entries(c).filter(([k, v]) => idRe.test(k) && v)),
+      }))
+      return { project: p.name, cfScan: true, totalClients: clients.length, cfTitles, rawFieldKeys: Object.keys(rawKeys).sort(), samples }
+    }
+
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
       const _dist = {}, _stageXstatus = {}
@@ -1343,6 +1359,7 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
+      cfScan: body.cfScan,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
