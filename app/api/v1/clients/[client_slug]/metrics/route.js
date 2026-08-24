@@ -132,8 +132,10 @@ export async function GET(request, ctx) {
   // Resolve names -> ids from the Meta report so older name-only CRM leads still merge
   // onto the correct id-keyed ad row.
   const metaNameToId = new Map()
+  const validMetaAdIds = new Set()
   fbReps.forEach(r => (r.data || []).forEach(row => {
     const id = (row.adId || '').toString().trim(), nm = norm(row.adName || row.name)
+    if (id) validMetaAdIds.add(id)
     if (id && nm && !metaNameToId.has(nm)) metaNameToId.set(nm, id)
   }))
   const ads = new Map()
@@ -147,7 +149,7 @@ export async function GET(request, ctx) {
     if (!a) { a = { platform: plat, campaign: rtl(c) || null, adset: rtl(as) || null, ad: norm(ad) || null,
       campaign_id: ids.campaignId || null, adset_id: ids.adsetId || null, ad_id: ids.adId || null,
       spend: 0, impressions: 0, clicks: 0, platform_leads: 0,
-      leads: 0, leads_with_id: 0, gclid_leads: 0, meetings_scheduled: 0, meetings_completed: 0, registrations: 0, contracts: 0 }; ads.set(k, a) }
+      leads: 0, relevant_leads: 0, leads_with_id: 0, gclid_leads: 0, meetings_scheduled: 0, meetings_completed: 0, registrations: 0, contracts: 0 }; ads.set(k, a) }
     if (!a.campaign && rtl(c)) a.campaign = rtl(c)
     if (!a.adset && rtl(as)) a.adset = rtl(as)
     if (!a.ad && norm(ad)) a.ad = norm(ad)
@@ -168,8 +170,12 @@ export async function GET(request, ctx) {
     const plat = platformOf(node)
     if (!plat) return
     if (platform !== 'all' && plat !== platform) return
-    const a = ensure(plat, { adId: node.adId, adsetId: node.adsetId, campaignId: node.campaignId }, node.campaign, node.adset, node.ad)
-    a.leads += n(node.leads); a.leads_with_id += n(node.leadsWithId); a.gclid_leads += n(node.gclidLeads)
+    // Only trust a CRM ad_id if it actually exists in the Meta report — this drops values that
+    // aren't real ad ids (e.g. an fb_lead_id that leaked into the מזהה מודעה field).
+    const vAdId = (plat === 'meta' && node.adId && validMetaAdIds.has(node.adId)) ? node.adId : ''
+    const a = ensure(plat, { adId: vAdId, adsetId: node.adsetId, campaignId: node.campaignId }, node.campaign, node.adset, node.ad)
+    a.leads += n(node.leads); a.relevant_leads += n(node.relevantLeads)
+    a.leads_with_id += vAdId ? n(node.leadsWithId) : 0; a.gclid_leads += n(node.gclidLeads)
     a.meetings_scheduled += n(node.meetings); a.meetings_completed += n(node.meetingsCompleted)
     a.registrations += n(node.registrations); a.contracts += n(node.contracts)
   })
@@ -188,11 +194,11 @@ export async function GET(request, ctx) {
       g = { platform: a.platform, campaign: a.campaign, campaign_id: a.campaign_id,
         adset: granularity === 'campaign' ? undefined : a.adset, adset_id: granularity === 'campaign' ? undefined : a.adset_id,
         ad: granularity === 'ad' ? a.ad : undefined, ad_id: granularity === 'ad' ? a.ad_id : undefined,
-        spend: 0, impressions: 0, clicks: 0, platform_leads: 0, leads: 0, leads_with_id: 0, gclid_leads: 0,
+        spend: 0, impressions: 0, clicks: 0, platform_leads: 0, leads: 0, relevant_leads: 0, leads_with_id: 0, gclid_leads: 0,
         meetings_scheduled: 0, meetings_completed: 0, registrations: 0, contracts: 0 }
       grouped.set(gk, g)
     }
-    for (const f of ['spend', 'impressions', 'clicks', 'platform_leads', 'leads', 'leads_with_id', 'gclid_leads', 'meetings_scheduled', 'meetings_completed', 'registrations', 'contracts']) g[f] += a[f]
+    for (const f of ['spend', 'impressions', 'clicks', 'platform_leads', 'leads', 'relevant_leads', 'leads_with_id', 'gclid_leads', 'meetings_scheduled', 'meetings_completed', 'registrations', 'contracts']) g[f] += a[f]
   }
   const rows = [...grouped.values()].map(g => {
     const has = g.spend || g.impressions || g.clicks || g.leads
@@ -206,6 +212,7 @@ export async function GET(request, ctx) {
       impressions: g.impressions || null,
       clicks: g.clicks || null,
       leads: g.leads || null,
+      relevant_leads: g.relevant_leads || null,
       platform_leads: g.platform_leads || null,
       cpl: round2(ratio(g.spend, g.leads)),
       meetings_scheduled: g.meetings_scheduled || null,

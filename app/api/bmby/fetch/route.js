@@ -1128,8 +1128,9 @@ async function runSync(opts = {}) {
       const source = (cidToMedia.get(cid) || 'ללא מקור').toString().trim() || 'ללא מקור'
       const key = [source, platform, campaign, adset, ad].join('\u0001')
       let a = _adAgg.get(key)
-      if (!a) { a = { source, platform, campaign, adset, ad, adId: '', adsetId: '', campaignId: '', gclid: '', leadsWithId: 0, gclidLeads: 0, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0 }; _adAgg.set(key, a) }
+      if (!a) { a = { source, platform, campaign, adset, ad, adId: '', adsetId: '', campaignId: '', gclid: '', leadsWithId: 0, gclidLeads: 0, relevantLeads: 0, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0 }; _adAgg.set(key, a) }
       a.leads++
+      if (clientRelevant.get(cid)) a.relevantLeads++
       if (adId && !a.adId) a.adId = adId
       if (adsetId && !a.adsetId) a.adsetId = adsetId
       if (campaignId && !a.campaignId) a.campaignId = campaignId
@@ -1145,10 +1146,21 @@ async function runSync(opts = {}) {
     //   בוצעו (meetingsCompleted) = appt HELD this period (start_date in range, up to today) + done  → mirrors apptByDate.completed
     // Attributed to the ad node of the meeting's lead (period leads only). Cancelled/future meetings now
     // correctly raise תואמו without raising בוצעו, so the two columns are no longer identical.
+    // Find-or-create the ad node for ANY client from its stored ad tags (not only period leads),
+    // so a meeting held this period for an OLDER tagged lead still attributes to the ad that made it.
+    const _nodeFor = (cid) => {
+      const platform = _rtl(clientPlatform.get(cid)), campaign = _rtl(clientCampaign.get(cid)), adset = _rtl(clientAdset.get(cid)), ad = _rtl(clientAdName.get(cid))
+      const source = (cidToMedia.get(cid) || 'ללא מקור').toString().trim() || 'ללא מקור'
+      const key = [source, platform, campaign, adset, ad].join('\u0001')
+      let a = _adAgg.get(key)
+      if (!a) { a = { source, platform, campaign, adset, ad, adId: _rtl(clientFbAdId.get(cid)), adsetId: _rtl(clientFbAdsetId.get(cid)), campaignId: _rtl(clientFbCampaignId.get(cid)), gclid: _rtl(clientGclid.get(cid)), leadsWithId: 0, gclidLeads: 0, relevantLeads: 0, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0 }; _adAgg.set(key, a) }
+      return a
+    }
+    const _hasAdTags = (cid) => clientFbAdId.has(cid) || clientAdName.has(cid) || clientCampaign.has(cid)
     for (const t of tasks) {
       if (!/appointment|meeting|פגישה/i.test((t.type || '').toString().toLowerCase())) continue
       const cid = String(t.client_id || '')
-      const node = _cidToAdNode.get(cid)
+      const node = _cidToAdNode.get(cid) || (_hasAdTags(cid) ? _nodeFor(cid) : null)
       if (!node) continue
       const status = (t.status || '').toString().toLowerCase()
       const isDone = /done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)
@@ -1220,7 +1232,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 25  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 26  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
