@@ -199,6 +199,7 @@ export async function GET(request, ctx) {
       meetings_scheduled: g.meetings_scheduled || null,
       meetings_completed: g.meetings_completed || null,
       cost_per_meeting_completed: round2(ratio(g.spend, g.meetings_completed)),
+      meeting_completion_rate: round2(ratio(g.meetings_completed, g.leads) == null ? null : ratio(g.meetings_completed, g.leads) * 100),
       registrations: { count: g.registrations || null, value: null },
       contracts: { count: g.contracts || null, value: null },
       cost_per_contract: round2(ratio(g.spend, g.contracts)),
@@ -253,7 +254,7 @@ export async function GET(request, ctx) {
     registrations_value: n(sm.registrationValue) || null,
     contracts: n(sm.contracts) || null,
     contracts_value: n(sm.contractValue) || null,
-    meeting_completion_rate: round2(ratio(n(sm.meetingsCompleted), n(sm.totalLeads))),
+    meeting_completion_rate: round2(ratio(n(sm.meetingsCompleted), n(sm.totalLeads)) == null ? null : ratio(n(sm.meetingsCompleted), n(sm.totalLeads)) * 100),
   }
 
   return J({
