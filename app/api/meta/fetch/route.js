@@ -342,6 +342,9 @@ async function runSync(opts = {}) {
     campaign: r.campaign_name || '',
     adSet: r.adset_name || '',
     adName: r.ad_name || '',
+    campaignId: r.campaign_id || '',
+    adsetId: r.adset_id || '',
+    adId: r.ad_id || '',
     adText: r.ad_id ? (adBodyById[r.ad_id] || '') : '',
     gender: r.gender || '',
     age: r.age || '',
@@ -459,10 +462,10 @@ async function runSync(opts = {}) {
     if (isSlim) {
       const byAd = new Map()
       for (const r of mine) {
-        const key = (r.campaign || '') + '\u0000' + (r.adSet || '') + '\u0000' + (r.adName || '')
+        const key = r.adId ? ('id\u0000' + r.adId) : ((r.campaign || '') + '\u0000' + (r.adSet || '') + '\u0000' + (r.adName || ''))
         let row = byAd.get(key)
         if (!row) {
-          row = { campaign: r.campaign, adSet: r.adSet, adName: r.adName, spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0, campaignStatus: r.campaignStatus, adSetStatus: r.adSetStatus, adStatus: r.adStatus }
+          row = { campaign: r.campaign, adSet: r.adSet, adName: r.adName, campaignId: r.campaignId || '', adsetId: r.adsetId || '', adId: r.adId || '', spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0, campaignStatus: r.campaignStatus, adSetStatus: r.adSetStatus, adStatus: r.adStatus }
           byAd.set(key, row)
         }
         row.spend += r.spend; row.impressions += r.impressions; row.reach += r.reach; row.clicks += r.clicks; row.leads += r.leads

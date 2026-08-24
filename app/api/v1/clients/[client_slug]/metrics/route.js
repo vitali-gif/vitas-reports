@@ -128,21 +128,37 @@ export async function GET(request, ctx) {
   const fbReps = reps.filter(r => r.source === 'facebook')
   const gReps = reps.filter(r => r.source && r.source.startsWith('google'))
 
-  // ---- ad-level core metrics: join ad platform rows (spend/impr/clicks) with CRM outcomes ----
+  // ---- ad-level core: ID-first join (Meta ad_id/adset_id/campaign_id), name fallback ----
+  // Resolve names -> ids from the Meta report so older name-only CRM leads still merge
+  // onto the correct id-keyed ad row.
+  const metaNameToId = new Map()
+  fbReps.forEach(r => (r.data || []).forEach(row => {
+    const id = (row.adId || '').toString().trim(), nm = norm(row.adName || row.name)
+    if (id && nm && !metaNameToId.has(nm)) metaNameToId.set(nm, id)
+  }))
   const ads = new Map()
-  const keyOf = (p, c, as, ad) => [p, rtl(c), rtl(as), norm(ad)].join('')
-  const ensure = (p, c, as, ad) => {
-    const k = keyOf(p, c, as, ad)
-    if (!ads.has(k)) ads.set(k, {
-      platform: p, campaign: rtl(c) || null, adset: rtl(as) || null, ad: norm(ad) || null,
+  const rowKey = (plat, adId, c, as, ad) => {
+    const rid = (adId || '').toString().trim() || (plat === 'meta' ? (metaNameToId.get(norm(ad)) || '') : '')
+    return rid ? (plat + '|id|' + rid) : (plat + '|nm|' + norm(ad) + '|' + rtl(as) + '|' + rtl(c))
+  }
+  const ensure = (plat, ids, c, as, ad) => {
+    const k = rowKey(plat, ids.adId, c, as, ad)
+    let a = ads.get(k)
+    if (!a) { a = { platform: plat, campaign: rtl(c) || null, adset: rtl(as) || null, ad: norm(ad) || null,
+      campaign_id: ids.campaignId || null, adset_id: ids.adsetId || null, ad_id: ids.adId || null,
       spend: 0, impressions: 0, clicks: 0, platform_leads: 0,
-      leads: 0, meetings_scheduled: 0, meetings_completed: 0, registrations: 0, contracts: 0,
-    })
-    return ads.get(k)
+      leads: 0, leads_with_id: 0, gclid_leads: 0, meetings_scheduled: 0, meetings_completed: 0, registrations: 0, contracts: 0 }; ads.set(k, a) }
+    if (!a.campaign && rtl(c)) a.campaign = rtl(c)
+    if (!a.adset && rtl(as)) a.adset = rtl(as)
+    if (!a.ad && norm(ad)) a.ad = norm(ad)
+    if (!a.campaign_id && ids.campaignId) a.campaign_id = ids.campaignId
+    if (!a.adset_id && ids.adsetId) a.adset_id = ids.adsetId
+    if (!a.ad_id && ids.adId) a.ad_id = ids.adId
+    return a
   }
   const addPlatformRows = (repList, plat) => {
     repList.forEach(r => (r.data || []).forEach(row => {
-      const a = ensure(plat, row.campaign, row.adSet || row.adset, row.adName || row.name)
+      const a = ensure(plat, { adId: row.adId, adsetId: row.adsetId, campaignId: row.campaignId }, row.campaign, row.adSet || row.adset, row.adName || row.name)
       a.spend += n(row.spend); a.impressions += n(row.impressions); a.clicks += n(row.clicks); a.platform_leads += n(row.leads)
     }))
   }
@@ -152,33 +168,40 @@ export async function GET(request, ctx) {
     const plat = platformOf(node)
     if (!plat) return
     if (platform !== 'all' && plat !== platform) return
-    const a = ensure(plat, node.campaign, node.adset, node.ad)
-    a.leads += n(node.leads); a.meetings_scheduled += n(node.meetings)
-    a.meetings_completed += n(node.meetingsCompleted); a.registrations += n(node.registrations); a.contracts += n(node.contracts)
+    const a = ensure(plat, { adId: node.adId, adsetId: node.adsetId, campaignId: node.campaignId }, node.campaign, node.adset, node.ad)
+    a.leads += n(node.leads); a.leads_with_id += n(node.leadsWithId); a.gclid_leads += n(node.gclidLeads)
+    a.meetings_scheduled += n(node.meetings); a.meetings_completed += n(node.meetingsCompleted)
+    a.registrations += n(node.registrations); a.contracts += n(node.contracts)
   })
 
-  // ---- roll up to requested granularity ----
-  const groupKey = (a) => granularity === 'campaign' ? [a.platform, a.campaign].join('')
-    : granularity === 'adset' ? [a.platform, a.campaign, a.adset].join('')
-      : [a.platform, a.campaign, a.adset, a.ad].join('')
+  // ---- roll up to requested granularity (group by id when available, else name) ----
+  const idOr = (id, name) => id ? ('id:' + id) : ('nm:' + (name || ''))
+  const groupKey = (a) => {
+    const c = idOr(a.campaign_id, a.campaign), as = idOr(a.adset_id, a.adset), ad = idOr(a.ad_id, a.ad)
+    return granularity === 'campaign' ? [a.platform, c].join('') : granularity === 'adset' ? [a.platform, c, as].join('') : [a.platform, c, as, ad].join('')
+  }
   const grouped = new Map()
   for (const a of ads.values()) {
     const gk = groupKey(a)
     let g = grouped.get(gk)
     if (!g) {
-      g = { platform: a.platform, campaign: a.campaign, adset: granularity === 'campaign' ? undefined : a.adset, ad: granularity === 'ad' ? a.ad : undefined,
-        spend: 0, impressions: 0, clicks: 0, platform_leads: 0, leads: 0, meetings_scheduled: 0, meetings_completed: 0, registrations: 0, contracts: 0 }
+      g = { platform: a.platform, campaign: a.campaign, campaign_id: a.campaign_id,
+        adset: granularity === 'campaign' ? undefined : a.adset, adset_id: granularity === 'campaign' ? undefined : a.adset_id,
+        ad: granularity === 'ad' ? a.ad : undefined, ad_id: granularity === 'ad' ? a.ad_id : undefined,
+        spend: 0, impressions: 0, clicks: 0, platform_leads: 0, leads: 0, leads_with_id: 0, gclid_leads: 0,
+        meetings_scheduled: 0, meetings_completed: 0, registrations: 0, contracts: 0 }
       grouped.set(gk, g)
     }
-    for (const f of ['spend', 'impressions', 'clicks', 'platform_leads', 'leads', 'meetings_scheduled', 'meetings_completed', 'registrations', 'contracts']) g[f] += a[f]
+    for (const f of ['spend', 'impressions', 'clicks', 'platform_leads', 'leads', 'leads_with_id', 'gclid_leads', 'meetings_scheduled', 'meetings_completed', 'registrations', 'contracts']) g[f] += a[f]
   }
   const rows = [...grouped.values()].map(g => {
     const has = g.spend || g.impressions || g.clicks || g.leads
+    const idRate = ratio(g.leads_with_id, g.leads)
     return {
       platform: g.platform,
-      campaign: g.campaign,
-      ...(granularity !== 'campaign' ? { adset: g.adset || null } : {}),
-      ...(granularity === 'ad' ? { ad: g.ad || null } : {}),
+      campaign: g.campaign, campaign_id: g.campaign_id || null,
+      ...(granularity !== 'campaign' ? { adset: g.adset || null, adset_id: g.adset_id || null } : {}),
+      ...(granularity === 'ad' ? { ad: g.ad || null, ad_id: g.ad_id || null } : {}),
       spend: has ? round2(g.spend) : null,
       impressions: g.impressions || null,
       clicks: g.clicks || null,
@@ -192,6 +215,8 @@ export async function GET(request, ctx) {
       registrations: { count: g.registrations || null, value: null },
       contracts: { count: g.contracts || null, value: null },
       cost_per_contract: round2(ratio(g.spend, g.contracts)),
+      attribution_rate: round2(idRate == null ? null : idRate * 100),
+      join_method: g.leads ? (g.leads_with_id === 0 ? 'name' : (g.leads_with_id >= g.leads ? 'id' : 'mixed')) : null,
     }
   }).sort((a, b) => (b.spend || 0) - (a.spend || 0) || (b.leads || 0) - (a.leads || 0))
 
@@ -253,7 +278,7 @@ export async function GET(request, ctx) {
       timezone: 'Asia/Jerusalem', currency: 'ILS',
       generated_at: new Date().toISOString(),
       schema_version: (sm.schemaVersion ?? null),
-      notes: 'Aggregates only, no PII. Per-ad registration/contract VALUE is unavailable (see totals). Ad join is by normalized ad name; untagged CRM leads roll into a null-ad row.',
+      notes: 'Aggregates only, no PII. Per-ad registration/contract VALUE is unavailable (see totals). Join: Meta rows joined by ad_id/adset_id/campaign_id when present (else by normalized name); Google is name-based (gclid cannot map to a campaign without click data). attribution_rate = % of a row\u2019s leads that carried a real ad_id (id-based); join_method = id|mixed|name. relevant_leads = BMBY client.relevant flag (rep-qualified: not spam/duplicate/wrong-number).',
     },
     totals,
     metrics: rows,

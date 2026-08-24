@@ -383,22 +383,6 @@ async function runSync(opts = {}) {
     const prices    = safeRows(pricesR)
     const contracts = safeRows(contractsR)
 
-    if (opts.cfScan) {
-      const cfTitles = {}, rawKeys = {}
-      for (const c of clients) {
-        for (const t in (c._cf || {})) cfTitles[t] = (cfTitles[t] || 0) + 1
-        for (const k in c) rawKeys[k] = (rawKeys[k] || 0) + 1
-      }
-      const withCf = clients.filter(c => c._cf && Object.keys(c._cf).length)
-      const idRe = /(^id$)|_id$|gclid|gbraid|wbraid|\bad\b|adset|campaign|utm/i
-      const samples = withCf.slice(-4).map(c => ({
-        client_id: c.client_id,
-        _cf: c._cf,
-        idFields: Object.fromEntries(Object.entries(c).filter(([k, v]) => idRe.test(k) && v)),
-      }))
-      return { project: p.name, cfScan: true, totalClients: clients.length, cfTitles, rawFieldKeys: Object.keys(rawKeys).sort(), samples }
-    }
-
     if (_stagesOnly) {
       // TEMP field-scan diagnostic (design living_status/property-type feature)
       const _dist = {}, _stageXstatus = {}
@@ -574,6 +558,7 @@ async function runSync(opts = {}) {
     const clientLivingStatus = new Map()  // for "מצב דיור" (HI PARK) — translated living_status
     const clientPropertyType = new Map()  // for "סוג נכס" (HI PARK) — value where title=='סוג נכס'
     const clientPlatform = new Map(), clientCampaign = new Map(), clientAdset = new Map(), clientAdName = new Map()  // FB ad hierarchy from _cf
+    const clientFbAdId = new Map(), clientFbAdsetId = new Map(), clientFbCampaignId = new Map(), clientGclid = new Map()  // numeric IDs from _cf (מזהה מודעה/סדרה/קמפיין/קליק גוגל)
     for (const c of clients) {
       if (!c.client_id) continue
       const cid = String(c.client_id)
@@ -601,6 +586,10 @@ async function runSync(opts = {}) {
         const _ca = (c._cf['שם קמפיין'] || '').toString().trim(); if (_ca) clientCampaign.set(cid, _ca)
         const _as = (c._cf['שם סדרת מודעות'] || '').toString().trim(); if (_as) clientAdset.set(cid, _as)
         const _ad = (c._cf['שם מודעה'] || '').toString().trim(); if (_ad) clientAdName.set(cid, _ad)
+        const _aid = (c._cf['מזהה מודעה'] || '').toString().trim(); if (_aid) clientFbAdId.set(cid, _aid)
+        const _asid = (c._cf['מזהה סדרת מודעות'] || '').toString().trim(); if (_asid) clientFbAdsetId.set(cid, _asid)
+        const _cid2 = (c._cf['מזהה קמפיין'] || '').toString().trim(); if (_cid2) clientFbCampaignId.set(cid, _cid2)
+        const _gc = (c._cf['מזהה קליק גוגל'] || '').toString().trim(); if (_gc) clientGclid.set(cid, _gc)
       }
       // Collect client profile samples for debug
       if (clientProfileSamples.length < 10) {
@@ -1135,11 +1124,18 @@ async function runSync(opts = {}) {
     for (const lid of aprilLids) {
       const cid = String(lid.client_id || '')
       const platform = _rtl(clientPlatform.get(cid)), campaign = _rtl(clientCampaign.get(cid)), adset = _rtl(clientAdset.get(cid)), ad = _rtl(clientAdName.get(cid))
+      const adId = _rtl(clientFbAdId.get(cid)), adsetId = _rtl(clientFbAdsetId.get(cid)), campaignId = _rtl(clientFbCampaignId.get(cid)), gclid = _rtl(clientGclid.get(cid))
       const source = (cidToMedia.get(cid) || 'ללא מקור').toString().trim() || 'ללא מקור'
       const key = [source, platform, campaign, adset, ad].join('\u0001')
       let a = _adAgg.get(key)
-      if (!a) { a = { source, platform, campaign, adset, ad, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0 }; _adAgg.set(key, a) }
+      if (!a) { a = { source, platform, campaign, adset, ad, adId: '', adsetId: '', campaignId: '', gclid: '', leadsWithId: 0, gclidLeads: 0, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0 }; _adAgg.set(key, a) }
       a.leads++
+      if (adId && !a.adId) a.adId = adId
+      if (adsetId && !a.adsetId) a.adsetId = adsetId
+      if (campaignId && !a.campaignId) a.campaignId = campaignId
+      if (gclid && !a.gclid) a.gclid = gclid
+      if (adId) a.leadsWithId++
+      if (gclid) a.gclidLeads++
       if (cid && !_cidToAdNode.has(cid)) _cidToAdNode.set(cid, a)
       if (_regCidSet.has(cid)) a.registrations++
       if (contractClientSet.has(cid)) a.contracts++
@@ -1224,7 +1220,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 24  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 25  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
@@ -1359,7 +1355,6 @@ export async function POST(request) {
       debugPhones: body.debugPhones,
       stagesOnly: body.stagesOnly,
       apptDump: body.apptDump,
-      cfScan: body.cfScan,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
