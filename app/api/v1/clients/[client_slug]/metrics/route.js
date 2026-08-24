@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
+import { CLIENTS } from '../../../../../../lib/apiClients'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -25,18 +26,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
-
-// ---- client / project registry (extend here for new clients) -------------
-const CLIENTS = {
-  sbaruch: {
-    name: 'ש.ברוך',
-    projects: {
-      'hi-park': 'c2251f06-197b-43f0-b91c-4947f2e8760c',
-      'once':    '0e09fdc5-a96a-4de0-8484-954746727830',
-      'rehavia': '01f67914-75f4-4afc-ac18-3d9aa797fbba',
-    },
-  },
-}
 
 const J = (body, status = 200) =>
   NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store, max-age=0' } })
@@ -80,7 +69,7 @@ export async function GET(request, ctx) {
 
   const params = (ctx && ctx.params) ? await ctx.params : {}
   const clientSlug = params.client_slug
-  if (tok.client_slug !== clientSlug) return J({ error: 'token_not_scoped_to_this_client' }, 403)
+  if (tok.client_slug !== clientSlug) return J({ error: 'token_not_scoped_to_this_client', allowed: [tok.client_slug] }, 403)
   const client = CLIENTS[clientSlug]
   if (!client) return J({ error: 'unknown_client_slug', valid: Object.keys(CLIENTS) }, 404)
   supabaseAdmin.from('api_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', tok.id).then(() => {}, () => {})
