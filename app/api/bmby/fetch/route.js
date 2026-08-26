@@ -484,6 +484,12 @@ async function runSync(opts = {}) {
     const _leadSource = (cid) => (cidToMedia.get(String(cid)) || '').toString().trim() || 'ללא מקור'
     const _meetRecs = { sched: [], comp: [], canc: [], future: [] } // per-appointment {cid,name} — matches the BMBY meeting count
     const _completedMeetings = [] // full detail of completed meetings in window: {name, phone, date, description}
+    // Day-of-week people WANT to meet: bucket meetings COORDINATED this period (non-cancelled) by the
+    // day-of-week of the meeting date itself (start_date). Answers "which weekday is most in demand".
+    const _dowNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+    const meetingDayOfWeek = {}
+    for (let _i = 0; _i < 7; _i++) meetingDayOfWeek[_i] = { name: _dowNames[_i], count: 0 }
+    const _dowOfDate = (str) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec((str || '').toString()); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay() : null }
     for (const t of tasks) {
       const tyRaw = (t.type || '').toString()
       const ty = tyRaw.toLowerCase()
@@ -506,6 +512,7 @@ async function runSync(opts = {}) {
         if (isDone) _apptByCoord.completed++
         if (isCanc) { _apptByCoord.cancelled++; _meetRecs.canc.push(_rec) }                     // בוטלו
         else if (!isDone && _sd && _sd > _todayStr) { _apptFuture++; _meetRecs.future.push(_rec) }  // עתידיות
+        if (!isCanc) { const _dw = _dowOfDate(_sd); if (_dw != null) meetingDayOfWeek[_dw].count++ }  // יום מבוקש לפגישה
       }
       // "בוצעו" = meetings HELD (start_date reached, up to today) + done — regardless of when coordinated (incl. old-month leads).
       if (_sd && _sd >= since && _sd <= _meetUntil) {
@@ -1232,7 +1239,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 26  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 27  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
@@ -1260,7 +1267,7 @@ async function runSync(opts = {}) {
         source: 'crm',
         month: m,
         data: xlsxRows,
-        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, hourlyApptStats, hourlyLeadStats, hourlyContactStats, hourlyContactMeeting, namedLeads, completedMeetings: _completedMeetings, adBreakdown, schemaVersion: CRM_SCHEMA_VERSION },
+        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, meetingDayOfWeek, hourlyApptStats, hourlyLeadStats, hourlyContactStats, hourlyContactMeeting, namedLeads, completedMeetings: _completedMeetings, adBreakdown, schemaVersion: CRM_SCHEMA_VERSION },
         file_name: 'BMBY API (live)',
         row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
       }, { onConflict: 'project_id,source,month' })

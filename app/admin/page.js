@@ -1278,6 +1278,7 @@ const selectProject = async (client, project) => {
     const bucketMeetingWith = { '0-15m': 0, '15m-1h': 0, '1h-4h': 0, '4h-8h': 0, '8h-1d': 0, '1d-3d': 0, '3d+': 0 };
     const byUserMerged = {};
     const dowMerged = {};
+    const meetingDowMerged = {};
     const bySourceMerged = {};
     const hourMerged = Array.from({ length: 24 }, () => 0);
     const leadHourMerged = Array.from({ length: 24 }, () => 0);
@@ -1305,6 +1306,13 @@ const selectProject = async (client, project) => {
           if (!dowMerged[k]) dowMerged[k] = { name: dow[k].name, leads: 0, scheduled: 0 };
           dowMerged[k].leads += dow[k].leads || 0;
           dowMerged[k].scheduled += dow[k].scheduled || 0;
+        }
+      }
+      const mdow = r.summary && r.summary.meetingDayOfWeek;
+      if (mdow) {
+        for (const k of Object.keys(mdow)) {
+          if (!meetingDowMerged[k]) meetingDowMerged[k] = { name: mdow[k].name, count: 0 };
+          meetingDowMerged[k].count += mdow[k].count || 0;
         }
       }
       const _hrs = r.summary && r.summary.hourlyApptStats;
@@ -1403,6 +1411,26 @@ const selectProject = async (client, project) => {
       }, 300));
     }
 
+    // Day people WANT to meet: meetings bucketed by the weekday of the meeting date (start_date)
+    const mdowOrder = ['0', '1', '2', '3', '4', '5', '6'];
+    const meetingDowHasData = mdowOrder.some(k => meetingDowMerged[k] && meetingDowMerged[k].count > 0);
+    if (meetingDowHasData) {
+      pendingChartsRef.current.push(setTimeout(() => {
+        const labels = mdowOrder.map(k => (meetingDowMerged[k] && meetingDowMerged[k].name) || k);
+        const counts = mdowOrder.map(k => (meetingDowMerged[k] && meetingDowMerged[k].count) || 0);
+        const _max = Math.max(...counts);
+        createChart('meetingDowChart', 'bar', labels, [
+          { label: 'פגישות שתואמו (לפי יום הפגישה)', type: 'bar', data: counts,
+            backgroundColor: counts.map(c => c === _max && _max > 0 ? '#7C3AED' : '#C4B5FD'),
+            borderRadius: 4, maxBarThickness: 46 },
+        ], {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
+               title: { display: true, text: 'מספר פגישות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+        });
+      }, 300));
+    }
+
     // Hour-of-day: when meetings were COORDINATED (create_date), Israel time
     const hourTotal = hourMerged.reduce((a, b) => a + b, 0);
     const leadHourTotal = leadHourMerged.reduce((a, b) => a + b, 0);
@@ -1495,6 +1523,13 @@ const selectProject = async (client, project) => {
           <div className="section">
             <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>פילוח לפי יום בשבוע</h2><span className="sub">לידים ו-% המרה לפי יום</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
+          </div>
+        )}
+
+        {meetingDowHasData && (
+          <div className="section">
+            <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>יום מבוקש לפגישה</h2><span className="sub">באיזה יום בשבוע לקוחות רוצים להגיע לפגישה (לפי תאריך הפגישה שנקבע, ללא מבוטלות)</span></div>
+            <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="meetingDowChart"></canvas></div></div>
           </div>
         )}
 
