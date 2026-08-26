@@ -64,13 +64,23 @@ jobs:
           for p in ${{ steps.t.outputs.paths }}; do
             url="https://reports.vitas.co.il/api/cron/$p"
             echo "::group::$p"
-            code=$(curl -sS -o /tmp/out.json -w '%{http_code}' --max-time 600 \
-              -H "Authorization: Bearer $CRON_SECRET" "$url" || echo 000)
-            echo "HTTP $code"
+            code=000
+            # Retry transient failures (HTTP 000 connection drop / 5xx). A single dropped
+            # connection to Vercel would otherwise fail the whole run. 4xx = real error, no retry.
+            for attempt in 1 2 3; do
+              code=$(curl -sS -o /tmp/out.json -w '%{http_code}' --max-time 600 \
+                -H "Authorization: Bearer $CRON_SECRET" "$url" || echo 000)
+              echo "attempt $attempt: HTTP $code"
+              case "$code" in
+                200) break ;;
+                000|5*) [ "$attempt" -lt 3 ] && { echo "transient — retrying in 20s"; sleep 20; } ;;
+                *) break ;;
+              esac
+            done
             head -c 1000 /tmp/out.json 2>/dev/null || true; echo
             if [ "$code" != "200" ]; then
               fail=1
-              echo "::error::$p returned HTTP $code"
+              echo "::error::$p returned HTTP $code after retries"
             fi
             echo "::endgroup::"
           done
