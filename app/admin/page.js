@@ -1459,6 +1459,24 @@ const selectProject = async (client, project) => {
       }, 350));
     }
 
+    // "אין מענה" by contact-attempt hour
+    const noAnswerTotal = noAnswerHourMerged.reduce((a, b) => a + b, 0);
+    if (noAnswerTotal > 0) {
+      pendingChartsRef.current.push(setTimeout(() => {
+        const hLabels2 = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
+        const _mx = Math.max(...noAnswerHourMerged);
+        createChart('noAnswerHourChart', 'bar', hLabels2, [
+          { label: 'לידים "אין מענה" (לפי שעת ניסיון יצירת קשר)', type: 'bar', data: noAnswerHourMerged.slice(),
+            backgroundColor: noAnswerHourMerged.map(c => c === _mx && _mx > 0 ? '#DC2626' : '#FCA5A5'),
+            borderRadius: 4, maxBarThickness: 26 },
+        ], {
+          x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' }, maxRotation: 0, autoSkip: false } },
+          y: { beginAtZero: true, grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
+               title: { display: true, text: 'מספר לידים', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+        });
+      }, 380));
+    }
+
     const fmt = (mn) => {
       if (mn == null) return '-';
       if (mn < 1) return 'מיידי';
@@ -1537,6 +1555,13 @@ const selectProject = async (client, project) => {
           <div className="section">
             <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2><span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, מתי אנשי המכירות יצרו קשר, וכמה פגישות תואמו. הקו האדום = פגישות שנקבעו באותה שעה חלקי יצירות הקשר באותה שעה (אחוז המרה)</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="apptHourChart"></canvas></div></div>
+          </div>
+        )}
+
+        {noAnswerTotal > 0 && (
+          <div className="section">
+            <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><h2>שעות אין מענה</h2><span className="sub">באילו שעות נרשמו הכי הרבה לידים עם התנגדות "אין מענה" (Bad Contact / Invalid Phone), לפי שעת ניסיון יצירת הקשר</span></div>
+            <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="noAnswerHourChart"></canvas></div></div>
           </div>
         )}
 

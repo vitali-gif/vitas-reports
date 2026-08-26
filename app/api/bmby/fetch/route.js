@@ -877,6 +877,8 @@ async function runSync(opts = {}) {
     // matured into a scheduled meeting — to compare "when she calls" vs "when it converts".
     const hourlyContactStats = Array.from({ length: 24 }, () => 0)   // first-contacts bucketed by contact hour
     const hourlyContactMeeting = Array.from({ length: 24 }, () => 0) // of those, that led to a scheduled meeting
+    const noAnswerContactHour = Array.from({ length: 24 }, () => 0)  // "אין מענה" (Bad Contact / Invalid Phone) by contact-attempt hour
+    const _isNoAnswerObj = (cid) => /bad contact|invalid phone/i.test(clientObjection.get(cid) || '')
     for (const lid of aprilLids) {
       const cid = String(lid.client_id || '')
       if (!cid) continue
@@ -911,7 +913,7 @@ async function runSync(opts = {}) {
       const apptList = clientApptList.get(cid) || []
       const postLidAppts = apptList.filter(a => !a.date || a.date >= lidDateOnly)
       const scheduledHit = postLidAppts.length > 0 && postLidAppts.some(a => !a.cancelled)
-      { const _ch = _hourOfDay(first.create_date || first.start_date); if (_ch !== null && _ch >= 0 && _ch <= 23) { hourlyContactStats[_ch]++; if (scheduledHit) hourlyContactMeeting[_ch]++ } }
+      { const _ch = _hourOfDay(first.create_date || first.start_date); if (_ch !== null && _ch >= 0 && _ch <= 23) { hourlyContactStats[_ch]++; if (scheduledHit) hourlyContactMeeting[_ch]++; if (_isNoAnswerObj(cid)) noAnswerContactHour[_ch]++ } }
       responseTimes.push({
         source,
         responseMinutes: deltaMin,
@@ -1239,7 +1241,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 27  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 28  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
@@ -1267,7 +1269,7 @@ async function runSync(opts = {}) {
         source: 'crm',
         month: m,
         data: xlsxRows,
-        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, meetingDayOfWeek, hourlyApptStats, hourlyLeadStats, hourlyContactStats, hourlyContactMeeting, namedLeads, completedMeetings: _completedMeetings, adBreakdown, schemaVersion: CRM_SCHEMA_VERSION },
+        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, meetingDayOfWeek, hourlyApptStats, hourlyLeadStats, hourlyContactStats, hourlyContactMeeting, noAnswerContactHour, namedLeads, completedMeetings: _completedMeetings, adBreakdown, schemaVersion: CRM_SCHEMA_VERSION },
         file_name: 'BMBY API (live)',
         row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
       }, { onConflict: 'project_id,source,month' })
