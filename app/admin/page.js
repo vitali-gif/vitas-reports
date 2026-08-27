@@ -1284,6 +1284,7 @@ const selectProject = async (client, project) => {
     const leadHourMerged = Array.from({ length: 24 }, () => 0);
     const contactHourMerged = Array.from({ length: 24 }, () => 0);       // first-contact by hour
     const contactMeetingMerged = Array.from({ length: 24 }, () => 0);    // of those, matured to a scheduled meeting
+    const noAnswerHourMerged = Array.from({ length: 24 }, () => 0);      // 'אין מענה' by contact-attempt hour
     for (const r of crmRows) {
       const rt = r.summary && r.summary.responseTimeStats;
       if (!rt) continue;
@@ -1323,6 +1324,8 @@ const selectProject = async (client, project) => {
       if (Array.isArray(_chrs)) for (let _k = 0; _k < 24; _k++) contactHourMerged[_k] += _chrs[_k] || 0;
       const _cmhrs = r.summary && r.summary.hourlyContactMeeting;
       if (Array.isArray(_cmhrs)) for (let _m = 0; _m < 24; _m++) contactMeetingMerged[_m] += _cmhrs[_m] || 0;
+      const _nahrs = r.summary && r.summary.noAnswerContactHour;
+      if (Array.isArray(_nahrs)) for (let _q = 0; _q < 24; _q++) noAnswerHourMerged[_q] += _nahrs[_q] || 0;
       const bUser = (rt.business && rt.business.byUser) || {};
       const bSource = (rt.business && rt.business.bySource) || {};
       for (const [k, v] of Object.entries(rt.byUser || {})) {
