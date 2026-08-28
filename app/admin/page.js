@@ -3833,17 +3833,17 @@ const selectProject = async (client, project) => {
         const camp=_normName(row.campaign), adset=_normName(row.adSet), adn=_normName(row.adName), sp=Number(row.spend)||0
         _fbTotalSpend+=sp; _fbCampSpend[camp]=(_fbCampSpend[camp]||0)+sp
         acc[camp+'\u0000'+adset]=(acc[camp+'\u0000'+adset]||0)+sp
-        adAcc[camp+'\u0000'+adn]=(adAcc[camp+'\u0000'+adn]||0)+sp
+        adAcc[camp+'\u0000'+adset+'\u0000'+adn]=(adAcc[camp+'\u0000'+adset+'\u0000'+adn]||0)+sp
       })})
       for (const k in acc){ const p=k.split('\u0000'); _fbAdsetArr.push({camp:p[0],adset:p[1],spend:acc[k]}) }
-      for (const k in adAcc){ const p=k.split('\u0000'); _fbAdArr.push({camp:p[0],adName:p[1],spend:adAcc[k]}) }
+      for (const k in adAcc){ const p=k.split('\u0000'); _fbAdArr.push({camp:p[0],adset:p[1],adName:p[2],spend:adAcc[k]}) }
     }
     const _isFb = (ch) => /facebook|פייס/i.test(ch||'')
     let _fbQnSpend = 0; for (const k in _fbCampSpend) { if (/questionnaire/i.test(k)) _fbQnSpend += _fbCampSpend[k] }
     const _isGeel = (camp) => /geel[\s_-]*remarketing/i.test(_normName(camp))
     const _spCamp = (ch,camp) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return _fbQnSpend; return _fbCampSpend[_normName(camp)]||0 }
-    const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), t=_normName(adset); if(!t||t.indexOf('ללא')>=0) return null; const m=_fbAdsetArr.filter(x=>x.camp===c && (x.adset===t || x.adset.includes(t))); if(!m.length) return null; return {spend:m.reduce((a,x)=>a+x.spend,0), approx: m.length>1 || m[0].adset!==t} }
-    const _spAd = (ch,camp,label) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp); const tok=(_normName(label).match(/AD\s*\d+/i)||[])[0]; if(!tok) return null; const tk=tok.toLowerCase().replace(/\s+/g,' '); const m=_fbAdArr.filter(x=>x.camp===c && x.adName.toLowerCase().replace(/\s+/g,' ').indexOf(tk)===0); if(!m.length) return null; return {spend:m.reduce((a,x)=>a+x.spend,0), approx: m.length>1} }
+    const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), t=_normName(adset); if(!t||t.indexOf('ללא')>=0) return null; const exact=_fbAdsetArr.filter(x=>x.camp===c && x.adset===t); if(exact.length) return {spend:exact.reduce((a,x)=>a+x.spend,0)}; const m=_fbAdsetArr.filter(x=>x.camp===c && x.adset.includes(t)); return m.length===1 ? {spend:m[0].spend} : null }
+    const _spAd = (ch,camp,adset,label) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), a=_normName(adset); const tok=(_normName(label).match(/AD\s*\d+/i)||[])[0]; if(!tok) return null; const tk=tok.toLowerCase().replace(/\s+/g,' '); const m=_fbAdArr.filter(x=>x.camp===c && x.adName.toLowerCase().replace(/\s+/g,' ').indexOf(tk)===0 && (!a || a.indexOf('ללא')>=0 || (x.adset||'').includes(a))); return m.length===1 ? {spend:m[0].spend} : null }
     const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
             const _agents = _zs.agentPerformance || []
             const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
@@ -3949,7 +3949,7 @@ const selectProject = async (client, project) => {
                                   out.push(
                                     <tr key={astKey+'|'+ad.ad} style={{background:'rgba(59,130,246,0.13)'}}>
                                       <td style={{paddingRight:62,fontSize:'0.8em',unicodeBidi:'plaintext',textAlign:'right',color:'#64748b'}}>{_resolveAd(c.channel, ad.ad)}</td>
-                                      <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>{_fbCell(_spAd(c.channel, cm.campaign, ad.ad), '0.8em')}
+                                      <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>{_fbCell(_spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}
                                     </tr>
                                   );
                                 });
