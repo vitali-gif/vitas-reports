@@ -1735,14 +1735,15 @@ const selectProject = async (client, project) => {
       }));
       _collectSpend(fbReports); _collectSpend(gReports);
       // Show only ads that actually spent money this month (drops organic/inactive/junk 'ads' with no spend).
-      const _hasSpend = (n) => (n.adId && spendByAdId[n.adId] > 0) || (spendByAdName[_norm(n.ad)] > 0);
+      const _hasSpend = (n) => { const v = n.adId ? (spendByAdId[n.adId] || 0) : (spendByAdName[_norm(n.ad)] || 0); return v > 0; };
+      const _normCampaign = (c) => { const v = (c || '').toString().replace(/[‎‏​‌‍‪-‮⁦-⁩﻿]/g, '').trim(); return (!v || /^(fb|ig|facebook|instagram|google|adwords|pmax|פייסבוק|אינסטגרם|גוגל)$/i.test(v)) ? '(ללא קמפיין)' : v; };
       const abF = adsSpentOnly ? ab.filter(_hasSpend) : ab;
       const _plat = (n) => { const p = (n.platform || '').toString().toLowerCase(); if (p === 'fb') return 'פייסבוק'; if (p === 'ig') return 'אינסטגרם'; const src = (n.source || '').toString(); if (/instagram|אינסטגרם/i.test(src)) return 'אינסטגרם'; if (/facebook|פייסבוק/i.test(src) || /fb/i.test(src)) return 'פייסבוק'; if (/google|גוגל|pmax|search/i.test(src)) return 'גוגל'; if (/yad2|יד ?2/i.test(src)) return 'יד2'; if (/כוכבית/.test(src)) return 'כוכבית'; return (src.split('|')[0].trim()) || 'אחר'; };
       const mkNode = (label) => ({ label, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, spend: 0, adId: '', srcs: new Set(), children: new Map() });
       const root = mkNode('');
       abF.forEach(n => {
         const source = (n.source || '').toString().trim();
-        const parts = [_plat(n), n.campaign || '(ללא קמפיין)', _norm(n.ad) || '(ללא מודעה)'];
+        const parts = [_plat(n), _normCampaign(n.campaign), _norm(n.ad) || '(ללא מודעה)'];
         let node = root, path = '';
         parts.forEach((label, idx) => {
           path += '' + label;
@@ -1765,6 +1766,17 @@ const selectProject = async (client, project) => {
         node.spend = sp; return sp;
       };
       root.children.forEach(c => rollup(c, 1));
+      if (adsSpentOnly) {
+        // Drop ad rows with 0 attributed spend (dedup artifacts / non-spending dups) so the visible
+        // table matches the export and the "spent this month" intent; then drop emptied parents.
+        const _prune = (node) => {
+          [...node.children.entries()].forEach(([k, c]) => {
+            if (c.children.size === 0) { if ((c.spend || 0) <= 0) node.children.delete(k); }
+            else { _prune(c); if (c.children.size === 0) node.children.delete(k); }
+          });
+        };
+        _prune(root);
+      }
       const DEPTH_META = [
         { name: 'פלטפורמה', accent: '#7c3aed', bg: 'rgba(124,58,237,0.055)', chipBg: '#ede9fe', chipFg: '#6d28d9' },
         { name: 'קמפיין', accent: '#2563eb', bg: 'rgba(37,99,235,0.05)', chipBg: '#dbeafe', chipFg: '#1d4ed8' },
@@ -1794,7 +1806,7 @@ const selectProject = async (client, project) => {
           node.children.forEach(c => {
             if (depth === 0) _fx(c, 1, c.label, camp);
             else if (depth === 1) _fx(c, 2, plat, c.label);
-            else rx.push({ 'פלטפורמה': plat, 'קמפיין': camp, 'מודעה': c.label, 'מקור הגעה': [...(c.srcs || [])].join(', '), 'הוצאה': _r(c.spend), 'לידים': c.leads, 'עלות/ליד': c.leads ? _r(c.spend / c.leads) : '', 'תואמו': c.meetings, 'בוצעו': c.meetingsCompleted, 'עלות/פגישה': c.meetings ? _r(c.spend / c.meetings) : '', 'הרשמות': c.registrations, 'עסקאות': c.contracts });
+            else if ((c.spend || 0) > 0) rx.push({ 'פלטפורמה': plat, 'קמפיין': camp, 'מודעה': c.label, 'מקור הגעה': [...(c.srcs || [])].join(', '), 'הוצאה': _r(c.spend), 'לידים': c.leads, 'עלות/ליד': c.leads ? _r(c.spend / c.leads) : '', 'תואמו': c.meetings, 'בוצעו': c.meetingsCompleted, 'עלות/פגישה': c.meetings ? _r(c.spend / c.meetings) : '', 'הרשמות': c.registrations, 'עסקאות': c.contracts });
           });
         })(root, 0, '', '');
         const ws = XLSX.utils.json_to_sheet(rx);
