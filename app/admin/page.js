@@ -1781,6 +1781,8 @@ const selectProject = async (client, project) => {
         });
       };
       walk(root, 0, []);
+      const gt = { spend: 0, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0 };
+      root.children.forEach(c => { gt.spend += c.spend || 0; gt.leads += c.leads || 0; gt.meetings += c.meetings || 0; gt.meetingsCompleted += c.meetingsCompleted || 0; gt.registrations += c.registrations || 0; gt.contracts += c.contracts || 0; });
       const allPaths = [];
       (function _cp(node){ node.children.forEach(c => { if (c.children.size) allPaths.push(c.path); _cp(c); }); })(root);
       const allOpen = allPaths.length > 0 && allPaths.every(pth => expandedAdTree.has(pth));
@@ -1851,6 +1853,19 @@ const selectProject = async (client, project) => {
                 </tr>
                 );
               })}
+              <tr style={{fontWeight:800,background:'#eef2ff',borderTop:'2px solid #c7d2fe'}}>
+                <td style={{textAlign:'right',borderRight:'3px solid #6366f1'}}>{'סה"כ'}</td>
+                <td style={{whiteSpace:'nowrap'}}>{gt.spend ? money(gt.spend) : '—'}</td>
+                <td>{num(gt.leads)}</td>
+                <td style={{whiteSpace:'nowrap'}}>{cost(gt.spend, gt.leads)}</td>
+                <td>{num(gt.meetings)}</td>
+                <td>{num(gt.meetingsCompleted)}</td>
+                <td style={{whiteSpace:'nowrap'}}>{cost(gt.spend, gt.meetings)}</td>
+                <td>{num(gt.registrations)}</td>
+                <td style={{whiteSpace:'nowrap'}}>{cost(gt.spend, gt.registrations)}</td>
+                <td>{num(gt.contracts)}</td>
+                <td style={{whiteSpace:'nowrap'}}>{cost(gt.spend, gt.contracts)}</td>
+              </tr>
             </tbody>
           </table></div>
         </div>
