@@ -183,6 +183,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
   const [expandedCrmSources, setExpandedCrmSources] = useState(new Set());
   const [expandedAdTree, setExpandedAdTree] = useState(new Set());
+  const [adsSpentOnly, setAdsSpentOnly] = useState(true); // ads drill: show only ads that spent money this month
   const [expandedFunnelCh, setExpandedFunnelCh] = useState(new Set());
   const [expandedFunnelCamp, setExpandedFunnelCamp] = useState(new Set());
   const [expandedFunnelAst, setExpandedFunnelAst] = useState(new Set());
@@ -1733,10 +1734,13 @@ const selectProject = async (client, project) => {
         if (nm) spendByAdName[nm] = (spendByAdName[nm] || 0) + sp;
       }));
       _collectSpend(fbReports); _collectSpend(gReports);
+      // Show only ads that actually spent money this month (drops organic/inactive/junk 'ads' with no spend).
+      const _hasSpend = (n) => (n.adId && spendByAdId[n.adId] > 0) || (spendByAdName[_norm(n.ad)] > 0);
+      const abF = adsSpentOnly ? ab.filter(_hasSpend) : ab;
       const _plat = (n) => { const p = (n.platform || '').toString().toLowerCase(); if (p === 'fb') return 'פייסבוק'; if (p === 'ig') return 'אינסטגרם'; const src = (n.source || '').toString(); if (/instagram|אינסטגרם/i.test(src)) return 'אינסטגרם'; if (/facebook|פייסבוק/i.test(src) || /fb/i.test(src)) return 'פייסבוק'; if (/google|גוגל|pmax|search/i.test(src)) return 'גוגל'; if (/yad2|יד ?2/i.test(src)) return 'יד2'; if (/כוכבית/.test(src)) return 'כוכבית'; return (src.split('|')[0].trim()) || 'אחר'; };
       const mkNode = (label) => ({ label, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, spend: 0, adId: '', srcs: new Set(), children: new Map() });
       const root = mkNode('');
-      ab.forEach(n => {
+      abF.forEach(n => {
         const source = (n.source || '').toString().trim();
         const parts = [_plat(n), n.campaign || '(ללא קמפיין)', _norm(n.ad) || '(ללא מודעה)'];
         let node = root, path = '';
@@ -1809,6 +1813,7 @@ const selectProject = async (client, project) => {
             <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
               <button onClick={toggleAll} style={{fontSize:'0.76em',fontWeight:600,padding:'5px 10px',borderRadius:8,border:'1px solid #c7d2fe',background:'#eef2ff',color:'#4338ca',cursor:'pointer',whiteSpace:'nowrap'}}>{allOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
               <button onClick={exportExcel} style={{fontSize:'0.76em',fontWeight:600,padding:'5px 10px',borderRadius:8,border:'1px solid #a7f3d0',background:'#ecfdf5',color:'#047857',cursor:'pointer',whiteSpace:'nowrap'}}>{'⬇ ייצוא לאקסל'}</button>
+              <button onClick={() => setAdsSpentOnly(v => !v)} style={{fontSize:'0.76em',fontWeight:600,padding:'5px 10px',borderRadius:8,border:'1px solid '+(adsSpentOnly?'#fbbf24':'#e2e8f0'),background:adsSpentOnly?'#fffbeb':'#fff',color:adsSpentOnly?'#b45309':'#475569',cursor:'pointer',whiteSpace:'nowrap'}}>{adsSpentOnly ? '✓ רק מודעות עם הוצאה' : 'מציג הכל'}</button>
               {DEPTH_META.map((d,di)=>(<span key={di} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'0.74em',color:'#475569',fontWeight:600}}><span style={{width:11,height:11,borderRadius:3,background:d.accent,display:'inline-block'}}></span>{d.name}</span>))}
             </div>
           </div>
@@ -1850,7 +1855,7 @@ const selectProject = async (client, project) => {
           </table></div>
         </div>
       );
-    }, [selectedMonth, reports, expandedAdTree]);
+    }, [selectedMonth, reports, expandedAdTree, adsSpentOnly]);
 
     const renderCrmDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
@@ -2536,7 +2541,7 @@ const selectProject = async (client, project) => {
           </div>
           <div className="kpi-label">{label}</div>
           <div className="kpi-value">{value}</div>
-          {subNote ? <div style={{fontSize:'0.72em',color:'#94a3b8',marginTop:2,fontWeight:600,whiteSpace:'nowrap'}}>{subNote}</div> : null}
+          {subNote ? <div style={{fontSize:'0.74em',color:'rgba(255,255,255,0.92)',marginTop:2,fontWeight:700,whiteSpace:'nowrap'}}>{subNote}</div> : null}
           {sparkVals ? <Sparkline values={sparkVals} /> : <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>}
         </div>
       );
