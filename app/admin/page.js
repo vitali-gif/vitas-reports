@@ -4679,10 +4679,15 @@ const selectProject = async (client, project) => {
             .sort((a, b) => (String(a.month) < String(b.month) ? 1 : -1))
             .forEach(r => (r.summary?.assetGroups || []).forEach(g => { if (g && g.id != null && !(g.id in _agCur)) _agCur[g.id] = g.status; }));
           const _agStatusOf = (g) => (g && g.id != null && _agCur[g.id]) ? _agCur[g.id] : (g.status || '');
-          // Hide dead asset groups: not-active AND zero activity in the period (old paused/removed groups
-          // with 0 spend that clutter the view and confuse clients). Keep active groups + any with activity.
-          const _agActivity = (g) => (g.spend || 0) + (g.impressions || 0) + (g.clicks || 0) + (g.conversions || g.leads || 0);
-          const groups = allGroups.filter(g => (_agStatusOf(g) === 'ENABLED') || _agActivity(g) > 0);
+          // Show ONLY asset groups that spent money this period (matches Google Ads' "spent this month"
+          // view) + dedupe by id (the same group can appear across google/google_pmax reports).
+          // Removed/paused/0-spend groups are hidden — they cluttered the gallery and confused clients.
+          const _agSeen = new Set();
+          const groups = allGroups.filter(g => {
+            if (!g || (g.spend || 0) <= 0) return false;
+            if (g.id != null) { if (_agSeen.has(g.id)) return false; _agSeen.add(g.id); }
+            return true;
+          });
           if (groups.length === 0) return null;
           return (
             <div className="section section-asset-gallery">
