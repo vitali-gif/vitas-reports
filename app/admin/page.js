@@ -1726,57 +1726,55 @@ const selectProject = async (client, project) => {
       const _norm = (n) => (n || '').replace(/[‎‏​‌‍‪-‮⁦-⁩﻿]/g, '').replace(/\s*[-–]\s*עותק\s*\d*$/, '').replace(/\s*#\d+$/, '').trim();
       const fbReports = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
       const gReports = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-      // Spend joins at AD level: by numeric ad_id when present (reliable), else by normalized ad name.
-      const spendByAdId = {}, spendByAdName = {};
-      const _collectSpend = (reps) => reps.forEach(r => (r.data || []).forEach(row => {
-        const id = (row.adId || '').toString().trim(), nm = _norm(row.adName || row.name), sp = Number(row.spend) || 0;
-        if (id) spendByAdId[id] = (spendByAdId[id] || 0) + sp;
-        if (nm) spendByAdName[nm] = (spendByAdName[nm] || 0) + sp;
+      const RTL = /[‎‏​‌‍‪-‮⁦-⁩﻿]/g;
+      const _rtl = (v) => (v || '').toString().replace(RTL, '').trim();
+      // Anchor the table on REAL ads that spent money this month (Meta/Google reports), then join CRM
+      // outcomes (leads/meetings/registrations/contracts) from adBreakdown by ad_id (fallback: name).
+      // 1) CRM outcomes per ad, keyed by ad_id and by name.
+      const crmById = {}, crmByName = {};
+      const _blankCrm = () => ({ leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0 });
+      const _addCrm = (d, o) => { d.leads += o.leads; d.meetings += o.meetings; d.meetingsCompleted += o.meetingsCompleted; d.registrations += o.registrations; d.contracts += o.contracts; };
+      (ab || []).forEach(n => {
+        const o = { leads: n.leads || 0, meetings: n.meetings || 0, meetingsCompleted: n.meetingsCompleted || 0, registrations: n.registrations || 0, contracts: n.contracts || 0 };
+        const id = _rtl(n.adId); if (id) { if (!crmById[id]) crmById[id] = _blankCrm(); _addCrm(crmById[id], o); }
+        const nm = _norm(n.ad); if (nm) { if (!crmByName[nm]) crmByName[nm] = _blankCrm(); _addCrm(crmByName[nm], o); }
+      });
+      // 2) Real ads that spent money, keyed by ad_id (fallback name+campaign).
+      const _adsMap = new Map();
+      const _addAds = (reps, platLabel) => reps.forEach(r => (r.data || []).forEach(row => {
+        const spend = Number(row.spend) || 0; if (spend <= 0) return;
+        const adId = _rtl(row.adId);
+        const ad = _norm(row.adName || row.name) || '(ללא מודעה)';
+        const campaign = _rtl(row.campaign) || '(ללא קמפיין)';
+        const key = platLabel + '' + (adId ? ('id:' + adId) : ('nm:' + campaign + '|' + ad));
+        let a = _adsMap.get(key);
+        if (!a) { a = { platform: platLabel, campaign, ad, adId, spend: 0, impressions: 0, clicks: 0 }; _adsMap.set(key, a); }
+        a.spend += spend; a.impressions += Number(row.impressions) || 0; a.clicks += Number(row.clicks) || 0;
       }));
-      _collectSpend(fbReports); _collectSpend(gReports);
-      // Show only ads that actually spent money this month (drops organic/inactive/junk 'ads' with no spend).
-      const _hasSpend = (n) => { const v = n.adId ? (spendByAdId[n.adId] || 0) : (spendByAdName[_norm(n.ad)] || 0); return v > 0; };
-      const _normCampaign = (c) => { const v = (c || '').toString().replace(/[‎‏​‌‍‪-‮⁦-⁩﻿]/g, '').trim(); return (!v || /^(fb|ig|facebook|instagram|google|adwords|pmax|פייסבוק|אינסטגרם|גוגל)$/i.test(v)) ? '(ללא קמפיין)' : v; };
-      const abF = adsSpentOnly ? ab.filter(_hasSpend) : ab;
-      const _plat = (n) => { const p = (n.platform || '').toString().toLowerCase(); if (p === 'fb') return 'פייסבוק'; if (p === 'ig') return 'אינסטגרם'; const src = (n.source || '').toString(); if (/instagram|אינסטגרם/i.test(src)) return 'אינסטגרם'; if (/facebook|פייסבוק/i.test(src) || /fb/i.test(src)) return 'פייסבוק'; if (/google|גוגל|pmax|search/i.test(src)) return 'גוגל'; if (/yad2|יד ?2/i.test(src)) return 'יד2'; if (/כוכבית/.test(src)) return 'כוכבית'; return (src.split('|')[0].trim()) || 'אחר'; };
+      _addAds(fbReports, 'פייסבוק'); _addAds(gReports, 'גוגל');
+      // 3) Join CRM outcomes (id-first, once per ad key).
+      const _crmClaimed = new Set();
+      const adsList = [..._adsMap.values()].map(a => {
+        let crm = _blankCrm(), ck = '';
+        if (a.adId && crmById[a.adId]) { crm = crmById[a.adId]; ck = 'id:' + a.adId; }
+        else if (crmByName[_norm(a.ad)]) { crm = crmByName[_norm(a.ad)]; ck = 'nm:' + _norm(a.ad); }
+        if (ck) { if (_crmClaimed.has(ck)) crm = _blankCrm(); else _crmClaimed.add(ck); }
+        return { ...a, leads: crm.leads, meetings: crm.meetings, meetingsCompleted: crm.meetingsCompleted, registrations: crm.registrations, contracts: crm.contracts };
+      });
       const mkNode = (label) => ({ label, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, spend: 0, adId: '', srcs: new Set(), children: new Map() });
       const root = mkNode('');
-      abF.forEach(n => {
-        const source = (n.source || '').toString().trim();
-        const parts = [_plat(n), _normCampaign(n.campaign), _norm(n.ad) || '(ללא מודעה)'];
+      adsList.forEach(a => {
+        const parts = [a.platform, a.campaign, a.ad];
         let node = root, path = '';
         parts.forEach((label, idx) => {
           path += '' + label;
           if (!node.children.has(path)) node.children.set(path, { ...mkNode(label), path });
           const child = node.children.get(path);
-          child.leads += n.leads || 0; child.meetings += n.meetings || 0; child.meetingsCompleted += n.meetingsCompleted || 0; child.registrations += n.registrations || 0; child.contracts += n.contracts || 0;
-          if (idx === 2) { if (n.adId && !child.adId) child.adId = (n.adId || '').toString().trim(); if (source) child.srcs.add(source); }
+          child.leads += a.leads; child.meetings += a.meetings; child.meetingsCompleted += a.meetingsCompleted; child.registrations += a.registrations; child.contracts += a.contracts; child.spend += a.spend;
+          if (idx === 2 && a.adId && !child.adId) child.adId = a.adId;
           node = child;
         });
       });
-      const _spCounted = new Set();
-      const rollup = (node, depth) => {
-        let sp = 0;
-        if (depth === 3) { // ad node: attribute Meta/Google spend by ad_id (else ad name), once per ad
-          const key = node.adId ? ('id:' + node.adId) : ('nm:' + _norm(node.label));
-          const val = node.adId ? (spendByAdId[node.adId] || 0) : (spendByAdName[_norm(node.label)] || 0);
-          if (val > 0 && !_spCounted.has(key)) { _spCounted.add(key); sp = val; }
-        }
-        node.children.forEach(c => { sp += rollup(c, depth + 1); });
-        node.spend = sp; return sp;
-      };
-      root.children.forEach(c => rollup(c, 1));
-      if (adsSpentOnly) {
-        // Drop ad rows with 0 attributed spend (dedup artifacts / non-spending dups) so the visible
-        // table matches the export and the "spent this month" intent; then drop emptied parents.
-        const _prune = (node) => {
-          [...node.children.entries()].forEach(([k, c]) => {
-            if (c.children.size === 0) { if ((c.spend || 0) <= 0) node.children.delete(k); }
-            else { _prune(c); if (c.children.size === 0) node.children.delete(k); }
-          });
-        };
-        _prune(root);
-      }
       const DEPTH_META = [
         { name: 'פלטפורמה', accent: '#7c3aed', bg: 'rgba(124,58,237,0.055)', chipBg: '#ede9fe', chipFg: '#6d28d9' },
         { name: 'קמפיין', accent: '#2563eb', bg: 'rgba(37,99,235,0.05)', chipBg: '#dbeafe', chipFg: '#1d4ed8' },
@@ -1827,7 +1825,6 @@ const selectProject = async (client, project) => {
             <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
               <button onClick={toggleAll} style={{fontSize:'0.76em',fontWeight:600,padding:'5px 10px',borderRadius:8,border:'1px solid #c7d2fe',background:'#eef2ff',color:'#4338ca',cursor:'pointer',whiteSpace:'nowrap'}}>{allOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
               <button onClick={exportExcel} style={{fontSize:'0.76em',fontWeight:600,padding:'5px 10px',borderRadius:8,border:'1px solid #a7f3d0',background:'#ecfdf5',color:'#047857',cursor:'pointer',whiteSpace:'nowrap'}}>{'⬇ ייצוא לאקסל'}</button>
-              <button onClick={() => setAdsSpentOnly(v => !v)} style={{fontSize:'0.76em',fontWeight:600,padding:'5px 10px',borderRadius:8,border:'1px solid '+(adsSpentOnly?'#fbbf24':'#e2e8f0'),background:adsSpentOnly?'#fffbeb':'#fff',color:adsSpentOnly?'#b45309':'#475569',cursor:'pointer',whiteSpace:'nowrap'}}>{adsSpentOnly ? '✓ רק מודעות עם הוצאה' : 'מציג הכל'}</button>
               {DEPTH_META.map((d,di)=>(<span key={di} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'0.74em',color:'#475569',fontWeight:600}}><span style={{width:11,height:11,borderRadius:3,background:d.accent,display:'inline-block'}}></span>{d.name}</span>))}
             </div>
           </div>
