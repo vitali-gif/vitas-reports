@@ -1734,18 +1734,18 @@ const selectProject = async (client, project) => {
       }));
       _collectSpend(fbReports); _collectSpend(gReports);
       const _plat = (n) => { const p = (n.platform || '').toString().toLowerCase(); if (p === 'fb') return 'פייסבוק'; if (p === 'ig') return 'אינסטגרם'; const src = (n.source || '').toString(); if (/instagram|אינסטגרם/i.test(src)) return 'אינסטגרם'; if (/facebook|פייסבוק/i.test(src) || /fb/i.test(src)) return 'פייסבוק'; if (/google|גוגל|pmax|search/i.test(src)) return 'גוגל'; if (/yad2|יד ?2/i.test(src)) return 'יד2'; if (/כוכבית/.test(src)) return 'כוכבית'; return (src.split('|')[0].trim()) || 'אחר'; };
-      const mkNode = (label) => ({ label, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, spend: 0, adId: '', children: new Map() });
+      const mkNode = (label) => ({ label, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, spend: 0, adId: '', srcs: new Set(), children: new Map() });
       const root = mkNode('');
       ab.forEach(n => {
-        const source = (n.source || '').toString().trim() || '(ללא מקור)';
-        const parts = [_plat(n), source, _norm(n.ad) || '(ללא מודעה)'];
+        const source = (n.source || '').toString().trim();
+        const parts = [_plat(n), n.campaign || '(ללא קמפיין)', _norm(n.ad) || '(ללא מודעה)'];
         let node = root, path = '';
         parts.forEach((label, idx) => {
           path += '' + label;
           if (!node.children.has(path)) node.children.set(path, { ...mkNode(label), path });
           const child = node.children.get(path);
           child.leads += n.leads || 0; child.meetings += n.meetings || 0; child.meetingsCompleted += n.meetingsCompleted || 0; child.registrations += n.registrations || 0; child.contracts += n.contracts || 0;
-          if (idx === 2 && n.adId && !child.adId) child.adId = (n.adId || '').toString().trim();
+          if (idx === 2) { if (n.adId && !child.adId) child.adId = (n.adId || '').toString().trim(); if (source) child.srcs.add(source); }
           node = child;
         });
       });
@@ -1763,7 +1763,7 @@ const selectProject = async (client, project) => {
       root.children.forEach(c => rollup(c, 1));
       const DEPTH_META = [
         { name: 'פלטפורמה', accent: '#7c3aed', bg: 'rgba(124,58,237,0.055)', chipBg: '#ede9fe', chipFg: '#6d28d9' },
-        { name: 'מקור הגעה', accent: '#2563eb', bg: 'rgba(37,99,235,0.05)', chipBg: '#dbeafe', chipFg: '#1d4ed8' },
+        { name: 'קמפיין', accent: '#2563eb', bg: 'rgba(37,99,235,0.05)', chipBg: '#dbeafe', chipFg: '#1d4ed8' },
         { name: 'מודעה', accent: '#059669', bg: 'rgba(5,150,105,0.045)', chipBg: '#dcfce7', chipFg: '#047857' },
       ];
       const rowsOut = [];
@@ -1772,11 +1772,30 @@ const selectProject = async (client, project) => {
         kids.forEach(c => {
           const hasKids = c.children.size > 0;
           const open = expandedAdTree.has(c.path);
-          rowsOut.push({ label: c.label, path: c.path, depth, hasKids, open, trail, leads: c.leads, meetings: c.meetings, meetingsCompleted: c.meetingsCompleted, registrations: c.registrations, contracts: c.contracts, spend: c.spend });
+          rowsOut.push({ label: c.label, path: c.path, depth, hasKids, open, trail, sources: [...(c.srcs || [])], leads: c.leads, meetings: c.meetings, meetingsCompleted: c.meetingsCompleted, registrations: c.registrations, contracts: c.contracts, spend: c.spend });
           if (hasKids && open) walk(c, depth + 1, [...trail, c.label]);
         });
       };
       walk(root, 0, []);
+      const allPaths = [];
+      (function _cp(node){ node.children.forEach(c => { if (c.children.size) allPaths.push(c.path); _cp(c); }); })(root);
+      const allOpen = allPaths.length > 0 && allPaths.every(pth => expandedAdTree.has(pth));
+      const toggleAll = () => setExpandedAdTree(() => allOpen ? new Set() : new Set(allPaths));
+      const exportExcel = () => {
+        const _r = (v) => v ? Math.round(v) : 0;
+        const rx = [];
+        (function _fx(node, depth, plat, camp){
+          node.children.forEach(c => {
+            if (depth === 0) _fx(c, 1, c.label, camp);
+            else if (depth === 1) _fx(c, 2, plat, c.label);
+            else rx.push({ 'פלטפורמה': plat, 'קמפיין': camp, 'מודעה': c.label, 'מקור הגעה': [...(c.srcs || [])].join(', '), 'הוצאה': _r(c.spend), 'לידים': c.leads, 'עלות/ליד': c.leads ? _r(c.spend / c.leads) : '', 'תואמו': c.meetings, 'בוצעו': c.meetingsCompleted, 'עלות/פגישה': c.meetings ? _r(c.spend / c.meetings) : '', 'הרשמות': c.registrations, 'עסקאות': c.contracts });
+          });
+        })(root, 0, '', '');
+        const ws = XLSX.utils.json_to_sheet(rx);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'עלות לפי מודעה');
+        XLSX.writeFile(wb, 'עלות-לפי-מודעה_' + (selectedMonth || '') + '.xlsx');
+      };
       const money = (v) => '₪' + Math.round(v || 0).toLocaleString('he-IL');
       const cost = (sp, cnt) => (sp && cnt) ? money(sp / cnt) : '—';
       const num = (v) => (v || 0).toLocaleString('he-IL');
@@ -1784,10 +1803,12 @@ const selectProject = async (client, project) => {
       const thSticky = { position: 'sticky', top: 0, zIndex: 1, background: '#f1f5f9' };
       return (
         <div className="section">
-          <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>עלות לתוצאה לפי מודעה</h2><span className="sub">פלטפורמה → מקור הגעה → מודעה</span></div>
+          <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>עלות לתוצאה לפי מודעה</h2><span className="sub">פלטפורמה → קמפיין → מודעה</span></div>
           <div style={{display:'flex',flexWrap:'wrap',gap:10,alignItems:'center',marginBottom:10}}>
-            <div style={{fontSize:'0.82em',color:'#64748b',flex:'1 1 220px',textAlign:'right'}}>{'💡 לחץ על שורה כדי לצלול פנימה. שדות "ללא..." = לידים ללא שיוך מלא (מתמלא על לידים חדשים מפייסבוק).'}</div>
-            <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{fontSize:'0.82em',color:'#64748b',flex:'1 1 180px',textAlign:'right'}}>{'💡 לחץ על שורה כדי לצלול פנימה. הוצאה מצורפת ברמת המודעה לפי מזהה מודעה (Meta) עם נפילה לשם.'}</div>
+            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+              <button onClick={toggleAll} style={{fontSize:'0.76em',fontWeight:600,padding:'5px 10px',borderRadius:8,border:'1px solid #c7d2fe',background:'#eef2ff',color:'#4338ca',cursor:'pointer',whiteSpace:'nowrap'}}>{allOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
+              <button onClick={exportExcel} style={{fontSize:'0.76em',fontWeight:600,padding:'5px 10px',borderRadius:8,border:'1px solid #a7f3d0',background:'#ecfdf5',color:'#047857',cursor:'pointer',whiteSpace:'nowrap'}}>{'⬇ ייצוא לאקסל'}</button>
               {DEPTH_META.map((d,di)=>(<span key={di} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'0.74em',color:'#475569',fontWeight:600}}><span style={{width:11,height:11,borderRadius:3,background:d.accent,display:'inline-block'}}></span>{d.name}</span>))}
             </div>
           </div>
@@ -1810,6 +1831,7 @@ const selectProject = async (client, project) => {
                       <span style={{fontWeight:r.depth===0?700:r.depth===1?600:500,color:r.depth<=1?'#0f172a':'#334155',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:260,unicodeBidi:'plaintext'}}>{r.label}</span>
                     </div>
                     {r.depth>=1 && r.trail.length>0 ? <div style={{direction:'rtl',paddingRight:(r.depth*22+23)+'px',fontSize:'0.68em',color:'#94a3b8',marginTop:3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:340,unicodeBidi:'plaintext'}}>{r.trail.join('  ›  ')}</div> : null}
+                    {r.depth===2 && r.sources && r.sources.length>0 ? <div style={{direction:'rtl',paddingRight:(r.depth*22+23)+'px',fontSize:'0.68em',color:'#2563eb',fontWeight:600,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:340,unicodeBidi:'plaintext'}}>{'מקור: ' + r.sources.join(' · ')}</div> : null}
                   </td>
                   <td style={{whiteSpace:'nowrap',fontWeight:600}}>{r.spend ? money(r.spend) : '—'}</td>
                   <td style={{fontWeight:600}}>{num(r.leads)}</td>
