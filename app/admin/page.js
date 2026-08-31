@@ -2679,6 +2679,7 @@ const selectProject = async (client, project) => {
     const fbReports = currentReports.filter(r => r.source === 'facebook');
     const gReports = currentReports.filter(r => r.source && r.source.startsWith('google'));
     const crmReports = currentReports.filter(r => r.source === 'crm');
+    const _cs = crmReports[0]?.summary || {};
     const crmRepReports = currentReports.filter(r =>
       r.source === 'crm_reports' || (r.source === 'crm' && r.summary && Array.isArray(r.summary.crmRepRows) && r.summary.crmRepRows.length > 0)
     );
