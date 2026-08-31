@@ -2477,7 +2477,7 @@ const selectProject = async (client, project) => {
       return <><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></>;
     };
 
-    const kpi = (label, value, color, current, prev, isCost, namesArr) => {
+    const kpi = (label, value, color, current, prev, isCost, namesArr, subNote) => {
       const ch = (prev != null && prev !== 0) ? changePercent(current, prev, isCost)
         : (prev === 0 && current > 0) ? { pct: null, isGood: !isCost, newVal: true }
         : null;
@@ -2514,6 +2514,7 @@ const selectProject = async (client, project) => {
           </div>
           <div className="kpi-label">{label}</div>
           <div className="kpi-value">{value}</div>
+          {subNote ? <div style={{fontSize:'0.72em',color:'#94a3b8',marginTop:2,fontWeight:600,whiteSpace:'nowrap'}}>{subNote}</div> : null}
           {sparkVals ? <Sparkline values={sparkVals} /> : <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>}
         </div>
       );
@@ -4059,17 +4060,16 @@ const selectProject = async (client, project) => {
           {kpi('\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3', formatCurrency(dashTab === 'all' ? (totalLeadsWithCrm > 0 ? activeT.spend / totalLeadsWithCrm : 0) : activeT.cpl), 'purple', (dashTab === 'all' ? (totalLeadsWithCrm > 0 ? activeT.spend / totalLeadsWithCrm : 0) : activeT.cpl), (dashTab === 'all' ? (activeP ? ((activeP.leads + prevCrmTotalLeads) > 0 ? activeP.spend / (activeP.leads + prevCrmTotalLeads) : 0) : null) : (activeP?.cpl ?? null)), true)}
           {crmReports[0]?.summary?.crmType === 'zoho' ? kpi('עלות ממוצעת לקליק', formatCurrency(activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0), 'amber', activeT.clicks > 0 ? activeT.spend / activeT.clicks : 0, (activeP && activeP.clicks > 0 ? activeP.spend / activeP.clicks : null), true) : null}
           {crmReports[0]?.summary?.crmType === 'zoho' ? kpi('אחוז המרה', (activeT.convRate || 0).toFixed(2) + '%', 'cyan', activeT.convRate || 0, activeP?.convRate || null) : null}
-          {crmTotals && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05ea\u05d5\u05d0\u05de\u05d5', formatNum(crmTotals.meetingsScheduled || 0), 'cyan', crmTotals.meetingsScheduled, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled) : null}
-          {crmTotals && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05e9\u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(crmTotals.meetingsCompleted || 0), 'orange', crmTotals.meetingsCompleted, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted) : null}
-          {crmReports[0]?.summary && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('פגישות עתידיות', formatNum(crmReports[0].summary.meetingsUpcoming || 0), 'cyan', crmReports[0].summary.meetingsUpcoming || 0, prevCrmTotals?.meetingsUpcoming, false, _tabCrmLeads?.meetingsUpcoming) : null}
-          {crmReports[0]?.summary && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('פגישות שבוטלו', formatNum(crmReports[0].summary.meetingsCancelled || 0), 'red', crmReports[0].summary.meetingsCancelled || 0, prevCrmTotals?.meetingsCancelled, false, _tabCrmLeads?.meetingsCancelled) : null}
-          {crmReports[0]?.summary && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('לידים שלא טופלו', formatNum(crmReports[0].summary.leadsToHandle || 0), 'amber', crmReports[0].summary.leadsToHandle || 0, null, false, null, 'לידים בסטטוס "לטיפול" — עדיין לא נגעו בהם. תור חי (כל הזמנים, לא מוגבל לתקופה).') : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('עלות לפגישה שבוצעה', (crmTotals?.meetingsCompleted > 0) ? formatCurrency(activeT.spend / crmTotals.meetingsCompleted) : '—', 'purple', (crmTotals?.meetingsCompleted > 0) ? activeT.spend / crmTotals.meetingsCompleted : 0, (prevCrmTotals?.meetingsCompleted > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.meetingsCompleted : null, true) : null}
-          {crmTotals && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
-          {crmTotals && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות שתואמו', formatNum(_cs.meetingsScheduled || 0), 'cyan', _cs.meetingsScheduled || 0, prevCrmTotals?.meetingsScheduled, false, _tabCrmLeads?.meetingsScheduled, (activeT.spend > 0 && (_cs.meetingsScheduled || 0) > 0) ? ('עלות/תואמה ' + formatCurrency(activeT.spend / _cs.meetingsScheduled)) : null) : null}
+          {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות שבוצעו', formatNum(_cs.meetingsCompleted || 0), 'orange', _cs.meetingsCompleted || 0, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted, (activeT.spend > 0 && (_cs.meetingsCompleted || 0) > 0) ? ('עלות/בוצעה ' + formatCurrency(activeT.spend / _cs.meetingsCompleted)) : null) : null}
+          {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות עתידיות', formatNum(_cs.meetingsUpcoming || 0), 'cyan', _cs.meetingsUpcoming || 0, prevCrmTotals?.meetingsUpcoming, false, _tabCrmLeads?.meetingsUpcoming) : null}
+          {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות שבוטלו', formatNum(_cs.meetingsCancelled || 0), 'red', _cs.meetingsCancelled || 0, prevCrmTotals?.meetingsCancelled, false, _tabCrmLeads?.meetingsCancelled) : null}
+          {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('לידים שלא טופלו', formatNum(_cs.leadsToHandle || 0), 'amber', _cs.leadsToHandle || 0, null, false, null) : null}
+          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
+          {activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
+          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
+          {activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
+          {activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
           </>)}
         </div>
 
