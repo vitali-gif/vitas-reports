@@ -1233,6 +1233,7 @@ async function runSync(opts = {}) {
     totals.meetingsScheduled = _apptByCoord.total       // תואמו = ALL meetings coordinated this period
     totals.meetingsCompleted = _apptByDate.completed     // בוצעו = held this period (incl. old-month leads)
     totals.meetingsCancelled = _apptByCoord.cancelled    // בוטלו = coordinated this period + cancelled
+    totals.leadsToHandle = clients.filter(c => /^not.?hand/i.test(String(c.client_stage || '').toLowerCase())).length  // לידים לטיפול — live all-time queue (client_stage=not_handeled)
     totals.meetingsUpcoming  = _apptFuture               // עתידיות = coordinated this period, open, future date
     const _periodLeadCids = new Set(aprilLids.map(l => String(l.client_id || '')))
     const _mSplit = (recs) => { let nw=0, od=0; for (const r of recs) { if (_periodLeadCids.has(String(r.cid))) nw++; else od++ } return { fromNewLeads: nw, fromOldLeads: od } }
@@ -1241,7 +1242,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 28  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 29  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.
