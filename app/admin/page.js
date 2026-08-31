@@ -1724,31 +1724,38 @@ const selectProject = async (client, project) => {
       if (ab.length === 0) return null;
       const _norm = (n) => (n || '').replace(/[‎‏​‌‍‪-‮⁦-⁩﻿]/g, '').replace(/\s*[-–]\s*עותק\s*\d*$/, '').replace(/\s*#\d+$/, '').trim();
       const fbReports = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
-      // Meta spend joins at CAMPAIGN level (ad names between BMBY and Meta don't reliably match; campaign names do).
-      const spendByCampaign = {};
-      fbReports.forEach(r => {
-        const dr = r.data || [];
-        if (dr.length) dr.forEach(row => { const k = _norm(row.campaignName || row.campaign); if (k) spendByCampaign[k] = (spendByCampaign[k] || 0) + (Number(row.spend) || 0); });
-        else (r.summary?.activeAds || []).forEach(a => { const k = _norm(a.campaign || a.campaignName); if (k) spendByCampaign[k] = (spendByCampaign[k] || 0) + ((a.metrics && a.metrics.spend) || 0); });
-      });
+      const gReports = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
+      // Spend joins at AD level: by numeric ad_id when present (reliable), else by normalized ad name.
+      const spendByAdId = {}, spendByAdName = {};
+      const _collectSpend = (reps) => reps.forEach(r => (r.data || []).forEach(row => {
+        const id = (row.adId || '').toString().trim(), nm = _norm(row.adName || row.name), sp = Number(row.spend) || 0;
+        if (id) spendByAdId[id] = (spendByAdId[id] || 0) + sp;
+        if (nm) spendByAdName[nm] = (spendByAdName[nm] || 0) + sp;
+      }));
+      _collectSpend(fbReports); _collectSpend(gReports);
       const _plat = (n) => { const p = (n.platform || '').toString().toLowerCase(); if (p === 'fb') return 'פייסבוק'; if (p === 'ig') return 'אינסטגרם'; const src = (n.source || '').toString(); if (/instagram|אינסטגרם/i.test(src)) return 'אינסטגרם'; if (/facebook|פייסבוק/i.test(src) || /fb/i.test(src)) return 'פייסבוק'; if (/google|גוגל|pmax|search/i.test(src)) return 'גוגל'; if (/yad2|יד ?2/i.test(src)) return 'יד2'; if (/כוכבית/.test(src)) return 'כוכבית'; return (src.split('|')[0].trim()) || 'אחר'; };
-      const mkNode = (label) => ({ label, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, spend: 0, children: new Map() });
-      // total leads per campaign (across all platforms) — used to split campaign spend proportionally
-      const campLeadTotals = {};
-      ab.forEach(n => { const ck = _norm(n.campaign); if (ck) campLeadTotals[ck] = (campLeadTotals[ck] || 0) + (n.leads || 0); });
+      const mkNode = (label) => ({ label, leads: 0, meetings: 0, meetingsCompleted: 0, registrations: 0, contracts: 0, spend: 0, adId: '', children: new Map() });
       const root = mkNode('');
       ab.forEach(n => {
-        const parts = [_plat(n), n.campaign || '(ללא קמפיין)', n.adset || '(ללא קהל)', _norm(n.ad) || '(ללא מודעה)'];
+        const source = (n.source || '').toString().trim() || '(ללא מקור)';
+        const parts = [_plat(n), source, _norm(n.ad) || '(ללא מודעה)'];
         let node = root, path = '';
-        parts.forEach((label) => { path += '' + label; if (!node.children.has(path)) node.children.set(path, { ...mkNode(label), path }); const child = node.children.get(path); child.leads += n.leads || 0; child.meetings += n.meetings || 0; child.meetingsCompleted += n.meetingsCompleted || 0; child.registrations += n.registrations || 0; child.contracts += n.contracts || 0; node = child; });
+        parts.forEach((label, idx) => {
+          path += '' + label;
+          if (!node.children.has(path)) node.children.set(path, { ...mkNode(label), path });
+          const child = node.children.get(path);
+          child.leads += n.leads || 0; child.meetings += n.meetings || 0; child.meetingsCompleted += n.meetingsCompleted || 0; child.registrations += n.registrations || 0; child.contracts += n.contracts || 0;
+          if (idx === 2 && n.adId && !child.adId) child.adId = (n.adId || '').toString().trim();
+          node = child;
+        });
       });
+      const _spCounted = new Set();
       const rollup = (node, depth) => {
         let sp = 0;
-        if (depth === 2) { // campaign node: assign its Meta spend, split across platforms by this node's lead share
-          const ck = _norm(node.label);
-          const tot = spendByCampaign[ck] || 0;
-          const denom = campLeadTotals[ck] || 0;
-          if (tot > 0 && denom > 0) sp = tot * (node.leads / denom);
+        if (depth === 3) { // ad node: attribute Meta/Google spend by ad_id (else ad name), once per ad
+          const key = node.adId ? ('id:' + node.adId) : ('nm:' + _norm(node.label));
+          const val = node.adId ? (spendByAdId[node.adId] || 0) : (spendByAdName[_norm(node.label)] || 0);
+          if (val > 0 && !_spCounted.has(key)) { _spCounted.add(key); sp = val; }
         }
         node.children.forEach(c => { sp += rollup(c, depth + 1); });
         node.spend = sp; return sp;
@@ -1756,8 +1763,7 @@ const selectProject = async (client, project) => {
       root.children.forEach(c => rollup(c, 1));
       const DEPTH_META = [
         { name: 'פלטפורמה', accent: '#7c3aed', bg: 'rgba(124,58,237,0.055)', chipBg: '#ede9fe', chipFg: '#6d28d9' },
-        { name: 'קמפיין', accent: '#2563eb', bg: 'rgba(37,99,235,0.05)', chipBg: '#dbeafe', chipFg: '#1d4ed8' },
-        { name: 'קהל', accent: '#0891b2', bg: 'rgba(8,145,178,0.05)', chipBg: '#cffafe', chipFg: '#0e7490' },
+        { name: 'מקור הגעה', accent: '#2563eb', bg: 'rgba(37,99,235,0.05)', chipBg: '#dbeafe', chipFg: '#1d4ed8' },
         { name: 'מודעה', accent: '#059669', bg: 'rgba(5,150,105,0.045)', chipBg: '#dcfce7', chipFg: '#047857' },
       ];
       const rowsOut = [];
@@ -1778,7 +1784,7 @@ const selectProject = async (client, project) => {
       const thSticky = { position: 'sticky', top: 0, zIndex: 1, background: '#f1f5f9' };
       return (
         <div className="section">
-          <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>עלות לתוצאה לפי מודעה</h2><span className="sub">פלטפורמה → קמפיין → קהל → מודעה</span></div>
+          <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>עלות לתוצאה לפי מודעה</h2><span className="sub">פלטפורמה → מקור הגעה → מודעה</span></div>
           <div style={{display:'flex',flexWrap:'wrap',gap:10,alignItems:'center',marginBottom:10}}>
             <div style={{fontSize:'0.82em',color:'#64748b',flex:'1 1 220px',textAlign:'right'}}>{'💡 לחץ על שורה כדי לצלול פנימה. שדות "ללא..." = לידים ללא שיוך מלא (מתמלא על לידים חדשים מפייסבוק).'}</div>
             <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
@@ -1794,7 +1800,7 @@ const selectProject = async (client, project) => {
             </tr></thead>
             <tbody>
               {rowsOut.map((r, i) => {
-                const dm = DEPTH_META[r.depth] || DEPTH_META[3];
+                const dm = DEPTH_META[r.depth] || DEPTH_META[2];
                 return (
                 <tr key={i} style={{cursor: r.hasKids ? 'pointer' : 'default', background: dm.bg}} onClick={r.hasKids ? () => toggle(r.path) : undefined}>
                   <td style={{textAlign:'right',borderRight:'3px solid '+dm.accent}}>
