@@ -3827,6 +3827,7 @@ const selectProject = async (client, project) => {
     const _resolveAd = (channel, label) => (/google|גוגל/i.test(channel || '') && _gAdIdName[label]) ? _gAdIdName[label] : label
     // ── Facebook spend maps for the CRM funnel (FB only; matched by name to Zoho UTM) ──
     const _normName = (v) => v==null ? '' : String(v).replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\u00ad\u200b\ufeff]/g,'').replace(/^geek[-_\s]+/i,'').trim()
+    const _nn = (v) => _normName(v).toLowerCase().replace(/[\s()|,:.+\/\-]+/g,'')
     const _fbCampSpend = {}; const _fbAdsetArr = []; const _fbAdArr = []; let _fbTotalSpend = 0
     { const acc = {}, adAcc = {}
       reports.filter(r => r.month === selectedMonth && r.source === 'facebook').forEach(r => { (r.data || []).forEach(row => {
@@ -3842,9 +3843,10 @@ const selectProject = async (client, project) => {
     let _fbQnSpend = 0; for (const k in _fbCampSpend) { if (/questionnaire/i.test(k)) _fbQnSpend += _fbCampSpend[k] }
     const _isGeel = (camp) => /geel[\s_-]*remarketing/i.test(_normName(camp))
     const _spCamp = (ch,camp) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return _fbQnSpend; return _fbCampSpend[_normName(camp)]||0 }
-    const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), t=_normName(adset); if(!t||t.indexOf('ללא')>=0) return null; const exact=_fbAdsetArr.filter(x=>x.camp===c && x.adset===t); if(exact.length) return {spend:exact.reduce((a,x)=>a+x.spend,0)}; const m=_fbAdsetArr.filter(x=>x.camp===c && x.adset.includes(t)); return m.length===1 ? {spend:m[0].spend} : null }
-    const _spAd = (ch,camp,adset,label) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), a=_normName(adset); const nn=v=>_normName(v).toLowerCase().replace(/\s+/g,' ').trim(); const L=nn(label); if(!L) return null; const inA=x=>(!a||a.indexOf('ללא')>=0||nn(x.adset).includes(a)); let m=_fbAdArr.filter(x=>x.camp===c && nn(x.adName)===L && inA(x)); if(m.length) return {spend:m.reduce((z,x)=>z+x.spend,0)}; m=_fbAdArr.filter(x=>x.camp===c && nn(x.adName)===L); if(m.length===1) return {spend:m[0].spend}; const tok=(L.match(/ad\s*\d+/)||[])[0]; if(tok){ const m2=_fbAdArr.filter(x=>x.camp===c && nn(x.adName).indexOf(tok)===0 && inA(x)); if(m2.length===1) return {spend:m2[0].spend}; } return null }
+    const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), t=_nn(adset); if(!t||t.indexOf('ללא')>=0) return null; const exact=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset)===t); if(exact.length) return {spend:exact.reduce((a,x)=>a+x.spend,0)}; const m=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset).includes(t)); return m.length===1 ? {spend:m[0].spend} : null }
+    const _spAd = (ch,camp,adset,label) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), a=_nn(adset); const L=_nn(label); if(!L) return null; const inA=x=>(!a||a.indexOf('ללא')>=0||_nn(x.adset).includes(a)); let m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L && inA(x)); if(m.length) return {spend:m.reduce((z,x)=>z+x.spend,0)}; m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L); if(m.length===1) return {spend:m[0].spend}; const tok=(_nn(label).match(/ad\d+/)||[])[0]; if(tok){ const m2=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName).indexOf(tok)===0 && inA(x)); if(m2.length===1) return {spend:m2[0].spend}; } return null }
     const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
+    const _roasCell = (rev, res, fs) => { const sp=res==null?null:(typeof res==='object'?res.spend:res); if(sp==null||sp<=0) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const r=(rev||0)/sp; return <td style={{fontSize:fs,whiteSpace:'nowrap',fontWeight:600,color:r>=1?'var(--emerald)':'var(--rose)'}}>{r.toFixed(2)}x</td> }
             const _agents = _zs.agentPerformance || []
             const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
             const _byStatus = Object.entries(_zs.byStatus || {}).sort((a,b) => b[1]-a[1])
@@ -3909,7 +3911,7 @@ const selectProject = async (client, project) => {
                   <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:10,textAlign:'right'}}>💡 לחץ על ערוץ ← קמפיין ← adset ← מודעה כדי לצלול פנימה · תקציב FB: קמפיין מדויק, adset/מודעה משוער (~)</div>
                   <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th><th>תקציב FB</th></tr></thead>
+                      <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th><th>תקציב FB</th><th>ROAS</th></tr></thead>
                       <tbody>
                         {(() => {
                           const out = [];
@@ -3919,7 +3921,7 @@ const selectProject = async (client, project) => {
                             out.push(
                               <tr key={c.channel} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
                                 <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{camps.length ? (chOpen ? '▼' : '◀') : ''}</span>{c.channel}</td>
-                                <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>{_fbCell(_isFb(c.channel) ? _fbTotalSpend : null)}
+                                <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>{_fbCell(_isFb(c.channel) ? _fbTotalSpend : null)}{_roasCell(c.netRevenue, _isFb(c.channel) ? _fbTotalSpend : null)}
                               </tr>
                             );
                             if (!chOpen) return;
@@ -3930,7 +3932,7 @@ const selectProject = async (client, project) => {
                               out.push(
                                 <tr key={campKey} style={{background:'rgba(59,130,246,0.05)', cursor: adSets.length ? 'pointer' : 'default'}} onClick={adSets.length ? () => toggleFunnelCamp(campKey) : undefined}>
                                   <td style={{paddingRight:24,fontSize:'0.9em',textAlign:'right',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{adSets.length ? (cmOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{cm.campaign}</span></td>
-                                  <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>{_fbCell(_spCamp(c.channel, cm.campaign), '0.9em')}
+                                  <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>{_fbCell(_spCamp(c.channel, cm.campaign), '0.9em')}{_roasCell(cm.netRevenue, _spCamp(c.channel, cm.campaign), '0.9em')}
                                 </tr>
                               );
                               if (!cmOpen) return;
@@ -3941,7 +3943,7 @@ const selectProject = async (client, project) => {
                                 out.push(
                                   <tr key={astKey} style={{background:'rgba(59,130,246,0.09)', cursor: ads.length ? 'pointer' : 'default'}} onClick={ads.length ? () => toggleFunnelAst(astKey) : undefined}>
                                     <td style={{paddingRight:44,fontSize:'0.85em',textAlign:'right',color:'#475569',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{ads.length ? (asOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{as.adset}</span></td>
-                                    <td style={{fontSize:'0.85em'}}>{formatNum(as.leads)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.opportunities)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.purchased)}</td><td style={{fontSize:'0.85em',color:'var(--violet)'}}>{(as.conversionRate||0)+'%'}</td><td style={{fontSize:'0.85em'}}>{formatCurrency(as.netRevenue||0)}</td>{_fbCell(_spAdset(c.channel, cm.campaign, as.adset), '0.85em')}
+                                    <td style={{fontSize:'0.85em'}}>{formatNum(as.leads)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.opportunities)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.purchased)}</td><td style={{fontSize:'0.85em',color:'var(--violet)'}}>{(as.conversionRate||0)+'%'}</td><td style={{fontSize:'0.85em'}}>{formatCurrency(as.netRevenue||0)}</td>{_fbCell(_spAdset(c.channel, cm.campaign, as.adset), '0.85em')}{_roasCell(as.netRevenue, _spAdset(c.channel, cm.campaign, as.adset), '0.85em')}
                                   </tr>
                                 );
                                 if (!asOpen) return;
@@ -3949,7 +3951,7 @@ const selectProject = async (client, project) => {
                                   out.push(
                                     <tr key={astKey+'|'+ad.ad} style={{background:'rgba(59,130,246,0.13)'}}>
                                       <td style={{paddingRight:62,fontSize:'0.8em',unicodeBidi:'plaintext',textAlign:'right',color:'#64748b'}}>{_resolveAd(c.channel, ad.ad)}</td>
-                                      <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>{_fbCell(_spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}
+                                      <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>{_fbCell(_spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}{_roasCell(ad.netRevenue, _spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}
                                     </tr>
                                   );
                                 });
@@ -3966,7 +3968,7 @@ const selectProject = async (client, project) => {
                           <td style={{fontWeight:700}}>{formatNum(_fn.opportunities||0)}</td>
                           <td style={{fontWeight:700}}>{formatNum(_fn.purchased||0)}</td>
                           <td style={{fontWeight:700,color:'var(--violet)'}}>{(_fn.conversionRate||0)+'%'}</td>
-                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}}>{formatCurrency(_fbTotalSpend)}</td>
+                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}}>{formatCurrency(_fbTotalSpend)}</td><td style={{fontWeight:700}}>{_fbTotalSpend>0 ? ((_fn.netRevenue||0)/_fbTotalSpend).toFixed(2)+'x' : '—'}</td>
                         </tr>
                       </tfoot>
                     </table>
