@@ -474,7 +474,17 @@ async function runSync(opts = {}) {
     const _todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
     const _meetUntil = (until && until > _todayStr) ? _todayStr : until // BMBY counts meetings only up to today (not future-scheduled)
     const cidToMedia = new Map() // client_id -> media_title (from any lead), for attributing meetings to source
-    for (const _t of tasks) { if ((_t.type || '').toString().toLowerCase() === 'lid') { const _c = String(_t.client_id || ''); const _md = (_t.media_title || '').trim(); if (_c && _md && !cidToMedia.has(_c)) cidToMedia.set(_c, _md) } }
+    // client_id -> earliest LID date (YYYY-MM-DD). This is "תאריך כניסת הליד" in the
+    // KPI-card / source drill-down modals. Built from ALL lid tasks (not just in-range ones) so a
+    // meeting held this period for an older lead still shows when that lead first came in.
+    const cidToLeadDate = new Map()
+    for (const _t of tasks) {
+      if ((_t.type || '').toString().toLowerCase() !== 'lid') continue
+      const _c = String(_t.client_id || ''); if (!_c) continue
+      const _md = (_t.media_title || '').trim(); if (_md && !cidToMedia.has(_c)) cidToMedia.set(_c, _md)
+      const _ld = (_t.start_date || _t.create_date || '').toString().slice(0, 10)
+      if (_ld) { const _prev = cidToLeadDate.get(_c); if (!_prev || _ld < _prev) cidToLeadDate.set(_c, _ld) }
+    }
     // client_id -> phone (mobile preferred) for the "פגישות שבוצעו" detail list
     const cidToPhone = new Map()
     for (const _c of clients) { const _id = String(_c.client_id || ''); if (!_id) continue; const _ph = (_c.phone_mobile || _c.phone_home || _c.phone_work || '').toString().trim(); if (_ph && !cidToPhone.has(_id)) cidToPhone.set(_id, _ph) }
@@ -482,7 +492,11 @@ async function runSync(opts = {}) {
     // (e.g. 'hi park | דופלקסים 170 מר | פייסבוק'), same value the מקורות-הגעה funnel groups by —
     // NOT the collapsed platform bucket.
     const _leadSource = (cid) => (cidToMedia.get(String(cid)) || '').toString().trim() || 'ללא מקור'
-    const _meetRecs = { sched: [], comp: [], canc: [], future: [] } // per-appointment {cid,name} — matches the BMBY meeting count
+    const _meetRecs = { sched: [], comp: [], canc: [], future: [] } // per-appointment {cid,name,coord} — matches the BMBY meeting count
+    // client_id -> earliest appointment COORDINATION date (create_date) = "תאריך תיאום פגישה".
+    // Per-appointment rows use their own _rec.coord; this map is the fallback for non-meeting lists
+    // (הרשמות / חוזים / כל הלידים), where there is no single appointment in context.
+    const cidToApptCoord = new Map()
     const _completedMeetings = [] // full detail of completed meetings in window: {name, phone, date, description}
     // Day-of-week people WANT to meet: bucket meetings COORDINATED this period (non-cancelled) by the
     // day-of-week of the meeting date itself (start_date). Answers "which weekday is most in demand".
@@ -501,7 +515,8 @@ async function runSync(opts = {}) {
       const apptDate = (t.start_date || t.create_date || '').toString().slice(0, 10)
       const isDone = /done|complete|בוצע|התקיים|סגור|סגרה|נסגרה|ended|success|finaliz|הסתיים/.test(status)
       const isCanc = /cancel|בוטל/.test(status)
-      const _rec = { cid, name: (t.client_name || '').toString().trim() }
+      const _rec = { cid, name: (t.client_name || '').toString().trim(), coord: (t.create_date || '').toString().slice(0, 10) }
+      if (_rec.coord) { const _pc = cidToApptCoord.get(cid); if (!_pc || _rec.coord < _pc) cidToApptCoord.set(cid, _rec.coord) }
       const _sd = (t.start_date || t.create_date || '').toString().slice(0, 10)
       // "תואמו" = ALL meetings COORDINATED (create_date) this period, any status. Its status
       // breakdown — עתידיות (open+future) / בוטלו (cancelled) — shares this coordination anchor so they reconcile.
@@ -1065,6 +1080,7 @@ async function runSync(opts = {}) {
         objection: clientObjection.get(cid) || '',
         remark: clientRemark.get(cid) || '',
         lastMeeting: apptDates.length ? apptDates[apptDates.length - 1] : '',
+        apptCoord: cidToApptCoord.get(cid) || '',
         lastNote: note ? note.msg : '',
         propertyType: clientPropertyType.get(cid) || '',
         date: (lid.start_date || lid.create_date || '').toString().slice(0, 10),
@@ -1178,7 +1194,18 @@ async function runSync(opts = {}) {
       if (_sd && _sd >= since && _sd <= _meetUntil && isDone) node.meetingsCompleted++
     }
     const adBreakdown = [..._adAgg.values()]
-    const _entry = (cid, name) => ({ name: name || clientName.get(String(cid)) || `ליד #${cid}`, phone: cidToPhone.get(String(cid)) || '', source: _leadSource(cid) })
+    // v32: entries also carry leadDate (תאריך כניסת הליד) and apptDate (תאריך תיאום פגישה).
+    // Both keys are OMITTED when empty — namedLeads rides on the LIGHT summary index, which must not
+    // grow unnecessarily (see [[issue-reports-row-accumulation]]).
+    const _entry = (cid, name, coord) => {
+      const _c = String(cid)
+      const _e = { name: name || clientName.get(_c) || `ליד #${cid}`, phone: cidToPhone.get(_c) || '', source: _leadSource(_c) }
+      const _ld = cidToLeadDate.get(_c) || ''
+      if (_ld) _e.leadDate = _ld
+      const _ad = coord || cidToApptCoord.get(_c) || ''
+      if (_ad) _e.apptDate = _ad
+      return _e
+    }
     const _buildGroup = (lids, regs, conts) => ({
       meetingsScheduled: lids.filter(_lidScheduled).map(lid => _entry(lid.client_id)),
       meetingsCompleted: lids.filter(_lidCompleted).map(lid => _entry(lid.client_id)),
@@ -1210,18 +1237,18 @@ async function runSync(opts = {}) {
     const _mediaSrc = (md) => /פייסבוק|facebook/i.test(md || '') ? 'facebook' : /גוגל|google|pmax|search/i.test(md || '') ? 'google' : 'other'
     const _mName = (r) => r.name || clientName.get(r.cid) || `ליד #${r.cid}`
     const _recMedia = (r) => cidToMedia.get(r.cid) || ''
-    namedLeads.all.meetingsScheduled      = _meetRecs.sched.map(r => _entry(r.cid, r.name))
-    namedLeads.all.meetingsCompleted      = _meetRecs.comp.map(r => _entry(r.cid, r.name))
-    namedLeads.facebook.meetingsScheduled = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name))
-    namedLeads.facebook.meetingsCompleted = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name))
-    namedLeads.google.meetingsScheduled   = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
-    namedLeads.google.meetingsCompleted   = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
-    namedLeads.all.meetingsUpcoming       = _meetRecs.future.map(r => _entry(r.cid, r.name))
-    namedLeads.all.meetingsCancelled      = _meetRecs.canc.map(r => _entry(r.cid, r.name))
-    namedLeads.facebook.meetingsUpcoming  = _meetRecs.future.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name))
-    namedLeads.facebook.meetingsCancelled = _meetRecs.canc.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name))
-    namedLeads.google.meetingsUpcoming    = _meetRecs.future.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
-    namedLeads.google.meetingsCancelled   = _meetRecs.canc.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name))
+    namedLeads.all.meetingsScheduled      = _meetRecs.sched.map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.all.meetingsCompleted      = _meetRecs.comp.map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.facebook.meetingsScheduled = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.facebook.meetingsCompleted = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.google.meetingsScheduled   = _meetRecs.sched.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.google.meetingsCompleted   = _meetRecs.comp.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.all.meetingsUpcoming       = _meetRecs.future.map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.all.meetingsCancelled      = _meetRecs.canc.map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.facebook.meetingsUpcoming  = _meetRecs.future.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.facebook.meetingsCancelled = _meetRecs.canc.filter(r => _mediaSrc(_recMedia(r)) === 'facebook').map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.google.meetingsUpcoming    = _meetRecs.future.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name, r.coord))
+    namedLeads.google.meetingsCancelled   = _meetRecs.canc.filter(r => _mediaSrc(_recMedia(r)) === 'google').map(r => _entry(r.cid, r.name, r.coord))
 
     // Single upsert: store source-level rows in `data`, and per-LID city/objection
     // detail in `summary.crmRepRows` so the dashboard's "מחולל דוחות" sub-tab can use it.
@@ -1242,7 +1269,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 31  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 32  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.

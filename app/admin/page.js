@@ -101,6 +101,9 @@ function InfoTip({ text, icon = 'i' }) {
   )
 }
 
+// YYYY-MM-DD (or a full BMBY timestamp) -> DD/MM/YYYY. Returns '' for anything unparseable,
+// so callers can just test the result before rendering.
+const dmy = (v) => { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; };
 
 export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null }) {
   // שמות הדמו מגיעים מה-DB (הפרויקט/הלקוח שסומנו is_demo) ולא מקודדים בקוד,
@@ -5240,12 +5243,18 @@ const selectProject = async (client, project) => {
                   const _p = (entry && typeof entry === 'object') ? (entry.phone || '') : '';
                   const _s = (entry && typeof entry === 'object') ? (entry.source || '') : '';
                   const _v = (entry && typeof entry === 'object' && entry.value) ? entry.value : null;
+                  const _ld = (entry && typeof entry === 'object') ? dmy(entry.leadDate) : '';
+                  const _ad = (entry && typeof entry === 'object') ? dmy(entry.apptDate) : '';
                   return (
                   <li key={i} style={{padding:'9px 12px',borderBottom:'1px solid var(--border)',fontSize:14,display:'flex',alignItems:'center',gap:10}}>
                     <span style={{width:22,height:22,borderRadius:'50%',background:'var(--indigo-50)',color:'var(--indigo)',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
                     <div style={{display:'flex',flexDirection:'column',gap:2,minWidth:0,flex:1}}>
                       <span style={{fontWeight:600}}>{_n}{_v ? ` (₪${Number(_v).toLocaleString('he-IL')})` : ''}</span>
                       {(_p || _s) && <span style={{fontSize:12,color:'#94a3b8'}}>{_p ? <span style={{unicodeBidi:'plaintext'}}>{_p}</span> : null}{_p && _s ? ' · ' : ''}{_s}</span>}
+                      {(_ld || _ad) && <span style={{fontSize:11.5,color:'#64748b',display:'flex',gap:10,flexWrap:'wrap'}}>
+                        {_ld ? <span>📥 כניסת ליד: <span style={{unicodeBidi:'plaintext'}}>{_ld}</span></span> : null}
+                        {_ad ? <span>📅 תיאום פגישה: <span style={{unicodeBidi:'plaintext'}}>{_ad}</span></span> : null}
+                      </span>}
                     </div>
                   </li>
                   );
@@ -5290,11 +5299,17 @@ const selectProject = async (client, project) => {
                       {L.status ? <span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#f1f5f9',color:'#475569',whiteSpace:'nowrap'}}>{L.status}</span> : null}
                       {typeof L.relevant === 'boolean' ? <span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:L.relevant?'#dcfce7':'#fee2e2',color:L.relevant?'#166534':'#991b1b',whiteSpace:'nowrap'}}>{L.relevant?'רלוונטי':'לא רלוונטי'}</span> : null}
                     </div>
+                    {(L.date || L.apptCoord) ? (
+                      <div style={{fontSize:11.5,color:'#64748b',marginTop:6,display:'flex',gap:12,flexWrap:'wrap'}}>
+                        {dmy(L.date) ? <span>📥 כניסת ליד: <span style={{unicodeBidi:'plaintext'}}>{dmy(L.date)}</span></span> : null}
+                        {dmy(L.apptCoord) ? <span>📅 תיאום פגישה: <span style={{unicodeBidi:'plaintext'}}>{dmy(L.apptCoord)}</span></span> : null}
+                      </div>
+                    ) : null}
                     {(L.objection || L.propertyType || L.lastMeeting) ? (
                       <div style={{fontSize:12,color:'#64748b',marginTop:6,display:'flex',gap:12,flexWrap:'wrap'}}>
                         {L.objection ? <span>🚧 {decodeHtmlEntities(L.objection)}</span> : null}
                         {L.propertyType ? <span>🏠 {decodeHtmlEntities(L.propertyType)}</span> : null}
-                        {L.lastMeeting ? <span>📅 {L.lastMeeting}</span> : null}
+                        {L.lastMeeting ? <span>🗓️ מועד פגישה: <span style={{unicodeBidi:'plaintext'}}>{dmy(L.lastMeeting) || L.lastMeeting}</span></span> : null}
                       </div>
                     ) : null}
                     {(L.remark || L.lastNote) ? (
