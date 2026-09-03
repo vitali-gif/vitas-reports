@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { requireAdmin, getUser, isAdminEmail, unauthorized } from '../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -6,11 +7,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-function checkAuth(req) {
-  const key = req.headers.get('x-client-key')
-  const expected = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  return expected && key === expected
-}
+// הרשאה: אדמין מאומת בלבד. ה-route הזה יוצר משתמשי Supabase ומאפס סיסמאות,
+// ולכן הוא היה נתיב ההשתלטות הישיר כשהשומר היה מפתח ה-anon הציבורי.
 
 // Generate a readable temporary password: XXXX-XXXX-XXXX
 function generateTempPassword() {
@@ -106,29 +104,33 @@ async function sendPasswordEmail(toEmail, tempPassword, clientName) {
   }
 }
 
+// GET — אדמין מקבל את הכל (או מסנן לפי ?email=). לקוח מחובר מקבל רק את השורות
+// שלו עצמו: הפרמטר email מתעלמים ממנו והמייל נלקח מהטוקן, אחרת כל לקוח היה
+// יכול לקרוא את רשימת ההרשאות של כל לקוח אחר.
 export async function GET(req) {
-  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await getUser(req)
+  if (!user) return unauthorized()
+  const admin = isAdminEmail(user.email)
+
   const { searchParams } = new URL(req.url)
-  const email = searchParams.get('email')
-  if (email) {
-    const { data, error } = await supabaseAdmin
-      .from('client_access')
-      .select('*, projects(id, name, client_id, is_demo, clients(name, color))')
-      .eq('email', email.toLowerCase().trim())
-      .order('created_at', { ascending: true })
-    if (error) return NextResponse.json({ error: error.message }, { status: 404 })
-    return NextResponse.json(data || [])
-  }
-  const { data, error } = await supabaseAdmin
+  const requested = searchParams.get('email')
+  const scopeEmail = admin ? (requested ? requested.toLowerCase().trim() : null) : user.email
+
+  let query = supabaseAdmin
     .from('client_access')
     .select('*, projects(id, name, client_id, is_demo, clients(name, color))')
-    .order('created_at', { ascending: false })
+
+  if (scopeEmail) query = query.eq('email', scopeEmail).order('created_at', { ascending: true })
+  else query = query.order('created_at', { ascending: false })
+
+  const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data || [])
 }
 
 export async function POST(req) {
-  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const gate = await requireAdmin(req)
+  if (!gate.ok) return gate.res
   const body = await req.json()
   // project_ids אופציונלי: אם נשלח — מעניקים גישה רק לפרויקטים שנבחרו.
   // בלעדיו נשמרת ההתנהגות הישנה (כל הפרויקטים של הלקוח), כדי לא לשבור
@@ -196,7 +198,8 @@ export async function POST(req) {
 }
 
 export async function DELETE(req) {
-  if (!checkAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const gate = await requireAdmin(req)
+  if (!gate.ok) return gate.res
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })

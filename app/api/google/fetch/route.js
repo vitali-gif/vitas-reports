@@ -1,8 +1,9 @@
 // API route: /api/google/fetch
-//   POST — from the admin UI (auth via x-client-key header = anon key)
+//   POST — from the admin UI (אדמין מאומת (JWT) או CRON_SECRET לקריאה פנימית)
 //   GET  — from Vercel Cron (auth via Authorization: Bearer <CRON_SECRET>)
 // Pulls Google Ads campaign/ad-level metrics via GAQL and writes one report per project per month.
 
+import { requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -457,10 +458,8 @@ function isValidDate(v) {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
 }
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const gate = await requireAdmin(request)
+  if (!gate.ok) return gate.res
   let body = {}
   try { body = await request.json() } catch {}
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) { return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 }) }

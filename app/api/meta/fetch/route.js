@@ -1,8 +1,9 @@
 // API route: /api/meta/fetch
-//   POST — called from the admin UI. Authorized by x-client-key = NEXT_PUBLIC_SUPABASE_ANON_KEY.
+//   POST — called from the admin UI. אדמין מאומת (JWT) או CRON_SECRET לקריאה פנימית.
 //   GET  — called by Vercel Cron hourly. Authorized by Authorization: Bearer <CRON_SECRET> (Vercel sets this automatically when CRON_SECRET env var is defined).
 // Pulls Meta Ads insights and writes one report per project per month to Supabase.
 
+import { requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -531,10 +532,8 @@ function isValidDate(v) {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
 }
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const gate = await requireAdmin(request)
+  if (!gate.ok) return gate.res
   let body = {}
   try { body = await request.json() } catch {}
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) { return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 }) }

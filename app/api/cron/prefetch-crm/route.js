@@ -62,7 +62,7 @@ export async function GET(request) {
   else if (only === 'ranges') jobs = jobs.filter(j => j.kind === 'range')
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  const internalKey = process.env.CRON_SECRET || ''   // קריאה פנימית שרת-לשרת
   const results = []
 
   // BCureLaser / Zoho doesn't use quarterly views, and a full quarter usually exceeds
@@ -76,16 +76,16 @@ export async function GET(request) {
     const skipZoho = ZOHO_SKIP_RANGES.includes(job.rangeId)
     const zohoPromise = skipZoho
       ? null
-      : fetch(`${base}/api/zoho/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
+      : fetch(`${base}/api/zoho/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify(job.payload) })
           .then(r => r.json()).catch(() => ({}))
     // Salesforce (KLOSS) in parallel — it only writes to KLOSS-named projects. Uses SOQL
     // aggregates, so quarters are fine (no record-count limit like Zoho).
-    const sfPromise = fetch(`${base}/api/salesforce/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
+    const sfPromise = fetch(`${base}/api/salesforce/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify(job.payload) })
       .then(r => r.json()).catch(() => ({}))
     try {
       // cache:'no-store' — see prefetch-ads: without it these internal calls came back from
       // cache in milliseconds and no fresh data / heartbeat was written.
-      const res = await fetch(`${base}/api/bmby/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
+      const res = await fetch(`${base}/api/bmby/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify(job.payload) })
       const data = await res.json().catch(() => ({}))
       results.push({ kind: job.kind, label: job.label, source: 'bmby', ok: res.ok, status: res.status, ms: Date.now()-t0, ...data })
     } catch (err) {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { requireAdmin, requireUser, escapeHtml } from '../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { sendAlert } from '../../../lib/alert'
 
@@ -7,13 +8,19 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-// POST — log session events from client dashboard
+// POST — log session events from client dashboard.
+// הרשאה: משתמש מחובר בלבד, והמייל נלקח מהטוקן ולא מגוף הבקשה. קודם ה-route
+// היה פתוח לגמרי — אפשר היה להזריק שורות ל-client_sessions ולהפעיל שליחת מיילים.
 export async function POST(req) {
   const body = await req.json().catch(() => ({}))
-  const { event, email, clientName, projectIds, sessionId, durationSec } = body
+  // navigator.sendBeacon (אירוע logout) לא יכול לשאת כותרות, ולכן הטוקן מתקבל גם מהגוף.
+  const gate = await requireUser(req, body.accessToken)
+  if (!gate.ok) return gate.res
+  const email = gate.user.email
+
+  const { event, clientName, projectIds, sessionId, durationSec } = body
 
   if (event === 'login') {
-    if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 })
     const { data, error } = await supabaseAdmin
       .from('client_sessions')
       .insert({
@@ -34,7 +41,7 @@ export async function POST(req) {
     await supabaseAdmin
       .from('client_sessions')
       .update({ last_seen_at: new Date().toISOString() })
-      .eq('id', sessionId)
+      .eq('id', sessionId).eq('email', email)
     return NextResponse.json({ ok: true })
   }
 
@@ -43,7 +50,7 @@ export async function POST(req) {
     await supabaseAdmin
       .from('client_sessions')
       .update({ selected_project: body.projectName || null })
-      .eq('id', sessionId)
+      .eq('id', sessionId).eq('email', email)
     return NextResponse.json({ ok: true })
   }
 
@@ -56,7 +63,7 @@ export async function POST(req) {
         last_seen_at: new Date().toISOString(),
         duration_sec: durationSec || 0,
       })
-      .eq('id', sessionId)
+      .eq('id', sessionId).eq('email', email)
     return NextResponse.json({ ok: true })
   }
 
@@ -67,14 +74,14 @@ export async function POST(req) {
       <h2 style="margin:0 0 10px">\u26a0\ufe0f \u05dc\u05e7\u05d5\u05d7 \u05e0\u05db\u05e0\u05e1 \u05dc\u05d3\u05e9\u05d1\u05d5\u05e8\u05d3 \u05e8\u05d9\u05e7</h2>
       <p style="margin:0 0 12px;color:#5E6478">\u05dc\u05e7\u05d5\u05d7 \u05e0\u05db\u05e0\u05e1 \u05dc\u05de\u05e2\u05e8\u05db\u05ea \u05d0\u05da \u05dc\u05d0 \u05e0\u05d8\u05e2\u05e0\u05d5 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd (\u05d9\u05d9\u05ea\u05db\u05df \u05e7\u05e8\u05d5\u05df/\u05e4\u05d9\u05d9\u05e4\u05dc\u05d9\u05d9\u05df).</p>
       <table style="border-collapse:collapse">
-        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05de\u05d9\u05d9\u05dc</td><td style="padding:3px 0"><b>${email || '\u2014'}</b></td></tr>
-        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05dc\u05e7\u05d5\u05d7</td><td style="padding:3px 0">${clientName || '\u2014'}</td></tr>
-        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8</td><td style="padding:3px 0">${body.projectName || '\u2014'}</td></tr>
-        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05e1\u05d9\u05d1\u05d4</td><td style="padding:3px 0">${body.reason || '\u2014'}</td></tr>
+        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05de\u05d9\u05d9\u05dc</td><td style="padding:3px 0"><b>${escapeHtml(email) || '\u2014'}</b></td></tr>
+        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05dc\u05e7\u05d5\u05d7</td><td style="padding:3px 0">${escapeHtml(clientName) || '\u2014'}</td></tr>
+        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8</td><td style="padding:3px 0">${escapeHtml(body.projectName) || '\u2014'}</td></tr>
+        <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05e1\u05d9\u05d1\u05d4</td><td style="padding:3px 0">${escapeHtml(body.reason) || '\u2014'}</td></tr>
         <tr><td style="padding:3px 10px 3px 0;color:#98A0B2">\u05d6\u05de\u05df</td><td style="padding:3px 0">${when}</td></tr>
       </table>
     </div>`
-    try { await sendAlert({ subject: `\u26a0\ufe0f VITAS: \u05dc\u05e7\u05d5\u05d7 \u05e8\u05d0\u05d4 \u05d3\u05e9\u05d1\u05d5\u05e8\u05d3 \u05e8\u05d9\u05e7 \u2014 ${clientName || email || ''}`, html }) } catch {}
+    try { await sendAlert({ subject: `\u26a0\ufe0f VITAS: \u05dc\u05e7\u05d5\u05d7 \u05e8\u05d0\u05d4 \u05d3\u05e9\u05d1\u05d5\u05e8\u05d3 \u05e8\u05d9\u05e7 \u2014 ${String(clientName || email || '').slice(0, 120)}`, html }) } catch {}
     return NextResponse.json({ ok: true })
   }
 
@@ -83,10 +90,8 @@ export async function POST(req) {
 
 // DELETE — clear all session logs (protected by anon key header)
 export async function DELETE(req) {
-  const key = req.headers.get('x-client-key')
-  if (!key || key !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const gate = await requireAdmin(req)
+  if (!gate.ok) return gate.res
   const { error } = await supabaseAdmin.from('client_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
@@ -94,10 +99,8 @@ export async function DELETE(req) {
 
 // GET — fetch logs for admin (protected by anon key header)
 export async function GET(req) {
-  const key = req.headers.get('x-client-key')
-  if (!key || key !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const gate = await requireAdmin(req)
+  if (!gate.ok) return gate.res
 
   const { data, error } = await supabaseAdmin
     .from('client_sessions')

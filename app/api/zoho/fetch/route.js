@@ -1,5 +1,5 @@
 // API route: /api/zoho/fetch
-//   POST — from the admin UI (auth via x-client-key header = anon key)
+//   POST — from the admin UI (אדמין מאומת (JWT) או CRON_SECRET לקריאה פנימית)
 //   GET  — from Vercel Cron (auth via Authorization: Bearer <CRON_SECRET>)
 //
 // Pulls BCureLaser leads + deals from Zoho CRM, writes to Supabase.
@@ -17,6 +17,7 @@
 //   ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN
 //   ZOHO_API_DOMAIN  (default: https://www.zohoapis.com)
 
+import { requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -570,10 +571,8 @@ async function runSync(opts = {}) {
 function isValidDate(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const gate = await requireAdmin(request)
+  if (!gate.ok) return gate.res
   let body = {}
   try { body = await request.json() } catch {}
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) {

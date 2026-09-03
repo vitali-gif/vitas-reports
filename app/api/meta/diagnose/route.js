@@ -5,8 +5,9 @@
 //     - List of existing automated rules in the account
 //
 // Auth: requires CRON_SECRET via Authorization: Bearer (so this isn't world-readable)
-// OR x-client-key = anon key (so we can call it from the admin UI).
+// או JWT של אדמין (כדי שאפשר יהיה לקרוא לזה מממשק הניהול).
 
+import { requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -21,14 +22,10 @@ async function fetchJson(url) {
 }
 
 export async function GET(request) {
-  // Auth: accept either anon key in x-client-key OR CRON_SECRET as Bearer
-  const anon = request.headers.get('x-client-key')
-  const auth = request.headers.get('authorization') || ''
-  const bearer = auth.replace(/^Bearer\s+/i, '')
-  const okAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && anon === process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const okCron = process.env.CRON_SECRET && bearer === process.env.CRON_SECRET
-  if (!okAnon && !okCron) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  // Auth: אדמין מאומת, או קריאה פנימית עם CRON_SECRET.
+  const gate = await requireAdmin(request)
+  if (!gate.ok) {
+    return gate.res
   }
 
   const token = process.env.META_ACCESS_TOKEN

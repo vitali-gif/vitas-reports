@@ -1,5 +1,5 @@
 // API route: /api/tasks/update
-//   POST - from the admin UI / client UI (auth via x-client-key header = anon key)
+//   POST - מממשק הניהול או מתצוגת הלקוח. הרשאה: גישה לפרויקט של המשימה.
 //
 // Updates a vitas_tasks row's status (and optionally writes the impact snapshot
 // when the task is closed). Trigger vitas_tasks_set_updated_at on the DB side
@@ -12,6 +12,7 @@
 //     impactSnapshot?: object   (only meaningful when status='done')
 //   }
 
+import { requireProjectAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -23,11 +24,6 @@ function badRequest(message) {
 }
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   let body = {}
   try { body = await request.json() } catch { return badRequest('Invalid JSON body') }
 
@@ -42,6 +38,14 @@ export async function POST(request) {
     return Response.json({ error: 'Supabase not configured' }, { status: 500 })
   }
   const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+
+  // הבקשה נושאת taskId בלבד, ולכן שולפים קודם את הפרויקט שאליו המשימה שייכת
+  // ומאמתים גישה אליו — אחרת אפשר היה לעדכן משימות של לקוחות אחרים לפי ניחוש id.
+  const { data: owner } = await supabase
+    .from('vitas_tasks').select('project_id').eq('id', taskId).maybeSingle()
+  if (!owner) return Response.json({ error: 'task not found' }, { status: 404 })
+  const gate = await requireProjectAccess(request, owner.project_id)
+  if (!gate.ok) return gate.res
 
   const update = { status }
   if (status === 'done' && impactSnapshot && typeof impactSnapshot === 'object') {

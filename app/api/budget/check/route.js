@@ -1,16 +1,15 @@
 // POST /api/budget/check — runs the monthly-budget threshold check on demand
 // (same logic as the prefetch-ads cron). Sends 75/95/100% alerts for any project
-// that newly crossed a threshold this month, and marks them sent. Auth: x-client-key=anon.
+// that newly crossed a threshold this month, and marks them sent. Auth: אדמין מאומת (JWT) או CRON_SECRET.
+import { requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { sendAlert } from '../../../../lib/alert'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const gate = await requireAdmin(request)
+  if (!gate.ok) return gate.res
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,

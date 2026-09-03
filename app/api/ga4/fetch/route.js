@@ -1,10 +1,11 @@
 // API route: /api/ga4/fetch
-//   POST — admin UI / cron. Authorized by x-client-key = NEXT_PUBLIC_SUPABASE_ANON_KEY.
+//   POST — admin UI / cron. אדמין מאומת (JWT) או CRON_SECRET לקריאה פנימית.
 //   GET  — ?test=1 returns a live summary for verification; with Bearer CRON_SECRET runs the sync.
 // Pulls GA4 Data API (property GA4_PROPERTY_ID) and writes a source='ga4' report per BCureLaser project.
 // Auth: OAuth refresh token (GA4_OAUTH_*), reusing the existing Google OAuth client (no service-account key
 // because the org blocks SA key creation). Scope: analytics.readonly.
 
+import { requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -172,10 +173,8 @@ async function runSync(opts = {}) {
 }
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const gate = await requireAdmin(request)
+  if (!gate.ok) return gate.res
   let body = {}
   try { body = await request.json() } catch {}
   const { status, body: resp } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId })

@@ -1,5 +1,5 @@
 // API route: /api/tasks/create
-//   POST - from the admin UI (auth via x-client-key header = anon key)
+//   POST - מממשק הניהול או מתצוגת הלקוח. הרשאה: גישה לפרויקט (client_access).
 //
 // Inserts a row into vitas_tasks representing a recommendation the user has
 // "locked" — committed to working on. The frontend supplies the rec object;
@@ -22,6 +22,7 @@
 // If a row already exists for (projectId, recommendationKey) with status
 // pending/in_progress, returns 409 with the existing row instead of creating.
 
+import { requireProjectAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -33,13 +34,12 @@ function badRequest(message) {
 }
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   let body = {}
   try { body = await request.json() } catch { return badRequest('Invalid JSON body') }
+
+  // גישה לפרויקט, לא אדמין: גם לקוחות נועלים המלצות מטאב "המלצות חכמות".
+  const gate = await requireProjectAccess(request, body.projectId)
+  if (!gate.ok) return gate.res
 
   const {
     projectId,
