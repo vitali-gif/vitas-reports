@@ -105,6 +105,20 @@ function InfoTip({ text, icon = 'i' }) {
 // so callers can just test the result before rendering.
 const dmy = (v) => { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; };
 
+// Build a CSV from an array of plain objects (the first row's keys become the header) and hand it
+// to the browser as a download. The UTF-8 BOM is REQUIRED — without it Excel opens Hebrew as mojibake.
+const downloadCsv = (rows, filename) => {
+  if (!rows || !rows.length) return;
+  const cols = Object.keys(rows[0]);
+  const esc = (v) => { const t = (v === null || v === undefined) ? '' : String(v); return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const csv = [cols.join(','), ...rows.map(r => cols.map(c => esc(r[c])).join(','))].join('\r\n');
+  const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = String(filename).replace(/[\\/:*?"<>|]/g, '-') + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null }) {
   // שמות הדמו מגיעים מה-DB (הפרויקט/הלקוח שסומנו is_demo) ולא מקודדים בקוד,
   // אחרת הכותרת והסיידבר מציגים שני שמות שונים.
@@ -3911,6 +3925,78 @@ const selectProject = async (client, project) => {
     const _roasCell = (rev, res, fs) => { const sp=res==null?null:(typeof res==='object'?res.spend:res); if(sp==null||sp<=0) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const r=(rev||0)/sp; return <td style={{fontSize:fs,whiteSpace:'nowrap',fontWeight:600,color:r>=1?'var(--emerald)':'var(--rose)'}}>{r.toFixed(2)}x</td> }
             const _agents = _zs.agentPerformance || []
             const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
+
+            // ── "סיכום כללי" (Zoho): פתח/כווץ הכל + ייצוא CSV, לשתי הטבלאות ──────────
+            // הרחבה/כיווץ נוגעים רק בתצוגה. הייצוא תמיד מוציא את העץ המלא, בכל הרמות,
+            // ללא תלות במה שפתוח על המסך — "את כל השדות".
+            const _fPaths = { ch: [], camp: [], ast: [] }
+            _ch.forEach(c => {
+              const camps = c.campaigns || []
+              if (camps.length) _fPaths.ch.push(c.channel)
+              camps.forEach(cm => {
+                const ck = c.channel + '|' + cm.campaign
+                const asets = cm.adSets || []
+                if (asets.length) _fPaths.camp.push(ck)
+                asets.forEach(as => { if ((as.ads || []).length) _fPaths.ast.push(ck + '|' + as.adset) })
+              })
+            })
+            const _funnelAllOpen = (_fPaths.ch.length + _fPaths.camp.length + _fPaths.ast.length) > 0
+              && _fPaths.ch.every(k => expandedFunnelCh.has(k))
+              && _fPaths.camp.every(k => expandedFunnelCamp.has(k))
+              && _fPaths.ast.every(k => expandedFunnelAst.has(k))
+            const toggleFunnelAll = () => {
+              const open = !_funnelAllOpen
+              setExpandedFunnelCh(open ? new Set(_fPaths.ch) : new Set())
+              setExpandedFunnelCamp(open ? new Set(_fPaths.camp) : new Set())
+              setExpandedFunnelAst(open ? new Set(_fPaths.ast) : new Set())
+            }
+            // Same shape the table cells use: null ⇒ no FB spend for this row (exported as blank, not 0).
+            const _spNum  = (res) => { if (res == null) return ''; const v = typeof res === 'object' ? res.spend : res; return (v == null) ? '' : Math.round(v) }
+            const _roasNum = (rev, res) => { const sp = res == null ? null : (typeof res === 'object' ? res.spend : res); return (sp == null || sp <= 0) ? '' : ((rev || 0) / sp).toFixed(2) }
+            const exportFunnelCsv = () => {
+              const rows = []
+              const add = (level, ch, camp, aset, ad, o, res) => rows.push({
+                'רמה': level, 'ערוץ': ch, 'קמפיין': camp, 'סדרת מודעות': aset, 'מודעה': ad,
+                'לידים': o.leads || 0, 'הזדמנויות': o.opportunities || 0, 'רכשו': o.purchased || 0,
+                'אחוז המרה': (o.conversionRate || 0) + '%', 'שווי נטו': Math.round(o.netRevenue || 0),
+                'תקציב FB': _spNum(res), 'ROAS': _roasNum(o.netRevenue, res),
+              })
+              _ch.forEach(c => {
+                add('ערוץ', c.channel, '', '', '', c, _isFb(c.channel) ? _fbTotalSpend : null)
+                ;(c.campaigns || []).forEach(cm => {
+                  add('קמפיין', c.channel, cm.campaign, '', '', cm, _spCamp(c.channel, cm.campaign))
+                  ;(cm.adSets || []).forEach(as => {
+                    add('סדרת מודעות', c.channel, cm.campaign, as.adset, '', as, _spAdset(c.channel, cm.campaign, as.adset))
+                    ;(as.ads || []).forEach(ad => {
+                      add('מודעה', c.channel, cm.campaign, as.adset, _resolveAd(c.channel, ad.ad), ad, _spAd(c.channel, cm.campaign, as.adset, ad.ad))
+                    })
+                  })
+                })
+              })
+              add('סה"כ', '', '', '', '', _fn, _fbTotalSpend)
+              downloadCsv(rows, 'משפך-לפי-ערוץ_' + (selectedMonth || ''))
+            }
+
+            const _agentPaths = _agents.filter(a => (a.bySource || []).length).map(a => a.agent)
+            const _agentsAllOpen = _agentPaths.length > 0 && _agentPaths.every(a => expandedAgents.has(a))
+            const toggleAgentsAll = () => setExpandedAgents(_agentsAllOpen ? new Set() : new Set(_agentPaths))
+            const exportAgentsCsv = () => {
+              const rows = []
+              const add = (level, agent, src, o) => rows.push({
+                'רמה': level, 'נציג': agent, 'מקור ליד': src,
+                'לידים': o.leads || 0, 'הזדמנויות': o.opportunities || 0, 'מכירות': o.purchased || 0,
+                'שווי מכירות': Math.round(o.netRevenue || 0), 'אחוז המרה': (o.conversionRate || 0) + '%',
+              })
+              _agents.forEach(ag => {
+                add('נציג', ag.agent, '', ag)
+                ;(ag.bySource || []).forEach(sr => add('מקור', ag.agent, sr.source, sr))
+              })
+              downloadCsv(rows, 'ביצועי-אנשי-מכירות_' + (selectedMonth || ''))
+            }
+            const _tblBar  = { display:'flex', flexWrap:'wrap', gap:10, alignItems:'center', marginBottom:10 }
+            const _tblHint = { fontSize:'0.85em', color:'#64748b', flex:'1 1 220px', textAlign:'right' }
+            const _btnOpen = { fontSize:'0.76em', fontWeight:600, padding:'5px 10px', borderRadius:8, border:'1px solid #c7d2fe', background:'#eef2ff', color:'#4338ca', cursor:'pointer', whiteSpace:'nowrap' }
+            const _btnCsv  = { fontSize:'0.76em', fontWeight:600, padding:'5px 10px', borderRadius:8, border:'1px solid #a7f3d0', background:'#ecfdf5', color:'#047857', cursor:'pointer', whiteSpace:'nowrap' }
             const _byStatus = Object.entries(_zs.byStatus || {}).sort((a,b) => b[1]-a[1])
             const _bySrc    = Object.entries(_zs.bySource || {}).sort((a,b) => b[1]-a[1])
             const _objList  = Object.entries(_zs.objections || {}).sort((a,b) => b[1]-a[1])
@@ -3970,7 +4056,13 @@ const selectProject = async (client, project) => {
                 </div>
                 <div className="section">
                   <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2></div>
-                  <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:10,textAlign:'right'}}>💡 לחץ על ערוץ ← קמפיין ← adset ← מודעה כדי לצלול פנימה · תקציב FB: קמפיין מדויק, adset/מודעה משוער (~)</div>
+                  <div style={_tblBar}>
+                    <div style={_tblHint}>💡 לחץ על ערוץ ← קמפיין ← adset ← מודעה כדי לצלול פנימה · תקציב FB: קמפיין מדויק, adset/מודעה משוער (~)</div>
+                    <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                      <button onClick={toggleFunnelAll} style={_btnOpen}>{_funnelAllOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
+                      <button onClick={exportFunnelCsv} style={_btnCsv}>{'⬇ ייצוא ל-CSV'}</button>
+                    </div>
+                  </div>
                   <div className="table-wrapper">
                     <table className="data-table">
                       <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th><th>תקציב FB</th><th>ROAS</th></tr></thead>
@@ -4038,7 +4130,13 @@ const selectProject = async (client, project) => {
                 </div>
                 <div className="section">
                   <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>ביצועי אנשי מכירות</h2></div>
-                  <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:10,textAlign:'right'}}>💡 לחץ על נציג כדי לראות פילוח לפי מקור ליד</div>
+                  <div style={_tblBar}>
+                    <div style={_tblHint}>💡 לחץ על נציג כדי לראות פילוח לפי מקור ליד</div>
+                    <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                      <button onClick={toggleAgentsAll} style={_btnOpen}>{_agentsAllOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
+                      <button onClick={exportAgentsCsv} style={_btnCsv}>{'⬇ ייצוא ל-CSV'}</button>
+                    </div>
+                  </div>
                   <div className="table-wrapper">
                     <table className="data-table">
                       <thead><tr><th>נציג</th><th>לידים</th><th>הזדמנויות</th><th>מכירות</th><th>שווי מכירות</th><th>אחוז המרה</th></tr></thead>
