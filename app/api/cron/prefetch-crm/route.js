@@ -22,6 +22,28 @@ function monthsBack(n) { const d = nowIsrael(); d.setDate(1); d.setMonth(d.getMo
 function toYMD(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
 function agoD(n) { const d = nowIsrael(); d.setDate(d.getDate()-n); return d }
 
+// The cron response is a log line, not a data dump. Each result used to spread the ENTIRE
+// body of its sub-fetch (...data) - totals, totalRaw, per-project detail - times 12 jobs.
+// cron-job.org answered "Response data too big" and marked the run failed even though the
+// fetch itself fully succeeded. Summarise instead of spreading.
+const _slim = (d) => {
+  if (!d || typeof d !== 'object') return {}
+  const out = {}
+  if (d.ok !== undefined) out.ok = d.ok
+  if (d.error) out.error = String(d.error).slice(0, 200)
+  if (typeof d.totalRows === 'number') out.totalRows = d.totalRows
+  if (Array.isArray(d.projects)) {
+    out.projects = d.projects.map(p => {
+      const r = { project: p.project }
+      const n = (p.counts && p.counts.leads) ?? p.leads
+      if (n !== undefined && n !== null) r.leads = n
+      if (p.ok === false) r.ok = false
+      if (p.error) r.error = String(p.error).slice(0, 120)
+      return r
+    })
+  }
+  return out
+}
 export async function GET(request) {
   const startedAt = Date.now()
   const auth = request.headers.get('authorization') || ''
@@ -87,7 +109,7 @@ export async function GET(request) {
       // cache in milliseconds and no fresh data / heartbeat was written.
       const res = await fetch(`${base}/api/bmby/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
       const data = await res.json().catch(() => ({}))
-      results.push({ kind: job.kind, label: job.label, source: 'bmby', ok: res.ok, status: res.status, ms: Date.now()-t0, ...data })
+      results.push({ kind: job.kind, label: job.label, source: 'bmby', ok: res.ok, status: res.status, ms: Date.now()-t0, ..._slim(data) })
     } catch (err) {
       results.push({ kind: job.kind, label: job.label, source: 'bmby', ok: false, ms: Date.now()-t0, error: String(err) })
     }
@@ -95,12 +117,12 @@ export async function GET(request) {
     if (zohoPromise) {
       try {
         const zohoData = await zohoPromise
-        results.push({ kind: job.kind, label: job.label, source: 'zoho', ok: zohoData.ok ?? false, ms: Date.now()-t0, ...zohoData })
+        results.push({ kind: job.kind, label: job.label, source: 'zoho', ok: zohoData.ok ?? false, ms: Date.now()-t0, ..._slim(zohoData) })
       } catch {}
     }
     try {
       const sfData = await sfPromise
-      results.push({ kind: job.kind, label: job.label, source: 'salesforce', ok: sfData.ok ?? false, ms: Date.now()-t0, ...sfData })
+      results.push({ kind: job.kind, label: job.label, source: 'salesforce', ok: sfData.ok ?? false, ms: Date.now()-t0, ..._slim(sfData) })
     } catch {}
   }
 

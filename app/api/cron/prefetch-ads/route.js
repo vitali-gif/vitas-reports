@@ -23,6 +23,28 @@ function daysBackRange(n) { return { since: toYMD(agoD(n)), until: toYMD(agoD(1)
 function todayRange()     { const t = nowIsrael(); return { since: toYMD(t), until: toYMD(t) } }
 function yesterdayRange() { const t = nowIsrael(); t.setDate(t.getDate()-1); return { since: toYMD(t), until: toYMD(t) } }
 
+// The cron response is a log line, not a data dump. Each result used to spread the ENTIRE
+// body of its sub-fetch (...data) - totals, totalRaw, per-project detail - times 12 jobs.
+// cron-job.org answered "Response data too big" and marked the run failed even though the
+// fetch itself fully succeeded. Summarise instead of spreading.
+const _slim = (d) => {
+  if (!d || typeof d !== 'object') return {}
+  const out = {}
+  if (d.ok !== undefined) out.ok = d.ok
+  if (d.error) out.error = String(d.error).slice(0, 200)
+  if (typeof d.totalRows === 'number') out.totalRows = d.totalRows
+  if (Array.isArray(d.projects)) {
+    out.projects = d.projects.map(p => {
+      const r = { project: p.project }
+      const n = (p.counts && p.counts.leads) ?? p.leads
+      if (n !== undefined && n !== null) r.leads = n
+      if (p.ok === false) r.ok = false
+      if (p.error) r.error = String(p.error).slice(0, 120)
+      return r
+    })
+  }
+  return out
+}
 export async function GET(request) {
   const startedAt = Date.now()
   const auth = request.headers.get('authorization') || ''
@@ -67,7 +89,7 @@ export async function GET(request) {
       // cron reported ok:true while NOT actually pulling fresh data or writing the heartbeat.
       const res = await fetch(`${base}/api/${job.source}/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey }, body: JSON.stringify(job.payload) })
       const data = await res.json().catch(() => ({}))
-      results.push({ kind: job.kind, label: job.label, source: job.source, ok: res.ok, status: res.status, ms: Date.now()-t0, ...data })
+      results.push({ kind: job.kind, label: job.label, source: job.source, ok: res.ok, status: res.status, ms: Date.now()-t0, ..._slim(data) })
     } catch (err) {
       results.push({ kind: job.kind, label: job.label, source: job.source, ok: false, ms: Date.now()-t0, error: String(err) })
     }
