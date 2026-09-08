@@ -2368,6 +2368,21 @@ const selectProject = async (client, project) => {
     destroyCharts();
 
     const currentReports = reports.filter(r => r.month === selectedMonth);
+
+    // תקופה שאין לה אף שורה = "אין עדיין נתונים", ולא רשת של אפסים.
+    // אפס הוא טענה: לקוח שרואה 0 לידים ו-₪0 תקציב מסיק שהקמפיינים נעצרו. זה מה שקרה
+    // ב-7.9 וב-8.9 כשהקרון לא רץ — הדשבורד הציג אפסים במקום להגיד שהנתונים טרם נמשכו.
+    if (currentReports.length === 0) {
+      return (
+        <div className="welcome-center">
+          <div className="icon">{'\u23f3'}</div>
+          <h3>{'\u05d0\u05d9\u05df \u05e2\u05d3\u05d9\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05ea\u05e7\u05d5\u05e4\u05d4 \u05d6\u05d5'}</h3>
+          <p style={{marginTop:10,color:'var(--text-secondary)',maxWidth:420,lineHeight:1.6}}>
+            {'\u05d4\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e0\u05de\u05e9\u05db\u05d9\u05dd \u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9\u05ea \u05de\u05d3\u05d9 \u05e9\u05e2\u05ea\u05d9\u05d9\u05dd. \u05d0\u05dd \u05d1\u05d7\u05e8\u05ea \u05d0\u05ea \u05d4\u05d9\u05d5\u05dd, \u05d9\u05d9\u05ea\u05db\u05df \u05e9\u05d4\u05de\u05e9\u05d9\u05db\u05d4 \u05d4\u05e8\u05d0\u05e9\u05d5\u05e0\u05d4 \u05d8\u05e8\u05dd \u05e8\u05e6\u05d4.'}
+          </p>
+        </div>
+      );
+    }
     // If there are NO reports at all for this project, show the welcome screen.
     // If there are reports but not for this period, fall through - tabs will still show
     // (based on `reports`, not `currentReports`) and per-tab content will handle empty.

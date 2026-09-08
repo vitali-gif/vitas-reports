@@ -39,6 +39,21 @@ export async function GET(request) {
   const dataForMonths = (searchParams.get('dataForMonths') || '')
     .split(',').map(s => s.trim()).filter(Boolean)
 
+  // FAST PATH (perf): when the caller asks for specific months' heavy `data`, return ONLY those
+  // rows. Until now this route always re-sent the FULL light index alongside them — 14.7MB measured
+  // on HI PARK — so every month switch in the UI re-downloaded the whole index it already had in
+  // memory. The client merges these rows into its existing state by `id` and ignores rows whose
+  // `data` is null, so returning just the heavy rows is a drop-in.
+  if (dataForMonths.length > 0) {
+    const { data: heavy, error: heavyOnlyErr } = await supabaseAdmin
+      .from('reports')
+      .select('id, project_id, source, month, summary, created_at, data')
+      .eq('project_id', projectId)
+      .in('month', dataForMonths)
+    if (heavyOnlyErr) return NextResponse.json({ error: heavyOnlyErr.message }, { status: 500 })
+    return NextResponse.json(heavy || [], { headers: NO_STORE })
+  }
+
   // 1) LIGHT index — no heavy `data` column (fast, never times out).
   const { data: lite, error: liteErr } = await supabaseAdmin
     .from('reports')
@@ -48,18 +63,7 @@ export async function GET(request) {
   if (liteErr) return NextResponse.json({ error: liteErr.message }, { status: 500 })
   if (!lite || lite.length === 0) return NextResponse.json([], { headers: NO_STORE })
 
-  // 2) HEAVY `data` only for the requested month-keys.
-  const heavyById = {}
-  if (dataForMonths.length > 0) {
-    const { data: heavy, error: heavyErr } = await supabaseAdmin
-      .from('reports')
-      .select('id, data')
-      .eq('project_id', projectId)
-      .in('month', dataForMonths)
-    if (heavyErr) return NextResponse.json({ error: heavyErr.message }, { status: 500 })
-    for (const r of heavy || []) heavyById[r.id] = r.data
-  }
-
-  const out = lite.map(r => ({ ...r, data: heavyById[r.id] ?? null }))
+  // No dataForMonths ⇒ pure light index (the heavy path returned above).
+  const out = lite.map(r => ({ ...r, data: null }))
   return NextResponse.json(out, { headers: NO_STORE })
 }

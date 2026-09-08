@@ -20,7 +20,12 @@ export const maxDuration = 60
 // threshold produced a false "cron stopped" alarm every single morning.
 // 6h absorbs the 2h cadence + a few hours of GH delay; the window starts at 10:00 UTC so the
 // (possibly delayed) first run of the day has landed before we start judging.
-const STALE_HOURS = 6
+// 2026-09-08: המתזמן הוחלף ל-cron-job.org (דיוק של דקה) ו-GitHub Actions נשאר כגיבוי בלבד,
+// אז אין יותר צורך בסבלנות לאיחורים של שעות. החלון נפתח ב-05:00 UTC (08:00 בישראל) כדי שהתקלה
+// תתגלה לפני שמישהו פותח את הדשבורד, ולא ב-13:00 כמו קודם.
+const STALE_HOURS = 3
+// "שקט": אף שורה לא נכתבה בכלל. הקצב הוא שעתיים, אז 4 שעות בלי שום כתיבה = תקלה ודאית.
+const SILENT_HOURS = 4
 const JOBS = [
   { job: 'prefetch-ads', label: 'קרון מודעות (Meta/Google)' },
   { job: 'prefetch-crm', label: 'קרון CRM (BMBY/Zoho)' },
@@ -39,7 +44,7 @@ export async function GET(request) {
 
   // Only judge once the (often-delayed) first run of the day has had time to land.
   const utcH = new Date().getUTCHours()
-  const inActiveWindow = utcH >= 10 && utcH <= 21
+  const inActiveWindow = utcH >= 5 && utcH <= 21
 
   let beats
   try {
@@ -70,6 +75,27 @@ export async function GET(request) {
       <p style="color:#888;font-size:12px">VITAS Reports · קרון שומר (health)</p></div>`
     try { await sendAlert({ subject: `🚨 VITAS: ייתכן שקרון נתקע`, html }) } catch {}
   }
+
+  // ── "שקט" — אף שורת דוח לא נכתבה לאחרונה. ─────────────────────────────────────────
+  // ה-heartbeat למעלה תופס "הקרון לא רץ". הבדיקה הזו תופסת גם את המקרה ההפוך והגרוע יותר:
+  // הקרון רץ, דיווח הצלחה, וכתב heartbeat — אבל לא כתב שום נתון. נשלחת רק כשהתראת ה-heartbeat
+  // לא נשלחה, כדי לא להתריע פעמיים על אותו שורש.
+  let writeAgeH = null
+  try {
+    const { data: newest } = await sb.from('reports').select('created_at').order('created_at', { ascending: false }).limit(1)
+    const ts = newest && newest[0] && newest[0].created_at
+    if (ts) {
+      writeAgeH = Math.round(((Date.now() - new Date(ts).getTime()) / 3.6e6) * 10) / 10
+      if (inActiveWindow && stale.length === 0 && writeAgeH > SILENT_HOURS) {
+        const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
+          <h2>🚨 אין כתיבות חדשות לטבלת הדוחות</h2>
+          <p>הקרונים מדווחים שהם רצים, אבל <b>לא נכתבה שום שורה כבר ${writeAgeH} שעות</b> (הקצב הצפוי: שעתיים).</p>
+          <p>כלומר המשיכה מתבצעת אך לא מגיעה למסד — לא תקלת תזמון אלא תקלת נתונים.</p>
+          <p style="color:#888;font-size:12px">VITAS Reports · שומר שקט</p></div>`
+        try { await sendAlert({ subject: `🚨 VITAS: אין נתונים חדשים כבר ${writeAgeH} שעות`, html }) } catch {}
+      }
+    }
+  } catch { /* best-effort */ }
 
   // ── Per-branch data health: morning + evening digest, immediate alert on a NEW red. ──
   // Wrapped so it can NEVER break the heartbeat watchdog above. Date-based dedup makes the
@@ -131,7 +157,9 @@ export async function GET(request) {
     const clRow = beats.find(b => b.job === 'reports_cleanup')
     const clAgeH = clRow?.last_run ? (Date.now() - new Date(clRow.last_run).getTime()) / 3.6e6 : Infinity
     if (clAgeH > 20) {
-      const { data, error } = await sb.rpc('prune_old_reports', { retain_days: 14 })
+      // retain_days=3 ולא 14: החתך הוא לפי created_at, והקרון דורס את המפתחות
+        // החיים כל שעתיים. 14 יום היה משאיר כמעט הכל (נמדד: 224 מתוך 230 שורות).
+        const { data, error } = await sb.rpc('prune_old_reports', { retain_days: 3 })
       if (!error) {
         pruned = data
         await sb.from('cron_heartbeat').upsert({ job: 'reports_cleanup', last_run: new Date().toISOString() }, { onConflict: 'job' })
@@ -139,5 +167,5 @@ export async function GET(request) {
     }
   } catch { /* best-effort; never fail the watchdog */ }
 
-  return Response.json({ ok: true, utcH, inActiveWindow, status, alerted: stale.length, pruned, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
+  return Response.json({ ok: true, utcH, inActiveWindow, status, writeAgeH, alerted: stale.length, pruned, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
 }
