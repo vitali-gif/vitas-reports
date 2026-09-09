@@ -24,8 +24,6 @@ export const maxDuration = 60
 // אז אין יותר צורך בסבלנות לאיחורים של שעות. החלון נפתח ב-05:00 UTC (08:00 בישראל) כדי שהתקלה
 // תתגלה לפני שמישהו פותח את הדשבורד, ולא ב-13:00 כמו קודם.
 const STALE_HOURS = 3
-// "שקט": אף שורה לא נכתבה בכלל. הקצב הוא שעתיים, אז 4 שעות בלי שום כתיבה = תקלה ודאית.
-const SILENT_HOURS = 4
 const JOBS = [
   { job: 'prefetch-ads', label: 'קרון מודעות (Meta/Google)' },
   { job: 'prefetch-crm', label: 'קרון CRM (BMBY/Zoho)' },
@@ -76,23 +74,37 @@ export async function GET(request) {
     try { await sendAlert({ subject: `🚨 VITAS: ייתכן שקרון נתקע`, html }) } catch {}
   }
 
-  // ── "שקט" — אף שורת דוח לא נכתבה לאחרונה. ─────────────────────────────────────────
-  // ה-heartbeat למעלה תופס "הקרון לא רץ". הבדיקה הזו תופסת גם את המקרה ההפוך והגרוע יותר:
-  // הקרון רץ, דיווח הצלחה, וכתב heartbeat — אבל לא כתב שום נתון. נשלחת רק כשהתראת ה-heartbeat
-  // לא נשלחה, כדי לא להתריע פעמיים על אותו שורש.
-  let writeAgeH = null
+  // ── "שקט" — האם נכתב בכלל מפתח של היום? ───────────────────────────────────────────
+  // 🔴 2026-09-09: הגרסה הקודמת מדדה את הגיל של ה-created_at הטרי ביותר בטבלה. זה היה שגוי.
+  // הכתיבה היא upsert על (project_id, source, month), ולכן created_at נשאר מרגע היצירה
+  // הראשונה ולא זז בדריסות. ריצת הבוקר יוצרת את מפתחות היום ב-04:07 UTC, וכל שאר ריצות
+  // היום דורסות אותם בלי לגעת ב-created_at — אז המדד טיפס בהתמדה כל היום וירה התראה כל
+  // שעה מאמצע היום, למרות שהמערכת תקינה לגמרי. תוצאה: ~9 מיילי שווא ביום.
+  // במקום מדד עקיף, בודקים ישירות את מה שבאמת מעניין: האם קיים מפתח <היום>_<היום>.
+  // זו גם בדיוק התקלה שהמשתמש חווה — "היום" ריק בדשבורד.
+  let todayKeyRows = null
   try {
-    const { data: newest } = await sb.from('reports').select('created_at').order('created_at', { ascending: false }).limit(1)
-    const ts = newest && newest[0] && newest[0].created_at
-    if (ts) {
-      writeAgeH = Math.round(((Date.now() - new Date(ts).getTime()) / 3.6e6) * 10) / 10
-      if (inActiveWindow && stale.length === 0 && writeAgeH > SILENT_HOURS) {
+    const todayIL = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
+    const todayKey = `${todayIL}_${todayIL}`
+    const { data: todayRows } = await sb.from('reports').select('id').eq('month', todayKey).limit(1)
+    todayKeyRows = (todayRows || []).length
+    // רק מ-06:00 UTC (09:00 בישראל) — לריצה הראשונה של היום (04:07 UTC) יש זמן לנחות.
+    // ורק אם ה-heartbeat תקין, אחרת זו תקלת תזמון שהשומר למעלה כבר כיסה.
+    if (utcH >= 6 && utcH <= 21 && stale.length === 0 && todayKeyRows === 0) {
+      const _fmtIL = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(d)
+      const alertRow = beats.find(b => b.job === 'silence_alert')
+      const alertedToday = !!(alertRow && alertRow.last_run && _fmtIL(new Date(alertRow.last_run)) === todayIL)
+      if (!alertedToday) {
         const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
-          <h2>🚨 אין כתיבות חדשות לטבלת הדוחות</h2>
-          <p>הקרונים מדווחים שהם רצים, אבל <b>לא נכתבה שום שורה כבר ${writeAgeH} שעות</b> (הקצב הצפוי: שעתיים).</p>
-          <p>כלומר המשיכה מתבצעת אך לא מגיעה למסד — לא תקלת תזמון אלא תקלת נתונים.</p>
-          <p style="color:#888;font-size:12px">VITAS Reports · שומר שקט</p></div>`
-        try { await sendAlert({ subject: `🚨 VITAS: אין נתונים חדשים כבר ${writeAgeH} שעות`, html }) } catch {}
+          <h2>🚨 לא נכתבו נתונים של היום</h2>
+          <p>הקרונים מדווחים שהם רצים, אבל <b>לא קיימת אף שורת דוח עבור ${todayIL}</b>.</p>
+          <p>כלומר המשיכה מתבצעת אך לא מגיעה למסד — לא תקלת תזמון אלא תקלת נתונים.
+             בדשבורד זה ייראה כמו טווח "היום" ריק.</p>
+          <p style="color:#888;font-size:12px">VITAS Reports · שומר שקט · התראה אחת ליום</p></div>`
+        try {
+          await sendAlert({ subject: `🚨 VITAS: לא נכתבו נתונים של ${todayIL}`, html })
+          await sb.from('cron_heartbeat').upsert({ job: 'silence_alert', last_run: new Date().toISOString() }, { onConflict: 'job' })
+        } catch { /* best-effort */ }
       }
     }
   } catch { /* best-effort */ }
@@ -167,5 +179,5 @@ export async function GET(request) {
     }
   } catch { /* best-effort; never fail the watchdog */ }
 
-  return Response.json({ ok: true, utcH, inActiveWindow, status, writeAgeH, alerted: stale.length, pruned, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
+  return Response.json({ ok: true, utcH, inActiveWindow, status, todayKeyRows, alerted: stale.length, pruned, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
 }
