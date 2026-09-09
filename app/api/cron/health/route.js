@@ -164,20 +164,42 @@ export async function GET(request) {
   // robust to GitHub Actions lateness). The heavy DELETE runs IN the DB via an RPC (minimal IO/transfer).
   // Requires the SQL function prune_old_reports() to exist; if it doesn't yet, this is a no-op (error
   // caught, heartbeat not written → retried next hour). Never breaks the watchdog.
+  // 2026-09-09: הבלוק הזה נכשל בשקט (pruned:null ללא שום אינדיקציה) — בדיוק הדפוס
+  // שאנחנו מנסים למגר. עכשיו כל נתיב מחזיר pruneNote מפורש, וכשל חוזר שולח מייל.
   let pruned = null
+  let pruneNote = null
   try {
     const clRow = beats.find(b => b.job === 'reports_cleanup')
     const clAgeH = clRow?.last_run ? (Date.now() - new Date(clRow.last_run).getTime()) / 3.6e6 : Infinity
-    if (clAgeH > 20) {
+    if (clAgeH <= 20) {
+      pruneNote = `skipped (ran ${clAgeH.toFixed(1)}h ago)`
+    } else {
       // retain_days=3 ולא 14: החתך הוא לפי created_at, והקרון דורס את המפתחות
-        // החיים כל שעתיים. 14 יום היה משאיר כמעט הכל (נמדד: 224 מתוך 230 שורות).
-        const { data, error } = await sb.rpc('prune_old_reports', { retain_days: 3 })
-      if (!error) {
+      // החיים כל שעתיים. 14 יום היה משאיר כמעט הכל (נמדד: 224 מתוך 230 שורות).
+      const { data, error } = await sb.rpc('prune_old_reports', { retain_days: 3 })
+      if (error) {
+        pruneNote = `RPC failed: ${error.code || ''} ${error.message || ''}`.trim()
+        const failRow = beats.find(b => b.job === 'reports_cleanup_fail')
+        const failAgeH = failRow?.last_run ? (Date.now() - new Date(failRow.last_run).getTime()) / 3.6e6 : Infinity
+        if (failAgeH > 20) {
+          await sendAlert({
+            subject: '\u26a0\ufe0f VITAS: גיזום טבלת הדוחות נכשל',
+            html: `<div dir="rtl" style="font-family:Arial,sans-serif">
+              <h3>הגיזום היומי של טבלת reports לא רץ</h3>
+              <p>הפונקציה <code>prune_old_reports</code> החזירה שגיאה:</p>
+              <pre style="background:#f6f6f6;padding:10px;direction:ltr;text-align:left">${pruneNote}</pre>
+              <p>הטבלה תמשיך לתפוח (~10-15 שורות ליום לכל פרויקט) ובסוף הדשבורד ייטען לאט.</p>
+              <p style="color:#888;font-size:12px">VITAS · watchdog</p></div>`,
+          })
+          await sb.from('cron_heartbeat').upsert({ job: 'reports_cleanup_fail', last_run: new Date().toISOString() }, { onConflict: 'job' })
+        }
+      } else {
         pruned = data
+        pruneNote = 'ok'
         await sb.from('cron_heartbeat').upsert({ job: 'reports_cleanup', last_run: new Date().toISOString() }, { onConflict: 'job' })
       }
     }
-  } catch { /* best-effort; never fail the watchdog */ }
+  } catch (e) { pruneNote = `threw: ${e?.message || e}` }
 
-  return Response.json({ ok: true, utcH, inActiveWindow, status, todayKeyRows, alerted: stale.length, pruned, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
+  return Response.json({ ok: true, utcH, inActiveWindow, status, todayKeyRows, alerted: stale.length, pruned, pruneNote, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
 }
