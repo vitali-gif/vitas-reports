@@ -161,13 +161,26 @@ export async function POST(request) {
     Dynamic: 0, FromDate: from, ToDate: today,
   }
 
-  let all = []
+  // Verified live 2026-09-10: with ClientID set, BMBY returns the SAME rows on every page —
+  // it advances LastUniqID but ignores it. Paging blindly produced each note 2-4 times.
+  // Dedupe by task_id and stop as soon as a page adds nothing new.
+  const all = []
+  const seenTaskIds = new Set()
   let uniqID = 1
   try {
     for (let page = 0; page < MAX_PAGES; page++) {
       const { rows, lastUniqID } = await callTasksGetAll({ ...base, UniqID: uniqID })
       if (!rows.length) break
-      all = all.concat(rows)
+      let added = 0
+      for (const r of rows) {
+        const tid = String(r.task_id || '')
+        const key = tid || `${r.client_id}|${r.create_date}|${(r.message || '').slice(0, 40)}`
+        if (seenTaskIds.has(key)) continue
+        seenTaskIds.add(key)
+        all.push(r)
+        added++
+      }
+      if (!added) break
       if (!lastUniqID || lastUniqID <= uniqID) break
       uniqID = lastUniqID
     }
@@ -179,14 +192,17 @@ export async function POST(request) {
   const mine = all.filter(t => String(t.client_id || '') === clientId)
   const filterHonored = all.length === 0 || mine.length === all.length
 
+  // decode THEN trim: BMBY sends &nbsp;, which is not whitespace until it is decoded.
+  // Trimming first let notes whose whole body was &nbsp; through as blank rows.
+  const _clean = (v) => decodeBmbyEntities((v || '').toString()).replace(/\u00a0/g, ' ').trim()
   const notes = mine
     .map(t => ({
       date: (t.create_date || t.start_date || '').toString(),
-      type: decodeBmbyEntities((t.type || '').toString().trim()),
-      subject: decodeBmbyEntities((t.subject || '').toString().trim()),
-      status: decodeBmbyEntities((t.status || '').toString().trim()),
-      user: decodeBmbyEntities((t.user_name || t.agent_name || '').toString().trim()),
-      message: decodeBmbyEntities((t.message || '').toString().trim()),
+      type: _clean(t.type),
+      subject: _clean(t.subject),
+      status: _clean(t.status),
+      user: _clean(t.user_name || t.agent_name),
+      message: _clean(t.message),
     }))
     // Drop BMBY's automatic bookkeeping comment — it carries no human content and would
     // otherwise dominate the timeline. Same rule the response-time calc already applies.
