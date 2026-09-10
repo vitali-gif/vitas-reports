@@ -533,7 +533,7 @@ async function runSync(opts = {}) {
       if (_sd && _sd >= since && _sd <= _meetUntil) {
         _apptByDate.total++
         if (!isCanc) _apptByDate.scheduled++
-        if (isDone)  { _apptByDate.completed++; _meetRecs.comp.push(_rec); _completedMeetings.push({ name: _rec.name, phone: cidToPhone.get(cid) || '', source: _leadSource(cid), date: (t.start_date || '').toString(), description: (t.message || '').toString().trim() }) }
+        if (isDone)  { _apptByDate.completed++; _meetRecs.comp.push(_rec); _completedMeetings.push({ cid, name: _rec.name, phone: cidToPhone.get(cid) || '', source: _leadSource(cid), date: (t.start_date || '').toString(), description: (t.message || '').toString().trim() }) }
         if (isCanc)  _apptByDate.cancelled++
       }
       // Debug: count raw appointment status values
@@ -1073,11 +1073,13 @@ async function runSync(opts = {}) {
       const apptDates = (clientApptList.get(cid) || []).map(a => a.date).filter(Boolean).sort()
       const note = _cidLastNote.get(cid)
       const entry = {
+        cid,                                   // needed to pull the lead's note history on demand
         name: clientName.get(cid) || ('ליד #' + cid),
         phone: cidToPhone.get(cid) || '',
         status: clientStatus.get(cid) || '',
         relevant: !!clientRelevant.get(cid),
         objection: clientObjection.get(cid) || '',
+        ad: (clientAdName.get(cid) || '').toString().trim(),   // 'שם מודעה' — shown in the objections popup
         remark: clientRemark.get(cid) || '',
         lastMeeting: apptDates.length ? apptDates[apptDates.length - 1] : '',
         apptCoord: cidToApptCoord.get(cid) || '',
@@ -1269,7 +1271,7 @@ async function runSync(opts = {}) {
     totals.meetingsUpcomingSplit  = _mSplit(_meetRecs.future)
     totals.meetingsCancelledSplit = _mSplit(_meetRecs.canc)
     _completedMeetings.sort((a, b) => String(b.date).localeCompare(String(a.date))) // most recent meeting first
-    const CRM_SCHEMA_VERSION = 32  // v15: livingStatus + propertyType per crmRepRow (מצב דיור / סוג נכס — HI PARK)
+    const CRM_SCHEMA_VERSION = 33  // v33: cid + שם מודעה על כל ליד (פופ-אפ התנגדויות) + cid על completedMeetings (היסטוריית הערות)
     // === Data-integrity guard ===
     // A partially-failed BMBY fetch (leads/tasks SOAP call timed out) can yield 0 leads
     // while registrations/contracts/meetings — derived from other modules — survived.

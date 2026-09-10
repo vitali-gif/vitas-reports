@@ -190,6 +190,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [toast, setToast] = useState('')
   const [namedLeadsModal, setNamedLeadsModal] = useState(null) // {title, names:[]}
   const [leadsModal, setLeadsModal] = useState(null) // {title, leads:[]} — per-source leads + rep note
+  const [objModal, setObjModal] = useState(null) // {title, leads:[]} — לידים מאחורי סוג התנגדות
+  const [noteModal, setNoteModal] = useState(null) // {cid, name, loading, error, notes:[]} — היסטוריית הערות (משיכה חיה)
   const [leadsFilter, setLeadsFilter] = useState('all') // all | relevant | irrelevant — filter for the leads modal
   const [sfNoteModal, setSfNoteModal] = useState(null) // {kind:'lead'|'opp', ...record}
   const [sfObjBranch, setSfObjBranch] = useState('all') // objections branch filter
@@ -1000,6 +1002,8 @@ const selectProject = async (client, project) => {
       if (!isMobile()) { window.__vitasNavArmed = false; return; }
       if (namedLeadsModal) setNamedLeadsModal(null);
       if (leadsModal) setLeadsModal(null);
+      if (objModal) setObjModal(null);
+      if (noteModal) setNoteModal(null);
       if (sfNoteModal) setSfNoteModal(null);
       else if (dashTab === 'crm' && crmSubTab !== 'sources') setCrmSubTab('sources');
       else if (dashTab !== 'all') setDashTab('all');
@@ -1008,7 +1012,7 @@ const selectProject = async (client, project) => {
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [dashTab, crmSubTab, namedLeadsModal, sfNoteModal]);
+  }, [dashTab, crmSubTab, namedLeadsModal, sfNoteModal, objModal, noteModal]);
 
   const destroyCharts = () => {
     // Cancel any pending chart-creation timeouts (prevents stale charts from
@@ -1078,7 +1082,7 @@ const selectProject = async (client, project) => {
     }
   };
 
-  const createChart = (id, type, labels, datasets, scalesConfig) => {
+  const createChart = (id, type, labels, datasets, scalesConfig, onSliceClick) => {
     const canvas = document.getElementById(id);
     if (!canvas) return;
     const isDoughnut = type === 'doughnut' || type === 'pie';
@@ -1118,6 +1122,13 @@ const selectProject = async (client, project) => {
              ticks: { font: { size: 11 }, color: '#6B7280' } },
         x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#6B7280' } }
       };
+    }
+    // אופציונלי: לחיצה על פלח מחזירה את התווית שלו (משמש בגרף ההתנגדויות)
+    if (typeof onSliceClick === 'function') {
+      config.options.onClick = (_evt, els) => {
+        if (els && els.length) { const lbl = labels[els[0].index]; if (lbl != null) onSliceClick(lbl); }
+      };
+      config.options.onHover = (evt, els) => { if (evt?.native?.target) evt.native.target.style.cursor = els && els.length ? 'pointer' : 'default'; };
     }
     const chart = new Chart(canvas, config);
     chartsRef.current.push(chart);
@@ -1634,6 +1645,24 @@ const selectProject = async (client, project) => {
     let allRows = [];
     crmRows.forEach(r => { if (r.summary && Array.isArray(r.summary.crmRepRows)) allRows = allRows.concat(r.summary.crmRepRows); });
 
+    // פירוט הלידים מאחורי כל התנגדות. יושב ב-`data` הכבד (נטען עצלנית לפי תקופה)
+    // ולא באינדקס הקל — אותו מקום שממנו קורא מודל הלידים לפי מקור.
+    const _objLeads = [];
+    crmRows.forEach(r => {
+      (Array.isArray(r.data) ? r.data : []).forEach(sr => {
+        (Array.isArray(sr && sr.leads) ? sr.leads : []).forEach(L => {
+          if (L && L.objection) _objLeads.push({ ...L, source: (sr.source || 'ללא מקור') });
+        });
+      });
+    });
+    // מקבצים עם אותו normalizeObjections שהגרף סופר איתו, אחרת מספר השורות
+    // בפופ-אפ לא יתאים למספר שמוצג ליד סוג ההתנגדות.
+    const _leadsByObj = {};
+    for (const L of _objLeads) {
+      for (const o of normalizeObjections(L.objection)) (_leadsByObj[o] = _leadsByObj[o] || []).push(L);
+    }
+    const _openObj = (name) => { const list = _leadsByObj[name] || []; if (list.length) setObjModal({ title: name, leads: list }); };
+
     const objCounts = {};
     let rowsWithObjection = 0;
     for (const row of allRows) {
@@ -1657,7 +1686,7 @@ const selectProject = async (client, project) => {
       createChart('crmObjChart', 'doughnut', topNames, [{
         data: topCounts,
         backgroundColor: COLORS.slice(0, topNames.length),
-      }]);
+      }], undefined, _openObj);
     }, 200));
 
     return (
@@ -1670,7 +1699,7 @@ const selectProject = async (client, project) => {
               {objEntries.map(([name, count], i) => {
                 const pct = total > 0 ? (count / total * 100) : 0;
                 return (
-                  <li key={name} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',borderBottom: i < objEntries.length-1 ? '1px solid var(--border)' : 'none'}}>
+                  <li key={name} onClick={() => _openObj(name)} title={'לחץ לרשימת הלידים'} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',borderBottom: i < objEntries.length-1 ? '1px solid var(--border)' : 'none',cursor:(_leadsByObj[name]||[]).length?'pointer':'default'}}>
                     <span style={{display:'flex',alignItems:'center',gap:'10px'}}>
                       <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:24,height:24,borderRadius:'50%',background:COLORS[i] || 'var(--accent)',color:'#fff',fontSize:12,fontWeight:700,flexShrink:0}}>{i + 1}</span>
                       <span style={{fontWeight: 600}}>{name}</span>
@@ -1688,7 +1717,7 @@ const selectProject = async (client, project) => {
             const pct = total > 0 ? (count / total * 100) : 0;
             const rankColors = ['rank-rose','rank-violet','rank-indigo','rank-emerald','rank-amber'];
             return (
-              <li key={name}>
+              <li key={name} onClick={() => _openObj(name)} style={{cursor:(_leadsByObj[name]||[]).length?'pointer':'default'}}>
                 <div className={`rank ${rankColors[i] || 'rank-rose'}`}>{i + 1}</div>
                 <div className="lbl">{name}</div>
                 <div className="count"><span className="pct">{pct.toFixed(0)}%</span>{count}</div>
@@ -1699,6 +1728,28 @@ const selectProject = async (client, project) => {
       </div>
     );
   }, [selectedMonth, reports]);
+
+  // היסטוריית ההערות של ליד — נמשכת חי מ-BMBY בלחיצה, לא נשמרת בדוח.
+  // הסיבה: הסנכרון הלילי מושך משימות רק בטווח התקופה שמסונכרנת, אז ליד שנכנס במרץ
+  // ונפגש בספטמבר — ההערות שלו ממרץ פשוט לא קיימות בשום דוח של ספטמבר.
+  const openLeadNotes = useCallback(async (m) => {
+    const cid = m && m.cid ? String(m.cid) : '';
+    if (!cid || !selectedProject) return;
+    setNoteModal({ cid, name: m.name || '', phone: m.phone || '', loading: true, error: '', notes: [] });
+    try {
+      const res = await fetch('/api/bmby/lead-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        body: JSON.stringify({ projectId: selectedProject.id, clientId: cid }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+      // מתעלמים מתשובה שהגיעה אחרי שהמשתמש כבר פתח ליד אחר
+      setNoteModal(prev => (prev && prev.cid === cid) ? { ...prev, loading: false, notes: j.notes || [], filterHonored: j.filterHonored !== false } : prev);
+    } catch (e) {
+      setNoteModal(prev => (prev && prev.cid === cid) ? { ...prev, loading: false, error: e.message || String(e) } : prev);
+    }
+  }, [selectedProject]);
 
   const renderCrmMeetingsDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
@@ -1719,8 +1770,8 @@ const selectProject = async (client, project) => {
             <thead><tr><th>{'שם מלא'}</th><th>{'טלפון'}</th><th>{'מקור הגעה'}</th><th>{'תאריך פגישה'}</th><th>{'תיאור'}</th></tr></thead>
             <tbody>
               {meetings.map((m, i) => (
-                <tr key={i}>
-                  <td style={{fontWeight:600,whiteSpace:'nowrap'}}>{m.name || '—'}</td>
+                <tr key={i} onClick={m.cid ? () => openLeadNotes(m) : undefined} title={m.cid ? 'לחץ לכל היסטוריית ההערות של הליד' : ''} style={m.cid ? {cursor:'pointer'} : undefined}>
+                  <td style={{fontWeight:600,whiteSpace:'nowrap'}}>{m.name || '—'}{m.cid ? <span style={{marginRight:6,fontSize:11,color:'#94a3b8',fontWeight:400}}>{'\u{1F5D2}'}</span> : null}</td>
                   <td style={{whiteSpace:'nowrap',direction:'ltr',textAlign:'right'}}>{m.phone || '—'}</td>
                   <td style={{whiteSpace:'nowrap'}}>{m.source || '—'}</td>
                   <td style={{whiteSpace:'nowrap'}}>{fmtDate(m.date)}</td>
@@ -1732,7 +1783,7 @@ const selectProject = async (client, project) => {
         </div>
       </div>
     );
-  }, [selectedMonth, reports]);
+  }, [selectedMonth, reports, openLeadNotes]);
 
     const renderCrmAdsDashboard = useCallback(() => {
       if (!selectedMonth || reports.length === 0) return null;
@@ -5275,6 +5326,70 @@ const selectProject = async (client, project) => {
         </div>
         )
       })()}
+
+      {objModal && (
+        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setObjModal(null); }} style={{zIndex:9999}}>
+          <div className="modal" style={{maxWidth:560,maxHeight:'78vh',display:'flex',flexDirection:'column',direction:'rtl'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700}}>{'\u{1F6AB} ' + objModal.title}</h3>
+              <button onClick={() => setObjModal(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
+            </div>
+            <div style={{fontSize:12,color:'#94a3b8',marginBottom:12}}>{objModal.leads.length + ' לידים'}</div>
+            <ul style={{margin:0,padding:0,listStyle:'none',overflowY:'auto',flex:1}}>
+              {objModal.leads.map((L, i) => (
+                <li key={i} style={{padding:'10px 2px',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline'}}>
+                    <span style={{fontWeight:600,unicodeBidi:'plaintext'}}>{L.name || '—'}</span>
+                    <span style={{direction:'ltr',color:'#475569',fontSize:13,whiteSpace:'nowrap'}}>{L.phone || '—'}</span>
+                  </div>
+                  <div style={{fontSize:12,color:'#64748b',marginTop:4,display:'flex',flexWrap:'wrap',gap:'4px 12px'}}>
+                    <span style={{unicodeBidi:'plaintext'}}>{'\u{1F4E5} ' + (L.source || 'ללא מקור')}</span>
+                    {L.ad ? <span style={{unicodeBidi:'plaintext'}}>{'\u{1F4E3} ' + L.ad}</span> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {noteModal && (
+        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setNoteModal(null); }} style={{zIndex:9999}}>
+          <div className="modal" style={{maxWidth:620,maxHeight:'80vh',display:'flex',flexDirection:'column',direction:'rtl'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700,unicodeBidi:'plaintext'}}>{noteModal.name || ('ליד #' + noteModal.cid)}</h3>
+              <button onClick={() => setNoteModal(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
+            </div>
+            <div style={{fontSize:12,color:'#94a3b8',marginBottom:12}}>
+              {noteModal.loading ? 'טוען היסטוריה מ-BMBY…' : noteModal.error ? '' : (noteModal.notes.length + ' הערות')}
+              {noteModal.phone ? <span style={{direction:'ltr',marginRight:8}}>{' · ' + noteModal.phone}</span> : null}
+            </div>
+            {noteModal.loading ? (
+              <p style={{color:'#94a3b8',textAlign:'center',margin:'28px 0'}}>{'\u23F3'}</p>
+            ) : noteModal.error ? (
+              <p style={{color:'#dc2626',textAlign:'center',margin:'24px 0',fontSize:13}}>{'לא הצלחתי למשוך את ההערות: ' + noteModal.error}</p>
+            ) : noteModal.notes.length === 0 ? (
+              <p style={{color:'#94a3b8',textAlign:'center',margin:'24px 0'}}>אין הערות רשומות לליד הזה</p>
+            ) : (
+              <ul style={{margin:0,padding:0,listStyle:'none',overflowY:'auto',flex:1}}>
+                {noteModal.notes.map((n, i) => (
+                  <li key={i} style={{padding:'10px 0',borderBottom: i < noteModal.notes.length-1 ? '1px solid var(--border)' : 'none'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline',fontSize:12,color:'#64748b'}}>
+                      <span style={{fontWeight:600,color:'#334155',unicodeBidi:'plaintext'}}>{n.subject || n.type || 'הערה'}</span>
+                      <span style={{whiteSpace:'nowrap'}}>{dmy(String(n.date || '').slice(0,10))}</span>
+                    </div>
+                    <div style={{whiteSpace:'pre-wrap',lineHeight:1.55,fontSize:13,marginTop:4,unicodeBidi:'plaintext'}}>{n.message}</div>
+                    {n.user ? <div style={{fontSize:11,color:'#94a3b8',marginTop:4,unicodeBidi:'plaintext'}}>{n.user}</div> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {noteModal.filterHonored === false ? (
+              <div style={{fontSize:11,color:'#b45309',marginTop:8}}>{'שים לב: BMBY לא סינן לפי הליד, סיננו בצד שלנו. ייתכן שההיסטוריה חלקית.'}</div>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {namedLeadsModal && (
         <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setNamedLeadsModal(null); }} style={{zIndex:9999}}>
