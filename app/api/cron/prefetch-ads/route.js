@@ -119,7 +119,7 @@ export async function GET(request) {
   // === Monthly budget threshold alerts (ש.ברוך projects with a budget set) ===
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY   // בלי נפילה חזרה למפתח הציבורי: חסר = 500 מפורש
     if (supabaseUrl && supabaseKey) {
       const sb = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
       const _n = nowIsrael()
@@ -156,7 +156,7 @@ export async function GET(request) {
   // heartbeat for the health watchdog (explicit timestamp -> updates every run)
   try {
     const _su = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const _sk = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const _sk = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (_su && _sk) {
       const _hb = createClient(_su, _sk, { auth: { persistSession: false } })
       await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-ads', last_run: new Date().toISOString() }, { onConflict: 'job' })

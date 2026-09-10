@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { rateLimit, tooManyRequests } from '../../../lib/rate-limit'
+import { adminClient } from '../../../lib/auth'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+// לקוח service_role עצל. קודם הוא נוצר ברמת המודול עם נפילה חזרה למפתח
+// ה-anon — כלומר אם SUPABASE_SERVICE_ROLE_KEY חסר בסביבה, ה-route המשיך לעבוד
+// בשקט עם הרשאות נמוכות והחזיר תוצאות חלקיות, שנראות כמו באג בנתונים ולא
+// כתקלת קונפיגורציה. עכשיו הוא נוצר בבקשה הראשונה (לא בזמן build) וזורק
+// שגיאה מפורשת אם המפתח חסר. ה-Proxy קיים כדי שמוקדי השימוש יישארו כמו שהם.
+let _sbAdmin = null
+const supabaseAdmin = new Proxy({}, {
+  get(_target, prop) {
+    if (!_sbAdmin) _sbAdmin = adminClient()
+    const value = _sbAdmin[prop]
+    return typeof value === 'function' ? value.bind(_sbAdmin) : value
+  },
+})
 
 async function sendMagicLinkEmail(toEmail, magicLink) {
   const resendKey = process.env.RESEND_API_KEY
@@ -88,6 +99,11 @@ export async function POST(req) {
   if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 })
 
   const cleanEmail = email.toLowerCase().trim()
+
+  // ה-route ציבורי בכוונה (כל אחד רשאי לבקש קישור כניסה), אבל הוא שולח מיילים
+  // ומגלה בעקיפין אילו כתובות קיימות במערכת. חמש בקשות לשעה לכל כתובת.
+  const limited = await rateLimit('client-auth', cleanEmail, 5, 3600)
+  if (!limited.ok) return tooManyRequests(limited.retryAfterSec)
 
   // Verify the email has access before sending anything
   const { data: access } = await supabaseAdmin

@@ -19,7 +19,7 @@
  * ההרצה אידמפוטנטית: אפשר להריץ שוב ושוב, התוצאה זהה.
  * להרצה חודשית אוטומטית ראה scripts/demo/README.md.
  */
-import { requireAdmin } from '../../../lib/auth'
+import { requireAdmin, adminClient } from '../../../lib/auth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { DEMO_DATASET } from '../../../lib/demo-dataset'
@@ -28,10 +28,19 @@ export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 export const maxDuration = 300
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+// לקוח service_role עצל. קודם הוא נוצר ברמת המודול עם נפילה חזרה למפתח
+// ה-anon — כלומר אם SUPABASE_SERVICE_ROLE_KEY חסר בסביבה, ה-route המשיך לעבוד
+// בשקט עם הרשאות נמוכות והחזיר תוצאות חלקיות, שנראות כמו באג בנתונים ולא
+// כתקלת קונפיגורציה. עכשיו הוא נוצר בבקשה הראשונה (לא בזמן build) וזורק
+// שגיאה מפורשת אם המפתח חסר. ה-Proxy קיים כדי שמוקדי השימוש יישארו כמו שהם.
+let _sbAdmin = null
+const supabaseAdmin = new Proxy({}, {
+  get(_target, prop) {
+    if (!_sbAdmin) _sbAdmin = adminClient()
+    const value = _sbAdmin[prop]
+    return typeof value === 'function' ? value.bind(_sbAdmin) : value
+  },
+})
 
 // ═══════════════════════════════════════════════════════════════════════════
 // עזרי תאריך — חייבים לשקף את presetToPayload ב-app/admin/page.js

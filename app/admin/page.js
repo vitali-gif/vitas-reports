@@ -7,6 +7,7 @@ import { apiFetch } from '../../lib/api-fetch'
 import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
+import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
 import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
 import Header from '../components/shell/Header'
@@ -225,6 +226,29 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [expandedFunnelCamp, setExpandedFunnelCamp] = useState(new Set());
   const [expandedFunnelAst, setExpandedFunnelAst] = useState(new Set());
   const [sfInfo, setSfInfo] = useState(null);
+
+  // ── Escape סוגר את החלון הפתוח ────────────────────────────────────────────
+  // כל החלונות נסגרים בלחיצה על הרקע, שזו פעולת עכבר בלבד. מי שמנווט במקלדת
+  // נשאר לכוד בפנים. הסדר כאן הוא מהפנימי לחיצוני, כך ש-Escape סוגר שכבה אחת.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (sfInfo) return setSfInfo(null);
+      if (sfNoteModal) return setSfNoteModal(null);
+      if (noteModal) return setNoteModal(null);
+      if (namedLeadsModal) return setNamedLeadsModal(null);
+      if (leadsModal) return setLeadsModal(null);
+      if (ruleDialog) return setRuleDialog(null);
+      if (showAddProject) return setShowAddProject(false);
+      if (showAddClient) return setShowAddClient(false);
+      if (showSessionLogs) return setShowSessionLogs(false);
+      if (showClientAccess) return setShowClientAccess(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sfInfo, sfNoteModal, noteModal, namedLeadsModal, leadsModal, ruleDialog,
+      showAddProject, showAddClient, showSessionLogs, showClientAccess]);
+
   const [sfTab, setSfTab] = useState('network');
   const [sfBranchLens, setSfBranchLens] = useState('cohort');
   const [expandedAgents, setExpandedAgents] = useState(new Set());
@@ -2104,7 +2128,7 @@ const selectProject = async (client, project) => {
       const v2cls = crmV2Color[color] || 'indigo';
       const _hasNames = namesArr && namesArr.length > 0;
       return (
-        <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined}>
+        <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} — הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
           <div className="kpi-top">
             <div className="kpi-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -2638,7 +2662,7 @@ const selectProject = async (client, project) => {
       const trendPct = ch ? (ch.pct > 0 ? '+' : '') + Math.abs(ch.pct).toFixed(0) + '%' : null;
       const _hasNames = namesArr && namesArr.length > 0;
       return (
-        <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined}>
+        <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} — הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
           <div className="kpi-top">
             <div className="kpi-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -3926,7 +3950,7 @@ const selectProject = async (client, project) => {
                       {notes.length === 0 ? <div className="sub">—</div> : (
                         <div style={{maxHeight:320,overflowY:'auto'}}>
                           {notes.map((n, i2) => (
-                            <div key={i2} onClick={() => setSfNoteModal({ ...n, kind })} style={{padding:'8px 10px',borderBottom:'1px solid var(--border)',cursor:'pointer',borderRadius:6}} onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                            <div key={i2} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSfNoteModal({ ...n, kind }); } }} onClick={() => setSfNoteModal({ ...n, kind })} style={{padding:'8px 10px',borderBottom:'1px solid var(--border)',cursor:'pointer',borderRadius:6}} onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                               <div style={{fontSize:13,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{n.text}</div>
                               <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>{[n.branch, n.date].filter(Boolean).join(' · ')}</div>
                             </div>
@@ -4963,6 +4987,14 @@ const selectProject = async (client, project) => {
   };
 
   // ── visibleClients: filter by allowedProjectIds in client view ──────────
+  // ── "אין נתונים" מול "עוד לא נטען" ────────────────────────────────────────
+  // עד עכשיו השלד הוצג רק כשלפרויקט לא היו דוחות בכלל. כשלקוח בחר תקופה
+  // שהקרון לא חימם (טווח תאריכים מותאם), reports לא היה ריק — היו בו חודשים
+  // אחרים — ולכן הדשבורד צויר עם אפסים בכל המדדים בזמן שמשיכה חיה של ~30
+  // שניות רצה ברקע. מבחינת הלקוח הדוח פשוט שבור.
+  const isFetching = refreshing || refreshingCrm || periodLoading;
+  const hasDataForPeriod = !!selectedMonth && reports.some(r => r.month === selectedMonth);
+
   const visibleClients = (isClientView && allowedProjectIds)
     ? clients
         .map(c => ({ ...c, projects: (c.projects || []).filter(p => allowedProjectIds.includes(p.id)) }))
@@ -5050,6 +5082,7 @@ const selectProject = async (client, project) => {
               showQuarters={!(/bcurelaser|ismooth/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
               allowedPresets={isDemoProject ? DEMO_PRESETS : undefined}
             />
+            <LastUpdated reports={reports} selectedMonth={selectedMonth} />
             {(() => {
               // Budget bar shown for all projects (ש.ברוך + BCureLaser). Inert until a budget is set.
               const _d = new Date();
@@ -5081,8 +5114,16 @@ const selectProject = async (client, project) => {
                 </div>
               );
             })()}
-            {(refreshing || refreshingCrm || periodLoading) && reports.length > 0 ? (<div className="period-loading-overlay"><div className="period-loading-spinner" /></div>) : null}
-            {reports.length === 0 ? ((refreshing || refreshingCrm || periodLoading) ? <SkeletonDashboard /> : <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d3\u05d9\u05d9\u05df'}</h3><p style={{marginTop:10,color:'var(--text-secondary)'}}>{'\u05dc\u05d7\u05e5 \u05e2\u05dc \u05db\u05e4\u05ea\u05d5\u05e8 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05dc\u05de\u05e9\u05d9\u05db\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</p></div>) : renderDashboard()}
+            {isFetching && hasDataForPeriod ? (<div className="period-loading-overlay"><div className="period-loading-spinner" /></div>) : null}
+            {reports.length === 0
+              ? (isFetching
+                  ? <SkeletonDashboard />
+                  : <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05e2\u05d3\u05d9\u05d9\u05df'}</h3><p style={{marginTop:10,color:'var(--text-secondary)'}}>{'\u05dc\u05d7\u05e5 \u05e2\u05dc \u05db\u05e4\u05ea\u05d5\u05e8 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05dc\u05de\u05e9\u05d9\u05db\u05ea \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd'}</p></div>)
+              : !hasDataForPeriod
+                ? (isFetching
+                    ? <PeriodFetching />
+                    : <PeriodEmpty onRefresh={isClientView ? null : () => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth })} />)
+                : renderDashboard()}
           </>)}
 
           
@@ -5582,42 +5623,4 @@ const selectProject = async (client, project) => {
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
     </div>
   );
-}
-
-function HistoryView({ clients }) {
-  const [reports, setReports] = useState([]);
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase.from('reports').select('*, projects!inner(name, client_id, clients!inner(name))').order('created_at', { ascending: false });
-      if (data) setReports(data);
-    }
-    load();
-  }, []);
-
-  const deleteReport = async (id) => {
-    if (!confirm('\u05dc\u05de\u05d7\u05d5\u05e7 \u05d0\u05ea \u05d4\u05d4\u05e2\u05dc\u05d0\u05d4?')) return;
-    await supabase.from('reports').delete().eq('id', id);
-    setReports(prev => prev.filter(r => r.id !== id));
-  };
-
-  const getSourceLabel = (source) => {
-    if (source === 'facebook') return 'Facebook';
-    if (source === 'google_pmax') return 'Google PMax';
-    if (source === 'google_search') return 'Google Search';
-    if (source === 'google') return 'Google';
-    if (source === 'crm') return 'CRM \u05de\u05e7\u05d5\u05e8\u05d5\u05ea \u05d4\u05d2\u05e2\u05d4';
-    if (source === 'crm_reports') return 'CRM \u05de\u05d7\u05d5\u05dc\u05dc \u05d3\u05d5\u05d7\u05d5\u05ea';
-    return source;
-  };
-
-  if (reports.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udced'}</div><h3>{'\u05d0\u05d9\u05df \u05d4\u05e2\u05dc\u05d0\u05d5\u05ea \u05e2\u05d3\u05d9\u05d9\u05df'}</h3></div>;
-  return reports.map(r => (
-    <div className="card" key={r.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-      <div>
-        <h4 style={{fontWeight: 700}}>{r.projects?.clients?.name} / {r.projects?.name} â {formatMonth(r.month)}</h4>
-        <p style={{color: 'var(--text-secondary)', fontSize: '0.9em'}}>{getSourceLabel(r.source)} | {r.file_name} | {r.row_count} rows</p>
-      </div>
-      <button className="btn btn-danger" style={{fontSize: '0.8em', padding: '6px 12px'}} onClick={() => deleteReport(r.id)}>{'\ud83d\uddd1'}</button>
-    </div>
-  ));
 }

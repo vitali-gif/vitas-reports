@@ -28,6 +28,7 @@ export default function ClientPage() {
   const [passwordInput, setPasswordInput] = useState('')
   const [loading, setLoading]       = useState(true)
   const [toast, setToast]           = useState('')
+  const [loginError, setLoginError] = useState('')   // נשאר על המסך עד שמתקנים, בניגוד ל-toast שנעלם אחרי 3 שניות
   const [accessList, setAccessList] = useState([])
   const [accessInfo, setAccessInfo] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -135,10 +136,13 @@ export default function ClientPage() {
         })
       }).then(r => r.json()).then(d => { if (d.sessionId) { setSessionId(d.sessionId); if (typeof window !== 'undefined') window.__vitasSessionId = d.sessionId } }).catch(() => {})
 
-      // Show onboarding — up to 10 times
+      // האונבורדינג מוצג פעם אחת בלבד. קודם הוא חזר עשר פעמים והציג ספירה
+      // לאחור ("ההודעה תופיע עוד N פעמים") — מודאל חוסם שחוזר מתפרש כתקלה,
+      // לא כעזרה. מי שרוצה לראות אותו שוב לוחץ על כפתור העזרה הקבוע.
       if (typeof window !== 'undefined') {
-        const remaining = parseInt(localStorage.getItem('vitas_onboarding_remaining') ?? '10', 10)
-        if (remaining > 0) setShowOnboarding(true)
+        try {
+          if (!localStorage.getItem('vitas_onboarding_seen')) setShowOnboarding(true)
+        } catch { /* דפדפן שחוסם אחסון — פשוט לא מציגים */ }
       }
     } catch {
       setStep('error')
@@ -150,20 +154,21 @@ export default function ClientPage() {
   const handlePasswordLogin = async () => {
     if (!emailInput.trim() || !passwordInput.trim()) return
     setLoading(true)
+    setLoginError('')
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: emailInput.trim().toLowerCase(),
         password: passwordInput.trim(),
       })
       if (error) {
-        showToast('מייל או סיסמה שגויים')
+        setLoginError('מייל או סיסמה שגויים. בדוק את הפרטים ונסה שוב.')
         return
       }
       if (data?.user?.email) {
         await handleSessionReady(data.user.email)
       }
     } catch {
-      showToast('שגיאת רשת — נסה שוב')
+      setLoginError('שגיאת רשת. בדוק את החיבור לאינטרנט ונסה שוב.')
     } finally {
       setLoading(false)
     }
@@ -193,7 +198,14 @@ export default function ClientPage() {
       <div style={{textAlign:'center',maxWidth:320,padding:'0 24px'}}>
         <div style={{fontSize:48,marginBottom:16}}>🔒</div>
         <h2 style={{margin:'0 0 8px',fontSize:20,fontWeight:800,color:'var(--text)'}}>אין גישה</h2>
-        <p style={{margin:'0 0 24px',fontSize:14,color:'var(--text-3)'}}>לכתובת המייל הזו אין גישה לאף פרויקט. צור קשר עם VITAS.</p>
+        <p style={{margin:'0 0 20px',fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>לכתובת המייל הזו אין גישה לאף פרויקט.</p>
+        {/* קודם היה כתוב "צור קשר עם VITAS" בלי שום דרך ליצור קשר — מסך ללא מוצא. */}
+        <a
+          href="mailto:vitali@vitas.co.il?subject=בקשת%20גישה%20לדוח%20VITAS"
+          style={{display:'block',marginBottom:12,padding:'10px 24px',background:'var(--indigo,#5B5EF4)',color:'#fff',borderRadius:8,fontSize:14,fontWeight:700,textDecoration:'none',fontFamily:'var(--font)'}}
+        >
+          בקש גישה במייל
+        </a>
         <button onClick={() => setStep('login')} style={{padding:'10px 24px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)'}}>חזרה</button>
       </div>
     </div>
@@ -208,12 +220,12 @@ export default function ClientPage() {
           <p style={{margin:0,fontSize:14,color:'var(--text-3)'}}>הכנס את פרטי הגישה שלך</p>
         </div>
         <input
-          type="email" value={emailInput} onChange={e => setEmailInput(e.target.value)}
+          type="email" value={emailInput} onChange={e => { setEmailInput(e.target.value); if (loginError) setLoginError('') }}
           placeholder="your@email.com" dir="ltr"
           style={{display:'block',width:'100%',padding:'12px 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15,fontFamily:'var(--font)',outline:'none',marginBottom:12,boxSizing:'border-box',background:'var(--card)',color:'var(--text)'}}
         />
         <input
-          type="password" value={passwordInput} onChange={e => setPasswordInput(e.target.value)}
+          type="password" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); if (loginError) setLoginError('') }}
           onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
           placeholder="סיסמה" dir="ltr"
           style={{display:'block',width:'100%',padding:'12px 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15,fontFamily:'var(--font)',outline:'none',marginBottom:12,boxSizing:'border-box',background:'var(--card)',color:'var(--text)'}}
@@ -222,6 +234,11 @@ export default function ClientPage() {
           style={{display:'block',width:'100%',padding:'13px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:10,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)',opacity:loading||!emailInput.trim()||!passwordInput.trim()?0.6:1}}>
           {loading ? 'נכנס...' : 'כניסה'}
         </button>
+        {loginError && (
+          <p role="alert" style={{marginTop:12,fontSize:13,color:'var(--danger,#B92A46)',textAlign:'center',lineHeight:1.5}}>
+            {loginError}
+          </p>
+        )}
         {toast && <p style={{marginTop:12,fontSize:13,color:'var(--danger)',textAlign:'center'}}>{toast}</p>}
       </div>
     </div>
@@ -229,13 +246,9 @@ export default function ClientPage() {
 
   // ── Dashboard — render AdminPage with client-view props ───────────────────
   const allowedProjectIds = accessList.map(a => a.project_id)
-  const onboardingRemaining = typeof window !== 'undefined'
-    ? parseInt(localStorage.getItem('vitas_onboarding_remaining') ?? '10', 10)
-    : 10
-
   const dismissOnboarding = () => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('vitas_onboarding_remaining', String(Math.max(0, onboardingRemaining - 1)))
+      try { localStorage.setItem('vitas_onboarding_seen', '1') } catch {}
     }
     setShowOnboarding(false)
   }
@@ -266,6 +279,27 @@ export default function ClientPage() {
   return (
     <>
       <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} />
+
+      {/* כפתור עזרה קבוע — מחליף את המודאל שחזר עשר פעמים. */}
+      {!showOnboarding && (
+        <button
+          type="button"
+          onClick={() => setShowOnboarding(true)}
+          aria-label="פתח מדריך שימוש"
+          title="מדריך שימוש"
+          style={{
+            position: 'fixed', bottom: 20, insetInlineStart: 20, zIndex: 9997,
+            width: 42, height: 42, borderRadius: '50%',
+            background: 'var(--card, #fff)', color: 'var(--indigo, #5B5EF4)',
+            border: '1px solid var(--border, #DDE2EC)', cursor: 'pointer',
+            fontSize: 18, fontWeight: 700, lineHeight: 1,
+            fontFamily: 'var(--font, Heebo, sans-serif)',
+            boxShadow: '0 4px 14px rgba(11,15,30,0.12)',
+          }}
+        >
+          ?
+        </button>
+      )}
 
       {installPrompt && (
         <div style={{
@@ -349,12 +383,9 @@ export default function ClientPage() {
               💡 <strong>טיפ:</strong> הנתונים מתעדכנים אוטומטית. אין צורך ללחוץ על "רענן".
             </div>
 
-            {/* Countdown */}
-            {onboardingRemaining > 1 && (
-              <p style={{ margin: '0 0 12px', textAlign: 'center', fontSize: 13, color: '#059669', fontWeight: 600 }}>
-                ההודעה הזאת תופיע עוד {onboardingRemaining - 1} פעמים
-              </p>
-            )}
+            <p style={{ margin: '0 0 12px', textAlign: 'center', fontSize: 12.5, color: '#98A0B2' }}>
+              אפשר לפתוח את המדריך שוב בכל רגע מכפתור העזרה בפינה.
+            </p>
 
             {/* CTA */}
             <button

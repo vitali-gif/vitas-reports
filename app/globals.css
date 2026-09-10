@@ -3933,3 +3933,51 @@ body.drp-no-scroll { overflow: hidden; }
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+/* ============================================================
+   נגישות
+   שני הבלוקים האלה לא היו קיימים: לא היה שום סימון מיקוד גלוי,
+   ולא היה כיבוד ל-prefers-reduced-motion למרות שיש בדשבורד
+   ספינרים מסתובבים ופסי טעינה נעים.
+   ============================================================ */
+
+/* ── מיקוד גלוי ─────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--indigo, #5B5EF4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* עכבר לא אמור לצייר מסגרת — רק מקלדת */
+:focus:not(:focus-visible) { outline: none; }
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--indigo, #5B5EF4);
+  outline-offset: 2px;
+}
+
+/* אלמנטים שהוסבו לאינטראקטיביים במקלדת */
+[role="button"] { cursor: pointer; }
+
+/* ── תנועה מופחתת ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* ספינרים הם חיווי שהמערכת עובדת — משאירים אותם, רק מאטים מאוד */
+  .period-loading-spinner,
+  .skel {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
+  }
+}

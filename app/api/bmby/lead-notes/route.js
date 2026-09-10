@@ -142,7 +142,7 @@ export async function POST(request) {
   catch (e) { return Response.json({ error: 'BMBY_PROJECT_IDS is not valid JSON' }, { status: 500 }) }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY   // בלי נפילה חזרה למפתח הציבורי: חסר = 500 מפורש
   if (!supabaseUrl || !supabaseKey) return Response.json({ error: 'Missing Supabase credentials' }, { status: 500 })
   const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 

@@ -23,11 +23,12 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-title" content="VITAS Reports" />
         <link rel="apple-touch-icon" href="/brand/icon-192.png" />
 
-        {/* Microsoft Clarity */}
-        <script
-          type="text/javascript"
-          dangerouslySetInnerHTML={{ __html: `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","x0evra1juu");` }}
-        />
+        {/*
+          Microsoft Clarity הועבר מכאן אל app/page.js (עמוד הנחיתה השיווקי).
+          כאן הוא רץ על כל עמוד — כולל דשבורד הלקוח — כלומר הקליט מסכים שמוצגים
+          בהם שמות וטלפונים של לידים, ושלח אותם לצד שלישי בלי הסכמה ובלי מדיניות
+          פרטיות מקושרת. באנליטיקס של עמוד שיווקי אין בעיה כזו.
+        */}
       </head>
       <body>{children}</body>
     </html>

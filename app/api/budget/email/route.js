@@ -17,7 +17,7 @@ export async function POST(request) {
 
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } }
   )
   const { data: pr } = await sb.from('projects').select('id, name, monthly_budgets').eq('id', projectId).single()
