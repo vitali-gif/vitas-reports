@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
+import { apiFetch } from '../../lib/api-fetch'
 import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
@@ -129,7 +130,6 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
   const [clients, setClients] = useState([])
   const [selectedClient, setSelectedClient] = useState(null)
   const [selectedProject, setSelectedProject] = useState(null)
@@ -230,9 +230,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const handleAuth = async (e) => {
     e.preventDefault(); setAuthError('');
     try {
-      let result;
-      if (isSignUp) result = await supabase.auth.signUp({ email, password });
-      else result = await supabase.auth.signInWithPassword({ email, password });
+      // הרשמה עצמית הוסרה. קודם כל אחד יכול היה להירשם כאן ולקבל סשן, והשער
+      // היחיד לפאנל היה עצם קיומו של סשן. חשבונות אדמין נוצרים ידנית ב-Supabase,
+      // והמייל חייב להופיע ב-ADMIN_EMAILS כדי שה-API יכיר בו כאדמין.
+      const result = await supabase.auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
     } catch (err) { setAuthError(err.message); }
   };
@@ -242,7 +243,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const handleSessionLogs = async () => {
     setShowSessionLogs(true)
     setLogsLoading(true)
-    const res = await fetch('/api/client-log', { headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
+    const res = await apiFetch('/api/client-log', { headers: {} })
     const data = await res.json()
     setSessionLogs(Array.isArray(data) ? data : [])
     setLogsLoading(false)
@@ -250,7 +251,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const handleExport = () => { alert('ייצוא לאקסל יהיה זמין בקרוב'); };
 
   const loadClientAccess = async () => {
-    const res = await fetch('/api/client-access', { headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
+    const res = await apiFetch('/api/client-access', { headers: {} })
     const data = await res.json()
     setClientAccessList(Array.isArray(data) ? data : [])
   }
@@ -272,9 +273,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const deleteAccessRow = async (row) => {
     const pName = row.projects?.name || 'הפרויקט'
     if (!confirm(`להסיר את הגישה של ${row.email} ל-${pName}?`)) return
-    const res = await fetch('/api/client-access?id=' + row.id, {
+    const res = await apiFetch('/api/client-access?id=' + row.id, {
       method: 'DELETE',
-      headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+      headers: {},
     })
     if (!res.ok) { showToast('שגיאה במחיקה'); return }
     setClientAccessList(prev => prev.filter(x => x.id !== row.id))
@@ -288,9 +289,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
    */
   const grantAccessProject = async (email, clientId, currentRows, projectId) => {
     const ids = [...currentRows.map(r => r.project_id), projectId]
-    const res = await fetch('/api/client-access', {
+    const res = await apiFetch('/api/client-access', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, client_id: clientId, project_ids: ids, notify: false }),
     })
     if (!res.ok) { showToast('שגיאה בהוספת הפרויקט'); return }
@@ -301,9 +302,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const addClientAccess = async () => {
     if (!caEmail.trim() || !caClientId || caProjectIds.length === 0) return
     setCaSaving(true)
-    const res = await fetch('/api/client-access', {
+    const res = await apiFetch('/api/client-access', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: caEmail.trim(), client_id: caClientId, project_ids: caProjectIds })
     })
     setCaSaving(false)
@@ -333,7 +334,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       ca.email === email && ca.projects?.client_id === clientId
     )
     await Promise.all(toDelete.map(ca =>
-      fetch('/api/client-access?id=' + ca.id, { method: 'DELETE', headers: { 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' } })
+      apiFetch('/api/client-access?id=' + ca.id, { method: 'DELETE', headers: {} })
     ))
     setClientAccessList(prev => prev.filter(x => !toDelete.some(d => d.id === x.id)))
     showToast(`✓ גישה נמחקה (${toDelete.length} פרויקטים)`)
@@ -378,7 +379,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       setRefreshElapsed(0);
     }
     if (selectedProject && !payload.projectId) payload = { ...payload, projectId: selectedProject.id };
-    const headers = { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' };
+    const headers = { 'Content-Type': 'application/json' };
     const callList = [];
     if (fb)  callList.push({ key: 'fb',  url: '/api/meta/fetch' });
     if (gg)  callList.push({ key: 'gg',  url: '/api/google/fetch' });
@@ -527,9 +528,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
           ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
           : {};
       if (selectedProject) payload = { ...payload, projectId: selectedProject.id };
-      const res = await fetch('/api/bmby/fetch', {
+      const res = await apiFetch('/api/bmby/fetch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -560,9 +561,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
           ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
           : {};
       if (selectedProject) payload = { ...payload, projectId: selectedProject.id };
-      const res = await fetch('/api/salesforce/fetch', {
+      const res = await apiFetch('/api/salesforce/fetch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -624,8 +625,8 @@ const loadClients = async () => {
     }
     // by-project (service_role) returns a LIGHT index; never times out. Revalidate in background.
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    const res = await fetch(`/api/reports/by-project?projectId=${projectId}`, {
-      headers: { 'x-client-key': anonKey },
+    const res = await apiFetch(`/api/reports/by-project?projectId=${projectId}`, {
+      headers: {},
     }).catch(() => null);
     let data = null;
     if (res && res.ok) data = await res.json().catch(() => null);
@@ -654,7 +655,7 @@ const loadClients = async () => {
     monthKeys.forEach(m => monthDataInFlight.current.add(m));
     try {
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-      const res = await fetch(`/api/reports/by-project?projectId=${projectId}&dataForMonths=${encodeURIComponent(monthKeys.join(','))}`, { headers: { 'x-client-key': anonKey } }).catch(() => null);
+      const res = await apiFetch(`/api/reports/by-project?projectId=${projectId}&dataForMonths=${encodeURIComponent(monthKeys.join(','))}`, { headers: {} }).catch(() => null);
       if (!res || !res.ok) return;                 // transient — leave keys UN-marked so a later render retries
       const rows = await res.json().catch(() => null);
       if (!Array.isArray(rows)) return;
@@ -696,9 +697,9 @@ const loadClients = async () => {
       const b = rec.baseline || {};
       const baselineValue = Number(b.conv || b.rate || b.share || b.slowestMin || b.fastestMin || b.count || b.leads || b.avgCpl || 0);
       const description = (rec.body || []).join('\n\n') + (rec.suggestion ? '\n\nהמלצה: ' + rec.suggestion : '');
-      const res = await fetch('/api/tasks/create', {
+      const res = await apiFetch('/api/tasks/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId: selectedProject.id,
           role: rec.role,
@@ -737,9 +738,9 @@ const loadClients = async () => {
   const updateTaskStatus = async (taskId, status) => {
     if (!selectedProject || !taskId) return;
     try {
-      const res = await fetch('/api/tasks/update', {
+      const res = await apiFetch('/api/tasks/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId, status }),
       });
       const json = await res.json();
@@ -756,9 +757,9 @@ const loadClients = async () => {
     if (!selectedProject) return;
     setCreatingRule(true);
     try {
-      const res = await fetch('/api/meta/rules', {
+      const res = await apiFetch('/api/meta/rules', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectName: selectedProject.name,
           ruleType,
@@ -792,9 +793,9 @@ const loadClients = async () => {
     setCreatingRule(true);
     setRuleError(null);
     const post = async (ruleType, p) => {
-      const res = await fetch('/api/meta/rules', {
+      const res = await apiFetch('/api/meta/rules', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectName: selectedProject.name, ruleType, params: p, recommendationKey }),
       });
       const json = await res.json().catch(() => ({}));
@@ -827,9 +828,9 @@ const loadClients = async () => {
     setCreatingRule(true);
     setRuleError(null);
     const post = async (ruleType) => {
-      const res = await fetch('/api/meta/rules', {
+      const res = await apiFetch('/api/meta/rules', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectName: selectedProject.name, ruleType, params, recommendationKey }),
       });
       const json = await res.json().catch(() => ({}));
@@ -903,7 +904,7 @@ const selectProject = async (client, project) => {
         window.__vitasNoDataAlerted = window.__vitasNoDataAlerted || new Set();
         if (!window.__vitasNoDataAlerted.has(project.id)) {
           window.__vitasNoDataAlerted.add(project.id);
-          fetch('/api/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          apiFetch('/api/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ event: 'no_data', email: (session && session.user && session.user.email) || null, clientName: (client && client.name) || null, projectName: (project && project.name) || null, projectId: project.id, reason: _loadRes.failed ? 'by-project read failed' : 'no reports for project' }) }).catch(() => {});
         }
       } catch {}
@@ -912,7 +913,7 @@ const selectProject = async (client, project) => {
     if (isClientView) {
       const sid = typeof window !== 'undefined' ? window.__vitasSessionId : null
       if (sid) {
-        fetch('/api/client-log', {
+        apiFetch('/api/client-log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ event: 'project_select', sessionId: sid, projectName: project.name })
@@ -1737,9 +1738,9 @@ const selectProject = async (client, project) => {
     if (!cid || !selectedProject) return;
     setNoteModal({ cid, name: m.name || '', phone: m.phone || '', loading: true, error: '', notes: [] });
     try {
-      const res = await fetch('/api/bmby/lead-notes', {
+      const res = await apiFetch('/api/bmby/lead-notes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId: selectedProject.id, clientId: cid }),
       });
       const j = await res.json().catch(() => ({}));
@@ -4897,11 +4898,10 @@ const selectProject = async (client, project) => {
         <div className="card">
           <form onSubmit={handleAuth} method="post" action="#">
             <div className="form-group"><label>{'\u05d0\u05d9\u05de\u05d9\u05d9\u05dc'}</label><input id="admin-email" name="email" className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} dir="ltr" autoComplete="username" required /></div>
-            <div className="form-group"><label>{'\u05e1\u05d9\u05e1\u05dd\u05d4'}</label><input id="admin-password" name="password" className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} dir="ltr" autoComplete="current-password" required /></div>
+            <div className="form-group"><label>{'\u05e1\u05d9\u05e1\u05de\u05d4'}</label><input id="admin-password" name="password" className="form-input" type="password" value={password} onChange={e => setPassword(e.target.value)} dir="ltr" autoComplete="current-password" required /></div>
             {authError && <p style={{color: 'var(--danger)', fontSize: '0.85em', marginBottom: 10}}>{authError}</p>}
-            <button className="btn btn-primary btn-lg" style={{width: '100%'}} type="submit">{isSignUp ? '\u05d4\u05e8\u05e9\u05de\u05d4' : '\u05db\u05e0\u05d9\u05e1\u05d4'}</button>
+            <button className="btn btn-primary btn-lg" style={{width: '100%'}} type="submit">{'\u05db\u05e0\u05d9\u05e1\u05d4'}</button>
           </form>
-          <p style={{textAlign: 'center', marginTop: 15, fontSize: '0.85em', color: 'var(--text-secondary)'}}><span style={{cursor: 'pointer', color: 'var(--accent)'}} onClick={() => setIsSignUp(!isSignUp)}>{isSignUp ? '\u05d9\u05e9 \u05dc\u05d9 \u05d7\u05e9\u05d1\u05d5\u05df - \u05db\u05e0\u05d9\u05e1\u05d4' : '\u05de\u05e9\u05ea\u05de\u05e9 \u05d7\u05d3\u05e9 - \u05d4\u05e8\u05e9\u05de\u05d4'}</span></p>
         </div>
       </div>
     );
@@ -5240,7 +5240,7 @@ const selectProject = async (client, project) => {
                 <button
                   onClick={async () => {
                     if (!confirm('למחוק את כל הלוגים?')) return
-                    await fetch('/api/client-log', { method:'DELETE', headers:{'x-client-key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||''} })
+                    await apiFetch('/api/client-log', { method:'DELETE', headers:{} })
                     setSessionLogs([])
                   }}
                   title="מחק את כל הלוגים"

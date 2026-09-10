@@ -1,17 +1,16 @@
 // POST /api/budget/email  { projectId, budget? }
 // Computes a project's current-month budget status (FB+Google spend) and emails it
 // via Resend (sendAlert). If `budget` is supplied it is used for the email only
-// (demo) without touching the stored monthly_budgets. Auth: x-client-key = anon.
+// (demo) without touching the stored monthly_budgets. Auth: אדמין מאומת (JWT) או CRON_SECRET.
+import { requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { sendAlert } from '../../../../lib/alert'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const gate = await requireAdmin(request)
+  if (!gate.ok) return gate.res
   const body = await request.json().catch(() => ({}))
   const projectId = body.projectId
   if (!projectId) return Response.json({ error: 'projectId required' }, { status: 400 })

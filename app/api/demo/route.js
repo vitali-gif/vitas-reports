@@ -19,6 +19,7 @@
  * ההרצה אידמפוטנטית: אפשר להריץ שוב ושוב, התוצאה זהה.
  * להרצה חודשית אוטומטית ראה scripts/demo/README.md.
  */
+import { requireAdmin } from '../../../lib/auth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { DEMO_DATASET } from '../../../lib/demo-dataset'
@@ -149,16 +150,15 @@ function checkWriteAuth(req) {
   return !!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET
 }
 
-function checkReadAuth(req) {
-  return req.headers.get('x-client-key') === process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GET — מצב
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function GET(req) {
-  if (!checkReadAuth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const gate = await requireAdmin(req)
+  if (!gate.ok) return gate.res
 
   const { data: project } = await supabaseAdmin
     .from('projects')
