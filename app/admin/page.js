@@ -4052,7 +4052,6 @@ const selectProject = async (client, project) => {
             return (<>
 
 
-              {crmSubTab !== 'ga4' && (<>
                 <div className="kpi-grid">
                   {zohoKpiCards({ leads:_fn.leads, opportunities:_fn.opportunities, purchased:_fn.purchased, cancellations:_fn.cancellations, netRevenue:_fn.netRevenue, conversionRate:_fn.conversionRate }, ((fbTotals && fbTotals.spend) || 0) + ((gTotals && gTotals.spend) || 0), null)}
                 </div>
@@ -4164,7 +4163,6 @@ const selectProject = async (client, project) => {
                     </table>
                   </div>
                 </div>
-              </>)}
             </>)
           }
 
