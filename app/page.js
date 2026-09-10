@@ -41,15 +41,6 @@ export default function Home() {
         rel="stylesheet"
       />
 
-      {/*
-        Microsoft Clarity — רק על עמוד הנחיתה הזה. קודם הוא ישב ב-layout.js ורץ
-        על כל עמוד, כולל דשבורד הלקוח, כלומר הקליט מסכים עם PII של לידים.
-      */}
-      <script
-        type="text/javascript"
-        dangerouslySetInnerHTML={{ __html: `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","x0evra1juu");` }}
-      />
-
       {/* Header */}
       <header style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
         <div style={{ color: '#e8e8e8' }}>
