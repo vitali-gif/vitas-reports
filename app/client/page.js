@@ -1,12 +1,10 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import { apiFetch, accessToken } from '../../lib/api-fetch'
 import dynamic from 'next/dynamic'
 
 const AdminPage = dynamic(() => import('../admin/page'), { ssr: false })
-
-// ─── Anon key (for client-access API auth) ────────────────────────────────
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ClientPage — handles magic-link auth, then renders AdminPage (client view)
@@ -58,8 +56,13 @@ export default function ClientPage() {
   useEffect(() => {
     if (!sessionId) return
     const start = sessionStart
+    // הטוקן נשמר כאן כי sendBeacon (למטה) חייב לרוץ סינכרונית ולא יכול להמתין
+    // ל-getSession. מתרענן בכל פעימה כדי שלא יפוג במהלך סשן ארוך.
+    let token = null
+    accessToken().then(t => { token = t })
     const hb = setInterval(() => {
-      fetch('/api/client-log', {
+      accessToken().then(t => { token = t })
+      apiFetch('/api/client-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event: 'heartbeat', sessionId })
@@ -67,8 +70,9 @@ export default function ClientPage() {
     }, 60000)
     const handleUnload = () => {
       const dur = Math.round((Date.now() - start) / 1000)
+      // sendBeacon לא יכול לשאת כותרות — השרת מקבל את הטוקן מגוף הבקשה.
       navigator.sendBeacon('/api/client-log',
-        JSON.stringify({ event: 'logout', sessionId, durationSec: dur }))
+        JSON.stringify({ event: 'logout', sessionId, durationSec: dur, accessToken: token }))
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => { clearInterval(hb); window.removeEventListener('beforeunload', handleUnload) }
@@ -106,8 +110,8 @@ export default function ClientPage() {
   const handleSessionReady = async (userEmail) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`, {
-        headers: { 'x-client-key': ANON_KEY }
+      const res = await apiFetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`, {
+        headers: {}
       })
       if (!res.ok) { setStep('error'); return }
       const list = await res.json()
@@ -120,7 +124,7 @@ export default function ClientPage() {
         setStep('picker')
       }
       // Log session start
-      fetch('/api/client-log', {
+      apiFetch('/api/client-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

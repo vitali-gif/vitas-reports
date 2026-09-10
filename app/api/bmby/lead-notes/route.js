@@ -12,6 +12,7 @@
 //
 // NOTE: this file keeps its own small copy of the SOAP envelope/parser rather than importing
 // from ../fetch/route.js — deliberately, so a change here can never destabilise the nightly sync.
+import { requireProjectAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -116,15 +117,16 @@ async function callTasksGetAll(params) {
 }
 
 export async function POST(request) {
-  const anon = request.headers.get('x-client-key')
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   let body = {}
   try { body = await request.json() } catch {}
   const projectId = String(body.projectId || '')
   const clientId = String(body.clientId || '').trim()
+
+  // גישה לפרויקט ולא אדמין: גם לקוחות פותחים את היסטוריית ההערות של הלידים
+  // שלהם. הבדיקה מונעת שליפת הערות של לידים מפרויקט של לקוח אחר לפי ניחוש id.
+  const gate = await requireProjectAccess(request, projectId)
+  if (!gate.ok) return gate.res
+
   if (!projectId || !/^\d+$/.test(clientId)) {
     return Response.json({ error: 'projectId and a numeric clientId are required' }, { status: 400 })
   }

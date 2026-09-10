@@ -12,12 +12,7 @@
  * Response shape unchanged: an array of report rows; rows outside dataForMonths have data:null.
  */
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+import { adminClient, requireProjectAccess } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // heavy per-month `data` (facebook age×gender rows) can be ~25MB → needs >60s
@@ -28,13 +23,17 @@ export const fetchCache = 'force-no-store'
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0, must-revalidate' }
 
 export async function GET(request) {
-  const key = request.headers.get('x-client-key')
-  if (!key || key !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
   const { searchParams } = new URL(request.url)
   const projectId = searchParams.get('projectId')
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 })
+
+  // הקריאה רצה עם service_role ועוקפת RLS, ולכן היא חייבת לאמת בעצמה שהקורא
+  // רשאי לגשת לפרויקט הזה. בלי זה כל projectId מחזיר את הנתונים הגולמיים של
+  // הלקוח שאליו הוא שייך — כולל PII של לידים.
+  const gate = await requireProjectAccess(request, projectId)
+  if (!gate.ok) return gate.res
+
+  const supabaseAdmin = adminClient()
 
   const dataForMonths = (searchParams.get('dataForMonths') || '')
     .split(',').map(s => s.trim()).filter(Boolean)
