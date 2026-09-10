@@ -9,7 +9,6 @@ import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
-import * as XLSX from 'xlsx'
 import Header from '../components/shell/Header'
 
 // BMBY note/remark fields arrive with HTML numeric entities (e.g. &#1493; = ו). Decode for display.
@@ -181,6 +180,25 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was SUCCESSFULLY lazy-loaded
   const monthDataInFlight = useRef(new Set())  // month-keys with a heavy-data fetch currently in flight (dedupe)
   const projectReportsCache = useRef(new Map())  // projectId -> light reports (stale-while-revalidate for instant project switching)
+
+  // ── מטמון האגרגציות הכבדות ────────────────────────────────────────────────
+  // aggregateRows/aggregateCrmRows רצות על השורות הגולמיות (עשרות אלפי רשומות
+  // בחודש), והן נקראו מתוך renderDashboard — שמערך התלויות שלו כולל sortConfig
+  // ושמונה Setים של שורות פתוחות. כלומר פתיחת שורה אחת בטבלה, או מיון עמודה,
+  // חישבו מחדש את כל נתוני החודש. זו הסיבה המרכזית לתחושת הכבדות.
+  //
+  // התוצאות נשמרות לפי מפתח (תקופה + טאב) ומתאפסות כש-`reports` משתנה — שזה
+  // המקור היחיד לנתונים, כולל כשה-data הכבד מגיע בטעינה עצלה.
+  const aggCache = useRef(new Map())
+  useEffect(() => { aggCache.current.clear() }, [reports])
+  const memoAgg = useCallback((key, compute) => {
+    const cache = aggCache.current
+    if (cache.has(key)) return cache.get(key)
+    const value = compute()
+    if (cache.size > 40) cache.clear()   // תקרה — החלפת פרויקטים לא תנפח אותו
+    cache.set(key, value)
+    return value
+  }, [])
   const [showAddClient, setShowAddClient] = useState(false)
   const [showAddProject, setShowAddProject] = useState(false)
   const [newClientName, setNewClientName] = useState('')
@@ -1145,7 +1163,8 @@ const selectProject = async (client, project) => {
     crmRows.forEach(r => { if (r.summary && Array.isArray(r.summary.crmRepRows)) allRows = allRows.concat(r.summary.crmRepRows); });
     legacyRepRows.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
     if (allRows.length === 0) return <div className="welcome-center"><div className="icon">{'\ud83d\udcad'}</div><h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9 CRM \u05d3\u05d5\u05d7\u05d5\u05ea \u05dc\u05d7\u05d5\u05d3\u05e9 \u05d6\u05d4'}</h3></div>;
-    const repData = aggregateCrmReportRows(allRows);
+    // נקרא-בלבד למטה, לכן נשמר במטמון כמו שהוא.
+    const repData = memoAgg(`crmRep|${selectedMonth}`, () => aggregateCrmReportRows(allRows));
 
     const metricKey = cityMetric === 'meetings' ? 'meetings' : cityMetric === 'contracts' ? 'contracts' : 'leads';
     const metricLabel = cityMetric === 'meetings' ? 'פגישות' : cityMetric === 'contracts' ? 'חוזים' : 'לידים';
@@ -1865,7 +1884,10 @@ const selectProject = async (client, project) => {
       (function _cp(node){ node.children.forEach(c => { if (c.children.size) allPaths.push(c.path); _cp(c); }); })(root);
       const allOpen = allPaths.length > 0 && allPaths.every(pth => expandedAdTree.has(pth));
       const toggleAll = () => setExpandedAdTree(() => allOpen ? new Set() : new Set(allPaths));
-      const exportExcel = () => {
+      // xlsx נטענת רק כשלוחצים על הייצוא. קודם היא הייתה ייבוא סטטי בראש הקובץ,
+      // כלומר ~400KB שכל לקוח הוריד — גם כשהכפתור הזה בכלל לא מוצג לו.
+      const exportExcel = async () => {
+        const XLSX = await import('xlsx');
         const _r = (v) => v ? Math.round(v) : 0;
         const rx = [];
         (function _fx(node, depth, plat, camp){
@@ -1976,9 +1998,15 @@ const selectProject = async (client, project) => {
       );
     }
 
-    let allCrmRows = [];
-    crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
-    const crmData = aggregateCrmRows(allCrmRows);
+    // האגרגציה רצה על כל שורות ה-CRM הגולמיות ולכן נשמרת במטמון, אבל הבלוקים
+    // שמיד אחריה משנים את crmData במקום (מיזוג מקורות פייסבוק/גוגל, הוספת
+    // הוצאת הפלטפורמות) — לכן מוחזר עותק טרי בכל רינדור, אחרת השינויים היו
+    // מצטברים על אותו אובייקט.
+    const crmData = structuredClone(memoAgg(`crmAgg|${selectedMonth}`, () => {
+      let allCrmRows = [];
+      crmReports.forEach(r => { if (r.data) allCrmRows = allCrmRows.concat(r.data); });
+      return aggregateCrmRows(allCrmRows);
+    }));
     const crmNamedLeads = crmReports[0]?.summary?.namedLeads || null;
     const _crmLeads = crmNamedLeads?.all || crmNamedLeads;  // v5: namedLeads nested under .all
 
@@ -2003,8 +2031,10 @@ const selectProject = async (client, project) => {
     const _gR = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
     const _emptySource = { totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, leads: [] };
     if (_fbR.length > 0) {
-      let _fbRows = []; _fbR.forEach(r => { if (r.data) _fbRows = _fbRows.concat(r.data); });
-      const _fbAgg = aggregateRows(_fbRows);
+      const _fbAgg = memoAgg(`crmFbAgg|${selectedMonth}`, () => {
+        let _fbRows = []; _fbR.forEach(r => { if (r.data) _fbRows = _fbRows.concat(r.data); });
+        return aggregateRows(_fbRows);
+      });
       _platformSpend += _fbAgg.totals.spend || 0;
       _fbSpend = _fbAgg.totals.spend || 0;
       const _fbLeads = _fbAgg.totals.leads || 0;
@@ -2018,8 +2048,10 @@ const selectProject = async (client, project) => {
       }
     }
     if (_gR.length > 0) {
-      let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data); });
-      const _gAgg = aggregateRows(_gRows);
+      const _gAgg = memoAgg(`crmGAgg|${selectedMonth}`, () => {
+        let _gRows = []; _gR.forEach(r => { if (r.data) _gRows = _gRows.concat(r.data); });
+        return aggregateRows(_gRows);
+      });
       _platformSpend += _gAgg.totals.spend || 0;
       _gSpend = _gAgg.totals.spend || 0;
       const _gLeads = _gAgg.totals.leads || 0;
@@ -2038,9 +2070,12 @@ const selectProject = async (client, project) => {
       const prevMonth = getPrevMonth(selectedMonth);
       const prevCrmReports = reports.filter(r => r.month === prevMonth && r.source === 'crm');
       if (prevCrmReports.length > 0) {
-        let prevRows = [];
-        prevCrmReports.forEach(r => { prevRows = prevRows.concat(r.data || []); });
-        prevCrmData = aggregateCrmRows(prevRows);
+        // נקרא רק דרך .totals ולא משתנה, ולכן אין צורך בעותק.
+        prevCrmData = memoAgg(`crmAggPrev|${selectedMonth}`, () => {
+          let prevRows = [];
+          prevCrmReports.forEach(r => { prevRows = prevRows.concat(r.data || []); });
+          return aggregateCrmRows(prevRows);
+        });
       }
     }
 
@@ -2425,24 +2460,27 @@ const selectProject = async (client, project) => {
     const isPmax = dashTab === 'google_pmax' || dashTab === 'google';
     const isFb = dashTab === 'facebook';
 
-    let allRows = [];
-    displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
-    const data = aggregateRows(allRows);
-    // Prefer server-computed demographics (summary.demographics) when present. Lets slim reports
-    // store ad-level `data` rows (no age/gender) with ZERO change to the gender/age tables — they
-    // read the same totals from summary instead of re-deriving them from raw rows. Fully
-    // backward-compatible: older "fat" reports have no summary.demographics → we keep whatever
-    // aggregateRows already computed from their raw rows.
-    {
+    // ממומואיז: תלוי רק בדוחות ובתקופה/טאב — לא במיון ולא בשורות פתוחות.
+    // מיזוג הדמוגרפיה נמצא בפנים כדי שהאובייקט שנשמר במטמון יהיה סופי.
+    const data = memoAgg(`ads|${selectedMonth}|${dashTab}`, () => {
+      let allRows = [];
+      displayReports.forEach(r => { if (r.data) allRows = allRows.concat(r.data); });
+      const d = aggregateRows(allRows);
+      // Prefer server-computed demographics (summary.demographics) when present. Lets slim reports
+      // store ad-level `data` rows (no age/gender) with ZERO change to the gender/age tables — they
+      // read the same totals from summary instead of re-deriving them from raw rows. Fully
+      // backward-compatible: older "fat" reports have no summary.demographics → we keep whatever
+      // aggregateRows already computed from their raw rows.
       const _demoReps = displayReports.filter(r => r && r.summary && r.summary.demographics);
       if (_demoReps.length) {
         const _mg = {}, _ma = {};
         const _addB = (dst, src) => { for (const k in (src || {})) { const v = src[k] || {}; if (!dst[k]) dst[k] = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 }; dst[k].spend += v.spend || 0; dst[k].impressions += v.impressions || 0; dst[k].reach += v.reach || 0; dst[k].clicks += v.clicks || 0; dst[k].leads += v.leads || 0; } };
         _demoReps.forEach(r => { _addB(_mg, r.summary.demographics.genders); _addB(_ma, r.summary.demographics.ages); });
-        data.genders = _mg;
-        data.ages = _ma;
+        d.genders = _mg;
+        d.ages = _ma;
       }
-    }
+      return d;
+    });
     // True while the heavy per-campaign/breakdown rows for the shown period are still
     // downloading (KPI cards already render from the light summary). Used to show a
     // loading placeholder for the detail tables instead of a blank/"missing" area.
@@ -2495,7 +2533,7 @@ const selectProject = async (client, project) => {
         } else if (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') {
           filteredR = allCrmR.filter(r => /גוגל|google|pmax|search/i.test(r.source || ''));
         }
-        if (filteredR.length > 0) crmTotals = aggregateCrmRows(filteredR).totals;
+        if (filteredR.length > 0) crmTotals = memoAgg(`crmTotals|${selectedMonth}|${dashTab}`, () => aggregateCrmRows(filteredR).totals);
         // ⚡ Fast path: if heavy CRM rows aren't loaded yet, use the cron-computed summary
         // totals (unfiltered) so the 'all' tab CRM cards show instantly instead of 0.
         if (!crmTotals && dashTab === 'all') {
@@ -2524,7 +2562,10 @@ const selectProject = async (client, project) => {
         : dashTab === 'google_search'
         ? prevReports.filter(r => r.source === 'google_search')
         : prevReports.filter(r => r.source && r.source.startsWith('google'));
-      if (displayPrev.length) { let prevRows = []; displayPrev.forEach(r => { prevRows = prevRows.concat(r.data || []); }); prevData = aggregateRows(prevRows); }
+      if (displayPrev.length) prevData = memoAgg(`adsPrev|${selectedMonth}|${dashTab}`, () => {
+        let prevRows = []; displayPrev.forEach(r => { prevRows = prevRows.concat(r.data || []); });
+        return aggregateRows(prevRows);
+      });
     }
 
     let prevCrmTotals = null;
@@ -2538,7 +2579,7 @@ const selectProject = async (client, project) => {
         let filtPrev = allPrevCrm;
         if (dashTab === 'facebook') filtPrev = allPrevCrm.filter(r => /פייסבוק|facebook/i.test(r.source || ''));
         else if (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') filtPrev = allPrevCrm.filter(r => /גוגל|google|pmax|search/i.test(r.source || ''));
-        if (filtPrev.length > 0) prevCrmTotals = aggregateCrmRows(filtPrev).totals;
+        if (filtPrev.length > 0) prevCrmTotals = memoAgg(`crmTotalsPrev|${selectedMonth}|${dashTab}`, () => aggregateCrmRows(filtPrev).totals);
         // Compute CRM-only (non-ad) leads for prev period — mirrors crmTotalLeads logic
         if (dashTab === 'all') {
           allPrevCrm.forEach(row => {
@@ -2565,7 +2606,10 @@ const selectProject = async (client, project) => {
       };
     });
 
-    const t = allRows.length ? data.totals : adTotalsFromSummaries(displayReports);
+    // שקול ל-`allRows.length` הקודם, אבל בלי לבנות את המערך — הבנייה עברה
+    // לתוך memoAgg למעלה. O(מספר הדוחות) במקום O(מספר השורות).
+    const hasHeavyRows = displayReports.some(r => Array.isArray(r.data) && r.data.length > 0);
+    const t = hasHeavyRows ? data.totals : adTotalsFromSummaries(displayReports);
     const p = prevData?.totals;
 
     // v2 color map: old name → new class
@@ -2781,8 +2825,14 @@ const selectProject = async (client, project) => {
     const hasCrm = anyCrm;
 
     let fbTotals = null, gTotals = null;
-    if (hasFb) { let fbRows = []; fbReports.forEach(r => { if (r.data) fbRows = fbRows.concat(r.data); }); fbTotals = fbRows.length ? aggregateRows(fbRows).totals : adTotalsFromSummaries(fbReports); }
-    if (hasG) { let gRows = []; gReports.forEach(r => { if (r.data) gRows = gRows.concat(r.data); }); gTotals = gRows.length ? aggregateRows(gRows).totals : adTotalsFromSummaries(gReports); }
+    if (hasFb) fbTotals = memoAgg(`fbTotals|${selectedMonth}`, () => {
+      let fbRows = []; fbReports.forEach(r => { if (r.data) fbRows = fbRows.concat(r.data); });
+      return fbRows.length ? aggregateRows(fbRows).totals : adTotalsFromSummaries(fbReports);
+    });
+    if (hasG) gTotals = memoAgg(`gTotals|${selectedMonth}`, () => {
+      let gRows = []; gReports.forEach(r => { if (r.data) gRows = gRows.concat(r.data); });
+      return gRows.length ? aggregateRows(gRows).totals : adTotalsFromSummaries(gReports);
+    });
 
     const activeT = dashTab === 'facebook' && fbTotals ? fbTotals : dashTab === 'google' && gTotals ? gTotals : t;
     const activeP = p;

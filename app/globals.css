@@ -4,60 +4,17 @@
    Built: 2026-05-24 (foundation session, design-v2 branch)
 
    Strategy:
-   - First section: self-hosted Heebo @font-face (faster than CDN on repeat visits)
+   - Fonts: Heebo from Google Fonts (layout.js) — self-hosted TTFs removed
    - Middle section: v2 design system (tokens + components) — verbatim from mockup
    - Last section: ALIASES mapping old JSX class names (.kpi-card, .green/.orange/etc)
      to new v2 styles. Lets us swap the visuals without touching ~121 JSX classNames.
    ============================================================ */
-
 /* ============================================================
-   SELF-HOSTED HEEBO (also loaded from Google Fonts in layout.js as fallback)
+   פונטים: Heebo נטען מ-Google Fonts ב-layout.js בלבד.
+   קודם היו כאן גם תשעה @font-face שהצביעו על public/fonts/*.ttf —
+   כ-508KB שנטענו במקביל לאותה משפחה מה-CDN. Google Fonts מגיש woff2
+   עם subset אוטומטי לפי unicode-range, כלומר קטן משמעותית מ-TTF.
    ============================================================ */
-@font-face {
-  font-family: 'Heebo'; font-style: normal; font-weight: 100;
-  src: url('/fonts/Heebo-Thin.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Heebo'; font-style: normal; font-weight: 200;
-  src: url('/fonts/Heebo-ExtraLight.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Heebo'; font-style: normal; font-weight: 300;
-  src: url('/fonts/Heebo-Light.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Heebo'; font-style: normal; font-weight: 400;
-  src: url('/fonts/Heebo-Regular.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Heebo'; font-style: normal; font-weight: 500;
-  src: url('/fonts/Heebo-Medium.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Heebo'; font-style: normal; font-weight: 600;
-  src: url('/fonts/Heebo-SemiBold.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Heebo'; font-style: normal; font-weight: 700;
-  src: url('/fonts/Heebo-Bold.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Heebo'; font-style: normal; font-weight: 800;
-  src: url('/fonts/Heebo-ExtraBold.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Heebo'; font-style: normal; font-weight: 900;
-  src: url('/fonts/Heebo-Black.ttf') format('truetype');
-  font-display: swap;
-}
 
 
 /* ============================================================
