@@ -4258,6 +4258,77 @@ const selectProject = async (client, project) => {
           )
         })()}
 
+        {/* פילוח פנימי לפי פרויקט — לקוח בחשבון מודעות אחד שמזהה את הבניין ברמת המודעה.
+            הסכום למעלה נשאר סך החשבון; כאן רואים ממה הוא מורכב. כל שקל בדלי אחד בלבד,
+            כולל דלי "ללא שיוך" — כדי ששם מודעה שגוי ייראה במקום להיעלם בשקט. */}
+        {(dashTab === 'all' || dashTab === 'facebook') && (() => {
+          const _sp = fbReports[0]?.summary?.bySubProject
+          if (!_sp || !Object.keys(_sp).length) return null
+          const UNM = 'ללא שיוך'
+          const _rows = Object.entries(_sp).sort((a, b) => {
+            if (a[0] === UNM) return 1
+            if (b[0] === UNM) return -1
+            return (b[1].spend || 0) - (a[1].spend || 0)
+          })
+          const _tot = _rows.reduce((s2, [, o]) => s2 + (o.spend || 0), 0)
+          const _totLeads = _rows.reduce((s2, [, o]) => s2 + (o.leads || 0), 0)
+          const _unmatched = fbReports[0]?.summary?.subProjectUnmatched || []
+          return (
+            <div className="section">
+              <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><h2>פילוח לפי פרויקט</h2><span className="sub">Facebook · לפי שם המודעה · הסכום שווה לסך החשבון</span></div>
+              <div className="table-wrapper">
+                <table className="data-table">
+                  <thead><tr>
+                    <th>פרויקט</th><th>הוצאה</th><th>% מהתקציב</th><th>לידים</th>
+                    <th>עלות לליד</th><th>קליקים</th><th>CTR</th>
+                  </tr></thead>
+                  <tbody>
+                    {_rows.map(([nm, o]) => {
+                      const isUnm = nm === UNM
+                      const pc = _tot > 0 ? (o.spend || 0) / _tot * 100 : 0
+                      return (
+                        <tr key={nm} style={isUnm ? { background: '#fff7ed' } : undefined}>
+                          <td style={{ fontWeight: 600, unicodeBidi: 'plaintext', color: isUnm ? '#b45309' : '#0f172a' }}>{nm}</td>
+                          <td>{formatCurrency(o.spend || 0)}</td>
+                          <td>{pc.toFixed(1)}%</td>
+                          <td>{formatNum(Math.round(o.leads || 0))}</td>
+                          <td style={{ color: '#7c3aed' }}>{(o.leads || 0) > 0 ? formatCurrency(o.cpl || 0) : '—'}</td>
+                          <td>{formatNum(o.clicks || 0)}</td>
+                          <td>{(o.ctr || 0).toFixed(2)}%</td>
+                        </tr>
+                      )
+                    })}
+                    <tr style={{ fontWeight: 700, borderTop: '2px solid #cbd5e1' }}>
+                      <td>סה״כ</td>
+                      <td>{formatCurrency(_tot)}</td>
+                      <td>100%</td>
+                      <td>{formatNum(Math.round(_totLeads))}</td>
+                      <td style={{ color: '#7c3aed' }}>{_totLeads > 0 ? formatCurrency(_tot / _totLeads) : '—'}</td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              {_unmatched.length > 0 && (
+                <div style={{ marginTop: 12, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: '#b45309', marginBottom: 8 }}>
+                    מודעות שלא שויכו לפרויקט ({_unmatched.length} היקרות)
+                  </div>
+                  <div style={{ fontSize: 12, color: '#92400e', marginBottom: 8 }}>
+                    שם הפרויקט לא מופיע בשם המודעה. תיקון שם המודעה במטא ישייך אותה בסנכרון הבא.
+                  </div>
+                  {_unmatched.map((u, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, padding: '3px 0', borderTop: i ? '1px solid #fed7aa' : 'none' }}>
+                      <span style={{ unicodeBidi: 'plaintext', color: '#78350f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.adName}</span>
+                      <span style={{ whiteSpace: 'nowrap', color: '#b45309' }}>{formatCurrency(u.spend || 0)} · {formatNum(Math.round(u.leads || 0))} לידים</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {/* FUNNEL */}
         <div className="section">
           <div className="section-head">

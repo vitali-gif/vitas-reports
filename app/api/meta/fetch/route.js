@@ -26,6 +26,38 @@ function klossAgencyOf(r) {
   return sc ? sc.agency : null
 }
 
+// ── פירוק פנימי לתת-פרויקטים לפי שם המודעה ────────────────────────────────────
+// לקוח שמריץ קמפיין אחד לכל החשבון ומזהה את הבניין ברמת המודעה ("AD 1 | שם טוב | ...")
+// לא ניתן לפילוח לפי שם קמפיין. `projects.sub_projects` מחזיק את רשימת השמות,
+// וכאן כל שורה נופלת לדלי אחד לפי השם הראשון שנמצא בשם המודעה.
+//
+// למה נרמול: שמות מודעות במטא מכילים תווי כיווניות RTL בלתי נראים שנדבקים בין
+// מילים עבריות, וגם גרשיים בצורות שונות. השוואת מחרוזות נאיבית נכשלת עליהם בשקט —
+// וכשל שקט כאן נראה כמו "לפרויקט אין הוצאה", לא כמו באג. לכן גם דלי "ללא שיוך".
+function normAdText(s) {
+  return String(s || '')
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
+    .replace(/["'`\u05f3\u05f4\u2018\u2019\u201c\u201d]/g, '')
+    .replace(/[\s\-_|/\\,.]+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+// התאמה מהשם הארוך לקצר: אחרת "שמי כללי" נבלע ע"י דלי בשם "שמי".
+function subProjectMatcher(names) {
+  const list = (Array.isArray(names) ? names : [])
+    .map(n => ({ name: String(n || '').trim(), key: normAdText(n) }))
+    .filter(x => x.name && x.key)
+    .sort((a, b) => b.key.length - a.key.length)
+  if (!list.length) return null
+  return (adName) => {
+    const hay = normAdText(adName)
+    if (!hay) return null
+    for (const x of list) if (hay.includes(x.key)) return x.name
+    return null
+  }
+}
+
 // ===== helpers =====
 
 function currentMonth() {
@@ -393,7 +425,7 @@ async function runSync(opts = {}) {
 
   const { data: projects, error: projectsError } = await supabase
     .from('projects')
-    .select('id, name, client_id, meta_account_id')
+    .select('id, name, client_id, meta_account_id, sub_projects')
 
   if (projectsError) {
     return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
@@ -495,9 +527,41 @@ async function runSync(opts = {}) {
       }
       for (const ag of Object.keys(byAgency)) { const o = byAgency[ag]; o.cpl = o.leads>0?o.spend/o.leads:0; o.cpc = o.clicks>0?o.spend/o.clicks:0; o.cpm = o.impressions>0?(o.spend/o.impressions)*1000:0; o.ctr = o.impressions>0?(o.clicks/o.impressions)*100:0 }
     }
+    // ── פירוק פנימי לתת-פרויקטים ───────────────────────────────────────────────
+    // הפרויקט נשאר אחד והסכום הכולל לא משתנה: כל שורה נספרת פעם אחת, בדלי אחד בלבד.
+    // מה שלא נתפס נכנס ל"ללא שיוך" ולא נעלם — הסכום של הדליים שווה תמיד לסך הפרויקט.
+    // `unmatchedAds` = 10 המודעות היקרות שלא נתפסו, כדי ששגיאת שם תיראה ולא תשתוק.
+    let bySubProject = null
+    let subProjectUnmatched = null
+    const _subMatch = subProjectMatcher(p.sub_projects)
+    if (_subMatch) {
+      bySubProject = {}
+      const _unm = new Map()
+      for (const r of mine) {
+        const key = _subMatch(r.adName) || 'ללא שיוך'
+        const o = bySubProject[key] || (bySubProject[key] = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 })
+        o.spend += r.spend; o.impressions += r.impressions; o.reach += r.reach; o.clicks += r.clicks; o.leads += r.leads
+        if (key === 'ללא שיוך') {
+          const an = r.adName || '(ללא שם מודעה)'
+          const u = _unm.get(an) || { adName: an, campaign: r.campaign || '', spend: 0, leads: 0 }
+          u.spend += r.spend; u.leads += r.leads
+          _unm.set(an, u)
+        }
+      }
+      for (const k of Object.keys(bySubProject)) {
+        const o = bySubProject[k]
+        o.cpl = o.leads > 0 ? o.spend / o.leads : 0
+        o.cpc = o.clicks > 0 ? o.spend / o.clicks : 0
+        o.cpm = o.impressions > 0 ? (o.spend / o.impressions) * 1000 : 0
+        o.ctr = o.impressions > 0 ? (o.clicks / o.impressions) * 100 : 0
+      }
+      subProjectUnmatched = Array.from(_unm.values()).sort((a, b) => b.spend - a.spend).slice(0, 10)
+    }
+
     const summaryWithAds = {
       ...pt,
       ...(byAgency ? { byAgency } : {}),
+      ...(bySubProject ? { bySubProject, subProjectUnmatched } : {}),
       demographics,
       activeAds: projectActiveAds,
       activeAdNames: projectActiveAds.map(a => a.name).filter(Boolean),
@@ -516,7 +580,12 @@ async function runSync(opts = {}) {
     if (upsertError) {
       results.push({ project: p.name, error: upsertError.message })
     } else {
-      results.push({ project: p.name, rows: mine.length, spend: pt.spend, leads: pt.leads })
+      results.push({
+        project: p.name, rows: mine.length, spend: pt.spend, leads: pt.leads,
+        ...(bySubProject ? {
+          subProjects: Object.fromEntries(Object.entries(bySubProject).map(([k, o]) => [k, { spend: Math.round(o.spend), leads: Math.round(o.leads) }])),
+        } : {}),
+      })
     }
   }
 
