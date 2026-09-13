@@ -39,11 +39,49 @@ function num(v) {
   return isNaN(n) ? 0 : n
 }
 
-async function getAccessToken() {
+// ── אישורי גישה לכל חשבון בנפרד ───────────────────────────────────────────────
+// חשבון של לקוח יכול לשבת תחת MCC אחר, שהמשתמש של החיבור הראשי לא רשום עליו
+// בכלל. במצב כזה אין login-customer-id ואין developer token שיפתרו את זה —
+// צריך OAuth של משתמש אחר.
+//
+// הפתרון הוא אותו דפוס שכבר קיים במטא (META_ACCESS_TOKEN_<accountId>): לכל
+// משתנה סביבה אפשר להוסיף סיומת של מזהה הלקוח, והיא גוברת עליו רק לאותו חשבון.
+// למשל GOOGLE_ADS_REFRESH_TOKEN_2713605466.
+//
+// זה מכוון: החיבור הראשי לא זז. אם החיבור החדש נשבר, החשבון שלו לבדו נופל
+// והשאר ממשיכים — במקום להחליף אסימון משותף ולהפיל את כולם, כפי שקרה לנו במטא.
+function credsFor(customerId) {
+  const suf = String(customerId || '').replace(/\D/g, '')
+  const pick = (base) => (suf && process.env[`${base}_${suf}`]) || process.env[base] || ''
+  return {
+    clientId: pick('GOOGLE_ADS_CLIENT_ID'),
+    clientSecret: pick('GOOGLE_ADS_CLIENT_SECRET'),
+    refreshToken: pick('GOOGLE_ADS_REFRESH_TOKEN'),
+    developerToken: pick('GOOGLE_ADS_DEVELOPER_TOKEN'),
+    loginCustomerId: pick('GOOGLE_ADS_LOGIN_CUSTOMER_ID').replace(/\D/g, ''),
+    isOverride: !!(suf && process.env[`GOOGLE_ADS_REFRESH_TOKEN_${suf}`]),
+  }
+}
+
+// אסימון גישה לכל refresh token נשלף פעם אחת, לא פעם לכל חשבון.
+// המטמון חי ברמת המודול, כלומר שורד בין קריאות ב-lambda חמה — ולכן יש לו תפוגה.
+// אסימון של גוגל תקף שעה; 50 דקות משאירות מרווח ומונעות 401 על אסימון שפג.
+const _atCache = new Map()
+async function getAccessToken(creds) {
+  const c = creds || credsFor(null)
+  if (!c.refreshToken) throw new Error('missing refresh token')
+  const hit = _atCache.get(c.refreshToken)
+  if (hit && hit.exp > Date.now()) return hit.token
+  const token = await mintAccessToken(c)
+  _atCache.set(c.refreshToken, { token, exp: Date.now() + 50 * 60 * 1000 })
+  return token
+}
+
+async function mintAccessToken(c) {
   const body = new URLSearchParams({
-    client_id: process.env.GOOGLE_ADS_CLIENT_ID,
-    client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET,
-    refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN,
+    client_id: c.clientId,
+    client_secret: c.clientSecret,
+    refresh_token: c.refreshToken,
     grant_type: 'refresh_token',
   })
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -62,15 +100,15 @@ async function getAccessToken() {
 // loginOverride: used only by the read-only account diagnostic below, to test a customer
 // that sits under a DIFFERENT manager account than GOOGLE_ADS_LOGIN_CUSTOMER_ID.
 // The sync itself never passes it, so its behaviour is unchanged.
-async function gaqlSearch(accessToken, customerId, query, loginOverride) {
+async function gaqlSearch(accessToken, customerId, query, opts = {}) {
   const headers = {
     Authorization: `Bearer ${accessToken}`,
-    'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    'developer-token': opts.developerToken || process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
     'Content-Type': 'application/json',
   }
-  const _login = loginOverride || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID
+  const _login = opts.login || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID
   if (_login) {
-    headers['login-customer-id'] = String(_login).replace(/-/g, '')
+    headers['login-customer-id'] = String(_login).replace(/\D/g, '')
   }
   const allRows = []
   let nextPageToken = null
@@ -167,9 +205,10 @@ async function runSync(opts = {}) {
     m = mArg
   }
 
-  let accessToken
+  // האסימון הראשי נשלף מראש כדי שכשל OAuth כללי ייכשל מיד ובקול, ולא יתגלה
+  // כשישה חשבונות אחר כך. חשבון עם אישורים משלו נשלף בתוך הלולאה.
   try {
-    accessToken = await getAccessToken()
+    await getAccessToken(credsFor(null))
   } catch (err) {
     return { status: 500, body: { error: 'OAuth failed: ' + (err.message || String(err)) } }
   }
@@ -179,6 +218,18 @@ async function runSync(opts = {}) {
   const _assetGroupsMerged = {}
   const _custDiag = []
   for (const customerId of customerIds) {
+
+  // אישורי הגישה של החשבון הזה. ברירת מחדל = החיבור הראשי; אם הוגדרו משתנים עם
+  // סיומת מזהה הלקוח, הם גוברים רק כאן. כשל של חשבון אחד לא מפיל את השאר.
+  const _creds = credsFor(customerId)
+  const _gopts = { login: _creds.loginCustomerId, developerToken: _creds.developerToken }
+  let accessToken
+  try {
+    accessToken = await getAccessToken(_creds)
+  } catch (err) {
+    _custDiag.push({ customer: customerId, credsOverride: _creds.isOverride, error: 'OAuth failed: ' + (err.message || String(err)) })
+    continue
+  }
 
   // Main query — ad-level metrics
   const query = `
@@ -204,7 +255,7 @@ async function runSync(opts = {}) {
 
   let rawRows
   try {
-    rawRows = await gaqlSearch(accessToken, customerId, query)
+    rawRows = await gaqlSearch(accessToken, customerId, query, _gopts)
   } catch (err) {
     _custDiag.push({ customer: customerId, error: err.message }); continue
   }
@@ -245,7 +296,7 @@ async function runSync(opts = {}) {
       WHERE segments.date BETWEEN '${since}' AND '${until}'
         AND campaign.status != 'REMOVED'
     `
-    const campRows = await gaqlSearch(accessToken, customerId, campQuery)
+    const campRows = await gaqlSearch(accessToken, customerId, campQuery, _gopts)
     const seenCampaigns = new Set(allRows.map(r => r.campaign).filter(Boolean))
     for (const r of campRows) {
       const cn = r.campaign?.name || ''
@@ -295,7 +346,7 @@ async function runSync(opts = {}) {
     `
     let agRows = []
     try {
-      agRows = await gaqlSearch(accessToken, customerId, agQuery)
+      agRows = await gaqlSearch(accessToken, customerId, agQuery, _gopts)
       console.log('[asset_group] rows returned:', agRows.length, agRows[0] ? JSON.stringify(agRows[0]).slice(0,300) : 'none')
     } catch (agErr) {
       console.log('[asset_group] metrics query failed:', agErr.message || agErr)
@@ -337,7 +388,7 @@ async function runSync(opts = {}) {
         FROM asset_group_asset
         WHERE asset_group_asset.status = 'ENABLED'
       `
-      const assetRows = await gaqlSearch(accessToken, customerId, assetQuery)
+      const assetRows = await gaqlSearch(accessToken, customerId, assetQuery, _gopts)
       for (const ar of assetRows) {
         const agId = ar.assetGroup?.id
         if (!agId || !agById[agId]) continue
@@ -372,7 +423,7 @@ async function runSync(opts = {}) {
       if (!_assetGroupsMerged[k]) _assetGroupsMerged[k] = []
       for (const ag of arr) _assetGroupsMerged[k].push(ag)
     }
-    _custDiag.push({ customer: customerId, rows: allRows.length })
+    _custDiag.push({ customer: customerId, rows: allRows.length, ...(_creds.isOverride ? { credsOverride: true, login: _creds.loginCustomerId || null } : {}) })
   } // ===== end per-customer loop =====
 
   const allRows = _allRowsMerged
@@ -492,10 +543,11 @@ export async function GET(request) {
   if (expected && bearer === expected && _q.get('diag') === 'accounts') {
     const target = (_q.get('customer') || '').replace(/-/g, '')
     try {
-      const accessToken = await getAccessToken()
+      const _dc = credsFor(target)
+      const accessToken = await getAccessToken(_dc)
       const listRes = await fetch(
         `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,
-        { headers: { Authorization: `Bearer ${accessToken}`, 'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN } }
+        { headers: { Authorization: `Bearer ${accessToken}`, 'developer-token': _dc.developerToken } }
       )
       const listJson = await listRes.json()
       if (!listRes.ok) return Response.json({ ok: false, step: 'listAccessibleCustomers', error: listJson }, { status: listRes.status })
@@ -509,7 +561,7 @@ export async function GET(request) {
       const seen = new Map()   // customerId -> { id, name, managers: [] }
       for (const root of roots) {
         try {
-          const rows = await gaqlSearch(accessToken, root, TREE_QUERY, root)
+          const rows = await gaqlSearch(accessToken, root, TREE_QUERY, { login: root, developerToken: _dc.developerToken })
           const children = rows.map(r => ({
             id: String(r.customerClient?.id || ''),
             name: r.customerClient?.descriptiveName || '',
@@ -555,8 +607,9 @@ export async function GET(request) {
   // מחזיר רק זהות והרשאות, אף פעם לא את האסימון עצמו.
   if (expected && bearer === expected && _q.get('diag') === 'whoami') {
     try {
-      const accessToken = await getAccessToken()
-      const out = { ok: true }
+      const _who = credsFor((_q.get('customer') || '').replace(/-/g, ''))
+      const accessToken = await getAccessToken(_who)
+      const out = { ok: true, customer: _q.get('customer') || null, credsOverride: _who.isOverride, loginCustomerId: _who.loginCustomerId || null }
       try {
         const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`)
         const j = await r.json()
@@ -579,12 +632,13 @@ export async function GET(request) {
     const login = (_q.get('login') || '').replace(/-/g, '') || undefined
     if (!cust) return Response.json({ ok: false, error: 'customer param required' }, { status: 400 })
     try {
-      const accessToken = await getAccessToken()
+      const _c = credsFor(cust)
+      const accessToken = await getAccessToken(_c)
       const rows = await gaqlSearch(accessToken, cust, `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
         metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions
-        FROM campaign WHERE segments.date DURING THIS_MONTH`, login)
+        FROM campaign WHERE segments.date DURING THIS_MONTH`, { login: login || _c.loginCustomerId, developerToken: _c.developerToken })
       return Response.json({
-        ok: true, customer: cust, loginUsed: login || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || null,
+        ok: true, customer: cust, loginUsed: login || _c.loginCustomerId || null, credsOverride: _c.isOverride,
         campaignCount: rows.length,
         campaigns: rows.map(r => ({
           name: r.campaign?.name, type: r.campaign?.advertisingChannelType, status: r.campaign?.status,
