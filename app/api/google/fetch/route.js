@@ -59,14 +59,18 @@ async function getAccessToken() {
   return json.access_token
 }
 
-async function gaqlSearch(accessToken, customerId, query) {
+// loginOverride: used only by the read-only account diagnostic below, to test a customer
+// that sits under a DIFFERENT manager account than GOOGLE_ADS_LOGIN_CUSTOMER_ID.
+// The sync itself never passes it, so its behaviour is unchanged.
+async function gaqlSearch(accessToken, customerId, query, loginOverride) {
   const headers = {
     Authorization: `Bearer ${accessToken}`,
     'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
     'Content-Type': 'application/json',
   }
-  if (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) {
-    headers['login-customer-id'] = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID
+  const _login = loginOverride || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID
+  if (_login) {
+    headers['login-customer-id'] = String(_login).replace(/-/g, '')
   }
   const allRows = []
   let nextPageToken = null
@@ -476,6 +480,101 @@ export async function GET(request) {
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '')
   const expected = process.env.CRON_SECRET
+
+  const _q = new URL(request.url).searchParams
+
+  // ── אבחון חשבונות (קריאה בלבד, מוגן ב-CRON_SECRET) ───────────────────────────
+  // למה: חשבון של לקוח חדש יכול לשבת תחת MCC אחר מזה שמוגדר ב-GOOGLE_ADS_LOGIN_CUSTOMER_ID.
+  // במקרה כזה הוספת מזהה הלקוח ל-GOOGLE_ADS_CUSTOMER_IDS לבדה תיכשל, וההודעה של גוגל
+  // ("USER_PERMISSION_DENIED") לא מסגירה שהבעיה היא ה-login ולא ההרשאה עצמה.
+  // כאן מיפוי מלא של מה שה-refresh token רואה, כדי לדעת מראש ולא לנחש.
+  // אין כאן שום כתיבה, ואין נגיעה ב-runSync.
+  if (expected && bearer === expected && _q.get('diag') === 'accounts') {
+    const target = (_q.get('customer') || '').replace(/-/g, '')
+    try {
+      const accessToken = await getAccessToken()
+      const listRes = await fetch(
+        `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,
+        { headers: { Authorization: `Bearer ${accessToken}`, 'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN } }
+      )
+      const listJson = await listRes.json()
+      if (!listRes.ok) return Response.json({ ok: false, step: 'listAccessibleCustomers', error: listJson }, { status: listRes.status })
+      const roots = (listJson.resourceNames || []).map(rn => String(rn).split('/').pop())
+
+      const TREE_QUERY = `SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager,
+        customer_client.level, customer_client.status, customer_client.currency_code
+        FROM customer_client WHERE customer_client.status != 'CANCELED'`
+
+      const managers = []
+      const seen = new Map()   // customerId -> { id, name, managers: [] }
+      for (const root of roots) {
+        try {
+          const rows = await gaqlSearch(accessToken, root, TREE_QUERY, root)
+          const children = rows.map(r => ({
+            id: String(r.customerClient?.id || ''),
+            name: r.customerClient?.descriptiveName || '',
+            isManager: !!r.customerClient?.manager,
+            level: Number(r.customerClient?.level || 0),
+            status: r.customerClient?.status || '',
+          })).filter(c => c.id)
+          managers.push({ root, ok: true, childCount: children.length, children })
+          for (const c of children) {
+            const e = seen.get(c.id) || { id: c.id, name: c.name, isManager: c.isManager, reachableVia: [] }
+            if (!e.reachableVia.includes(root)) e.reachableVia.push(root)
+            if (!e.name && c.name) e.name = c.name
+            seen.set(c.id, e)
+          }
+        } catch (e) {
+          managers.push({ root, ok: false, error: String(e.message || e).slice(0, 400) })
+        }
+      }
+
+      let targetReport = null
+      if (target) {
+        const hit = seen.get(target)
+        targetReport = hit
+          ? { found: true, ...hit, note: `הוסף את ${target} ל-GOOGLE_ADS_CUSTOMER_IDS; login-customer-id צריך להיות אחד מ-${hit.reachableVia.join(', ')}` }
+          : { found: false, note: `${target} לא נמצא תחת אף אחד מה-MCC שה-refresh token רואה (${roots.join(', ')})` }
+      }
+
+      return Response.json({
+        ok: true,
+        currentLoginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || null,
+        currentCustomerIds: (process.env.GOOGLE_ADS_CUSTOMER_IDS || process.env.GOOGLE_ADS_CUSTOMER_ID || ''),
+        accessibleRoots: roots,
+        managers,
+        target: targetReport,
+      })
+    } catch (err) {
+      return Response.json({ ok: false, step: 'diag', error: String(err.message || err) }, { status: 500 })
+    }
+  }
+
+  // בדיקת משיכה אמיתית מחשבון בודד, עם login-customer-id לבחירה. קריאה בלבד.
+  if (expected && bearer === expected && _q.get('diag') === 'probe') {
+    const cust = (_q.get('customer') || '').replace(/-/g, '')
+    const login = (_q.get('login') || '').replace(/-/g, '') || undefined
+    if (!cust) return Response.json({ ok: false, error: 'customer param required' }, { status: 400 })
+    try {
+      const accessToken = await getAccessToken()
+      const rows = await gaqlSearch(accessToken, cust, `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
+        metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions
+        FROM campaign WHERE segments.date DURING THIS_MONTH`, login)
+      return Response.json({
+        ok: true, customer: cust, loginUsed: login || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || null,
+        campaignCount: rows.length,
+        campaigns: rows.map(r => ({
+          name: r.campaign?.name, type: r.campaign?.advertisingChannelType, status: r.campaign?.status,
+          spend: Math.round(Number(r.metrics?.costMicros || 0) / 1e6),
+          impressions: Number(r.metrics?.impressions || 0),
+          clicks: Number(r.metrics?.clicks || 0),
+          conversions: Number(r.metrics?.conversions || 0),
+        })),
+      })
+    } catch (err) {
+      return Response.json({ ok: false, customer: cust, loginUsed: login || null, error: String(err.message || err).slice(0, 1500) }, { status: 200 })
+    }
+  }
 
   if (expected && bearer === expected) {
     const { status, body: responseBody } = await runSync()
