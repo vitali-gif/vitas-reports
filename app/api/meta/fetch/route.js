@@ -632,6 +632,51 @@ export async function GET(request) {
   const bearer = auth.replace(/^Bearer\s+/i, '')
   const expected = process.env.CRON_SECRET
 
+  // ── אילו סוגי action מטא בכלל מחזירה לחשבון הזה ─────────────────────────────
+  // נדרש לפני בניית סרגל המשפך: "פתיחות טופס" הוא שלב שאולי אין לו נתון בכלל,
+  // ואסור להציג שלב ריק כאפס. בנוסף זה מגלה אם החשבון מריץ Instant Form או דף
+  // נחיתה — שני משפכים שאסור להציג באותו סרגל.
+  // קריאה בלבד, מוגן ב-CRON_SECRET, לא נוגע ב-Supabase.
+  if (expected && bearer === expected && new URL(request.url).searchParams.get('diag') === 'actions') {
+    const _p = new URL(request.url).searchParams
+    const acct = (_p.get('account') || '').replace(/\D/g, '')
+    if (!acct) return Response.json({ error: 'account param required' }, { status: 400 })
+    const _tok = process.env[`META_ACCESS_TOKEN_${acct}`] || process.env.META_ACCESS_TOKEN
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
+    const since = _p.get('since') || `${today.slice(0, 8)}01`
+    const until = _p.get('until') || today
+    try {
+      const tr = encodeURIComponent(JSON.stringify({ since, until }))
+      const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/act_${acct}/insights`
+        + `?level=campaign&fields=campaign_name,impressions,clicks,actions,cost_per_action_type`
+        + `&time_range=${tr}&limit=500`
+      const rows = await metaFetchAll(url, _tok)
+      const byType = {}
+      const byCampaign = []
+      for (const r of rows) {
+        const per = {}
+        for (const a of (r.actions || [])) {
+          const t = a.action_type, v = num(a.value)
+          byType[t] = (byType[t] || 0) + v
+          per[t] = (per[t] || 0) + v
+        }
+        byCampaign.push({
+          campaign: r.campaign_name,
+          impressions: num(r.impressions),
+          clicks: num(r.clicks),
+          actions: Object.fromEntries(Object.entries(per).sort((a, b) => b[1] - a[1])),
+        })
+      }
+      return Response.json({
+        ok: true, account: acct, since, until, campaigns: rows.length,
+        actionTypes: Object.fromEntries(Object.entries(byType).sort((a, b) => b[1] - a[1])),
+        byCampaign,
+      })
+    } catch (e) {
+      return Response.json({ ok: false, error: String(e.message || e).slice(0, 800) }, { status: 200 })
+    }
+  }
+
   if (expected && bearer === expected) {
     // Authorized as Vercel Cron: run the sync
     const { status, body: responseBody } = await runSync()
