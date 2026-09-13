@@ -550,6 +550,29 @@ export async function GET(request) {
     }
   }
 
+  // באיזה חשבון גוגל הדשבורד מחובר. כשחשבון לקוח לא נגיש, זה ההבדל בין
+  // "להוסיף את המשתמש ל-MCC" לבין "להוציא refresh token חדש" - ובלי זה מנחשים.
+  // מחזיר רק זהות והרשאות, אף פעם לא את האסימון עצמו.
+  if (expected && bearer === expected && _q.get('diag') === 'whoami') {
+    try {
+      const accessToken = await getAccessToken()
+      const out = { ok: true }
+      try {
+        const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`)
+        const j = await r.json()
+        out.tokeninfo = { email: j.email || null, scope: j.scope || null, aud: j.aud || null, expires_in: j.expires_in || null }
+      } catch (e) { out.tokeninfo = { error: String(e.message || e).slice(0, 200) } }
+      try {
+        const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${accessToken}` } })
+        out.userinfo = r.ok ? await r.json() : { status: r.status, note: 'OAuth scope does not include email/profile' }
+      } catch (e) { out.userinfo = { error: String(e.message || e).slice(0, 200) } }
+      out.clientIdTail = (process.env.GOOGLE_ADS_CLIENT_ID || '').slice(-30) || null
+      return Response.json(out)
+    } catch (err) {
+      return Response.json({ ok: false, error: String(err.message || err) }, { status: 500 })
+    }
+  }
+
   // בדיקת משיכה אמיתית מחשבון בודד, עם login-customer-id לבחירה. קריאה בלבד.
   if (expected && bearer === expected && _q.get('diag') === 'probe') {
     const cust = (_q.get('customer') || '').replace(/-/g, '')
