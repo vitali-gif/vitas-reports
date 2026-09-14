@@ -2791,24 +2791,22 @@ const selectProject = async (client, project) => {
     // Total leads including CRM for "all" tab display
     const totalLeadsWithCrm = dashTab === 'all' ? t.leads + crmTotalLeads : activeT.leads;
 
-    // ── סרגל אחוזי המרה לאורך כל המשפך ──────────────────────────────────────────
-    // הכלי שמראה איפה המשפך דולף. שלושה כללים שהוא לא מפר:
+    // ── סרגל אחוזי המרה לאורך המשפך ──────────────────────────────────────────────
+    // מסלול אחד לרוחב. לכל תחנה: המספר המוחלט, האחוז, ושם המכנה במפורש מתחתיו —
+    // כי "36%" בלי לדעת ממה זה נמדד הוא בדיוק אותו מספר חסר משמעות שאחוז בלי n הוא.
     //
-    // 1. אחוז בלי n הוא חסר משמעות — לכל אחוז מוצג המספר המוחלט שמאחוריו, ומתחת
-    //    ל-MIN_N במכנה האחוז מסומן כלא אמין ולא מוצג כעובדה.
-    // 2. שלב בלי נתון מוצג כ"אין נתון" ולא כאפס. אפס אמיתי (לא נחתמו חוזים) ואין
-    //    נתון (אין חיבור CRM) הם שני דברים שונים, ואסור שייראו זהה.
-    // 3. אסור לערבב סוגי משפך. טופס מיידי ודף נחיתה אינם ברי-השוואה, ולכן יש בורר
-    //    ערוץ, ובתצוגת "הכל" מופיעה אזהרה מפורשת.
+    // המכנה אינו תמיד התחנה שלפניה, ולכן הוא מוגדר לכל תחנה בנפרד ולא נגזר מהסדר:
+    // "התבטלו" נמדד מהפגישות שנקבעו ולא מהפגישות שהגיעו, והרשמות וחוזים נמדדים
+    // שניהם מהפגישות שהתקיימו. שרשור עיוור לפי סדר היה מייצר שלושה אחוזים שגויים.
     //
-    // כל שלבי ה-CRM נלקחים מ-namedLeads, אותו מבנה בדיוק לשלושת הערוצים, כדי שכל
-    // מספר בסרגל יהיה זהה למספר שכבר מוצג בכרטיסיות. מקור אחד, הגדרה אחת.
+    // שלושת הכללים: מספר מוחלט לצד כל אחוז; מכנה מתחת ל-MIN_N מסמן את האחוז כלא
+    // אמין (~, כתום); תחנה בלי מקור נתונים מציגה "אין נתון" ולא אפס.
     const renderFunnelBar = () => {
       const MIN_N = 30;
       const _nlRoot = crmReports[0]?.summary?.namedLeads || null;
       const _nl = _nlRoot ? (_nlRoot.all ? _nlRoot : { all: _nlRoot }) : null;
-      const grp = _nl ? (funnelChannel === 'facebook' ? _nl.facebook : funnelChannel === 'google' ? _nl.google : _nl.all) : null;
-      const _len = (a) => (Array.isArray(a) ? a.length : null);
+      const g = _nl ? (funnelChannel === 'facebook' ? _nl.facebook : funnelChannel === 'google' ? _nl.google : _nl.all) : null;
+      const L = (a) => (Array.isArray(a) ? a.length : null);
 
       const _mediaRows = funnelChannel === 'facebook' ? fbReports
         : funnelChannel === 'google' ? gReports
@@ -2822,36 +2820,34 @@ const selectProject = async (client, project) => {
       }
       const _chF = fbReports.length > 0, _chG = gReports.length > 0;
 
-      const stages = [
-        { key: 'impr',  label: 'חשיפות',        value: _hasMedia ? _impr : null },
-        { key: 'click', label: 'קליק על קישור', sub: 'פתיחת טופס', value: _hasMedia ? _clk : null },
-        { key: 'lead',  label: 'לידים',          value: grp ? _len(grp.allLeads) : null },
-        { key: 'cont',  label: 'נוצר קשר',       value: (grp && _len(grp.allLeads) != null && _len(grp.noResponse) != null) ? (grp.allLeads.length - grp.noResponse.length) : null },
-        { key: 'sched', label: 'פגישה נקבעה',    value: grp ? _len(grp.meetingsScheduled) : null },
-        { key: 'held',  label: 'פגישה התקיימה',  value: grp ? _len(grp.meetingsCompleted) : null },
-        { key: 'sale',  label: 'מכירה',          value: grp ? _len(grp.contracts) : null },
+      const leads = g ? L(g.allLeads) : null;
+      const noResp = g ? L(g.noResponse) : null;
+      const V = {
+        impr: _hasMedia ? _impr : null,
+        click: _hasMedia ? _clk : null,
+        lead: leads,
+        cont: (leads != null && noResp != null) ? leads - noResp : null,
+        sched: g ? L(g.meetingsScheduled) : null,
+        held: g ? L(g.meetingsCompleted) : null,
+        canc: g ? L(g.meetingsCancelled) : null,
+        reg: g ? L(g.registrations) : null,
+        deal: g ? L(g.contracts) : null,
+      };
+
+      const STAGES = [
+        { key: 'impr',  label: 'חשיפות',            of: null,    ofLabel: 'ראש המשפך' },
+        { key: 'click', label: 'קליקים על קישור',   of: 'impr',  ofLabel: 'מהחשיפות' },
+        { key: 'lead',  label: 'לידים',              of: 'click', ofLabel: 'מהקליקים' },
+        { key: 'cont',  label: 'נוצר קשר',           of: 'lead',  ofLabel: 'מהלידים' },
+        { key: 'sched', label: 'פגישה נקבעה',        of: 'cont',  ofLabel: 'מנוצר קשר' },
+        { key: 'held',  label: 'פגישות שהגיעו',      of: 'sched', ofLabel: 'מהפגישות שנקבעו' },
+        { key: 'canc',  label: 'פגישות שהתבטלו',     of: 'sched', ofLabel: 'מהפגישות שנקבעו', leak: true },
+        { key: 'reg',   label: 'הרשמות',             of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
+        { key: 'deal',  label: 'חוזים',              of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
       ];
-      if (stages.every(x => x.value == null)) return null;
+      if (STAGES.every(st => V[st.key] == null)) return null;
 
-      // ראש המשפך = השלב הראשון שיש לו נתון. אם אין מדיה בטווח, הלידים הופכים לראש
-      // המשפך במקום שכל אחוז יוצג כ"—" בגלל מכנה חסר בשלב שלא קיים.
-      const top = (stages.find(x => x.value != null) || {}).value ?? null;
-      let prev = null;
-      const rows = stages.map((st) => {
-        const v = st.value;
-        // אחוז נמדד רק כששני האגפים קיימים. מכנה חסר => אין אחוז, לא אפס.
-        const stepPct = (v != null && prev != null && prev > 0) ? (v / prev) * 100 : null;
-        const topPct  = (v != null && top != null && top > 0) ? (v / top) * 100 : null;
-        const row = { ...st, stepPct, topPct, stepDenom: prev,
-          stepWeak: prev != null && prev < MIN_N, topWeak: top != null && top < MIN_N,
-          isFirst: prev == null && v != null };
-        if (v != null) prev = v;
-        return row;
-      });
-
-      // דיוק משתנה: 143 לידים מתוך 412,000 חשיפות הם 0.035%, ו-"0.0%" הוא מספר
-      // חסר משמעות בדיוק כמו אחוז בלי n. מתחת לחצי אחוז עוברים ל-"1 מכל N",
-      // שקריא לבן אדם ולא מאבד את הסדר גודל.
+      // "0.035%" חסר משמעות בדיוק כמו אחוז בלי n. מתחת לחצי אחוז עוברים ל"1 מכל N".
       const fmtPct = (x) => {
         if (x == null) return '—';
         if (x >= 10) return x.toFixed(0) + '%';
@@ -2860,7 +2856,14 @@ const selectProject = async (client, project) => {
         if (x > 0) return '1 מכל ' + formatNum(Math.round(100 / x));
         return '0%';
       };
-      const anyWeak = rows.some(r => r.value != null && (r.stepWeak || r.topWeak));
+
+      const rows = STAGES.map(st => {
+        const v = V[st.key];
+        const d = st.of ? V[st.of] : null;
+        const pct = (v != null && d != null && d > 0) ? (v / d) * 100 : null;
+        return { ...st, value: v, denom: d, pct, weak: d != null && d < MIN_N };
+      });
+      const anyWeak = rows.some(r => r.value != null && r.weak);
       const missing = rows.filter(r => r.value == null);
 
       return (
@@ -2868,73 +2871,69 @@ const selectProject = async (client, project) => {
           <div className="section-head">
             <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
             <h2>אחוזי המרה לאורך המשפך</h2>
-            <span className="sub">רוחב הפס = אחוז מהשלב הקודם</span>
+            <span className="sub">כל אחוז נמדד מהמכנה הרשום מתחתיו</span>
           </div>
 
           {(_chF || _chG) && (
             <div className="client-tabs" style={{ marginBottom: 12 }}>
-              <button className={`client-tab ${funnelChannel === 'all' ? 'active' : ''}`} onClick={() => setFunnelChannel('all')}>הכל</button>
-              {_chF && <button className={`client-tab ${funnelChannel === 'facebook' ? 'active' : ''}`} onClick={() => setFunnelChannel('facebook')}>Facebook</button>}
-              {_chG && <button className={`client-tab ${funnelChannel === 'google' ? 'active' : ''}`} onClick={() => setFunnelChannel('google')}>Google</button>}
+              <button type="button" className={`client-tab ${funnelChannel === 'all' ? 'active' : ''}`} onClick={() => setFunnelChannel('all')}>הכל</button>
+              {_chF && <button type="button" className={`client-tab ${funnelChannel === 'facebook' ? 'active' : ''}`} onClick={() => setFunnelChannel('facebook')}>Facebook</button>}
+              {_chG && <button type="button" className={`client-tab ${funnelChannel === 'google' ? 'active' : ''}`} onClick={() => setFunnelChannel('google')}>Google</button>}
             </div>
           )}
 
           {funnelChannel === 'all' && _chF && _chG && (
-            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 13px', marginBottom: 12, fontSize: 12.5, color: '#92400e', lineHeight: 1.6 }}>
-              <b>{'תצוגת "הכל" מערבבת סוגי משפך.'}</b>{' טופס מיידי בפייסבוק ודף נחיתה בגוגל אינם ברי-השוואה, והלידים כוללים גם מקורות ללא מדיה. האחוז מחשיפות ללידים כאן אינדיקטיבי בלבד — להשוואה אמיתית בחר ערוץ בודד.'}
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '9px 12px', marginBottom: 12, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+              <b>{'תצוגת "הכל" מערבבת סוגי משפך.'}</b>{' טופס מיידי ודף נחיתה אינם ברי-השוואה, והלידים כוללים גם מקורות ללא מדיה. להשוואה אמיתית בחר ערוץ בודד.'}
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {rows.map((r) => {
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, overflowX: 'auto', paddingBottom: 6 }}>
+            {rows.map((r, i) => {
               const na = r.value == null;
-              const w = na ? 0 : (r.stepPct == null ? 100 : Math.max(1.5, Math.min(100, r.stepPct)));
+              const leak = !!r.leak;
+              const accent = na ? '#94a3b8' : leak ? '#e11d48' : '#7c3aed';
               return (
-                <div key={r.key} style={{ background: na ? '#f8fafc' : '#fff', border: '1px solid var(--border, #e2e8f0)', borderRadius: 10, padding: '10px 13px', opacity: na ? 0.7 : 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 170 }}>
-                      <span style={{ fontWeight: 600, fontSize: 14, color: na ? '#94a3b8' : '#0f172a' }}>{r.label}</span>
-                      {r.sub && <span style={{ fontSize: 11, color: '#94a3b8' }}>{r.sub}</span>}
+                <Fragment key={r.key}>
+                  {i > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', color: leak ? '#fda4af' : '#cbd5e1', fontSize: 18, padding: '0 2px', flex: '0 0 auto' }}>
+                      {leak ? '↳' : '›'}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-                      {na ? (
-                        <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 600 }}>אין נתון</span>
-                      ) : (<>
-                        <span style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', lineHeight: 1 }}>{formatNum(r.value)}</span>
-                        {r.isFirst ? (
-                          <span style={{ fontSize: 11.5, color: '#94a3b8' }}>ראש המשפך</span>
-                        ) : (<>
-                          <span title={r.stepDenom != null ? ('מתוך ' + formatNum(r.stepDenom) + ' בשלב הקודם') : ''}
-                            style={{ fontSize: 12.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                                     color: r.stepWeak ? '#92400e' : '#0369a1', background: r.stepWeak ? '#fff7ed' : '#e0f2fe' }}>
-                            {(r.stepWeak && r.stepPct != null ? '~' : '') + fmtPct(r.stepPct) + ' מהשלב הקודם'}
-                          </span>
-                          <span style={{ fontSize: 11.5, color: r.topWeak ? '#b45309' : '#64748b' }}>
-                            {(r.topWeak && r.topPct != null ? '~' : '') + fmtPct(r.topPct) + ' מראש המשפך'}
-                          </span>
-                        </>)}
-                      </>)}
-                    </div>
+                  )}
+                  <div style={{
+                    flex: '1 1 0', minWidth: 118,
+                    background: na ? '#f8fafc' : leak ? '#fff1f2' : '#fff',
+                    border: '1px solid ' + (na ? '#e2e8f0' : leak ? '#fecdd3' : '#e2e8f0'),
+                    borderTop: '3px solid ' + (na ? '#e2e8f0' : accent),
+                    borderRadius: 10, padding: '9px 10px', textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: na ? '#94a3b8' : leak ? '#9f1239' : '#475569', lineHeight: 1.3, minHeight: 28 }}>{r.label}</div>
+                    {na ? (
+                      <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginTop: 10 }}>אין נתון</div>
+                    ) : (<>
+                      <div style={{ fontSize: 21, fontWeight: 700, color: leak ? '#9f1239' : '#0f172a', lineHeight: 1.15, marginTop: 2 }}>{formatNum(r.value)}</div>
+                      <div title={r.denom != null ? ('מתוך ' + formatNum(r.denom)) : ''}
+                        style={{ fontSize: 12.5, fontWeight: 700, marginTop: 4, color: r.weak ? '#b45309' : accent }}>
+                        {r.of ? ((r.weak && r.pct != null ? '~' : '') + fmtPct(r.pct)) : '—'}
+                      </div>
+                      <div style={{ fontSize: 9.5, color: '#94a3b8', marginTop: 1, lineHeight: 1.3 }}>
+                        {r.ofLabel}{r.denom != null ? ' (' + formatNum(r.denom) + ')' : ''}
+                      </div>
+                    </>)}
                   </div>
-                  <div style={{ marginTop: 8, height: 8, background: '#f1f5f9', borderRadius: 20, overflow: 'hidden' }}>
-                    <div style={{ width: w + '%', height: '100%', borderRadius: 20,
-                                  background: na ? '#e2e8f0' : (r.stepWeak ? 'linear-gradient(90deg,#fdba74,#fb923c)' : 'linear-gradient(90deg,#a78bfa,#7c3aed)') }} />
-                  </div>
-                </div>
+                </Fragment>
               );
             })}
           </div>
 
-          {(anyWeak || missing.length > 0) && (
-            <div style={{ marginTop: 10, fontSize: 11.5, color: '#64748b', lineHeight: 1.7 }}>
-              {anyWeak && <div><b style={{ color: '#b45309' }}>~</b>{' אחוז שחושב על פחות מ-' + MIN_N + ' — רועש מכדי להסיק ממנו, ולא להתייחס אליו כעובדה.'}</div>}
-              {missing.length > 0 && <div>{'"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — חסר מקור נתונים לשלב הזה בטווח הנבחר.'}</div>}
-            </div>
-          )}
+          <div style={{ marginTop: 9, fontSize: 11.5, color: '#64748b', lineHeight: 1.7 }}>
+            <div><b style={{ color: '#e11d48' }}>↳</b>{' "פגישות שהתבטלו" הוא ענף ולא שלב: הוא נמדד מהפגישות שנקבעו, כמו "הגיעו", ולא ממנו.'}</div>
+            {anyWeak && <div><b style={{ color: '#b45309' }}>~</b>{' אחוז שחושב על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו, לא להתייחס אליו כעובדה.'}</div>}
+            {missing.length > 0 && <div>{'"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — חסר מקור נתונים לשלב הזה בטווח הנבחר.'}</div>}
+          </div>
         </div>
       );
     };
-
 
     return (
       <>
@@ -5104,7 +5103,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
