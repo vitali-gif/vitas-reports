@@ -113,6 +113,14 @@ export default function ClientPage() {
       const res = await apiFetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`, {
         headers: {}
       })
+      // 401 כאן (אחרי שה-apiFetch כבר ניסה לרענן) = ההתחברות באמת פגה, לא "אין גישה".
+      // מחזירים למסך הכניסה עם הסבר, במקום מסך מנעול שמרמז שהגישה בוטלה.
+      if (res.status === 401) {
+        await supabase.auth.signOut().catch(() => {})
+        setStep('login')
+        showToast('החיבור פג תוקף — התחבר שוב')
+        return
+      }
       if (!res.ok) { setStep('error'); return }
       const list = await res.json()
       if (!Array.isArray(list) || list.length === 0) { setStep('error'); return }
