@@ -1950,6 +1950,171 @@ const selectProject = async (client, project) => {
       );
     }, [selectedMonth, reports, expandedAdTree, adsSpentOnly]);
 
+  // ── סרגל אחוזי המרה לאורך המשפך ────────────────────────────────────────────────
+    // מסלול אחד לרוחב, מחשיפות ועד חוזה. מחליף את משפך הלידים הישן, שהתחיל בלידים
+    // ולכן לא יכול היה להראות את הדליפה הגדולה ביותר — זו שבין החשיפה לליד.
+    //
+    // לכל תחנה: המספר המוחלט, האחוז, ושם המכנה במפורש מתחתיו. "36%" בלי לדעת ממה
+    // הוא נמדד הוא בדיוק אותו מספר חסר משמעות שאחוז בלי n הוא.
+    //
+    // המכנה אינו התחנה שלפניה אלא מוגדר לכל תחנה בנפרד: "התבטלו" נמדד מהפגישות
+    // שנקבעו ולא מ"הגיעו", והרשמות וחוזים נמדדים שניהם מהפגישות שהתקיימו. שרשור
+    // עיוור לפי הסדר היה מייצר כאן שלושה אחוזים שגויים.
+    //
+    // צבע: סקאלה אחת שמתכהה לאורך המסלול (עומק במשפך), ולא קשת צבעים כמו בגרסה
+    // הישנה — שם כל שלב קיבל גוון אחר, מה שרומז על זהויות שונות במקום על רצף אחד.
+    // המספרים נשארים בצבע טקסט; הצבע יושב על הפס בלבד. הביטולים הם צבע מצב (ורוד)
+    // ומסומנים גם בחץ ↳ וגם בטקסט, כדי שהם לא ייקראו כשלב ברצף.
+    const renderFunnelBar = useCallback(() => {
+      const MIN_N = 30;
+      const RAMP = ['#ddd6fe', '#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95'];
+      const LEAK = '#e11d48';
+
+      const _rows = reports.filter(r => r.month === selectedMonth);
+      const crmR = _rows.filter(r => r.source === 'crm');
+      const fbR = _rows.filter(r => r.source === 'facebook');
+      const gR = _rows.filter(r => r.source && r.source.startsWith('google'));
+
+      const _nlRoot = crmR[0]?.summary?.namedLeads || null;
+      const _nl = _nlRoot ? (_nlRoot.all ? _nlRoot : { all: _nlRoot }) : null;
+      const g = _nl ? (funnelChannel === 'facebook' ? _nl.facebook : funnelChannel === 'google' ? _nl.google : _nl.all) : null;
+      const L = (a) => (Array.isArray(a) ? a.length : null);
+
+      const mediaRows = funnelChannel === 'facebook' ? fbR : funnelChannel === 'google' ? gR : [...fbR, ...gR];
+      let hasMedia = false, impr = 0, clk = 0;
+      for (const r of mediaRows) {
+        const sm = r.summary || {};
+        if (sm.impressions != null || sm.clicks != null) hasMedia = true;
+        impr += Number(sm.impressions) || 0;
+        clk += Number(sm.clicks) || 0;
+      }
+      const chF = fbR.length > 0, chG = gR.length > 0;
+
+      const leads = g ? L(g.allLeads) : null;
+      const noResp = g ? L(g.noResponse) : null;
+      const V = {
+        impr: hasMedia ? impr : null,
+        click: hasMedia ? clk : null,
+        lead: leads,
+        cont: (leads != null && noResp != null) ? leads - noResp : null,
+        sched: g ? L(g.meetingsScheduled) : null,
+        held: g ? L(g.meetingsCompleted) : null,
+        canc: g ? L(g.meetingsCancelled) : null,
+        reg: g ? L(g.registrations) : null,
+        deal: g ? L(g.contracts) : null,
+      };
+
+      const STAGES = [
+        { key: 'impr',  label: 'חשיפות',          of: null,    ofLabel: 'ראש המשפך' },
+        { key: 'click', label: 'קליקים על קישור', of: 'impr',  ofLabel: 'מהחשיפות' },
+        { key: 'lead',  label: 'לידים',            of: 'click', ofLabel: 'מהקליקים' },
+        { key: 'cont',  label: 'נוצר קשר',         of: 'lead',  ofLabel: 'מהלידים' },
+        { key: 'sched', label: 'פגישה נקבעה',      of: 'cont',  ofLabel: 'מנוצר קשר' },
+        { key: 'held',  label: 'פגישות שהגיעו',    of: 'sched', ofLabel: 'מהפגישות שנקבעו' },
+        { key: 'canc',  label: 'פגישות שהתבטלו',   of: 'sched', ofLabel: 'מהפגישות שנקבעו', leak: true },
+        { key: 'reg',   label: 'הרשמות',           of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
+        { key: 'deal',  label: 'חוזים',            of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
+      ];
+      if (STAGES.every(st => V[st.key] == null)) return null;
+
+      // "0.035%" חסר משמעות בדיוק כמו אחוז בלי n. מתחת לחצי אחוז עוברים ל"1 מכל N".
+      const fmtPct = (x) => {
+        if (x == null) return '—';
+        if (x >= 10) return x.toFixed(0) + '%';
+        if (x >= 1) return x.toFixed(1) + '%';
+        if (x >= 0.5) return x.toFixed(2) + '%';
+        if (x > 0) return '1 מכל ' + formatNum(Math.round(100 / x));
+        return '0%';
+      };
+
+      let mainIdx = -1;
+      const rows = STAGES.map(st => {
+        if (!st.leak) mainIdx++;
+        const v = V[st.key];
+        const d = st.of ? V[st.of] : null;
+        const pct = (v != null && d != null && d > 0) ? (v / d) * 100 : null;
+        return { ...st, value: v, denom: d, pct, weak: d != null && d < MIN_N,
+                 color: st.leak ? LEAK : RAMP[Math.min(mainIdx, RAMP.length - 1)] };
+      });
+      const anyWeak = rows.some(r => r.value != null && r.weak);
+      const missing = rows.filter(r => r.value == null);
+
+      return (
+        <div className="section">
+          <div className="section-head">
+            <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+            <h2>משפך לידים</h2>
+            <span className="sub">מחשיפה ועד חוזה · כל אחוז נמדד מהמכנה הרשום מתחתיו</span>
+          </div>
+
+          {(chF || chG) && (
+            <div className="client-tabs" style={{ marginBottom: 14 }}>
+              <button type="button" className={`client-tab ${funnelChannel === 'all' ? 'active' : ''}`} onClick={() => setFunnelChannel('all')}>הכל</button>
+              {chF && <button type="button" className={`client-tab ${funnelChannel === 'facebook' ? 'active' : ''}`} onClick={() => setFunnelChannel('facebook')}>Facebook</button>}
+              {chG && <button type="button" className={`client-tab ${funnelChannel === 'google' ? 'active' : ''}`} onClick={() => setFunnelChannel('google')}>Google</button>}
+            </div>
+          )}
+
+          {funnelChannel === 'all' && chF && chG && (
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '9px 12px', marginBottom: 14, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+              <b>{'תצוגת "הכל" מערבבת סוגי משפך.'}</b>{' טופס מיידי ודף נחיתה אינם ברי-השוואה, והלידים כוללים גם מקורות ללא מדיה. להשוואה אמיתית בחר ערוץ בודד.'}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: 6, overflowX: 'auto', paddingBottom: 8 }}>
+            {rows.map((r, i) => {
+              const na = r.value == null;
+              const leak = !!r.leak;
+              const barW = na || r.pct == null ? 0 : Math.max(2, Math.min(100, r.pct));
+              return (
+                <Fragment key={r.key}>
+                  {i > 0 && (
+                    <div aria-hidden style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: leak ? '#fb7185' : '#cbd5e1', fontSize: leak ? 15 : 17, flex: '0 0 auto', width: 12 }}>
+                      {leak ? '↳' : '‹'}
+                    </div>
+                  )}
+                  <div title={r.denom != null ? (r.label + ': ' + formatNum(r.value ?? 0) + ' מתוך ' + formatNum(r.denom) + ' ' + r.ofLabel) : r.label}
+                    style={{
+                      flex: '1 1 0', minWidth: 124,
+                      background: na ? '#f8fafc' : '#fff',
+                      border: '1px solid ' + (na ? '#e2e8f0' : leak ? '#fecdd3' : '#e5e7eb'),
+                      borderRadius: 12, padding: '12px 10px 11px', textAlign: 'center',
+                      boxShadow: na ? 'none' : '0 1px 2px rgba(15,23,42,0.04)',
+                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 30 }}>
+                      {leak && <span aria-hidden style={{ color: LEAK, fontSize: 11, lineHeight: 1 }}>▼</span>}
+                      <span style={{ fontSize: 11, fontWeight: 600, color: na ? '#94a3b8' : '#475569', lineHeight: 1.35 }}>{r.label}</span>
+                    </div>
+                    {na ? (
+                      <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, margin: '14px 0 8px' }}>אין נתון</div>
+                    ) : (<>
+                      <div style={{ fontSize: 23, fontWeight: 700, color: '#0f172a', lineHeight: 1.1, letterSpacing: '-0.01em' }}>{formatNum(r.value)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: r.weak ? '#b45309' : '#334155', marginTop: 5 }}>
+                        {r.of ? ((r.weak && r.pct != null ? '~' : '') + fmtPct(r.pct)) : ' '}
+                      </div>
+                      <div style={{ height: 4, background: '#f1f5f9', borderRadius: 4, margin: '6px 6px 0', overflow: 'hidden' }}>
+                        <div style={{ width: barW + '%', height: '100%', borderRadius: 4, background: r.color, marginInlineStart: 0 }} />
+                      </div>
+                      <div style={{ fontSize: 9.5, color: '#94a3b8', marginTop: 5, lineHeight: 1.35 }}>
+                        {r.of ? (r.ofLabel + (r.denom != null ? ' (' + formatNum(r.denom) + ')' : '')) : r.ofLabel}
+                      </div>
+                    </>)}
+                  </div>
+                </Fragment>
+              );
+            })}
+          </div>
+
+          <div style={{ marginTop: 4, fontSize: 11.5, color: '#64748b', lineHeight: 1.75 }}>
+            <div><span style={{ color: LEAK, fontWeight: 700 }}>▼ פגישות שהתבטלו</span>{' הוא ענף ולא שלב: הוא נמדד מהפגישות שנקבעו, כמו "הגיעו", ולא ממנו.'}</div>
+            {anyWeak && <div><b style={{ color: '#b45309' }}>~</b>{' אחוז שחושב על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו, ולא להתייחס אליו כעובדה.'}</div>}
+            {missing.length > 0 && <div>{'"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — חסר מקור נתונים לשלב הזה בטווח הנבחר.'}</div>}
+          </div>
+        </div>
+      );
+    }, [reports, selectedMonth, funnelChannel]);
+
     const renderCrmDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
     destroyCharts();
@@ -2216,53 +2381,7 @@ const selectProject = async (client, project) => {
         </div>
 
 
-        {/* CRM Funnel */}
-        <div className="section">
-          <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><h2>{'\u05de\u05e9\u05e4\u05da \u05dc\u05d9\u05d3\u05d9\u05dd'}</h2><span className="sub">{'\u05de\u05dc\u05d9\u05d3 \u05d5\u05e2\u05d3 \u05d7\u05d5\u05d6\u05d4'}</span></div>
-          <div className="crm-funnel">
-            <div className="crm-fstep sky">
-              <div className="v">{formatNum(ct.totalLeads)}</div>
-              <div className="l">{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</div>
-              <div className="pct">100%</div>
-              {compareEnabled && cp ? (() => { const _c=ct.totalLeads; const _p=(cp.totalLeads)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
-            </div>
-            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-            <div className="crm-fstep">
-              <div className="v">{formatNum(ct.relevantLeads)}</div>
-              <div className="l">{'\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</div>
-              <div className="pct">{ct.totalLeads > 0 ? ct.relevantRate.toFixed(0) + '%' : '-'}</div>
-              {compareEnabled && cp ? (() => { const _c=ct.relevantLeads; const _p=(cp.relevantLeads)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
-            </div>
-            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-            <div className="crm-fstep terra">
-              <div className="v">{formatNum(ct.meetingsScheduled)}</div>
-              <div className="l">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5'}</div>
-              <div className="pct">{ct.totalLeads > 0 ? ct.scheduledRate.toFixed(0) + '%' : '-'}</div>
-              {compareEnabled && cp ? (() => { const _c=ct.meetingsScheduled; const _p=(cp.meetingsScheduled)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
-            </div>
-            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-            <div className="crm-fstep emerald">
-              <div className="v">{formatNum(ct.meetingsCompleted)}</div>
-              <div className="l">{'\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5'}</div>
-              <div className="pct">{ct.meetingsScheduled > 0 ? (ct.meetingsCompleted / ct.meetingsScheduled * 100).toFixed(0) + '%' : '-'}</div>
-              {compareEnabled && cp ? (() => { const _c=ct.meetingsCompleted; const _p=(cp.meetingsCompleted)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
-            </div>
-            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-            <div className="crm-fstep amber">
-              <div className="v">{formatNum(ct.registrations)}</div>
-              <div className="l">{'\u05d4\u05e8\u05e9\u05de\u05d5\u05ea'}</div>
-              <div className="pct">{ct.meetingsCompleted > 0 ? (ct.registrations / ct.meetingsCompleted * 100).toFixed(0) + '%' : '-'}</div>
-              {compareEnabled && cp ? (() => { const _c=ct.registrations; const _p=(cp.registrations)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
-            </div>
-            <div className="crm-farrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-            <div className="crm-fstep rose">
-              <div className="v">{formatNum(ct.contracts)}</div>
-              <div className="l">{'\u05d7\u05d5\u05d6\u05d9\u05dd'}</div>
-              <div className="pct">{ct.registrations > 0 ? (ct.contracts / ct.registrations * 100).toFixed(0) + '%' : '-'}</div>
-              {compareEnabled && cp ? (() => { const _c=ct.contracts; const _p=(cp.contracts)||0; const d=_c-_p; if(_p===0&&_c===0)return null; const pStr=_p>0?('('+(d>0?'+':'')+Math.abs(d/_p*100).toFixed(0)+'%)'):d>0?'(חדש)':null; if(!pStr&&d===0)return null; const arrow=d>0?"↑":d<0?"↓":"−"; const sign=d>0?"+":d<0?"-":""; return <span className="kpi-trend" style={{fontSize:9,padding:"2px 5px",marginTop:3}}>{arrow} {sign}{formatNum(Math.abs(Math.round(d)))} {pStr||""}</span>; })() : null}
-            </div>
-          </div>
-        </div>
+        {renderFunnelBar()}
 
         {/* CRM Table by Source */}
         <div className="section">
@@ -2385,7 +2504,7 @@ const selectProject = async (client, project) => {
         </div>
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric]);
+  }, [selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric, renderFunnelBar]);
 
   const renderDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
@@ -2790,150 +2909,6 @@ const selectProject = async (client, project) => {
 
     // Total leads including CRM for "all" tab display
     const totalLeadsWithCrm = dashTab === 'all' ? t.leads + crmTotalLeads : activeT.leads;
-
-    // ── סרגל אחוזי המרה לאורך המשפך ──────────────────────────────────────────────
-    // מסלול אחד לרוחב. לכל תחנה: המספר המוחלט, האחוז, ושם המכנה במפורש מתחתיו —
-    // כי "36%" בלי לדעת ממה זה נמדד הוא בדיוק אותו מספר חסר משמעות שאחוז בלי n הוא.
-    //
-    // המכנה אינו תמיד התחנה שלפניה, ולכן הוא מוגדר לכל תחנה בנפרד ולא נגזר מהסדר:
-    // "התבטלו" נמדד מהפגישות שנקבעו ולא מהפגישות שהגיעו, והרשמות וחוזים נמדדים
-    // שניהם מהפגישות שהתקיימו. שרשור עיוור לפי סדר היה מייצר שלושה אחוזים שגויים.
-    //
-    // שלושת הכללים: מספר מוחלט לצד כל אחוז; מכנה מתחת ל-MIN_N מסמן את האחוז כלא
-    // אמין (~, כתום); תחנה בלי מקור נתונים מציגה "אין נתון" ולא אפס.
-    const renderFunnelBar = () => {
-      const MIN_N = 30;
-      const _nlRoot = crmReports[0]?.summary?.namedLeads || null;
-      const _nl = _nlRoot ? (_nlRoot.all ? _nlRoot : { all: _nlRoot }) : null;
-      const g = _nl ? (funnelChannel === 'facebook' ? _nl.facebook : funnelChannel === 'google' ? _nl.google : _nl.all) : null;
-      const L = (a) => (Array.isArray(a) ? a.length : null);
-
-      const _mediaRows = funnelChannel === 'facebook' ? fbReports
-        : funnelChannel === 'google' ? gReports
-        : [...fbReports, ...gReports];
-      let _hasMedia = false, _impr = 0, _clk = 0;
-      for (const r of _mediaRows) {
-        const sm = r.summary || {};
-        if (sm.impressions != null || sm.clicks != null) _hasMedia = true;
-        _impr += Number(sm.impressions) || 0;
-        _clk += Number(sm.clicks) || 0;
-      }
-      const _chF = fbReports.length > 0, _chG = gReports.length > 0;
-
-      const leads = g ? L(g.allLeads) : null;
-      const noResp = g ? L(g.noResponse) : null;
-      const V = {
-        impr: _hasMedia ? _impr : null,
-        click: _hasMedia ? _clk : null,
-        lead: leads,
-        cont: (leads != null && noResp != null) ? leads - noResp : null,
-        sched: g ? L(g.meetingsScheduled) : null,
-        held: g ? L(g.meetingsCompleted) : null,
-        canc: g ? L(g.meetingsCancelled) : null,
-        reg: g ? L(g.registrations) : null,
-        deal: g ? L(g.contracts) : null,
-      };
-
-      const STAGES = [
-        { key: 'impr',  label: 'חשיפות',            of: null,    ofLabel: 'ראש המשפך' },
-        { key: 'click', label: 'קליקים על קישור',   of: 'impr',  ofLabel: 'מהחשיפות' },
-        { key: 'lead',  label: 'לידים',              of: 'click', ofLabel: 'מהקליקים' },
-        { key: 'cont',  label: 'נוצר קשר',           of: 'lead',  ofLabel: 'מהלידים' },
-        { key: 'sched', label: 'פגישה נקבעה',        of: 'cont',  ofLabel: 'מנוצר קשר' },
-        { key: 'held',  label: 'פגישות שהגיעו',      of: 'sched', ofLabel: 'מהפגישות שנקבעו' },
-        { key: 'canc',  label: 'פגישות שהתבטלו',     of: 'sched', ofLabel: 'מהפגישות שנקבעו', leak: true },
-        { key: 'reg',   label: 'הרשמות',             of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
-        { key: 'deal',  label: 'חוזים',              of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
-      ];
-      if (STAGES.every(st => V[st.key] == null)) return null;
-
-      // "0.035%" חסר משמעות בדיוק כמו אחוז בלי n. מתחת לחצי אחוז עוברים ל"1 מכל N".
-      const fmtPct = (x) => {
-        if (x == null) return '—';
-        if (x >= 10) return x.toFixed(0) + '%';
-        if (x >= 1) return x.toFixed(1) + '%';
-        if (x >= 0.5) return x.toFixed(2) + '%';
-        if (x > 0) return '1 מכל ' + formatNum(Math.round(100 / x));
-        return '0%';
-      };
-
-      const rows = STAGES.map(st => {
-        const v = V[st.key];
-        const d = st.of ? V[st.of] : null;
-        const pct = (v != null && d != null && d > 0) ? (v / d) * 100 : null;
-        return { ...st, value: v, denom: d, pct, weak: d != null && d < MIN_N };
-      });
-      const anyWeak = rows.some(r => r.value != null && r.weak);
-      const missing = rows.filter(r => r.value == null);
-
-      return (
-        <div className="section">
-          <div className="section-head">
-            <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
-            <h2>אחוזי המרה לאורך המשפך</h2>
-            <span className="sub">כל אחוז נמדד מהמכנה הרשום מתחתיו</span>
-          </div>
-
-          {(_chF || _chG) && (
-            <div className="client-tabs" style={{ marginBottom: 12 }}>
-              <button type="button" className={`client-tab ${funnelChannel === 'all' ? 'active' : ''}`} onClick={() => setFunnelChannel('all')}>הכל</button>
-              {_chF && <button type="button" className={`client-tab ${funnelChannel === 'facebook' ? 'active' : ''}`} onClick={() => setFunnelChannel('facebook')}>Facebook</button>}
-              {_chG && <button type="button" className={`client-tab ${funnelChannel === 'google' ? 'active' : ''}`} onClick={() => setFunnelChannel('google')}>Google</button>}
-            </div>
-          )}
-
-          {funnelChannel === 'all' && _chF && _chG && (
-            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '9px 12px', marginBottom: 12, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
-              <b>{'תצוגת "הכל" מערבבת סוגי משפך.'}</b>{' טופס מיידי ודף נחיתה אינם ברי-השוואה, והלידים כוללים גם מקורות ללא מדיה. להשוואה אמיתית בחר ערוץ בודד.'}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, overflowX: 'auto', paddingBottom: 6 }}>
-            {rows.map((r, i) => {
-              const na = r.value == null;
-              const leak = !!r.leak;
-              const accent = na ? '#94a3b8' : leak ? '#e11d48' : '#7c3aed';
-              return (
-                <Fragment key={r.key}>
-                  {i > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', color: leak ? '#fda4af' : '#cbd5e1', fontSize: 18, padding: '0 2px', flex: '0 0 auto' }}>
-                      {leak ? '↳' : '›'}
-                    </div>
-                  )}
-                  <div style={{
-                    flex: '1 1 0', minWidth: 118,
-                    background: na ? '#f8fafc' : leak ? '#fff1f2' : '#fff',
-                    border: '1px solid ' + (na ? '#e2e8f0' : leak ? '#fecdd3' : '#e2e8f0'),
-                    borderTop: '3px solid ' + (na ? '#e2e8f0' : accent),
-                    borderRadius: 10, padding: '9px 10px', textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: na ? '#94a3b8' : leak ? '#9f1239' : '#475569', lineHeight: 1.3, minHeight: 28 }}>{r.label}</div>
-                    {na ? (
-                      <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginTop: 10 }}>אין נתון</div>
-                    ) : (<>
-                      <div style={{ fontSize: 21, fontWeight: 700, color: leak ? '#9f1239' : '#0f172a', lineHeight: 1.15, marginTop: 2 }}>{formatNum(r.value)}</div>
-                      <div title={r.denom != null ? ('מתוך ' + formatNum(r.denom)) : ''}
-                        style={{ fontSize: 12.5, fontWeight: 700, marginTop: 4, color: r.weak ? '#b45309' : accent }}>
-                        {r.of ? ((r.weak && r.pct != null ? '~' : '') + fmtPct(r.pct)) : '—'}
-                      </div>
-                      <div style={{ fontSize: 9.5, color: '#94a3b8', marginTop: 1, lineHeight: 1.3 }}>
-                        {r.ofLabel}{r.denom != null ? ' (' + formatNum(r.denom) + ')' : ''}
-                      </div>
-                    </>)}
-                  </div>
-                </Fragment>
-              );
-            })}
-          </div>
-
-          <div style={{ marginTop: 9, fontSize: 11.5, color: '#64748b', lineHeight: 1.7 }}>
-            <div><b style={{ color: '#e11d48' }}>↳</b>{' "פגישות שהתבטלו" הוא ענף ולא שלב: הוא נמדד מהפגישות שנקבעו, כמו "הגיעו", ולא ממנו.'}</div>
-            {anyWeak && <div><b style={{ color: '#b45309' }}>~</b>{' אחוז שחושב על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו, לא להתייחס אליו כעובדה.'}</div>}
-            {missing.length > 0 && <div>{'"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — חסר מקור נתונים לשלב הזה בטווח הנבחר.'}</div>}
-          </div>
-        </div>
-      );
-    };
 
     return (
       <>
@@ -4314,7 +4289,6 @@ const selectProject = async (client, project) => {
 
           // BMBY CRM (existing behavior — unchanged)
           return (<>
-            {renderFunnelBar()}
             <div className="client-tabs" style={{marginBottom: 15}}>
               <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
               <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
