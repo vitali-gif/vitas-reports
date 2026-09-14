@@ -4378,6 +4378,13 @@ const selectProject = async (client, project) => {
           )
         })()}
 
+        {/* משפך לידים ללקוח שעדיין אין לו CRM (שמי נדל"ן היום).
+            הסרגל חי בתוך טאב ה-CRM, וטאב ה-CRM לא קיים בלי נתוני CRM — כלומר לקוח
+            מדיה-בלבד לא היה רואה אותו כלל, למרות שחצי מהמשפך שלו כן קיים.
+            כאן הוא מוצג בטאב "הכל": שלבי המדיה עם נתונים, ושלבי ה-CRM כ"אין נתון".
+            ברגע שה-CRM יחובר, טאב ה-CRM ייווצר והסרגל יעבור לשם מעצמו. */}
+        {dashTab === 'all' && !hasCrm ? renderFunnelBar() : null}
+
         {/* פילוח פנימי לפי פרויקט — לקוח בחשבון מודעות אחד שמזהה את הבניין ברמת המודעה.
             הסכום למעלה נשאר סך החשבון; כאן רואים ממה הוא מורכב. כל שקל בדלי אחד בלבד,
             כולל דלי "ללא שיוך" — כדי ששם מודעה שגוי ייראה במקום להיעלם בשקט. */}
@@ -5077,7 +5084,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
