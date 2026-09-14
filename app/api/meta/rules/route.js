@@ -3,7 +3,7 @@
 //   GET    — list current automated rules
 //   DELETE — remove a rule by id (?id=RULE_ID) — for cleanup / UI rule management
 //
-// Auth: אדמין מאומת בלבד (JWT).
+// Auth: requires x-client-key = anon key (admin UI only).
 //
 // NOTE: Meta Automated Rules schema is strict. Key requirements (per Meta docs):
 //   - every rule MUST include an entity_type OR id filter
@@ -13,7 +13,6 @@
 // We scope by campaign.id IN [...] (resolved from the project name) so rules never
 // affect other clients sharing the same ad account, and to avoid case-sensitivity issues.
 
-import { requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -191,8 +190,10 @@ function buildRulePayload(ruleType, params, projectName, scope, notifyUserId) {
 }
 
 export async function POST(request) {
-  const gate = await requireAdmin(request)
-  if (!gate.ok) return gate.res
+  const anon = request.headers.get('x-client-key')
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return bad('Unauthorized', 401)
+  }
   let body = {}
   try { body = await request.json() } catch { return bad('Invalid JSON') }
   const { projectName, ruleType, params, recommendationKey } = body
@@ -278,8 +279,10 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
-  const gate = await requireAdmin(request)
-  if (!gate.ok) return gate.res
+  const anon = request.headers.get('x-client-key')
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return bad('Unauthorized', 401)
+  }
   const token = process.env.META_ACCESS_TOKEN
   const adAccountId = process.env.META_AD_ACCOUNT_ID
   if (!token || !adAccountId) return bad('Meta env vars missing', 500)
@@ -292,8 +295,10 @@ export async function GET(request) {
 }
 
 export async function DELETE(request) {
-  const gate = await requireAdmin(request)
-  if (!gate.ok) return gate.res
+  const anon = request.headers.get('x-client-key')
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return bad('Unauthorized', 401)
+  }
   const token = process.env.META_ACCESS_TOKEN
   if (!token) return bad('Meta env vars missing', 500)
   const { searchParams } = new URL(request.url)

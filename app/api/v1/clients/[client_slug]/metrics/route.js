@@ -105,9 +105,9 @@ export async function GET(request, ctx) {
   // Optional live pull when the period isn't cached yet.
   if (!crm && refresh) {
     const origin = new URL(request.url).origin
-    const internalKey = process.env.CRON_SECRET || ''
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     const body = JSON.stringify({ projectId, since: from, until: to })
-    const hdr = { 'Content-Type': 'application/json', 'x-internal-key': internalKey }
+    const hdr = { 'Content-Type': 'application/json', 'x-client-key': anon }
     await Promise.allSettled(['/api/bmby/fetch', '/api/meta/fetch', '/api/google/fetch']
       .map(u => fetch(origin + u, { method: 'POST', headers: hdr, body })))
     reps = await readReports()

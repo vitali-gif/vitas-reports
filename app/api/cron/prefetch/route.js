@@ -139,7 +139,7 @@ export async function GET(request) {
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
 
-  const internalKey = process.env.CRON_SECRET || ''   // קריאה פנימית שרת-לשרת
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   const results = []
 
   async function run(job) {
@@ -147,7 +147,7 @@ export async function GET(request) {
     try {
       const res = await fetch(`${base}/api/${job.source}/fetch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey },
+        headers: { 'Content-Type': 'application/json', 'x-client-key': anonKey },
         body: JSON.stringify(job.payload),
       })
       const data = await res.json().catch(() => ({}))
