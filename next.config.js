@@ -3,16 +3,16 @@
 // כותרות אבטחה. עד עכשיו התשובות נשאו רק HSTS (מ-Vercel), כך שאפשר היה
 // להטמיע את הדשבורד ב-iframe באתר זר.
 //
-// CSP מלא לא נכלל כאן בכוונה: הדף טוען Google Fonts, Microsoft Clarity ו-Supabase,
-// ומדיניות שגויה שוברת אותם בשקט. התבנית למטה היא נקודת ההתחלה — להפעיל אותה
-// קודם כ-Content-Security-Policy-Report-Only ולבדוק את הקונסול לפני שאוכפים.
+// CSP מלא לא נכלל כאן בכוונה: הדף טוען Google Fonts ו-Supabase, ומדיניות שגויה
+// שוברת אותם בשקט. התבנית למטה היא נקודת ההתחלה — להפעיל אותה קודם כ-
+// Content-Security-Policy-Report-Only ולבדוק את הקונסול לפני שאוכפים.
 //
 //   default-src 'self';
-//   script-src 'self' 'unsafe-inline' https://www.clarity.ms;
+//   script-src 'self' 'unsafe-inline';
 //   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
 //   font-src 'self' https://fonts.gstatic.com;
 //   img-src 'self' data: blob: https:;
-//   connect-src 'self' https://*.supabase.co https://*.clarity.ms;
+//   connect-src 'self' https://*.supabase.co;
 //   frame-ancestors 'none';
 const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },

@@ -3,7 +3,11 @@ import { NextResponse } from 'next/server'
 export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const token = searchParams.get('token')
-  const type = searchParams.get('type') || 'magiclink'
+  // הפרמטר הגיע מה-URL והועבר ל-Supabase כמו שהוא. whitelist קצר מונע העברת
+  // ערך שרירותי לשרת האימות.
+  const VALID_TYPES = ['magiclink', 'recovery', 'invite', 'signup', 'email_change']
+  const requested = searchParams.get('type')
+  const type = VALID_TYPES.includes(requested) ? requested : 'magiclink'
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
 

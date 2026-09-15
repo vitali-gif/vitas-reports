@@ -36,7 +36,7 @@ export async function GET(request) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY   // בלי נפילה חזרה למפתח הציבורי: חסר = 500 מפורש
   if (!supabaseUrl || !supabaseKey) return Response.json({ ok: false, error: 'env missing' }, { status: 500 })
   const sb = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 
