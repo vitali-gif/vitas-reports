@@ -1764,9 +1764,36 @@ const selectProject = async (client, project) => {
       return <div className="welcome-center"><div className="icon">📅</div><h3>{'אין פגישות שבוצעו לתקופה זו'}</h3></div>;
     }
     const fmtDate = (d) => { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/); if (!m) return String(d || ''); return m[3] + '/' + m[2] + '/' + m[1] + (m[4] ? '  ' + m[4] + ':' + m[5] : ''); };
+
+    // ייצוא לאקסל של בדיוק מה שמוצג בטבלה — אותן שורות, אותו סדר, אותו פורמט
+    // תאריך. קובץ שמכיל משהו אחר ממה שהמסך מראה הוא מקור לוויכוח מול הלקוח.
+    // שני פרטים שנראים טכניים ואינם: תצוגת RTL על החוברת, אחרת אקסל פותח את
+    // הגיליון משמאל לימין ועברית נראית שבורה; ורוחבי עמודות, כי "תיאור" הוא
+    // טקסט חופשי ארוך שבלי רוחב מפורש נחתך לעמודה צרה.
+    const exportMeetings = () => {
+      const rows = meetings.map(m => ({
+        'שם מלא': m.name || '',
+        'טלפון': m.phone || '',
+        'מקור הגעה': m.source || '',
+        'תאריך פגישה': fmtDate(m.date),
+        'תיאור': (m.description || '').toString(),
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [{ wch: 22 }, { wch: 15 }, { wch: 22 }, { wch: 18 }, { wch: 70 }];
+      const wb = XLSX.utils.book_new();
+      wb.Workbook = { Views: [{ RTL: true }] };
+      XLSX.utils.book_append_sheet(wb, ws, 'פגישות שבוצעו');
+      XLSX.writeFile(wb, 'פגישות-שבוצעו_' + (selectedMonth || '') + '.xlsx');
+    };
+
     return (
       <div className="section">
-        <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>{'פגישות שבוצעו'}</h2><span className="sub">{meetings.length + ' פגישות בתקופה'}</span></div>
+        <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>{'פגישות שבוצעו'}</h2><span className="sub">{meetings.length + ' פגישות בתקופה'}</span>
+          <button type="button" onClick={exportMeetings} title="ייצוא הטבלה כפי שהיא לקובץ אקסל"
+            style={{marginInlineStart:'auto',fontSize:'0.76em',fontWeight:600,padding:'5px 10px',borderRadius:8,border:'1px solid #a7f3d0',background:'#ecfdf5',color:'#047857',cursor:'pointer',whiteSpace:'nowrap'}}>
+            {'\u2B07 ייצוא לאקסל'}
+          </button>
+        </div>
         <div className="table-wrapper">
           <table className="data-table">
             <thead><tr><th>{'שם מלא'}</th><th>{'טלפון'}</th><th>{'מקור הגעה'}</th><th>{'תאריך פגישה'}</th><th>{'תיאור'}</th></tr></thead>
