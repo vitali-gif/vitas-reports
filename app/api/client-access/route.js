@@ -110,7 +110,7 @@ async function sendPasswordEmail(toEmail, tempPassword, clientName) {
 export async function GET(req) {
   const user = await getUser(req)
   if (!user) return unauthorized()
-  const admin = isAdminEmail(user.email)
+  const admin = await isAdminEmail(user.email)
 
   const { searchParams } = new URL(req.url)
   const requested = searchParams.get('email')
