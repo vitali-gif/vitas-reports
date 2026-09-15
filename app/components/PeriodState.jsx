@@ -59,10 +59,14 @@ export function PeriodFetching() {
  * הבטיח לענות עליה ("הנתונים מתעדכנים אוטומטית") בלי להראות שום הוכחה.
  */
 export function LastUpdated({ reports, selectedMonth }) {
-  const rows = (reports || []).filter(r => r.month === selectedMonth && r.created_at)
+  // הקרונים כותבים ב-upsert, ולכן created_at של שורת החודש קפוא על היום הראשון
+  // בחודש — הוא "נוצר", לא "עודכן לאחרונה". updated_at (מיגרציה 003) הוא זמן
+  // הכתיבה האחרונה באמת; created_at נשאר כגיבוי עד שהמיגרציה רצה.
+  const stamp = r => r.updated_at || r.created_at
+  const rows = (reports || []).filter(r => r.month === selectedMonth && stamp(r))
   if (!rows.length) return null
 
-  const latest = rows.reduce((max, r) => (r.created_at > max ? r.created_at : max), rows[0].created_at)
+  const latest = rows.reduce((max, r) => (stamp(r) > max ? stamp(r) : max), stamp(rows[0]))
   const then = new Date(latest)
   if (Number.isNaN(then.getTime())) return null
 
