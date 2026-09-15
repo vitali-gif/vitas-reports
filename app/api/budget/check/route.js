@@ -12,7 +12,7 @@ export async function POST(request) {
   if (!gate.ok) return gate.res
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } }
   )
   const il = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }))
