@@ -24,7 +24,7 @@ if (anon !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return 401   // ← לא
 
 | הקורא | מה להשתמש | מה זה בודק |
 |---|---|---|
-| אדמין מממשק הניהול | `requireAdmin(req)` | JWT תקף + המייל ב-`ADMIN_EMAILS` |
+| אדמין מממשק הניהול | `requireAdmin(req)` | JWT תקף + המייל בטבלת `admins` |
 | לקוח, על פרויקט מסוים | `requireProjectAccess(req, projectId)` | JWT תקף + שורה ב-`client_access` |
 | כל משתמש מחובר | `requireUser(req)` | JWT תקף בלבד |
 | קרון / קריאה פנימית | `isInternalCall(req)` | `CRON_SECRET` בכותרת `x-internal-key` |
@@ -85,7 +85,7 @@ route שהוא ציבורי בכוונה נרשם ב-`PUBLIC_ROUTES` בתוך
 מדיניות RLS מתועדת ב-[`scripts/migrations/`](../scripts/migrations/). מי אדמין
 נקבע בשני מקומות שצריכים להישאר מסונכרנים:
 
-- `ADMIN_EMAILS` — משתנה סביבה ב-Vercel, משמש את שכבת ה-API
+- טבלת `admins` — מקור האמת היחיד לאדמינים, משמש גם את שכבת ה-API (`isAdminEmail`) וגם את ה-RLS (`is_admin()`)
 - טבלת `admins` — משמשת את `is_admin()` במדיניות RLS
 
 מוסיפים אדמין? לשני המקומות.

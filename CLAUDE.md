@@ -41,5 +41,5 @@ npm install
 ```
 
 - מדיניות ההרצה של PowerShell חוסמת `npx`, לכן משתמשים ב-`npx.cmd` עם נתיב מלא.
-- משתני ה-Secret ב-Vercel (`ADMIN_EMAILS`, `CRON_SECRET`, `RESEND_API_KEY`) לא נמשכים — מופיעים כ-`[SENSITIVE]`. לקימפול מקומי זה בסדר.
+- משתני ה-Secret ב-Vercel (`CRON_SECRET`, `RESEND_API_KEY`) לא נמשכים — מופיעים כ-`[SENSITIVE]`. לקימפול מקומי זה בסדר.
 - אחרי התקנת Node צריך לפתוח טרמינל חדש, אחרת `node` לא נמצא.
