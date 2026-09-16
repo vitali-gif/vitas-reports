@@ -22,6 +22,19 @@ export const fetchCache = 'force-no-store'
 // Ensure freshly-written reports are visible immediately (no stale cached snapshot).
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0, must-revalidate' }
 
+// updated_at נוספה במיגרציה 003 (טריגר שמעדכן אותה בכל upsert). עד שהיא רצה
+// בפרודקשן, Postgres מחזיר 42703 (undefined_column) — ואז חוזרים על השאילתה
+// בלעדיה. ככה הקוד הזה נפרס בבטחה גם לפני המיגרציה, והתווית "עודכן לפני"
+// נופלת ל-created_at כמו קודם.
+const LITE_COLS = 'id, project_id, source, month, summary, created_at, updated_at'
+async function selectReports(sb, cols, apply) {
+  let res = await apply(sb.from('reports').select(cols))
+  if (res.error?.code === '42703' && cols.includes('updated_at')) {
+    res = await apply(sb.from('reports').select(cols.replace(', updated_at', '')))
+  }
+  return res
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const projectId = searchParams.get('projectId')
@@ -44,21 +57,17 @@ export async function GET(request) {
   // memory. The client merges these rows into its existing state by `id` and ignores rows whose
   // `data` is null, so returning just the heavy rows is a drop-in.
   if (dataForMonths.length > 0) {
-    const { data: heavy, error: heavyOnlyErr } = await supabaseAdmin
-      .from('reports')
-      .select('id, project_id, source, month, summary, created_at, data')
+    const { data: heavy, error: heavyOnlyErr } = await selectReports(supabaseAdmin, LITE_COLS + ', data', q => q
       .eq('project_id', projectId)
-      .in('month', dataForMonths)
+      .in('month', dataForMonths))
     if (heavyOnlyErr) return NextResponse.json({ error: heavyOnlyErr.message }, { status: 500 })
     return NextResponse.json(heavy || [], { headers: NO_STORE })
   }
 
   // 1) LIGHT index — no heavy `data` column (fast, never times out).
-  const { data: lite, error: liteErr } = await supabaseAdmin
-    .from('reports')
-    .select('id, project_id, source, month, summary, created_at')
+  const { data: lite, error: liteErr } = await selectReports(supabaseAdmin, LITE_COLS, q => q
     .eq('project_id', projectId)
-    .order('month', { ascending: false })
+    .order('month', { ascending: false }))
   if (liteErr) return NextResponse.json({ error: liteErr.message }, { status: 500 })
   if (!lite || lite.length === 0) return NextResponse.json([], { headers: NO_STORE })
 

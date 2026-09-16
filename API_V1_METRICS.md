@@ -124,3 +124,31 @@ Issue a new token (store only its hash):
 insert into api_tokens (token_hash, client_slug, label)
 values (encode(digest('<PLAINTEXT_TOKEN>','sha256'),'hex'), 'sbaruch', 'campaign-session-x');
 ```
+
+## Monitoring feed — `GET /api/v1/health`
+For the daily monitoring agent. Replaces the old check that called `/api/reports/by-project`
+with `x-client-key` (removed in the 09.2026 security fix — the anon key is public, so it was
+never authorization).
+
+```
+GET https://reports.vitas.co.il/api/v1/health
+Authorization: Bearer <MONITOR_TOKEN>
+```
+
+* Requires a token with **`client_slug = '*'`** (monitor scope). A client-scoped token gets `403`,
+  because the feed lists every client's projects. A `*` token may also call `/metrics` for any client.
+* Read-only, aggregates only: `ok`, `reds[]`, `issues[]`, `projects[{name, checks[{label,status,detail}]}]`,
+  `cron_heartbeats[{job,last_run,hours_ago}]`. No PII, no business numbers.
+* Same sensors as the hourly health email (`lib/health.js`), so both always agree.
+* Crons run every ~2h from ~07:00 Israel (cron-job.org). An overnight gap is normal, not a fault.
+  The old midnight writes in `reports` were the monitor's own `POST fetch` calls, not a cron.
+
+Issue a monitor token (store only its hash; the plaintext goes to the agent once):
+```sql
+insert into api_tokens (token_hash, client_slug, label)
+values (encode(digest('<PLAINTEXT_TOKEN>','sha256'),'hex'), '*', 'daily monitor');
+```
+Or widen an existing token to monitor scope, keeping its plaintext:
+```sql
+update api_tokens set client_slug = '*' where label = 'daily monitor';
+```

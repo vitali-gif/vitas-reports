@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
+import { adminClient } from '../../../../../../lib/auth'
 import { CLIENTS } from '../../../../../../lib/apiClients'
 
 export const dynamic = 'force-dynamic'
@@ -22,10 +23,19 @@ export const revalidate = 0
 export const fetchCache = 'force-no-store'
 export const maxDuration = 300
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+// לקוח service_role עצל. קודם הוא נוצר ברמת המודול עם נפילה חזרה למפתח
+// ה-anon — כלומר אם SUPABASE_SERVICE_ROLE_KEY חסר בסביבה, ה-route המשיך לעבוד
+// בשקט עם הרשאות נמוכות והחזיר תוצאות חלקיות, שנראות כמו באג בנתונים ולא
+// כתקלת קונפיגורציה. עכשיו הוא נוצר בבקשה הראשונה (לא בזמן build) וזורק
+// שגיאה מפורשת אם המפתח חסר. ה-Proxy קיים כדי שמוקדי השימוש יישארו כמו שהם.
+let _sbAdmin = null
+const supabaseAdmin = new Proxy({}, {
+  get(_target, prop) {
+    if (!_sbAdmin) _sbAdmin = adminClient()
+    const value = _sbAdmin[prop]
+    return typeof value === 'function' ? value.bind(_sbAdmin) : value
+  },
+})
 
 const J = (body, status = 200) =>
   NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store, max-age=0' } })
@@ -69,7 +79,8 @@ export async function GET(request, ctx) {
 
   const params = (ctx && ctx.params) ? await ctx.params : {}
   const clientSlug = params.client_slug
-  if (tok.client_slug !== clientSlug) return J({ error: 'token_not_scoped_to_this_client', allowed: [tok.client_slug] }, 403)
+  // client_slug = '*' הוא היקף הניטור הפנימי (ראה /api/v1/health) — רשאי לקרוא כל לקוח.
+  if (tok.client_slug !== '*' && tok.client_slug !== clientSlug) return J({ error: 'token_not_scoped_to_this_client', allowed: [tok.client_slug] }, 403)
   const client = CLIENTS[clientSlug]
   if (!client) return J({ error: 'unknown_client_slug', valid: Object.keys(CLIENTS) }, 404)
   supabaseAdmin.from('api_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', tok.id).then(() => {}, () => {})

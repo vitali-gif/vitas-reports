@@ -4,3 +4,4 @@ node_modules
 
 # QA artifacts של פרויקט הדמו (נוצרים מקומית, לא נכנסים לריפו)
 qa-screenshots/
+.vercel
