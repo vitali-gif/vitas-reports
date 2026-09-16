@@ -5307,7 +5307,8 @@ const selectProject = async (client, project) => {
               showQuarters={!(/bcurelaser|ismooth/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
               allowedPresets={isDemoProject ? DEMO_PRESETS : undefined}
             />
-            <LastUpdated reports={reports} selectedMonth={selectedMonth} />
+            {/* לאדמין בלבד: הלקוח לא צריך לדעת מתי הקרון רץ, ומספר "ימים" עלול להיראות לו כתקלה. */}
+            {!isClientView && <LastUpdated reports={reports} selectedMonth={selectedMonth} />}
             {(() => {
               // Budget bar shown for all projects (ש.ברוך + BCureLaser). Inert until a budget is set.
               const _d = new Date();
