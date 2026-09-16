@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "check:auth": "node scripts/check-auth-pattern.mjs",
-    "test:crm": "node scripts/tests/bmby-summary.smoke.mjs"
+    "test:crm": "node scripts/tests/bmby-summary.smoke.mjs && node scripts/tests/raw-store.smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

@@ -17,7 +17,8 @@
 
 import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
-import { computeBmbySummary } from '../../../../lib/crm/bmby-summary.js'
+import { computeBmbySummary, toReportRow } from '../../../../lib/crm/bmby-summary.js'
+import { upsertRawRecords, ENTITIES } from '../../../../lib/crm/raw-store.js'
 import { CRM_SCHEMA_VERSION } from '../../../../lib/crm/schema-version.js'
 
 export const dynamic = 'force-dynamic'
@@ -377,6 +378,22 @@ async function runSync(opts = {}) {
     }
 
     const errors = []
+
+    // תמונת מצב גולמית (שלב 1 של docs/daily-ranges-plan.md): מה שנמשך נשמר רשומה-רשומה
+    // ב-crm_raw, כדי שטווח מותאם יחושב מכאן בלי לפנות ל-BMBY. כישלון כאן לא מפיל את
+    // הריצה — הדוח השמור נכתב כרגיל, והתמונה תתעדכן בריצה הבאה.
+    let snapshot = null
+    if (opts.snapshot !== false) {
+      try {
+        const parts = await Promise.all(
+          [clients, tasks, prices, contracts].map((rows, i) => upsertRawRecords(supabase, p.id, 'bmby', ENTITIES[i], rows))
+        )
+        snapshot = Object.fromEntries(parts.map((r, i) => [ENTITIES[i], r]))
+      } catch (e) {
+        // לא נכנס ל-errors: הדוח השמור נכתב כרגיל, ואין סיבה למייל התראה. מדווח בשדה snapshot.
+        snapshot = { error: String(e?.message || e) }
+      }
+    }
     const debug = {}
     const captureDebug = (label, res) => {
       if (res.status === 'rejected') {
@@ -409,10 +426,8 @@ async function runSync(opts = {}) {
         project_id: p.id,
         source: 'crm',
         month: m,
-        data: xlsxRows,
-        summary: { ...totals, sources, crmRepRows: crmReportRows, responseTimeStats, dayOfWeekStats, meetingDayOfWeek, hourlyApptStats, hourlyLeadStats, hourlyContactStats, hourlyContactMeeting, noAnswerContactHour, namedLeads, completedMeetings: _completedMeetings, adBreakdown, schemaVersion: CRM_SCHEMA_VERSION },
+        ...toReportRow(R),   // data / summary / row_count — הגדרה אחת, משותפת לנקודת הקצה של הטווחים
         file_name: 'BMBY API (live)',
-        row_count: aprilLids.length + registrationsInRange.length + contractsSignedInRange.length,
       }, { onConflict: 'project_id,source,month' })
 
       if (upsertErr) errors.push('upsert: ' + upsertErr.message)
@@ -447,6 +462,7 @@ async function runSync(opts = {}) {
         contracts: contractsSignedInRange.length,
         prices: pricesInRange.length,
       },
+      snapshot,
       totalRaw: {
         clients: clients.length,
         tasks: tasks.length,
