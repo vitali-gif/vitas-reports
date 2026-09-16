@@ -28,6 +28,8 @@ Next.js 14 (App Router) · Supabase · Vercel · אינטגרציות: Meta, Goo
 
 בצד הדפדפן: `apiFetch` מ-`lib/api-fetch.js`, לא `fetch` ישיר.
 
+סוכנים חיצוניים (סשני קמפיינים, סוכן הבדיקה היומי) נכנסים רק דרך `/api/v1/*` עם טוקן Bearer מטבלת `api_tokens` — ראה `API_V1_METRICS.md`. הסוכן היומי משתמש ב-`/api/v1/health` עם טוקן בהיקף `client_slug = *`.
+
 ## הקמה על מחשב חדש (Windows)
 
 ```

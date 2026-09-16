@@ -79,7 +79,8 @@ export async function GET(request, ctx) {
 
   const params = (ctx && ctx.params) ? await ctx.params : {}
   const clientSlug = params.client_slug
-  if (tok.client_slug !== clientSlug) return J({ error: 'token_not_scoped_to_this_client', allowed: [tok.client_slug] }, 403)
+  // client_slug = '*' הוא היקף הניטור הפנימי (ראה /api/v1/health) — רשאי לקרוא כל לקוח.
+  if (tok.client_slug !== '*' && tok.client_slug !== clientSlug) return J({ error: 'token_not_scoped_to_this_client', allowed: [tok.client_slug] }, 403)
   const client = CLIENTS[clientSlug]
   if (!client) return J({ error: 'unknown_client_slug', valid: Object.keys(CLIENTS) }, 404)
   supabaseAdmin.from('api_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', tok.id).then(() => {}, () => {})
