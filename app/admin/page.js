@@ -275,7 +275,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     try {
       // הרשמה עצמית הוסרה. קודם כל אחד יכול היה להירשם כאן ולקבל סשן, והשער
       // היחיד לפאנל היה עצם קיומו של סשן. חשבונות אדמין נוצרים ידנית ב-Supabase,
-      // והמייל חייב להופיע ב-ADMIN_EMAILS כדי שה-API יכיר בו כאדמין.
+      // והמייל חייב להופיע בטבלת admins בבסיס הנתונים כדי שה-API יכיר בו כאדמין.
       const result = await supabase.auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
     } catch (err) { setAuthError(err.message); }
