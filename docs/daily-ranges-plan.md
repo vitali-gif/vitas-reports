@@ -59,6 +59,9 @@ Meta ו-Google מחזירים מספרים ניתנים לחיבור: הוצאה
 - לאחד את קבועי `schemaVersion` בצד הלקוח (היום 14 מול 33 בשרת, כפול בקוד).
 
 ### שלב 1 — CRM גולמי (יום)
+- **קוד מוכן (16.9), ממתין למיגרציה 006 ולמיזוג.** `lib/crm/raw-store.js`, `crm_raw` ב-bmby/fetch
+  (שדה `snapshot` בתשובה מדווח איזה שדה שימש כמזהה — לאמת אחרי הריצה הראשונה),
+  `GET /api/reports/range` עם `compare=1` כהשוואת זהב שוטפת (מותר לטוקן הניטור).
 - טבלה `crm_snapshots(project_id, crm_type, entity, payload jsonb, fetched_at)`
   עם RLS ללא מדיניות (service_role בלבד). מיגרציה 006.
 - הקרון `prefetch-crm` שומר תמונת מצב מלאה בכל ריצה (בנוסף לדוחות הקיימים).
