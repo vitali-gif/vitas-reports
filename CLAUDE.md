@@ -25,6 +25,7 @@ Next.js 14 (App Router) · Supabase · Vercel · אינטגרציות: Meta, Goo
 - `requireAdmin(req)` — אדמין (לפי טבלת `admins` בבסיס הנתונים)
 - `requireProjectAccess(req, projectId)` — לקוח על הפרויקט שלו (לפי `client_access`)
 - `isInternalCall(req)` — קרונים, עם `CRON_SECRET`
+- `requireFetchAccess(req, projectId)` — משיכה חיה: אדמין וקרונים תמיד; לקוח רק לפרויקט שלו, בהגבלת קצב
 
 בצד הדפדפן: `apiFetch` מ-`lib/api-fetch.js`, לא `fetch` ישיר.
 

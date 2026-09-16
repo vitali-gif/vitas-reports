@@ -22,7 +22,7 @@
 //
 // Env vars: SF_CLIENT_ID, SF_CLIENT_SECRET, SF_REFRESH_TOKEN, SF_LOGIN_URL, SF_API_VERSION
 
-import { requireAdmin } from '../../../../lib/auth'
+import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -655,10 +655,10 @@ async function runSync(opts = {}) {
 function isValidDate(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) }
 
 export async function POST(request) {
-  const gate = await requireAdmin(request)
-  if (!gate.ok) return gate.res
   let body = {}
   try { body = await request.json() } catch {}
+  const gate = await requireFetchAccess(request, body.projectId)
+  if (!gate.ok) return gate.res
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) {
     return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
   }

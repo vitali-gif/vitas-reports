@@ -15,7 +15,7 @@
 //                                 Anything not in this list is counted as "non-relevant".
 //                                 If not set, falls back to: lead with status in {"relevant","hot","warm","חם","פושר","רלוונטי"}
 
-import { requireAdmin } from '../../../../lib/auth'
+import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { normalizeCity } from '../../../../lib/city-normalize.js'
 import { businessMinutesBetween } from '../../../../lib/business-hours.js'
@@ -1391,10 +1391,10 @@ function isValidDate(v) {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
 }
 export async function POST(request) {
-  const gate = await requireAdmin(request)
-  if (!gate.ok) return gate.res
   let body = {}
   try { body = await request.json() } catch {}
+  const gate = await requireFetchAccess(request, body.projectId)
+  if (!gate.ok) return gate.res
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) { return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 }) }
   try {
     const { status, body: responseBody } = await runSync({
@@ -1402,9 +1402,10 @@ export async function POST(request) {
       since: body.since,
       until: body.until,
       projectId: body.projectId,
-      debugPhones: body.debugPhones,
-      stagesOnly: body.stagesOnly,
-      apptDump: body.apptDump,
+      // אופציות דיבוג שמדפיסות רשומות לידים — לאדמין ולקרונים בלבד.
+      debugPhones: gate.admin ? body.debugPhones : undefined,
+      stagesOnly: gate.admin ? body.stagesOnly : undefined,
+      apptDump: gate.admin ? body.apptDump : undefined,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
