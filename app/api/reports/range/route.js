@@ -5,9 +5,9 @@
  * המצב הגולמית (crm_raw) עם אותה פונקציה שה-route של BMBY מריץ על משיכה חיה
  * (lib/crm/bmby-summary.js). בלי BMBY, בלי המתנה, בלי הגבלת קצב.
  *
- * תשובה: { rows: [שורת crm בצורת reports, עם synthetic:true], missing: ['facebook','google'], snapshot }
- *   מזהה השורה קבוע — range:<project>:crm:<since>_<until> — כי הדשבורד ממזג שורות לפי id.
- *   בשלב 2 יתווספו כאן שורות המודעות, ו-missing יתרוקן.
+ * תשובה: { rows: [crm, facebook, google — כל מה שיש לו נתונים, בצורת reports עם synthetic:true], missing, snapshot, ads }
+ *   מזהה כל שורה קבוע — range:<project>:<source>:<since>_<until> — כי הדשבורד ממזג שורות לפי id.
+ *   שורות המודעות מגיעות מהעובדות היומיות (lib/ads/range-rows.js, שלב 2); ה-CRM מתמונת המצב (שלב 1).
  *
  * compare=1: השוואה מול הדוח השמור לאותו מפתח (אם קיים) — סכומים בלבד, בלי PII.
  *   מותר גם לטוקן הניטור ('*'), כדי שהסוכן היומי יוכל לאמת שהחישוב מהתמונה זהה
@@ -20,6 +20,7 @@ import { NextResponse } from 'next/server'
 import { adminClient, requireProjectAccess, monitorTokenOf } from '../../../../lib/auth'
 import { loadRawRecords } from '../../../../lib/crm/raw-store.js'
 import { computeBmbySummary, toReportRow } from '../../../../lib/crm/bmby-summary.js'
+import { buildAdsRangeRows } from '../../../../lib/ads/range-rows.js'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -54,21 +55,28 @@ export async function GET(request) {
   }
 
   const sb = adminClient()
-  let raw
-  try {
-    raw = await loadRawRecords(sb, projectId, 'bmby')
-  } catch (e) {
-    return J({ error: 'snapshot_load_failed', detail: String(e?.message || e) }, 500)
-  }
-  if (!raw.total) {
-    return J({ error: 'no_snapshot', hint: 'crm_raw has no records for this project yet — the next BMBY cron run fills it' }, 404)
-  }
-
   const key = `${since}_${until}`
-  const R = computeBmbySummary(raw, { since, until, monthKey: key })
-  const shaped = toReportRow(R)
-  const stamp = raw.fetchedAt || new Date().toISOString()
-  const snapshot = { fetchedAt: raw.fetchedAt, counts: raw.counts }
+  const { data: project } = await sb.from('projects').select('id, name, meta_account_id, sub_projects, is_demo').eq('id', projectId).maybeSingle()
+  if (!project) return J({ error: 'unknown_project' }, 404)
+
+  // CRM מתמונת המצב (שלב 1) ומודעות מהעובדות היומיות (שלב 2) — במקביל, כל אחד אופציונלי.
+  const [rawRes, adsRes] = await Promise.allSettled([
+    loadRawRecords(sb, projectId, 'bmby'),
+    compare ? Promise.resolve(null) : buildAdsRangeRows(sb, project, since, until),
+  ])
+  const raw = rawRes.status === 'fulfilled' ? rawRes.value : null
+  const ads = adsRes.status === 'fulfilled' ? adsRes.value : null
+  const problems = {}
+  if (rawRes.status === 'rejected') problems.crm = String(rawRes.reason?.message || rawRes.reason)
+  if (adsRes.status === 'rejected') problems.ads = String(adsRes.reason?.message || adsRes.reason)
+
+  const hasCrm = !!(raw && raw.total)
+  if (compare && !hasCrm) return J({ error: 'no_snapshot', hint: 'crm_raw has no records for this project yet — the next BMBY cron run fills it', problems }, 404)
+
+  const R = hasCrm ? computeBmbySummary(raw, { since, until, monthKey: key }) : null
+  const shaped = R ? toReportRow(R) : null
+  const stamp = (raw && raw.fetchedAt) || new Date().toISOString()
+  const snapshot = hasCrm ? { fetchedAt: raw.fetchedAt, counts: raw.counts } : null
 
   if (compare) {
     const { data: stored } = await sb.from('reports')
@@ -95,16 +103,10 @@ export async function GET(request) {
     })
   }
 
-  const row = {
-    id: `range:${projectId}:crm:${key}`,
-    project_id: projectId,
-    source: 'crm',
-    month: key,
-    ...shaped,
-    file_name: 'BMBY snapshot (computed)',
-    created_at: stamp,
-    updated_at: stamp,
-    synthetic: true,
-  }
-  return J({ rows: [row], missing: ['facebook', 'google'], snapshot })
+  const rows = []
+  if (shaped) rows.push({ id: `range:${projectId}:crm:${key}`, project_id: projectId, source: 'crm', month: key, ...shaped, file_name: 'BMBY snapshot (computed)', created_at: stamp, updated_at: stamp, synthetic: true })
+  if (ads) rows.push(...ads.rows)
+  const missing = [...(hasCrm ? [] : ['crm']), ...(ads ? ads.missing : ['facebook', 'google'])]
+  if (!rows.length) return J({ error: 'no_data', missing, problems, hint: 'no CRM snapshot and no daily ad facts for this project/range yet' }, 404)
+  return J({ rows, missing, snapshot, ads: ads ? { coverage: ads.coverage } : null, ...(Object.keys(problems).length ? { problems } : {}) })
 }

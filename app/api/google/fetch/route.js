@@ -5,166 +5,20 @@
 
 import { requireFetchAccess } from '../../../../lib/auth'
 import { GOOGLE_SCHEMA_VERSION } from '../../../../lib/crm/schema-version.js'
+// עזרי Google Ads והניתוב לפרויקטים עברו ל-lib/ads (שלב 2 של docs/daily-ranges-plan.md) — משותפים
+// לעובדות היומיות. הקוד זהה; רק המיקום השתנה.
+import { GOOGLE_ADS_API_VERSION, num, credsFor, getAccessToken, mintAccessToken, gaqlSearch, extractAdText } from '../../../../lib/ads/google-api.js'
+import { klossGoogleAgencyOf, computeTotals } from '../../../../lib/ads/routing.js'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // was 60 — full-quarter fetches (q1-q4) exceeded 60s and returned 504
-
-const GOOGLE_ADS_API_VERSION = 'v22'
-
-// KLOSS multi-agency (Google): both accounts hold Kloss campaigns mixed with sister brands
-// (Zula / Novo). Match by customer + campaign contains 'kloss', tag by agency.
-const KLOSS_GOOGLE_SOURCES = [
-  { customer: '9483793370', agency: 'סיגאווי', any: ['kloss', 'p-max', 'pmax'] },
-  { customer: '4733225739', agency: 'VITAS', any: ['kloss'] },
-]
-function klossGoogleAgencyOf(r) {
-  const camp = (r && r.campaign || '').toLowerCase()
-  const cust = String(r && r.account)
-  const sc = KLOSS_GOOGLE_SOURCES.find(s => s.customer === cust && (!s.any || s.any.some(k => camp.includes(k))))
-  return sc ? sc.agency : null
-}
 
 // ===== helpers =====
 
 function currentMonth() {
   const now = new Date()
   return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
-}
-
-function num(v) {
-  if (typeof v === 'number') return v
-  if (v === null || v === undefined || v === '') return 0
-  const n = parseFloat(String(v))
-  return isNaN(n) ? 0 : n
-}
-
-// ── אישורי גישה לכל חשבון בנפרד ───────────────────────────────────────────────
-// חשבון של לקוח יכול לשבת תחת MCC אחר, שהמשתמש של החיבור הראשי לא רשום עליו
-// בכלל. במצב כזה אין login-customer-id ואין developer token שיפתרו את זה —
-// צריך OAuth של משתמש אחר.
-//
-// הפתרון הוא אותו דפוס שכבר קיים במטא (META_ACCESS_TOKEN_<accountId>): לכל
-// משתנה סביבה אפשר להוסיף סיומת של מזהה הלקוח, והיא גוברת עליו רק לאותו חשבון.
-// למשל GOOGLE_ADS_REFRESH_TOKEN_2713605466.
-//
-// זה מכוון: החיבור הראשי לא זז. אם החיבור החדש נשבר, החשבון שלו לבדו נופל
-// והשאר ממשיכים — במקום להחליף אסימון משותף ולהפיל את כולם, כפי שקרה לנו במטא.
-function credsFor(customerId) {
-  const suf = String(customerId || '').replace(/\D/g, '')
-  const pick = (base) => (suf && process.env[`${base}_${suf}`]) || process.env[base] || ''
-  return {
-    clientId: pick('GOOGLE_ADS_CLIENT_ID'),
-    clientSecret: pick('GOOGLE_ADS_CLIENT_SECRET'),
-    refreshToken: pick('GOOGLE_ADS_REFRESH_TOKEN'),
-    developerToken: pick('GOOGLE_ADS_DEVELOPER_TOKEN'),
-    loginCustomerId: pick('GOOGLE_ADS_LOGIN_CUSTOMER_ID').replace(/\D/g, ''),
-    isOverride: !!(suf && process.env[`GOOGLE_ADS_REFRESH_TOKEN_${suf}`]),
-  }
-}
-
-// אסימון גישה לכל refresh token נשלף פעם אחת, לא פעם לכל חשבון.
-// המטמון חי ברמת המודול, כלומר שורד בין קריאות ב-lambda חמה — ולכן יש לו תפוגה.
-// אסימון של גוגל תקף שעה; 50 דקות משאירות מרווח ומונעות 401 על אסימון שפג.
-const _atCache = new Map()
-async function getAccessToken(creds) {
-  const c = creds || credsFor(null)
-  if (!c.refreshToken) throw new Error('missing refresh token')
-  const hit = _atCache.get(c.refreshToken)
-  if (hit && hit.exp > Date.now()) return hit.token
-  const token = await mintAccessToken(c)
-  _atCache.set(c.refreshToken, { token, exp: Date.now() + 50 * 60 * 1000 })
-  return token
-}
-
-async function mintAccessToken(c) {
-  const body = new URLSearchParams({
-    client_id: c.clientId,
-    client_secret: c.clientSecret,
-    refresh_token: c.refreshToken,
-    grant_type: 'refresh_token',
-  })
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
-  if (!res.ok) {
-    const txt = await res.text()
-    throw new Error(`OAuth token refresh failed ${res.status}: ${txt.slice(0, 300)}`)
-  }
-  const json = await res.json()
-  return json.access_token
-}
-
-// loginOverride: used only by the read-only account diagnostic below, to test a customer
-// that sits under a DIFFERENT manager account than GOOGLE_ADS_LOGIN_CUSTOMER_ID.
-// The sync itself never passes it, so its behaviour is unchanged.
-async function gaqlSearch(accessToken, customerId, query, opts = {}) {
-  const headers = {
-    Authorization: `Bearer ${accessToken}`,
-    'developer-token': opts.developerToken || process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
-    'Content-Type': 'application/json',
-  }
-  const _login = opts.login || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID
-  if (_login) {
-    headers['login-customer-id'] = String(_login).replace(/\D/g, '')
-  }
-  const allRows = []
-  let nextPageToken = null
-  let safety = 0
-  while (safety < 20) {
-    const body = { query }
-    if (nextPageToken) body.pageToken = nextPageToken
-    const res = await fetch(
-      `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${customerId}/googleAds:search`,
-      { method: 'POST', headers, body: JSON.stringify(body) }
-    )
-    if (!res.ok) {
-      const txt = await res.text()
-      throw new Error(`Google Ads API ${res.status}: ${txt.slice(0, 2000)}`)
-    }
-    const json = await res.json()
-    if (Array.isArray(json.results)) allRows.push(...json.results)
-    nextPageToken = json.nextPageToken || null
-    if (!nextPageToken) break
-    safety++
-  }
-  return allRows
-}
-
-function extractAdText(ad) {
-  if (!ad) return ''
-  if (ad.textAd?.description1) return ad.textAd.description1
-  if (ad.expandedTextAd?.description) return ad.expandedTextAd.description
-  if (Array.isArray(ad.responsiveSearchAd?.descriptions)) {
-    return ad.responsiveSearchAd.descriptions.map(d => d.text).filter(Boolean).join(' / ')
-  }
-  if (Array.isArray(ad.responsiveSearchAd?.headlines)) {
-    return ad.responsiveSearchAd.headlines.map(d => d.text).filter(Boolean).join(' / ')
-  }
-  if (Array.isArray(ad.responsiveDisplayAd?.descriptions)) {
-    return ad.responsiveDisplayAd.descriptions.map(d => d.text).filter(Boolean).join(' / ')
-  }
-  return ''
-}
-
-function computeTotals(rows) {
-  const t = { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 }
-  for (const r of rows) {
-    t.spend += r.spend
-    t.impressions += r.impressions
-    t.reach += r.reach
-    t.clicks += r.clicks
-    t.leads += r.leads
-  }
-  t.cpl = t.leads > 0 ? t.spend / t.leads : 0
-  t.cpc = t.clicks > 0 ? t.spend / t.clicks : 0
-  t.cpm = t.impressions > 0 ? (t.spend / t.impressions) * 1000 : 0
-  t.ctr = t.impressions > 0 ? (t.clicks / t.impressions) * 100 : 0
-  t.convRate = t.clicks > 0 ? (t.leads / t.clicks) * 100 : 0
-  t.frequency = t.reach > 0 ? t.impressions / t.reach : 0
-  return t
 }
 
 // ===== main sync =====

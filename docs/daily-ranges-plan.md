@@ -69,6 +69,11 @@ Meta ו-Google מחזירים מספרים ניתנים לחיבור: הוצאה
   שמחזירה שורת `crm` סינתטית מהתמונה השמורה. מזהה קבוע: `range:<project>:<source>:<key>`.
 
 ### שלב 2 — מודעות יומיות (יום)
+- **קוד מוכן (16.9), ממתין למיגרציה 007 ולמיזוג.** `lib/ads/*` (meta-api, google-api, routing, daily-store,
+  meta-daily, google-daily, range-rows), `POST /api/ads/daily-sync` (recent / backfill / range), הקרון
+  `prefetch-ads` מריץ recent + צעד backfill בכל ריצה — ההיסטוריה מ-1.1.2026 מתמלאת לבד תוך יום.
+  `/api/reports/range` מחזיר עכשיו גם facebook ו-google. Reach: קריאה קלה ל-Meta, אחרת `reachSource:'approx'`.
+  meta/fetch ו-google/fetch מייבאים את העזרים מ-lib/ads (הקוד זהה, אומת בדיף).
 - טבלה `ad_daily(project_id, source, day, account, campaign_id, campaign, adset_id,
   adset, ad_id, ad, age, gender, spend, impressions, clicks, leads, reach_day)`,
   מפתח ייחודי על כל העמודות המזהות. מיגרציה 007.

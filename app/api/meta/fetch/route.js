@@ -4,120 +4,20 @@
 // Pulls Meta Ads insights and writes one report per project per month to Supabase.
 
 import { requireFetchAccess } from '../../../../lib/auth'
+// עזרי Meta והניתוב לפרויקטים עברו ל-lib/ads (שלב 2 של docs/daily-ranges-plan.md) — משותפים
+// לעובדות היומיות. הקוד זהה; רק המיקום השתנה.
+import { META_GRAPH_VERSION, num, extractLeads, metaFetchAll } from '../../../../lib/ads/meta-api.js'
+import { klossAgencyOf, subProjectMatcher } from '../../../../lib/ads/routing.js'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // was 60 — full-quarter fetches (q1-q4) exceeded 60s and returned 504
-
-const META_GRAPH_VERSION = 'v21.0'
-
-// KLOSS multi-agency attribution: rows are matched to the KLOSS project by ad-account + campaign-name
-// keywords (its campaigns don't contain "kloss" in the agency accounts), and tagged by agency for the breakdown.
-const KLOSS_SOURCES = [
-  { account: '295378394595304', agency: 'סיגאווי', any: ['leadg', 'leads'] },
-  { account: '143725504579407', agency: 'VITAS', all: ['kloss'], any: ['leadg', 'leads'] },
-]
-function klossAgencyOf(r) {
-  const camp = (r && r.campaign || '').toLowerCase()
-  const acct = String(r && r.account)
-  const sc = KLOSS_SOURCES.find(s => s.account === acct
-    && (!s.all || s.all.every(k => camp.includes(k)))
-    && (!s.any || s.any.some(k => camp.includes(k))))
-  return sc ? sc.agency : null
-}
-
-// ── פירוק פנימי לתת-פרויקטים לפי שם המודעה ────────────────────────────────────
-// לקוח שמריץ קמפיין אחד לכל החשבון ומזהה את הבניין ברמת המודעה ("AD 1 | שם טוב | ...")
-// לא ניתן לפילוח לפי שם קמפיין. `projects.sub_projects` מחזיק את רשימת השמות,
-// וכאן כל שורה נופלת לדלי אחד לפי השם הראשון שנמצא בשם המודעה.
-//
-// למה נרמול: שמות מודעות במטא מכילים תווי כיווניות RTL בלתי נראים שנדבקים בין
-// מילים עבריות, וגם גרשיים בצורות שונות. השוואת מחרוזות נאיבית נכשלת עליהם בשקט —
-// וכשל שקט כאן נראה כמו "לפרויקט אין הוצאה", לא כמו באג. לכן גם דלי "ללא שיוך".
-function normAdText(s) {
-  return String(s || '')
-    .replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
-    .replace(/["'`\u05f3\u05f4\u2018\u2019\u201c\u201d]/g, '')
-    .replace(/[\s\-_|/\\,.]+/g, ' ')
-    .trim()
-    .toLowerCase()
-}
-
-// התאמה מהשם הארוך לקצר: אחרת "שמי כללי" נבלע ע"י דלי בשם "שמי".
-function subProjectMatcher(names) {
-  const list = (Array.isArray(names) ? names : [])
-    .map(n => ({ name: String(n || '').trim(), key: normAdText(n) }))
-    .filter(x => x.name && x.key)
-    .sort((a, b) => b.key.length - a.key.length)
-  if (!list.length) return null
-  return (adName) => {
-    const hay = normAdText(adName)
-    if (!hay) return null
-    for (const x of list) if (hay.includes(x.key)) return x.name
-    return null
-  }
-}
 
 // ===== helpers =====
 
 function currentMonth() {
   const now = new Date()
   return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
-}
-
-function num(v) {
-  if (typeof v === 'number') return v
-  if (!v) return 0
-  const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''))
-  return isNaN(n) ? 0 : n
-}
-
-// Extract leads count from Meta actions array.
-// Meta returns BOTH an aggregate 'lead' action AND specific sub-types (onsite_conversion.lead_grouped, etc).
-// Summing them all double-counts. So we pick ONE source by priority to match what Ads Manager shows.
-function extractLeads(actions) {
-  if (!Array.isArray(actions)) return 0
-  const getByType = (type) => {
-    for (const a of actions) {
-      if (a && a.action_type === type) return num(a.value)
-    }
-    return null
-  }
-  // Each ad's "result" = the conversion its campaign optimizes for (matches Ads Manager "Results"):
-  //   lead-form campaigns  -> onsite_conversion.lead_grouped (on-Facebook Instant Forms)
-  //   conversion campaigns -> custom conversion "LEAD | 2025" (offsite_conversion.custom.1586162569238898)
-  // An ad belongs to one campaign type, so max() picks its real result with no double-counting.
-  // Accounts without that custom conversion (e.g. ש.ברוך) -> lead2025 is null -> behaves like lead_grouped.
-  const leadGrouped = getByType('onsite_conversion.lead_grouped')
-  const lead2025 = getByType('offsite_conversion.custom.1586162569238898')
-  if (leadGrouped !== null || lead2025 !== null) return Math.max(leadGrouped || 0, lead2025 || 0)
-  // Fallbacks for rows/accounts without either of the above
-  let v = getByType('offsite_conversion.fb_pixel_lead')
-  if (v !== null) return v
-  v = getByType('leadgen.other')
-  if (v !== null) return v
-  v = getByType('lead')
-  return v !== null ? v : 0
-}
-
-async function metaFetchAll(url, token) {
-  const out = []
-  let next = url
-  let safety = 0
-  while (next && safety < 50) {
-    const sep = next.includes('?') ? '&' : '?'
-    const full = next.includes('access_token=') ? next : `${next}${sep}access_token=${encodeURIComponent(token)}`
-    const res = await fetch(full)
-    if (!res.ok) {
-      const txt = await res.text()
-      throw new Error(`Meta API ${res.status}: ${txt.slice(0, 400)}`)
-    }
-    const json = await res.json()
-    if (Array.isArray(json.data)) out.push(...json.data)
-    next = json.paging && json.paging.next ? json.paging.next : null
-    safety++
-  }
-  return out
 }
 
 // ===== main sync logic (shared by GET and POST) =====
