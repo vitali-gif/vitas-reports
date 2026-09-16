@@ -83,6 +83,17 @@ Meta ו-Google מחזירים מספרים ניתנים לחיבור: הוצאה
 - `/api/reports/range` מחבר שורות `facebook` ו-`google`: data (מודעה×גיל×מגדר),
   summary, demographics. Reach לפי הסעיף למעלה.
 
+#### אימות 16.9 (17:53)
+- crm_raw התמלאה מהריצה של 17:38: HI PARK 3,367 לקוחות / 15,287 משימות / 54 חוזים; ONCE, REHAVIA בהתאם.
+  מזהים אמיתיים (לא גיבוב) בכל הישויות, חוץ מ-8 משימות ב-REHAVIA. אין price_offers.
+- compare=1 על HI PARK 15.9: **identical**. על 8–14.9: רק relevant/nonRelevant השתנו (סיווג
+  שהשתנה ב-CRM מאז 15.9) — סכומם זהה. זו הסטייה הצפויה היחידה.
+- golden שלב 0: ONCE ו-REHAVIA אוגוסט נכתבו מחדש עם md5 זהה בית לבית. HI PARK השתנה — אותה
+  סיבה (סיווג relevant), row_count זהה.
+- ❌ ad_daily נשארה ריקה: הבלוק היומי בסוף prefetch-ads דולג/נכשל בלי עדות. תיקון:
+  קרון ייעודי `/api/cron/prefetch-daily` (לתזמן ב-cron-job.org כל שעה, דקה 25) + `job_log`
+  (מיגרציה 008) + חשיפת המצב ב-`/api/v1/health` (daily_facts, crm_snapshot).
+
 ### שלב 3 — חיווט הדשבורד (חצי יום)
 - טווח מותאם והשוואה לתקופה קודמת: קודם `/api/reports/range`. משיכה חיה רק
   אם השרת ענה "חסרים ימים" (למשל לפני תאריך הטעינה ההיסטורית).
