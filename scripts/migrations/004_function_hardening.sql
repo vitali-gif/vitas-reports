@@ -19,7 +19,11 @@ begin;
 alter function public.reports_set_updated_at()     set search_path = '';
 alter function public.vitas_tasks_set_updated_at() set search_path = '';
 
-revoke execute on function public.is_admin() from anon;
+-- ברירת המחדל של Postgres מעניקה EXECUTE ל-PUBLIC, שכולל את anon — לכן revoke
+-- מ-anon לבד לא משנה כלום. מסירים מ-PUBLIC ומעניקים במפורש למי שצריך.
+-- כל המדיניות שקוראות ל-is_admin() הן `to authenticated`, אז anon לא נפגע.
+revoke execute on function public.is_admin() from public, anon;
+grant  execute on function public.is_admin() to authenticated, service_role;
 
 commit;
 
@@ -27,5 +31,5 @@ commit;
 -- ROLLBACK:
 --   alter function public.reports_set_updated_at()     reset search_path;
 --   alter function public.vitas_tasks_set_updated_at() reset search_path;
---   grant execute on function public.is_admin() to anon;
+--   grant execute on function public.is_admin() to public;
 -- ═══════════════════════════════════════════════════════════════════════════
