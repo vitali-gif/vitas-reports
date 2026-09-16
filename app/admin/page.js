@@ -165,6 +165,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [caEmail, setCaEmail] = useState('')
   const [caClientId, setCaClientId] = useState('')
   const [caProjectIds, setCaProjectIds] = useState([])   // אילו פרויקטים לסמן בהוספה
+  // מייל שכבר יש לו גישה: ברירת המחדל היא לעדכן היקף בלי לאפס סיסמה. איפוס ושליחת
+  // סיסמה חדשה רק אם האדמין מסמן זאת במפורש (למקרה שהלקוח איבד את הסיסמה).
+  const [caResendPassword, setCaResendPassword] = useState(false)
   const [expandedAccess, setExpandedAccess] = useState(new Set())  // אילו שורות פתוחות ברשימה
   const [caLabel, setCaLabel] = useState('')
   const [caSaving, setCaSaving] = useState(false)
@@ -342,18 +345,29 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     showToast('✓ הפרויקט נוסף לגישה (ללא מייל ללקוח)')
   }
 
+  /** האם למייל שבטופס כבר יש גישה כלשהי (לכל לקוח). */
+  const caEmailExists = clientAccessList.some(ca => ca.email === caEmail.trim().toLowerCase())
+
   const addClientAccess = async () => {
     if (!caEmail.trim() || !caClientId || caProjectIds.length === 0) return
+    // לקוח קיים: הוספה חוזרת דרך ה-API מאפסת את הסיסמה שלו ושולחת מייל חדש. זה
+    // ניתק לקוחות שכבר משתמשים בדשבורד, ולכן כאן ברירת המחדל היא notify:false.
+    const notify = !caEmailExists || caResendPassword
     setCaSaving(true)
     const res = await apiFetch('/api/client-access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: caEmail.trim(), client_id: caClientId, project_ids: caProjectIds })
+      body: JSON.stringify({ email: caEmail.trim(), client_id: caClientId, project_ids: caProjectIds, notify })
     })
     setCaSaving(false)
     if (res.ok) {
       const result = await res.json()
-      setCaEmail(''); setCaClientId(''); setCaProjectIds([])
+      setCaEmail(''); setCaClientId(''); setCaProjectIds([]); setCaResendPassword(false)
+      if (!notify) {
+        await loadClientAccess()
+        showToast(`✓ הגישה של ${result.email} עודכנה (${result.projectCount} פרויקטים) — הסיסמה לא שונתה`)
+        return
+      }
       await loadClientAccess()
       if (result.tempPassword) {
         setAccessCreds({ email: result.email, password: result.tempPassword, loginUrl: result.loginUrl, emailSent: result.emailSent, clientName: result.clientName })
@@ -5429,10 +5443,23 @@ const selectProject = async (client, project) => {
                 )
               })()}
 
+              {caEmailExists && (
+                <div style={{display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',borderRadius:10,
+                  background:'rgba(245,158,11,0.10)',border:'1px solid rgba(245,158,11,0.35)',fontSize:12.5,lineHeight:1.5}}>
+                  <span style={{color:'#B45309',fontWeight:600}}>למייל הזה כבר יש גישה. שמירה תעדכן את סט הפרויקטים בלי לאפס את הסיסמה.</span>
+                  <label style={{display:'inline-flex',alignItems:'center',gap:6,cursor:'pointer',color:'var(--text-secondary)'}}>
+                    <input type="checkbox" checked={caResendPassword} onChange={e => setCaResendPassword(e.target.checked)} style={{margin:0}} />
+                    לאפס סיסמה ולשלוח חדשה במייל (הלקוח איבד את הסיסמה)
+                  </label>
+                </div>
+              )}
+
               <button className="btn btn-primary" onClick={addClientAccess}
                 disabled={caSaving || !caEmail || !caClientId || caProjectIds.length === 0}
                 style={{alignSelf:'flex-end',padding:'8px 20px'}}>
-                {caSaving ? 'שומר...' : `+ הוסף גישה ושלח קישור${caProjectIds.length ? ` (${caProjectIds.length})` : ''}`}
+                {caSaving ? 'שומר...'
+                  : caEmailExists && !caResendPassword ? `עדכן גישה בלי מייל${caProjectIds.length ? ` (${caProjectIds.length})` : ''}`
+                  : `+ הוסף גישה ושלח קישור${caProjectIds.length ? ` (${caProjectIds.length})` : ''}`}
               </button>
             </div>
 
