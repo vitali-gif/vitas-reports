@@ -452,7 +452,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     let metaOk = false, googleOk = false, crmOk = false;
     try {
       const results = await Promise.allSettled(
-        callList.map(c => fetch(c.url, { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json()))
+        // apiFetch ולא fetch: בלי הטוקן השרת מחזיר 401, וכל רענון (ידני ואוטומטי) נכשל בשקט מ-15.9.
+        callList.map(c => apiFetch(c.url, { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json()))
       );
       callList.forEach((c, i) => {
         const r = results[i];
@@ -5362,7 +5363,7 @@ const selectProject = async (client, project) => {
               : !hasDataForPeriod
                 ? (isFetching
                     ? <PeriodFetching />
-                    : <PeriodEmpty onRefresh={isClientView ? null : () => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth })} />)
+                    : <PeriodEmpty onRefresh={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth })} />)
                 : renderDashboard()}
           </>)}
 

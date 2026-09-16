@@ -33,7 +33,7 @@ const PUBLIC_ROUTES = new Set([
   'app/api/client-auth/route.js',
 ])
 
-const GUARDS = /requireAdmin\s*\(|requireProjectAccess\s*\(|requireUser\s*\(|isInternalCall\s*\(|CRON_SECRET|api_tokens/
+const GUARDS = /requireAdmin\s*\(|requireProjectAccess\s*\(|requireFetchAccess\s*\(|requireUser\s*\(|isInternalCall\s*\(|CRON_SECRET|api_tokens/
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
