@@ -103,6 +103,24 @@ export async function GET(request) {
     if (inFlight.size > 0) await Promise.race(inFlight)
   }
 
+  // ── עובדות יומיות (שלב 2 של docs/daily-ranges-plan.md) ────────────────────────
+  // recent: 7 ימים אחורה כולל היום, בכל ריצה (Meta מעדכנת המרות באיחור).
+  // backfill: צעד אחד של מילוי היסטורי לכל חשבון, עד שההיסטוריה מלאה — בלי טריגר ידני.
+  // לא נכנס לרשימת הכשלים של המייל: הדוחות הרגילים לא תלויים בזה; שלב 5 מוסיף חיישן health.
+  const daily = []
+  for (const mode of ['recent', 'backfill']) {
+    if (Date.now() - startedAt > 200000) { daily.push({ mode, skipped: 'time budget' }); continue }
+    const t0 = Date.now()
+    try {
+      const res = await fetch(`${base}/api/ads/daily-sync`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify({ mode }) })
+      const d = await res.json().catch(() => ({}))
+      daily.push({ mode, ok: res.ok && d.ok !== false, status: res.status, jobs: d.jobs, failed: d.failed, deferred: d.deferred, done: d.done, ms: Date.now() - t0,
+        errors: (d.results || []).filter(r => !r.ok && !r.deferred).map(r => `${r.source}/${r.account} ${r.since}..${r.until}: ${r.error}`).slice(0, 5) })
+    } catch (err) {
+      daily.push({ mode, ok: false, error: String(err).slice(0, 200), ms: Date.now() - t0 })
+    }
+  }
+
   const failed = results.filter(r => !r.ok)
   if (failed.length > 0) {
     const fmt = new Intl.DateTimeFormat('he-IL', { timeZone: 'Asia/Jerusalem', dateStyle: 'short', timeStyle: 'short' }).format(new Date())
@@ -162,5 +180,5 @@ export async function GET(request) {
       await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-ads', last_run: new Date().toISOString() }, { onConflict: 'job' })
     }
   } catch {}
-  return Response.json({ ok: failed.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, elapsedMs: Date.now()-startedAt }, results })
+  return Response.json({ ok: failed.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, elapsedMs: Date.now()-startedAt }, daily, results })
 }
