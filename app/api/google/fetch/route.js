@@ -4,6 +4,7 @@
 // Pulls Google Ads campaign/ad-level metrics via GAQL and writes one report per project per month.
 
 import { requireFetchAccess } from '../../../../lib/auth'
+import { GOOGLE_SCHEMA_VERSION } from '../../../../lib/crm/schema-version.js'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +24,6 @@ function klossGoogleAgencyOf(r) {
   const sc = KLOSS_GOOGLE_SOURCES.find(s => s.customer === cust && (!s.any || s.any.some(k => camp.includes(k))))
   return sc ? sc.agency : null
 }
-const GOOGLE_SCHEMA_VERSION = 2  // bump when stored summary shape changes
 
 // ===== helpers =====
 

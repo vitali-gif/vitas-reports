@@ -8,6 +8,7 @@ import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFaceb
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
+import { CRM_SCHEMA_VERSION, GOOGLE_SCHEMA_VERSION } from '../../lib/crm/schema-version'
 import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
 import Header from '../components/shell/Header'
@@ -495,9 +496,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
 
     // What do we already have cached in 'reports' for this period?
     const haveFb = reports.some(r => r.month === targetKey && r.source === 'facebook');
-    const GOOGLE_SCHEMA_VERSION = 2;  // keep in sync with google route.js
     const haveGoog = reports.some(r => r.month === targetKey && r.source && r.source.startsWith('google') && (r.summary?.schemaVersion || 0) >= GOOGLE_SCHEMA_VERSION);
-    const CRM_SCHEMA_VERSION = 14;  // keep in sync with route.js + useEffect below
     const crmRow = reports.find(r => r.month === targetKey && r.source === 'crm');
     const haveCrm = !!crmRow && (isClientView || (crmRow.summary?.schemaVersion || 0) >= CRM_SCHEMA_VERSION); // client: don't force re-fetch on version bump (cron re-warms)
     const haveAll = haveFb && haveGoog && haveCrm;
@@ -1024,7 +1023,6 @@ const selectProject = async (client, project) => {
     if (refreshing || refreshingCrm) return;
     const hasMeta = reports.some(r => r.month === selectedMonth && r.source === 'facebook');
     const hasGoogle = reports.some(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
-    const CRM_SCHEMA_VERSION = 14  // must match server-side route in api/bmby/fetch
     const crmRow = reports.find(r => r.month === selectedMonth && r.source === 'crm')
     const cachedCrmVersion = crmRow?.summary?.schemaVersion || 0
     const hasCrm = !!crmRow && (isClientView || cachedCrmVersion >= CRM_SCHEMA_VERSION); // client: cached CRM of any version counts (avoids heavy client live-fetch + clobber)
