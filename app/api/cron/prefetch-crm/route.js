@@ -138,8 +138,12 @@ export async function GET(request) {
     } catch {}
   }
 
-  // Concurrency 2 — gentle on BMBY SOAP
+  // מקביליות: החלונות הקלים (דוחות שמורים בלבד) רצים 4 במקביל. חלונות התמונה (רבעונים — BMBY 14k
+  // ו-Salesforce 59k רשומות גולמיות) רצים 2 במקביל: ב-15:37 (17.9) ארבעה כאלה יחד הביאו את ה-DB
+  // ל-17 statement timeouts על נעילות שורות, גם בלי deadlocks. הרבעונים כבר ראשונים בתור.
   const CONCURRENCY = 4  // was 2 — with real (uncached) fetching the run exceeded 300s and 504'd
+  const SNAPSHOT_CONCURRENCY = 2
+  const isSnapshotJob = (job) => QUARTERS.includes(job.rangeId)
   // Wall-clock deadline: return BEFORE Vercel's 300s hard kill. A 504 (kill) makes the GitHub
   // Actions job fail ("all jobs have failed" email). Instead we stop starting new jobs past the
   // budget and resolve at the deadline with whatever finished — any unfinished range simply keeps
@@ -149,7 +153,8 @@ export async function GET(request) {
   const inFlight = new Set()
   const loop = (async () => {
     while (queue.length > 0 || inFlight.size > 0) {
-      while (queue.length > 0 && inFlight.size < CONCURRENCY && (Date.now() - startedAt) < DEADLINE_MS) {
+      // התקרה נקבעת לפי העבודה הבאה בתור: כל עוד יש רבעונים, לא יותר מ-2 בטיסה בו-זמנית.
+      while (queue.length > 0 && inFlight.size < (isSnapshotJob(queue[0]) ? SNAPSHOT_CONCURRENCY : CONCURRENCY) && (Date.now() - startedAt) < DEADLINE_MS) {
         const p = run(queue.shift()).finally(() => inFlight.delete(p)); inFlight.add(p)
       }
       if (inFlight.size > 0) await Promise.race(inFlight)
