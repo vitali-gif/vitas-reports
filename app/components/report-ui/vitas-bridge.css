@@ -222,6 +222,22 @@
 .vr-ui .vcs-root .vcs-legend li { padding-block: 14px; }
 .vr-ui .vcs-root .vcs-legend strong em { font-style: normal; color: var(--vr-muted, #586581); font-weight: 600; }
 
+/* ── CRM › זמני תגובה (.vrt-root, חבילה שלישית) — הגרפים הקיימים בתוך פאנלים לבנים ────── */
+.vr-ui .vrt-root .vcs-metric-scope { margin-block-end: 12px; }
+.vr-ui .vrt-root .vr-metric-grid { margin-block-end: 36px; }
+.vr-ui .vrt-root .vrt-group-title { font-size: 23px; font-weight: 750; line-height: 1.35; color: var(--vr-text, #142044); margin: 0 0 16px; }
+.vr-ui .vrt-root .vrt-speed, .vr-ui .vrt-root .vrt-patterns { margin-block-end: 36px; }
+.vr-ui .vrt-root .vrt-speed > .section, .vr-ui .vrt-root .vrt-patterns > .section, .vr-ui .vrt-root .vrt-tables > .section { margin: 0; min-inline-size: 0; background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); padding: 20px 20px 16px; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.vr-ui .vrt-root .vrt-speed .section-head, .vr-ui .vrt-root .vrt-patterns .section-head, .vr-ui .vrt-root .vrt-tables .section-head { margin-block-end: 12px; flex-wrap: wrap; }
+.vr-ui .vrt-root .vrt-speed .section-head h2, .vr-ui .vrt-root .vrt-patterns .section-head h2, .vr-ui .vrt-root .vrt-tables .section-head h2 { font-size: 18px; }
+.vr-ui .vrt-root .vrt-speed .section-head .sub, .vr-ui .vrt-root .vrt-patterns .section-head .sub { flex-basis: 100%; margin: 0; }
+.vr-ui .vrt-root .chart-card { border: 0; box-shadow: none; background: transparent; padding: 0; }
+.vr-ui .vrt-root .vrt-tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.vr-ui .vrt-root .vrt-tables .chart-card { padding: 0 !important; }
+.vr-ui .vrt-root .vrt-tables .data-table td:first-child { font-weight: 700; }
+@media (max-width: 1200px) { .vr-ui .vrt-root .vrt-patterns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 850px) { .vr-ui .vrt-root .vrt-tables { grid-template-columns: minmax(0, 1fr); } }
+
 /* ── טקסט כללי בתוך .vr-ui ──────────────────────────────────────────────────── */
 .vr-ui { font-size: 15px; }
 .vr-ui .welcome-center { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); }

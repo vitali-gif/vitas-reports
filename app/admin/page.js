@@ -28,7 +28,7 @@ import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../compone
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
-import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText } from 'lucide-react'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info } from 'lucide-react'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -435,6 +435,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const vrMode = vrShell && dashTab === 'all'
   // vrCrm — המסך השני של הפיילוט: CRM › מקורות הגעה (design/handoff-crm-sources)
   const vrCrm = vrShell && dashTab === 'crm' && crmSubTab === 'sources'
+  // vrResp — המסך השלישי: CRM › זמני תגובה (design/handoff-response-times)
+  const vrResp = vrShell && dashTab === 'crm' && crmSubTab === 'response'
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -1658,8 +1660,26 @@ const selectProject = async (client, project) => {
       .sort((a, b) => b.bizAvg - a.bizAvg)
       .slice(0, 10);
 
+    // עיצוב מחודש: ההסבר העסקי + 4 כרטיסי report-ui עם אותן הגדרות (ה-InfoTip הקיים → "הסבר המדד").
+    // חציון אינו זמין: הדוחות שומרים סיכומים (ממוצעים ודליים), לא זמן תגובה לכל ליד — לכן נשמרו המדדים הקיימים.
+    const _vrRespTips = ['כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות.', 'לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב.'];
     return (
-      <>
+      <div className={vrResp ? 'vrt-root' : undefined}>
+        {vrResp ? (<>
+          <p className="vrt-explanation"><Info size={18} aria-hidden="true" />זמן המענה נמדד מכניסת הליד ל-BMBY ועד הפעולה הראשונה של איש מכירות אנושי, בשעות העסקים בלבד. לידים שטרם קיבלו מענה מוצגים בנפרד ואינם נכללים בממוצע.</p>
+          <p className="vr-caption vcs-metric-scope">{formatNum(totalLids)} לידים שנכנסו בתקופה · {formatNum(respondedCount)} מהם עם מענה אנושי</p>
+          <div className="vr-metric-grid">
+            <MetricCard label={'סה"כ לידים'} value={formatNum(totalLids)} tone="indigo" icon={Users} details={_vrRespTips[0]}
+              onClick={_crmRespLeads?.allLeads?.length > 0 ? () => setNamedLeadsModal({title: 'סה"כ לידים', names: _crmRespLeads.allLeads}) : undefined} />
+            <MetricCard label="קיבלו מענה" value={formatNum(respondedCount)} tone="emerald" icon={CheckCircle2} details={_vrRespTips[1]}
+              description={totalLids > 0 ? Math.round(respondedCount / totalLids * 100) + '% מהלידים' : undefined} />
+            <MetricCard label="זמן מענה ממוצע" value={fmt(overallBusinessMin)} tone="sky" icon={Clock} details={_vrRespTips[2]}
+              description={respondedCount > 0 ? 'שעות עסקים · מתוך ' + formatNum(respondedCount) + ' לידים עם מענה' : undefined} />
+            <MetricCard label="בלי מענה" value={formatNum(noResponseCount)} tone="amber" icon={PhoneOff} details={_vrRespTips[3]}
+              description={totalLids > 0 ? 'מתוך ' + formatNum(totalLids) + ' לידים' : undefined}
+              onClick={_crmRespLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים בלי מענה', names: _crmRespLeads.noResponse}) : undefined} />
+          </div>
+        </>) : (
                 <div className="kpi-tier primary" style={{marginBottom:'36px'}}>
           <div className="kpi-c indigo" style={_crmRespLeads?.allLeads?.length > 0 ? {cursor:'pointer'} : undefined} onClick={_crmRespLeads?.allLeads?.length > 0 ? () => setNamedLeadsModal({title: 'סה"כ לידים', names: _crmRespLeads.allLeads}) : undefined}>
             <div className="ic-wrap">
@@ -1689,8 +1709,10 @@ const selectProject = async (client, project) => {
             <div className="lbl">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div>
             <div className="val">{noResponseCount}</div>
           </div>
-        </div>
+        </div>)}
 
+        {vrResp && <h2 className="vrt-group-title">מהירות המענה</h2>}
+        <div className={vrResp ? 'vrt-speed' : undefined}>
         <div className="section">
           <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>התפלגות זמני תגובה</h2><span className="sub">חלוקת לידים ל-7 דליי זמן</span></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
@@ -1702,7 +1724,10 @@ const selectProject = async (client, project) => {
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
           </div>
         )}
+        </div>
 
+        {vrResp && <h2 className="vrt-group-title">דפוסי פגישות ומענה</h2>}
+        <div className={vrResp ? 'vrt-patterns' : undefined}>
         {meetingDowHasData && (
           <div className="section">
             <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>יום מבוקש לפגישה</h2><span className="sub">באיזה יום בשבוע לקוחות רוצים להגיע לפגישה (לפי תאריך הפגישה שנקבע, ללא מבוטלות)</span></div>
@@ -1723,8 +1748,9 @@ const selectProject = async (client, project) => {
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="noAnswerHourChart"></canvas></div></div>
           </div>
         )}
+        </div>
 
-        <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
+        <div className={vrResp ? 'vrt-tables' : 'chart-grid'} style={vrResp ? undefined : {gridTemplateColumns: '1fr 1fr'}}>
           <div className="section">
             <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><h2>זמן מענה לפי איש מכירות</h2></div>
             <div className="chart-card" style={{padding:'10px'}}>
@@ -1760,9 +1786,9 @@ const selectProject = async (client, project) => {
             </div>
           </div>
         </div>
-      </>
+      </div>
     );
-  }, [selectedMonth, reports]);
+  }, [vrResp, selectedMonth, reports]);
 
     // ==================== CRM OBJECTIONS SUB-TAB ====================
   const renderCrmObjectionsDashboard = useCallback(() => {
@@ -4570,7 +4596,7 @@ const selectProject = async (client, project) => {
               <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>{vrShell ? '' : '🏘️ '}יישובים</button>
               <button className={`client-tab ${crmSubTab === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>{vrShell ? '' : '📅 '}פגישות שבוצעו</button>
             </div>
-            {vrShell && crmSubTab === 'sources' && (
+            {vrShell && (crmSubTab === 'sources' || crmSubTab === 'response') && (
               <button type="button" className="vr-button vcs-refresh" onClick={refreshFromBmby} disabled={refreshingCrm} title="משיכה חיה מ-BMBY לתקופה שנבחרה">
                 <RefreshCw size={16} aria-hidden="true" />{refreshingCrm ? 'מרענן נתונים…' : 'רענון נתונים'}
               </button>

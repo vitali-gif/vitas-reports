@@ -3,6 +3,7 @@ import './globals.css';
 import './components/report-ui/vitas-visual.css';
 import './components/report-ui/vitas-bridge.css';
 import './components/report-ui/crm-sources.css';
+import './components/report-ui/response-times.css';
 
 export const metadata = {
   title: 'VITAS Reports - מערכת דוחות',
