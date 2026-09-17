@@ -73,9 +73,9 @@ export default function TitleBar({
     <div className="titlebar">
       {/* Left: breadcrumb + title */}
       <div>
-        {crumb.length > 0 && (
+        {crumb.filter(Boolean).length > 0 && (
           <div className="crumb">
-            {crumb.map((part, i) => (
+            {crumb.filter(Boolean).map((part, i) => (
               <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {i > 0 && <span className="sep">/</span>}
                 <span dir={/^[a-zA-Z]/.test(part) ? 'ltr' : undefined}>{part}</span>

@@ -6,13 +6,16 @@
    בלי לגעת ב-globals.css. נטען פעם אחת אחרי globals.css ב-app/layout.js. */
 
 /* ── טאבים (DESIGN-SPEC: 44px, 15px, active indigo + underline) ─────────────── */
-.vr-ui .client-tabs { gap: 6px; margin-block-end: 28px; border-block-end: 1px solid var(--border, #DDE2EC); }
-.vr-ui .client-tab { min-block-size: 44px; font-size: 15px; font-weight: 600; padding-inline: 18px; color: var(--vr-muted); }
-.vr-ui .client-tab.active { color: var(--indigo, #5B5EF4); }
-.vr-ui .client-tab.active::after { background: var(--indigo, #5B5EF4); block-size: 3px; }
+/* טאבים כפקד מקוטע (כמו בסקיצה): קופסאות צמודות עם גבול, הפעיל לבן עם טקסט וקו תחתון אינדיגו */
+.vr-ui .client-tabs { display: inline-flex; gap: 0; margin-block-end: 26px; border: 1px solid var(--border, #DDE2EC); border-radius: 10px; overflow: hidden; background: var(--card, #fff); box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.vr-ui .client-tab { min-block-size: 44px; font-size: 15px; font-weight: 600; padding-inline: 22px; color: var(--vr-text, #142044); background: var(--surface, #F5F7FB); border-inline-start: 1px solid var(--border, #DDE2EC); border-radius: 0; }
+.vr-ui .client-tab:first-child { border-inline-start: 0; }
+.vr-ui .client-tab:hover { color: var(--indigo, #5B5EF4); background: #fff; }
+.vr-ui .client-tab.active { color: var(--indigo, #5B5EF4); background: #fff; box-shadow: inset 0 -3px 0 var(--indigo, #5B5EF4); }
+.vr-ui .client-tab.active::after { display: none; }
 /* טאבי המשפך (הכל / Facebook / Google) בתוך כותרת סקשן — קומפקטיים, בלי קו תחתון של כל הרוחב */
-.vr-ui .vr-inline-tabs { margin: 0; border: 0; gap: 2px; }
-.vr-ui .vr-inline-tabs .client-tab { min-block-size: 36px; font-size: 13.5px; padding-inline: 12px; }
+.vr-ui .vr-inline-tabs { margin: 0; }
+.vr-ui .vr-inline-tabs .client-tab { min-block-size: 36px; font-size: 13.5px; padding-inline: 14px; }
 
 /* ── כרטיסי KPI: הגרדיאנטים של המותג (DESIGN-SPEC: "קלוד יכול למפות אחרי בדיקת הקוד") ── */
 /* החבילה הגיעה עם גרדיאנטים כהים משלה; הסקיצה המאושרת משתמשת בגוונים הבהירים של --g-* הקיימים.
@@ -124,14 +127,21 @@
 .vr-shell .add-btn { margin-inline-start: 22px; }
 
 /* budget card (DESIGN-SPEC: משטח לבן עם border, min-height 56, labels גלויים) */
-.vr-budget { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); padding: 12px 18px; margin-block-end: 20px; display: flex; flex-direction: column; gap: 10px; min-block-size: 56px; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
-.vr-budget-main { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* שורה אחת (כמו בסקיצה): בצד ההתחלה תווית + חודש + סכום + שמור, בצד הסיום פס ההתקדמות + "נוצל החודש" */
+.vr-budget { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); padding: 9px 16px; margin-block-end: 20px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; min-block-size: 56px; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.vr-budget-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vr-budget-progress { flex: 1 1 320px; }
+.vr-budget-amount { display: inline-flex; align-items: center; gap: 2px; font-size: 20px; font-weight: 800; color: var(--vr-text, #142044); }
+.vr-budget-amount .vr-budget-currency { font-size: 17px; font-weight: 700; }
+.vr-budget-field.vr-budget-amount input { border: 1px solid transparent; background: transparent; font-size: 20px; font-weight: 800; padding: 4px 6px; inline-size: 7ch; min-block-size: 36px; -moz-appearance: textfield; }
+.vr-budget-field.vr-budget-amount input::-webkit-outer-spin-button, .vr-budget-field.vr-budget-amount input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.vr-budget-field.vr-budget-amount input:hover, .vr-budget-field.vr-budget-amount input:focus { border-color: var(--border, #DDE2EC); background: var(--surface, #F5F7FB); }
 .vr-budget-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: var(--vr-text, #142044); }
 .vr-budget-label svg { color: var(--indigo, #5B5EF4); }
 .vr-budget-field select, .vr-budget-field input { font: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-xs, 6px); background: var(--surface, #F5F7FB); color: var(--vr-text, #142044); min-block-size: 38px; }
 .vr-budget-field input { inline-size: 130px; font-variant-numeric: tabular-nums; }
 .vr-budget-save { min-block-size: 38px; padding-block: 6px; background: var(--indigo, #5B5EF4); color: #fff; border-color: transparent; font-weight: 700; }
-.vr-budget-total { margin-inline-start: auto; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--vr-text, #142044); }
+.vr-budget-total { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--vr-text, #142044); }
 .vr-budget-progress { display: flex; align-items: center; gap: 14px; }
 .vr-budget-track { flex: 1 1 auto; block-size: 10px; background: var(--surface, #F5F7FB); border: 1px solid var(--divider, #E5E9F1); border-radius: 999px; overflow: hidden; }
 .vr-budget-fill { block-size: 100%; border-radius: 999px; background: var(--emerald, #10B981); transition: width .3s ease; }

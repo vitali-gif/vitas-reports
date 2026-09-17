@@ -5474,11 +5474,11 @@ const selectProject = async (client, project) => {
                         {monthOpts.map(m=><option key={m} value={m}>{formatMonth ? formatMonth(m) : m}</option>)}
                       </select>
                     </label>
-                    <label className="vr-budget-field"><span className="vr-sr-only">סכום התקציב בש״ח</span>
-                      <input type="number" min="0" placeholder="₪" value={shownVal} onChange={e=>setBudgetDraft(e.target.value)} />
+                    <label className="vr-budget-field vr-budget-amount"><span className="vr-sr-only">סכום התקציב בש״ח</span>
+                      <span className="vr-budget-currency" aria-hidden="true">₪</span>
+                      <input type="number" min="0" placeholder="0" value={shownVal} onChange={e=>setBudgetDraft(e.target.value)} />
                     </label>
                     <button type="button" className="vr-button vr-budget-save" onClick={async ()=>{ await saveMonthlyBudget(ym, shownVal); setBudgetDraft(null); }}>שמור</button>
-                    <span className="vr-budget-total"><bdi>{budget != null ? formatCurrency(budget) : '—'}</bdi></span>
                   </div>
                   <div className="vr-budget-progress" data-level={_lvl}>
                     <div className="vr-budget-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct != null ? Math.min(100, pct) : 0} aria-label="ניצול התקציב החודשי">
