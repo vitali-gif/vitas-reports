@@ -159,9 +159,9 @@
 .vr-ui .vr-tree-row.vr-lvl-2 { background: #FCFCFE; font-size: 13.5px; }
 .vr-ui .vr-tree-row td:first-child svg { vertical-align: middle; color: var(--vr-muted, #586581); }
 .vr-platform { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-inline-end: 10px; vertical-align: middle; border: 1px solid var(--border, #DDE2EC); background: var(--surface, #F5F7FB); color: var(--vr-text, #142044); }
-.vr-platform i { font-style: normal; display: inline-grid; place-items: center; inline-size: 16px; block-size: 16px; border-radius: 50%; font-size: 10px; font-weight: 900; color: #fff; }
-.vr-platform.meta i { background: #0866FF; }
-.vr-platform.google i { background: #EA4335; }
+.vr-platform svg { flex-shrink: 0; }
+.vr-platform.meta { color: #1C2B33; }
+.vr-platform.google { color: #3C4043; }
 .vr-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 .vr-status i { inline-size: 8px; block-size: 8px; border-radius: 50%; background: #98A0B2; }
 .vr-status.on { color: #0E9F6E; } .vr-status.on i { background: #10B981; }
@@ -169,7 +169,11 @@
 .vr-status.off { color: var(--vr-muted, #586581); } .vr-status.off i { background: #E5E9F1; }
 .vr-status.none { color: var(--vr-muted, #586581); }
 
-/* פילוח דמוגרפי: כותרות המשנה בתוך הסקשן */
+/* פילוח דמוגרפי: שתי טבלאות זו מתחת לזו, כל אחת בכרטיס לבן עם הכותרת בתוכו (כמו בסקיצה) */
+.vr-ui .vr-demo-grid { display: flex; flex-direction: column; gap: 20px; }
+.vr-ui .vr-demo-block { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); padding: 14px 16px 6px; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.vr-ui .vr-demo-block h3 { font-size: 16px; font-weight: 700; color: var(--vr-text, #142044); margin: 0 0 12px; }
+.vr-ui .vr-demo-block .card { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 .vr-ui .section h3 { font-size: 16px; font-weight: 700; color: var(--vr-text, #142044); margin-block-end: 10px; }
 
 /* ── טקסט כללי בתוך .vr-ui ──────────────────────────────────────────────────── */
@@ -181,3 +185,6 @@
   .vr-ui .section-head h2 { font-size: 19px; }
   .vr-ui .data-table thead th, .vr-ui .data-table tbody td { padding-block: 11px; padding-inline: 10px; font-size: 13px; }
 }
+
+/* כותרת סקשן של report-ui: הפעולות (טאבי המשפך) צמודות לכותרת בצד ההתחלה (ימין), לא בקצה השני */
+.vr-ui .vr-section-heading { justify-content: flex-start; gap: 28px; flex-wrap: wrap; }

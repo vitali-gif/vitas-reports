@@ -25,6 +25,7 @@ import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
+import { MetaMark, GoogleMark } from '../components/report-ui/BrandMarks'
 import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft } from 'lucide-react'
 
 
@@ -426,7 +427,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // תוכן הדשבורד עטוף ב-.vr-ui, כרטיסי ה-KPI והמשפך מוצגים ברכיבי report-ui, ושאר
   // הסקשנים מקבלים את המידות מ-vitas-bridge.css. הלוגיקה, החישובים וההרשאות לא משתנים.
   const _vrCrmType = reports.find(r => r.month === selectedMonth && r.source === 'crm')?.summary?.crmType || null
-  const vrMode = view === 'dashboard' && dashTab === 'all' && !isDemoProject && !['zoho', 'salesforce'].includes(_vrCrmType)
+  // vrShell — המעטפת (סיידבר, header, כותרת, תקציב) בעיצוב החדש בכל הטאבים של פרויקט נדל"ן, כדי שהמסך לא
+  // יקפוץ בין שני עיצובים במעבר טאב. vrMode — תוכן הטאב "הכל" בלבד (הפיילוט).
+  const vrShell = view === 'dashboard' && !isDemoProject && !['zoho', 'salesforce'].includes(_vrCrmType)
+  const vrMode = vrShell && dashTab === 'all'
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -4894,7 +4898,7 @@ const selectProject = async (client, project) => {
                     {hasChildren ? (vrMode ? (isExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />) : (isExpanded ? '\u25bc' : '\u25c0')) : ''}
                   </span>
                   {level === 0 && data.source ? (vrMode
-                    ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}><i aria-hidden="true">{data.source.includes('google') ? 'G' : 'M'}</i>{data.source.includes('google') ? 'Google' : 'Meta'}</span>
+                    ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
                     : <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:data.source.includes('google')?'var(--rose-50)':'var(--sky-50)',color:data.source.includes('google')?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{data.source.includes('google')?'G':'F'}</span>) : null}
                   {name}
                   {level === 0 && data.source && !vrMode ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
@@ -5009,8 +5013,8 @@ const selectProject = async (client, project) => {
 
         {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section section-demographics">
           <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>פילוח דמוגרפי</h2><span className="sub">חלוקת ביצועים לפי מגדר וקבוצת גיל</span></div>
-        <div style={{display:'flex',gap:'20px',alignItems:'flex-start'}}>
-          <div style={{flex:1,minWidth:0}}>
+        <div className={vrMode ? 'vr-demo-grid' : undefined} style={vrMode ? undefined : {display:'flex',gap:'20px',alignItems:'flex-start'}}>
+          <div className={vrMode ? 'vr-demo-block' : undefined} style={vrMode ? undefined : {flex:1,minWidth:0}}>
           {!isPmax && genderNames.length > 0 && (() => {
           const gd = data.genders;
           const genderLabel = (g) => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : g === 'unknown' ? '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2' : g;
@@ -5037,7 +5041,7 @@ const selectProject = async (client, project) => {
           </div>);
         })()}
           </div>
-          <div style={{flex:1,minWidth:0}}>
+          <div className={vrMode ? 'vr-demo-block' : undefined} style={vrMode ? undefined : {flex:1,minWidth:0}}>
           {!isPmax && ageNames.length > 0 && (() => {
           const ad = data.ages;
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb; });
@@ -5372,7 +5376,7 @@ const selectProject = async (client, project) => {
       })()}
       <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes loadingSlide{0%{margin-right:-40%} 100%{margin-right:100%}} @keyframes loadingSlide{0%{transform:translateX(-150%)} 100%{transform:translateX(300%)}}`}</style>
       <div className={`sidebar-overlay${sidebarOpen ? ' active' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
-      <Header className={vrMode ? 'header-vr' : ''}
+      <Header className={vrShell ? 'header-vr' : ''}
         onMenuOpen={() => setSidebarOpen(true)}
         onExport={!isClientView && !isDemoProject ? handleExport : undefined}
         onClientAccess={!isClientView ? handleClientAccess : undefined}
@@ -5386,7 +5390,7 @@ const selectProject = async (client, project) => {
         ) : null}
       />
 
-      <div className={vrMode ? 'app-layout vr-shell' : 'app-layout'}>
+      <div className={vrShell ? 'app-layout vr-shell' : 'app-layout'}>
         <Sidebar
           clients={visibleClients}
           activeClient={selectedClient?.name}
@@ -5396,7 +5400,7 @@ const selectProject = async (client, project) => {
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
           footerText="VITAS Reports v3.2"
-          brand={vrMode ? { logo: '/brand/vitas-logo-white.png', tagline: 'Real Estate Intelligence' } : null}
+          brand={vrShell ? { logo: '/brand/vitas-logo-white.png', tagline: 'Real Estate Intelligence' } : null}
           lockedProjects={[]}
           demoProjects={clients.flatMap(c=>(c.projects||[]).filter(p=>p.is_demo).map(p=>p.name))}
           isOpen={sidebarOpen}
@@ -5449,7 +5453,7 @@ const selectProject = async (client, project) => {
               const budgets = selectedProject?.monthly_budgets || {};
               const budget = budgets[ym];
               if (isClientView) {
-                return budget != null ? (vrMode ? (
+                return budget != null ? (vrShell ? (
                   <div className="vr-budget"><div className="vr-budget-main">
                     <span className="vr-budget-label"><Wallet size={16} aria-hidden="true" />תקציב חודשי</span>
                     <span className="vr-budget-total"><bdi>{formatCurrency(budget)}</bdi></span>
@@ -5465,7 +5469,7 @@ const selectProject = async (client, project) => {
               const shownVal = budgetDraft !== null ? budgetDraft : (budget!=null ? String(budget) : '');
               // עיצוב מחודש: כרטיס לבן עם פס התקדמות (DESIGN-SPEC: משטח לבן, min-height 56, labels גלויים, חודש כתוב)
               const _lvl = pct == null ? 'none' : pct >= 100 ? 'over' : pct >= 95 ? 'hot' : pct >= 75 ? 'warm' : 'ok';
-              return vrMode ? (
+              return vrShell ? (
                 <div className="vr-budget">
                   <div className="vr-budget-main">
                     <span className="vr-budget-label"><Wallet size={16} aria-hidden="true" />תקציב חודשי</span>
