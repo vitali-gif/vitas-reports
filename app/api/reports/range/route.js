@@ -18,7 +18,7 @@
  */
 import { NextResponse } from 'next/server'
 import { adminClient, requireProjectAccess, monitorTokenOf } from '../../../../lib/auth'
-import { loadRawRecords } from '../../../../lib/crm/raw-store.js'
+import { loadRawRecords, loadCompactSnapshot } from '../../../../lib/crm/raw-store.js'
 import { computeBmbySummary, toReportRow } from '../../../../lib/crm/bmby-summary.js'
 import { buildAdsRangeRows } from '../../../../lib/ads/range-rows.js'
 
@@ -61,7 +61,8 @@ export async function GET(request) {
 
   // CRM מתמונת המצב (שלב 1) ומודעות מהעובדות היומיות (שלב 2) — במקביל, כל אחד אופציונלי.
   const [rawRes, adsRes] = await Promise.allSettled([
-    loadRawRecords(sb, projectId, 'bmby'),
+    // התמונה הדחוסה (שורה אחת, מיגרציה 009); הרשומות הגולמיות רק אם היא עוד לא נבנתה.
+    loadCompactSnapshot(sb, projectId, 'bmby').then(c => c || loadRawRecords(sb, projectId, 'bmby')),
     compare ? Promise.resolve(null) : buildAdsRangeRows(sb, project, since, until),
   ])
   const raw = rawRes.status === 'fulfilled' ? rawRes.value : null
