@@ -12,7 +12,7 @@
  */
 import { createClient } from '@supabase/supabase-js'
 import { runDailySync } from '../../../../lib/ads/daily-sync.js'
-import { pruneJobLog } from '../../../../lib/job-log.js'
+import { pruneJobLog, logJob, lastRuns } from '../../../../lib/job-log.js'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -42,6 +42,56 @@ export async function GET(request) {
       errors: (bf.body.results || []).filter(r => !r.ok && !r.deferred).map(r => `${r.source}/${r.account} ${r.since}..${r.until}: ${r.error}`).slice(0, 5) }
   } else {
     out.backfill = { skipped: 'time budget' }
+  }
+
+  // ── Zoho (שלב 4): רענון עסקאות שהשתנו + צעד מילוי היסטורי של חודש אחד ─────────────
+  // הקרון הרגיל (prefetch-crm) מכסה 3 חודשים + טווחים; ההיסטוריה מ-2026-01 ממולאת כאן חודש-חודש,
+  // חודש אחד לשעה, ומצבו נשמר ב-job_log (החודש האחרון שמולא). בלי טריגר ידני.
+  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
+  const internal = { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.CRON_SECRET || '' } }
+  const leftZ = 270000 - (Date.now() - startedAt)
+  if (leftZ > 60000) {
+    const t0 = Date.now()
+    try {
+      const r = await fetch(`${base}/api/zoho/fetch`, { ...internal, body: JSON.stringify({ dealsRefreshDays: 3 }) })
+      const d = await r.json().catch(() => ({}))
+      out.zohoDeals = { ok: r.ok && d.ok !== false, ms: Date.now() - t0, projects: (d.projects || []).map(p => ({ project: p.project, ok: p.ok, deals: p.deals, error: p.error })) }
+      await logJob(sb, 'prefetch-daily:zoho-deals', out.zohoDeals.ok, Date.now() - t0, out.zohoDeals)
+    } catch (err) { out.zohoDeals = { ok: false, error: String(err).slice(0, 200) } }
+
+    // Salesforce (KLOSS): מה שהשתנה ב-3 הימים האחרונים — סטטוסים, שלבים, פריטים, היסטוריה.
+    {
+      const t2 = Date.now()
+      try {
+        const r = await fetch(`${base}/api/salesforce/fetch`, { ...internal, body: JSON.stringify({ modifiedRefreshDays: 3 }) })
+        const d = await r.json().catch(() => ({}))
+        out.sfModified = { ok: r.ok && d.ok !== false, ms: Date.now() - t2, counts: d.counts, error: d.error }
+        await logJob(sb, 'prefetch-daily:sf-modified', out.sfModified.ok, Date.now() - t2, out.sfModified)
+      } catch (err) { out.sfModified = { ok: false, error: String(err).slice(0, 200) } }
+    }
+
+    // צעד מילוי: החודש שלפני האחרון שמולא (או שלפני שלושת החודשים שהקרון הרגיל מכסה), עד ZOHO_BACKFILL_SINCE.
+    const floor = (process.env.ZOHO_BACKFILL_SINCE || '2026-01')
+    const prevMonth = (ym) => { const [y, m] = ym.split('-').map(Number); const d = new Date(Date.UTC(y, m - 2, 1)); return d.toISOString().slice(0, 7) }
+    const nowIl = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit' }).format(new Date())
+    const last = (await lastRuns(sb, 'prefetch-daily:zoho-backfill', 1))[0]
+    const target = last?.detail?.month ? prevMonth(last.detail.month) : prevMonth(prevMonth(prevMonth(nowIl)))
+    if (target < floor || last?.detail?.done) {
+      out.zohoBackfill = { done: true, floor }
+    } else if (270000 - (Date.now() - startedAt) > 60000) {
+      const t1 = Date.now()
+      try {
+        const r = await fetch(`${base}/api/zoho/fetch`, { ...internal, body: JSON.stringify({ month: target }) })
+        const d = await r.json().catch(() => ({}))
+        const ok = r.ok && d.ok !== false
+        out.zohoBackfill = { ok, month: target, ms: Date.now() - t1, projects: (d.projects || []).map(p => ({ project: p.project, leads: p.leads, error: p.error })) }
+        await logJob(sb, 'prefetch-daily:zoho-backfill', ok, Date.now() - t1, { month: target, done: prevMonth(target) < floor, projects: out.zohoBackfill.projects })
+      } catch (err) { out.zohoBackfill = { ok: false, month: target, error: String(err).slice(0, 200) } }
+    } else {
+      out.zohoBackfill = { skipped: 'time budget', next: target }
+    }
+  } else {
+    out.zohoDeals = { skipped: 'time budget' }
   }
 
   // heartbeat + גיזום הלוג

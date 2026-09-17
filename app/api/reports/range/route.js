@@ -18,8 +18,8 @@
  */
 import { NextResponse } from 'next/server'
 import { adminClient, requireProjectAccess, monitorTokenOf } from '../../../../lib/auth'
-import { loadRawRecords, loadCompactSnapshot, loadCompactMeta } from '../../../../lib/crm/raw-store.js'
-import { computeBmbySummary, toReportRow } from '../../../../lib/crm/bmby-summary.js'
+import { loadRawRecords, loadCompactSnapshot, loadCompactMeta, detectCrmType } from '../../../../lib/crm/raw-store.js'
+import { computeCrmRow, totalKeysFor, getPath } from '../../../../lib/crm/compute.js'
 import { buildAdsRangeRows } from '../../../../lib/ads/range-rows.js'
 
 export const dynamic = 'force-dynamic'
@@ -43,21 +43,23 @@ const compactSet = (k, v) => { COMPACT_CACHE.set(k, v); if (COMPACT_CACHE.size >
 
 // טעינת ה-CRM בשלוש מדרגות: (1) מטא זעיר → (2) תוצאה מוכנה במטמון / payload במטמון → (3) payload מה-DB.
 async function loadCrmForRange(sb, projectId, key, timing) {
-  const meta = await loadCompactMeta(sb, projectId, 'bmby')
-  if (!meta) {   // עוד אין תמונה דחוסה — הרשומות הגולמיות (איטי, נדיר: רק לפני הריצה הראשונה של הקרון אחרי 009)
-    const raw = await loadRawRecords(sb, projectId, 'bmby')
+  const meta = await loadCompactMeta(sb, projectId)   // כל סוג CRM שיש לפרויקט (bmby / zoho / salesforce)
+  if (!meta) {   // עוד אין תמונה דחוסה — הרשומות הגולמיות (איטי, נדיר: רק לפני הריצה הראשונה של הקרון)
+    const crmType = await detectCrmType(sb, projectId)
+    if (!crmType) return { raw: null, shaped: null, cacheKey: null }
+    const raw = await loadRawRecords(sb, projectId, crmType)
     return { raw, shaped: null, cacheKey: null }
   }
   const cacheKey = `${projectId}|${key}|${meta.built_at}`
   const hit = cacheGet(cacheKey)
-  const stub = { counts: meta.counts, fetchedAt: meta.source_fetched_at || meta.built_at, builtAt: meta.built_at, total: Object.values(meta.counts || {}).reduce((x, y) => x + (Number(y) || 0), 0), compact: true }
+  const stub = { counts: meta.counts, fetchedAt: meta.source_fetched_at || meta.built_at, builtAt: meta.built_at, total: Object.values(meta.counts || {}).reduce((x, y) => x + (Number(y) || 0), 0), compact: true, crmType: meta.crm_type }
   if (hit) { timing.crmCache = 'hit'; return { raw: stub, shaped: hit, cacheKey } }
   const pk = `${projectId}|${meta.built_at}`
   let raw = compactGet(pk)
   if (raw) { timing.crmCache = 'payload-hit' }
   else {
     timing.crmCache = 'miss'
-    raw = await loadCompactSnapshot(sb, projectId, 'bmby')
+    raw = await loadCompactSnapshot(sb, projectId, meta.crm_type)
     if (raw) compactSet(pk, raw)
   }
   return { raw, shaped: null, cacheKey }
@@ -65,7 +67,6 @@ async function loadCrmForRange(sb, projectId, key, timing) {
 const cacheGet = (k) => { const v = CRM_CACHE.get(k); if (v) { CRM_CACHE.delete(k); CRM_CACHE.set(k, v) } return v || null }
 const cacheSet = (k, v) => { CRM_CACHE.set(k, v); if (CRM_CACHE.size > 64) CRM_CACHE.delete(CRM_CACHE.keys().next().value) }
 
-const TOTAL_KEYS = ['totalLeads', 'relevantLeads', 'nonRelevantLeads', 'meetingsScheduled', 'meetingsCompleted', 'meetingsCancelled', 'meetingsUpcoming', 'leadsToHandle', 'registrations', 'registrationValue', 'contracts', 'contractValue']
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
@@ -108,23 +109,25 @@ export async function GET(request) {
   if (adsRes.status === 'rejected') problems.ads = String(adsRes.reason?.message || adsRes.reason)
 
   const hasCrm = !!(raw && raw.total)
-  if (compare && !hasCrm) return J({ error: 'no_snapshot', hint: 'crm_raw has no records for this project yet — the next BMBY cron run fills it', problems }, 404)
+  if (compare && (!hasCrm)) return J({ error: 'no_snapshot', hint: 'crm_raw has no records for this project yet — the next BMBY cron run fills it', problems }, 404)
 
   const cacheKey = crmLoad ? crmLoad.cacheKey : null
   let shaped = crmLoad ? crmLoad.shaped : null
   if (!timing.crmCache) timing.crmCache = 'n/a'
   if (hasCrm && !shaped) {
     const t1 = Date.now()
-    shaped = toReportRow(computeBmbySummary(raw, { since, until, monthKey: key }))
+    shaped = computeCrmRow(raw.crmType, raw, { since, until, key })
     timing.computeMs = Date.now() - t1
     if (cacheKey) cacheSet(cacheKey, shaped)
   }
+  if (compare && !shaped) return J({ error: 'crm_type_not_supported_yet', crmType: raw?.crmType || null }, 501)
   timing.totalMs = Date.now() - t0
   timing.snapshot = raw ? (raw.compact ? 'compact' : 'raw') : null
   const stamp = (raw && raw.fetchedAt) || new Date().toISOString()
   const snapshot = hasCrm ? { fetchedAt: raw.fetchedAt, counts: raw.counts } : null
 
   if (compare) {
+    const TOTAL_KEYS = totalKeysFor(raw.crmType)
     const { data: stored } = await sb.from('reports')
       .select('summary, row_count, updated_at, created_at')
       .eq('project_id', projectId).eq('source', 'crm').eq('month', key).maybeSingle()
@@ -132,7 +135,7 @@ export async function GET(request) {
     let differing = 0
     if (stored?.summary) {
       for (const k of TOTAL_KEYS) {
-        const a = stored.summary[k] ?? null, b = shaped.summary[k] ?? null
+        const a = getPath(stored.summary, k) ?? null, b = getPath(shaped.summary, k) ?? null
         if (JSON.stringify(a) !== JSON.stringify(b)) { diff[k] = { stored: a, computed: b }; differing++ }
       }
       const a = stored.row_count ?? null, b = shaped.row_count
@@ -141,7 +144,8 @@ export async function GET(request) {
     return J({
       key, spanDays, snapshot,
       stored: stored ? { updatedAt: stored.updated_at || stored.created_at, rowCount: stored.row_count } : null,
-      computed: Object.fromEntries(TOTAL_KEYS.map(k => [k, shaped.summary[k] ?? null])),
+      crmType: raw.crmType,
+      computed: Object.fromEntries(TOTAL_KEYS.map(k => [k, getPath(shaped.summary, k) ?? null])),
       differing, diff,
       identical: !!stored && differing === 0,
       timing,
@@ -151,7 +155,7 @@ export async function GET(request) {
   }
 
   const rows = []
-  if (shaped) rows.push({ id: `range:${projectId}:crm:${key}`, project_id: projectId, source: 'crm', month: key, ...shaped, file_name: 'BMBY snapshot (computed)', created_at: stamp, updated_at: stamp, synthetic: true })
+  if (shaped) rows.push({ id: `range:${projectId}:crm:${key}`, project_id: projectId, source: 'crm', month: key, ...shaped, created_at: stamp, updated_at: stamp, synthetic: true })
   if (ads) rows.push(...ads.rows)
   const missing = [...(hasCrm ? [] : ['crm']), ...(ads ? ads.missing : ['facebook', 'google'])]
   if (!rows.length) return J({ error: 'no_data', missing, problems, hint: 'no CRM snapshot and no daily ad facts for this project/range yet' }, 404)
