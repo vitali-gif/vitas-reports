@@ -24,6 +24,8 @@ const decodeHtmlEntities = (str) => {
 import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
+import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake } from 'lucide-react'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -413,6 +415,13 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // ── Demo mode detection ────────────────────────────────────────────────
   // מוגדר כאן ולא למטה, כי applyPreset/applyCustomRange צריכים אותו.
   const isDemoProject = !!(selectedProject?.is_demo)
+
+  // ── עיצוב מחודש (ענף redesign, design/handoff-v1): פיילוט נדל"ן, טאב "הכל" בלבד ──
+  // opt-in מפורש: לא KLOSS (salesforce), לא BCure (zoho), לא פרויקט הדגמה. כשהדגל דלוק,
+  // תוכן הדשבורד עטוף ב-.vr-ui, כרטיסי ה-KPI והמשפך מוצגים ברכיבי report-ui, ושאר
+  // הסקשנים מקבלים את המידות מ-vitas-bridge.css. הלוגיקה, החישובים וההרשאות לא משתנים.
+  const _vrCrmType = reports.find(r => r.month === selectedMonth && r.source === 'crm')?.summary?.crmType || null
+  const vrMode = view === 'dashboard' && dashTab === 'all' && !isDemoProject && !['zoho', 'salesforce'].includes(_vrCrmType)
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -2099,7 +2108,7 @@ const selectProject = async (client, project) => {
     // הישנה — שם כל שלב קיבל גוון אחר, מה שרומז על זהויות שונות במקום על רצף אחד.
     // המספרים נשארים בצבע טקסט; הצבע יושב על הפס בלבד. הביטולים הם צבע מצב (ורוד)
     // ומסומנים גם בחץ ↳ וגם בטקסט, כדי שהם לא ייקראו כשלב ברצף.
-    const renderFunnelBar = useCallback(() => {
+    const renderFunnelBar = useCallback((vr = false) => {
       const MIN_N = 30;
       const RAMP = ['#ddd6fe', '#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95'];
       const LEAK = '#e11d48';
@@ -2172,6 +2181,34 @@ const selectProject = async (client, project) => {
       });
       const anyWeak = rows.some(r => r.value != null && r.weak);
       const missing = rows.filter(r => r.value == null);
+
+      if (vr) {
+        // עיצוב מחודש: אותן תחנות, אותם מכנים ואותם אחוזים — ברכיב Funnel של report-ui.
+        const VR_TONE = { impr: 'indigo', click: 'indigo', lead: 'emerald', cont: 'emerald', sched: 'sky', held: 'terra', canc: 'rose', reg: 'emerald', deal: 'rose' };
+        const VR_ICON = { impr: Eye, click: MousePointerClick, lead: Users, cont: Handshake, sched: CalendarCheck, held: CheckCircle2, canc: XCircle, reg: ClipboardList, deal: FileSignature };
+        const items = rows.map(r => ({
+          id: r.key, label: r.label, tone: VR_TONE[r.key], icon: VR_ICON[r.key],
+          value: r.value == null ? null : formatNum(r.value),
+          rate: (r.value != null && r.of) ? ((r.weak && r.pct != null ? '~' : '') + fmtPct(r.pct)) : null,
+          denominatorLabel: r.of ? (r.ofLabel + (r.denom != null ? ' (' + formatNum(r.denom) + ')' : '')) : '',
+        }));
+        const notes = ['לידים שנכנסו בתקופה. חשיפות וקליקים הם נתוני פרסום בתקופה, לא אנשים ייחודיים. "פגישות שהתבטלו" נמדד מהפגישות שנקבעו, כמו "הגיעו".'];
+        if (anyWeak) notes.push('~ אחוז על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו.');
+        if (missing.length > 0) notes.push('"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — אין מקור נתונים לשלב הזה בטווח הנבחר.');
+        if (funnelChannel === 'all' && chF && chG) notes.push('תצוגת "הכל" מערבבת טופס מיידי ודף נחיתה; להשוואה אמיתית בחר ערוץ בודד.');
+        const actions = (chF || chG) ? (
+          <div className="client-tabs vr-inline-tabs" role="tablist" aria-label="ערוץ המשפך">
+            <button type="button" className={`client-tab ${funnelChannel === 'all' ? 'active' : ''}`} onClick={() => setFunnelChannel('all')}>הכל</button>
+            {chF && <button type="button" className={`client-tab ${funnelChannel === 'facebook' ? 'active' : ''}`} onClick={() => setFunnelChannel('facebook')}>Facebook</button>}
+            {chG && <button type="button" className={`client-tab ${funnelChannel === 'google' ? 'active' : ''}`} onClick={() => setFunnelChannel('google')}>Google</button>}
+          </div>
+        ) : null;
+        return (
+          <ReportSection title="משפך לידים" description="מחשיפה ועד חוזה · כל אחוז נמדד מהמכנה הרשום מתחתיו" actions={actions}>
+            <Funnel items={items} description={notes.join(' ')} />
+          </ReportSection>
+        );
+      }
 
       return (
         <div className="section">
@@ -2869,6 +2906,18 @@ const selectProject = async (client, project) => {
       const sparkVals = metricKey && trendData.length >= 2 ? trendData.map(d => d[metricKey] || 0) : null;
       const trendPct = ch ? (ch.pct > 0 ? '+' : '') + Math.abs(ch.pct).toFixed(0) + '%' : null;
       const _hasNames = namesArr && namesArr.length > 0;
+      if (vrMode) {
+        // עיצוב מחודש: אותם ערכים, אותה תגית שינוי, אותה לחיצה לרשימת לידים — בכרטיס report-ui.
+        const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'לידים שלא טופלו': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature };
+        const badge = !ch ? null : ch.newVal ? '↑ חדש'
+          : ((ch.pct > 0 ? '↑ ' : ch.pct < 0 ? '↓ ' : '− ') + (ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '-') + Math.abs(ch.pct).toFixed(0) + '%'));
+        return (
+          <MetricCard key={label} label={label === 'תקציב' ? 'תקציב שנוצל' : label} value={value} tone={v2cls} icon={VR_ICON[label]}
+            description={subNote || undefined} badge={badge}
+            trend={sparkVals ? <Sparkline values={sparkVals} /> : null}
+            onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} />
+        );
+      }
       return (
         <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} — הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
           <div className="kpi-top">
@@ -4467,7 +4516,8 @@ const selectProject = async (client, project) => {
             <p style={{color:'#64748b',marginTop:'8px'}}>{'\u05d1\u05d7\u05e8 \u05d8\u05d5\u05d5\u05d7 \u05d0\u05d7\u05e8 \u05d0\u05d5 \u05d4\u05e8\u05e5 \u05e1\u05e0\u05db\u05e8\u05d5\u05df'}</p>
           </div>
         ) : (<>
-        <div className="kpi-grid">
+        {vrMode && <p className="vr-caption vr-metrics-section">פעילות בתקופה · כולל פעילות מלידים שנכנסו לפני התקופה</p>}
+        <div className={vrMode ? 'vr-metric-grid' : 'kpi-grid'}>
           {crmReports[0]?.summary?.crmType === 'zoho' ? (() => {
             const _zr = (crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {};
             const _zf = _zr.funnel || {};
@@ -4501,11 +4551,13 @@ const selectProject = async (client, project) => {
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות עתידיות', formatNum(_cs.meetingsUpcoming || 0), 'cyan', _cs.meetingsUpcoming || 0, prevCrmTotals?.meetingsUpcoming, false, _tabCrmLeads?.meetingsUpcoming) : null}
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות שבוטלו', formatNum(_cs.meetingsCancelled || 0), 'red', _cs.meetingsCancelled || 0, prevCrmTotals?.meetingsCancelled, false, _tabCrmLeads?.meetingsCancelled) : null}
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('לידים שלא טופלו', formatNum(_cs.leadsToHandle || 0), 'amber', _cs.leadsToHandle || 0, null, false, null) : null}
-          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
-          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations,
+            (vrMode && activeT.spend > 0 && (crmTotals?.registrationValue || 0) > 0) ? ('שווי ' + formatCurrencyCompact(crmTotals.registrationValue)) : undefined) : null}
+          {!vrMode && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
+          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts,
+            (vrMode && activeT.spend > 0) ? [ (crmTotals?.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(crmTotals.contractValue) : null, (crmTotals?.contracts || 0) > 0 ? 'עלות לחוזה ' + formatCurrency(activeT.spend / crmTotals.contracts) : null ].filter(Boolean).join(' · ') || undefined : undefined) : null}
+          {!vrMode && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
+          {!vrMode && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
           </>)}
         </div>
 
@@ -4545,7 +4597,7 @@ const selectProject = async (client, project) => {
             מדיה-בלבד לא היה רואה אותו כלל, למרות שחצי מהמשפך שלו כן קיים.
             כאן הוא מוצג בטאב "הכל": שלבי המדיה עם נתונים, ושלבי ה-CRM כ"אין נתון".
             ברגע שה-CRM יחובר, טאב ה-CRM ייווצר והסרגל יעבור לשם מעצמו. */}
-        {dashTab === 'all' && !hasCrm ? renderFunnelBar() : null}
+        {dashTab === 'all' && (!hasCrm || vrMode) ? renderFunnelBar(vrMode) : null}
 
         {/* פילוח פנימי לפי פרויקט — לקוח בחשבון מודעות אחד שמזהה את הבניין ברמת המודעה.
             הסכום למעלה נשאר סך החשבון; כאן רואים ממה הוא מורכב. כל שקל בדלי אחד בלבד,
@@ -5246,7 +5298,7 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
+  }, [vrMode, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 
@@ -5421,7 +5473,7 @@ const selectProject = async (client, project) => {
                 ? (isFetching
                     ? <PeriodFetching />
                     : <PeriodEmpty onRefresh={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }, { live: !isClientView })} />)
-                : renderDashboard()}
+                : (vrMode ? <VitasPresentation>{renderDashboard()}</VitasPresentation> : renderDashboard())}
           </>)}
 
           

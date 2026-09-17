@@ -1,0 +1,63 @@
+/* vitas-bridge.css — גשר בין העיצוב המחודש (vitas-visual.css, .vr-ui) ל-markup הקיים של הדשבורד.
+
+   הכרטיסים והמשפך עברו לרכיבי report-ui. הטבלאות, כותרות הסקשנים, הטאבים וגלריות המודעות
+   נשארו עם ה-markup והלוגיקה הקיימים (מיון, פתיחת קמפיין→קבוצה→מודעה, ייצוא) — וכאן הם
+   מקבלים את המידות והצבעים מ-DESIGN-SPEC.md. הכל בתוך .vr-ui בלבד, בלי !important,
+   בלי לגעת ב-globals.css. נטען פעם אחת אחרי globals.css ב-app/layout.js. */
+
+/* ── טאבים (DESIGN-SPEC: 44px, 15px, active indigo + underline) ─────────────── */
+.vr-ui .client-tabs { gap: 6px; margin-block-end: 28px; border-block-end: 1px solid var(--border, #DDE2EC); }
+.vr-ui .client-tab { min-block-size: 44px; font-size: 15px; font-weight: 600; padding-inline: 18px; color: var(--vr-muted); }
+.vr-ui .client-tab.active { color: var(--indigo, #5B5EF4); }
+.vr-ui .client-tab.active::after { background: var(--indigo, #5B5EF4); block-size: 3px; }
+/* טאבי המשפך (הכל / Facebook / Google) בתוך כותרת סקשן — קומפקטיים, בלי קו תחתון של כל הרוחב */
+.vr-ui .vr-inline-tabs { margin: 0; border: 0; gap: 2px; }
+.vr-ui .vr-inline-tabs .client-tab { min-block-size: 36px; font-size: 13.5px; padding-inline: 12px; }
+
+/* ── כרטיסי KPI: תגית שינוי (VITAS: הרחבה) ─────────────────────────────────── */
+.vr-metric-top { flex-wrap: wrap; }
+.vr-metric-badge { margin-inline-start: auto; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #ffffff2e; border: 1px solid #ffffff4d; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vr-metric.vr-tone-amber .vr-metric-badge { background: #00000014; border-color: #00000022; }
+.vr-metric-clickable { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.vr-metric-clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-md, 0 10px 24px -10px rgba(11,15,30,0.2)); }
+.vr-metric-note { opacity: .92; }
+.vr-metrics-section { margin-block-end: 8px; }
+
+/* ── סקשנים קיימים (.section / .section-head) ──────────────────────────────── */
+.vr-ui .section { margin-block: 44px 0; }
+.vr-ui .section-head { gap: 12px; margin-block-end: 18px; }
+.vr-ui .section-head h2 { font-size: 23px; font-weight: 750; line-height: 1.35; letter-spacing: 0; color: var(--vr-text); }
+.vr-ui .section-head .sub { font-size: 14px; color: var(--vr-muted); margin-inline-start: 4px; }
+.vr-ui .section-head .ico { inline-size: 36px; block-size: 36px; border-radius: 10px; }
+.vr-ui .section-head .ico svg { inline-size: 18px; block-size: 18px; stroke-width: 1.8; }
+.vr-ui .section-head .head-right { margin-inline-start: auto; }
+
+/* ── טבלאות קיימות (.table-wrapper / .data-table / .card) ──────────────────── */
+.vr-ui .table-wrapper, .vr-ui .card { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); overflow: hidden; }
+.vr-ui .card .card-body { padding: 0; }
+.vr-ui .card .table-wrapper { border: 0; border-radius: 0; box-shadow: none; }
+.vr-ui .table-wrapper { overflow-x: auto; }
+.vr-ui .data-table { font-size: 14px; }
+.vr-ui .data-table thead th { background: #EDF0FC; color: #25315C; font-weight: 650; font-size: 13.5px; padding-block: 14px; padding-inline: 14px; border-block-end: 1px solid var(--border, #DDE2EC); white-space: nowrap; }
+.vr-ui .data-table tbody td { padding-block: 15px; padding-inline: 14px; border-block-end: 1px solid var(--divider, #E5E9F1); font-variant-numeric: tabular-nums; }
+.vr-ui .data-table tbody tr:nth-child(even) { background: #F8FAFF; }
+.vr-ui .data-table tbody tr:hover { background: #F0F3FF; }
+.vr-ui .data-table tbody tr:last-child td { border-block-end: 0; }
+.vr-ui .data-table tbody tr.lvl-2 { background: #F8FAFF; font-size: 13.5px; }
+.vr-ui .data-table tbody tr.lvl-3 { background: #FCFCFE; font-size: 13px; }
+/* כותרות המשנה של הפילוח הדמוגרפי (h3 עם inline style בקוד הקיים) */
+.vr-ui .section h3 { font-family: inherit; }
+
+/* ── גלריות מודעות קיימות (Facebook top ads, Google PMax) ─────────────────── */
+.vr-ui .section-top-ads .card, .vr-ui .section-asset-gallery .card { border-radius: var(--r-md, 12px); box-shadow: var(--shadow-sm, 0 2px 8px -2px rgba(11,15,30,0.08)); }
+.vr-ui .section-top-ads > div[style*="grid"], .vr-ui .section-asset-gallery > div[style*="grid"] { gap: 24px; }
+
+/* ── טקסט כללי בתוך .vr-ui ──────────────────────────────────────────────────── */
+.vr-ui { font-size: 15px; }
+.vr-ui .welcome-center { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); }
+
+@media (max-width: 767px) {
+  .vr-ui .section { margin-block-start: 32px; }
+  .vr-ui .section-head h2 { font-size: 19px; }
+  .vr-ui .data-table thead th, .vr-ui .data-table tbody td { padding-block: 11px; padding-inline: 10px; font-size: 13px; }
+}
