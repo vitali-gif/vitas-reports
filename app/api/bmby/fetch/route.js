@@ -18,7 +18,7 @@
 import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { computeBmbySummary, toReportRow } from '../../../../lib/crm/bmby-summary.js'
-import { upsertRawRecords, ENTITIES } from '../../../../lib/crm/raw-store.js'
+import { upsertRawRecords, rebuildCompact, ENTITIES } from '../../../../lib/crm/raw-store.js'
 import { CRM_SCHEMA_VERSION } from '../../../../lib/crm/schema-version.js'
 
 export const dynamic = 'force-dynamic'
@@ -389,6 +389,9 @@ async function runSync(opts = {}) {
           [clients, tasks, prices, contracts].map((rows, i) => upsertRawRecords(supabase, p.id, 'bmby', ENTITIES[i], rows))
         )
         snapshot = Object.fromEntries(parts.map((r, i) => [ENTITIES[i], r]))
+        // תמונה דחוסה לחישוב מהיר (מיגרציה 009) — נבנית בתוך ה-DB, קריאה אחת זולה.
+        try { snapshot.compact = await rebuildCompact(supabase, p.id, 'bmby') }
+        catch (e) { snapshot.compact = { error: String(e?.message || e) } }
       } catch (e) {
         // לא נכנס ל-errors: הדוח השמור נכתב כרגיל, ואין סיבה למייל התראה. מדווח בשדה snapshot.
         snapshot = { error: String(e?.message || e) }
