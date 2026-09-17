@@ -137,7 +137,9 @@ export async function POST(req) {
   // קריאות קיימות.
   // notify=false → עדכון היקף גישה בלבד, בלי מייל. notify=true → קישור כניסה חד-פעמי במייל.
   // הסיסמה של משתמש קיים לעולם לא משתנה כאן.
-  const { email, client_id, project_ids, notify } = body
+  // notify_client_names (אופציונלי): כשהאדמין מעניק גישה לכמה לקוחות בבת אחת, הדשבורד שולח קריאה
+  // לכל לקוח ומבקש מייל רק באחרונה — ובמייל מופיעים כל הלקוחות, לא רק זה של הקריאה.
+  const { email, client_id, project_ids, notify, notify_client_names } = body
   const shouldNotify = notify !== false
   if (!email || !client_id) return NextResponse.json({ error: 'email and client_id required' }, { status: 400 })
 
@@ -167,6 +169,9 @@ export async function POST(req) {
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 })
 
   const clientName = projects[0]?.clients?.name || ''
+  const emailClientName = Array.isArray(notify_client_names) && notify_client_names.length
+    ? notify_client_names.map(n => String(n).slice(0, 80)).slice(0, 20).join(', ')
+    : clientName
 
   // notify: לוודא שיש משתמש Auth, להנפיק קישור כניסה חד-פעמי ולשלוח. בלי סיסמה, בלי לגעת
   // בסיסמה של משתמש קיים. הקישור חוזר גם לאדמין (inviteLink) להעברה ידנית אם המייל לא הגיע.
@@ -181,7 +186,7 @@ export async function POST(req) {
       if (!lk.ok) emailError = lk.error
       else {
         inviteLink = lk.link
-        const result = await sendInviteEmail(cleanEmail, inviteLink, clientName)
+        const result = await sendInviteEmail(cleanEmail, inviteLink, emailClientName)
         emailSent = result.ok
         emailError = result.error || null
       }

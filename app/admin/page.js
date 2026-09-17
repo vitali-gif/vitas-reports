@@ -164,8 +164,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [sessionLogs, setSessionLogs] = useState([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [caEmail, setCaEmail] = useState('')
-  const [caClientId, setCaClientId] = useState('')
-  const [caProjectIds, setCaProjectIds] = useState([])   // אילו פרויקטים לסמן בהוספה
+  const [caProjectIds, setCaProjectIds] = useState([])   // פרויקטים מסומנים בהוספה — מכל הלקוחות יחד
   // מייל שכבר יש לו גישה: ברירת המחדל היא לעדכן היקף בלי לאפס סיסמה. איפוס ושליחת
   // סיסמה חדשה רק אם האדמין מסמן זאת במפורש (למקרה שהלקוח איבד את הסיסמה).
   const [caResendPassword, setCaResendPassword] = useState(false)
@@ -303,11 +302,14 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     setClientAccessList(Array.isArray(data) ? data : [])
   }
 
-  /** בחירת לקוח בטופס — מסמנת כברירת מחדל את כל הפרויקטים שלו. */
-  const selectAccessClient = (clientId) => {
-    setCaClientId(clientId)
-    const cl = clients.find(c => c.id === clientId)
-    setCaProjectIds((cl?.projects || []).map(p => p.id))
+  /** מייל בטופס: אם למייל כבר יש גישה — מתחילים מהפרויקטים שיש לו היום, כדי שהשמירה תעדכן ולא תאפס. */
+  const onAccessEmailChange = (value) => {
+    setCaEmail(value)
+    const next = value.trim().toLowerCase()
+    const prev = caEmail.trim().toLowerCase()
+    const rows = clientAccessList.filter(ca => ca.email === next)
+    const prevExisted = clientAccessList.some(ca => ca.email === prev)
+    if (rows.length && !prevExisted) setCaProjectIds(rows.map(r => r.project_id))
   }
 
   const toggleAccessProject = (projectId) => {
@@ -349,39 +351,43 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   /** האם למייל שבטופס כבר יש גישה כלשהי (לכל לקוח). */
   const caEmailExists = clientAccessList.some(ca => ca.email === caEmail.trim().toLowerCase())
 
+  /**
+   * הוספה/עדכון גישה — כמה לקוחות בבת אחת. ה-API עובד פר לקוח (מוחק וכותב מחדש את הגישות של
+   * המייל אצל אותו לקוח), לכן שולחים קריאה לכל לקוח שסומן. מייל אחד בלבד: רק בקריאה האחרונה,
+   * ורק למייל חדש (או כשביקשו במפורש קישור חדש). לקוחות שלא סומנו לא נוגעים בהם.
+   */
   const addClientAccess = async () => {
-    if (!caEmail.trim() || !caClientId || caProjectIds.length === 0) return
-    // לקוח קיים: הוספה חוזרת דרך ה-API מאפסת את הסיסמה שלו ושולחת מייל חדש. זה
-    // ניתק לקוחות שכבר משתמשים בדשבורד, ולכן כאן ברירת המחדל היא notify:false.
+    const email = caEmail.trim()
+    if (!email || caProjectIds.length === 0) return
+    const groups = clients
+      .map(cl => ({ cl, ids: (cl.projects || []).filter(p => caProjectIds.includes(p.id)).map(p => p.id) }))
+      .filter(g => g.ids.length)
+    if (!groups.length) return
     const notify = !caEmailExists || caResendPassword
+    const clientNames = groups.map(g => g.cl.name)
     setCaSaving(true)
-    const res = await apiFetch('/api/client-access', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: caEmail.trim(), client_id: caClientId, project_ids: caProjectIds, notify })
-    })
-    setCaSaving(false)
-    if (res.ok) {
-      const result = await res.json()
-      setCaEmail(''); setCaClientId(''); setCaProjectIds([]); setCaResendPassword(false)
-      if (!notify) {
-        await loadClientAccess()
-        showToast(`✓ הגישה של ${result.email} עודכנה (${result.projectCount} פרויקטים) — הסיסמה לא שונתה`)
-        return
-      }
-      await loadClientAccess()
-      if (result.inviteLink) {
-        setAccessCreds({ email: result.email, inviteLink: result.inviteLink, loginUrl: result.loginUrl, emailSent: result.emailSent, clientName: result.clientName })
-      }
-      if (result.emailSent) {
-        showToast(`✓ גישה נוספה ל-${result.clientName} — קישור כניסה נשלח במייל`)
-      } else {
-        showToast('⚠️ המייל לא נשלח — הקישור מוצג להעברה ידנית')
-      }
-    } else {
-      const err = await res.json()
-      showToast('שגיאה: ' + (err.error || 'unknown'))
+    let last = null, total = 0, failed = null
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i]
+      const res = await apiFetch('/api/client-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, client_id: g.cl.id, project_ids: g.ids, notify: notify && i === groups.length - 1, notify_client_names: clientNames }),
+      })
+      if (!res.ok) { const err = await res.json().catch(() => ({})); failed = g.cl.name + ': ' + (err.error || res.status); break }
+      last = await res.json(); total += last.projectCount || 0
     }
+    setCaSaving(false)
+    await loadClientAccess()
+    if (failed) { showToast('שגיאה: ' + failed); return }
+    setCaEmail(''); setCaProjectIds([]); setCaResendPassword(false)
+    const who = clientNames.join(', ')
+    if (!notify) { showToast(`✓ הגישה של ${last.email} עודכנה (${total} פרויקטים · ${who}) — בלי מייל`); return }
+    if (last.inviteLink) {
+      setAccessCreds({ email: last.email, inviteLink: last.inviteLink, loginUrl: last.loginUrl, emailSent: last.emailSent, clientName: who })
+    }
+    if (last.emailSent) showToast(`✓ גישה נוספה (${total} פרויקטים · ${who}) — קישור כניסה אחד נשלח במייל`)
+    else showToast('⚠️ המייל לא נשלח — הקישור מוצג להעברה ידנית')
   }
 
   const deleteClientAccess = async (email, clientId) => {
@@ -5434,63 +5440,64 @@ const selectProject = async (client, project) => {
               <button onClick={() => setShowClientAccess(false)} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'#64748b'}}>&times;</button>
             </div>
             <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:16,lineHeight:1.6}}>
-              הוסף מייל של איש קשר, בחר לקוח וסמן <strong>אילו פרויקטים</strong> הוא יראה (ברירת מחדל: כולם).
-              הוא יקבל במייל קישור כניסה חד-פעמי ויבחר סיסמה בעצמו. לא נשלחת סיסמה במייל.
+              הוסף מייל של איש קשר וסמן <strong>אילו פרויקטים</strong> הוא יראה — אפשר כמה לקוחות בבת אחת.
+              הוא יקבל מייל אחד עם קישור כניסה חד-פעמי ויבחר סיסמה בעצמו. לא נשלחת סיסמה במייל.
               לעריכת גישה קיימת — לחץ על תגית הפרויקטים בטבלה.
             </p>
 
             {/* Add form */}
             <div style={{background:'var(--surface)',borderRadius:12,padding:'16px',marginBottom:20,display:'flex',flexDirection:'column',gap:10}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                <div>
-                  <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>מייל איש קשר</label>
-                  <input className="form-input" type="email" value={caEmail} onChange={e => setCaEmail(e.target.value)}
-                    placeholder="client@example.com" style={{direction:'ltr',textAlign:'left'}} />
-                </div>
-                <div>
-                  <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>לקוח</label>
-                  <select className="form-input" value={caClientId} onChange={e => selectAccessClient(e.target.value)}>
-                    <option value="">-- בחר לקוח --</option>
-                    {clients.map(cl => (
-                      <option key={cl.id} value={cl.id}>{cl.name} ({(cl.projects||[]).length} פרויקטים)</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>מייל איש קשר</label>
+                <input className="form-input" type="email" value={caEmail} onChange={e => onAccessEmailChange(e.target.value)}
+                  placeholder="client@example.com" style={{direction:'ltr',textAlign:'left'}} />
               </div>
 
-              {/* בחירת פרויקטים — מופיעה רק אחרי שנבחר לקוח */}
-              {caClientId && (() => {
-                const cl = clients.find(c => c.id === caClientId)
-                const projs = cl?.projects || []
-                if (!projs.length) return <div style={{fontSize:12,color:'var(--text-secondary)'}}>ללקוח הזה אין פרויקטים</div>
-                const allOn = caProjectIds.length === projs.length
+              {/* פרויקטים מקובצים לפי לקוח — מסמנים כמה לקוחות שרוצים, שמירה אחת, מייל אחד */}
+              {(() => {
+                const groups = clients.filter(cl => (cl.projects || []).length)
+                const allIds = groups.flatMap(cl => cl.projects.map(p => p.id))
+                const allOn = allIds.length > 0 && allIds.every(id => caProjectIds.includes(id))
                 return (
                   <div>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                       <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>
-                        פרויקטים ({caProjectIds.length}/{projs.length})
+                        פרויקטים ({caProjectIds.length}/{allIds.length}) — לפי לקוח
                       </label>
                       <button type="button"
-                        onClick={() => setCaProjectIds(allOn ? [] : projs.map(p => p.id))}
+                        onClick={() => setCaProjectIds(allOn ? [] : allIds)}
                         style={{background:'none',border:'none',cursor:'pointer',color:'var(--indigo)',fontSize:12,fontWeight:600,padding:0}}>
                         {allOn ? 'נקה הכל' : 'בחר הכל'}
                       </button>
                     </div>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-                      {projs.map(pr => {
-                        const on = caProjectIds.includes(pr.id)
-                        return (
-                          <button key={pr.id} type="button" onClick={() => toggleAccessProject(pr.id)}
-                            style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 12px',borderRadius:20,
-                              cursor:'pointer',fontSize:12.5,fontWeight:on?700:500,fontFamily:'inherit',
-                              border:'1.5px solid ' + (on ? 'var(--indigo)' : 'var(--border)'),
-                              background: on ? 'var(--indigo-50,rgba(91,94,244,0.08))' : 'transparent',
-                              color: on ? 'var(--indigo)' : 'var(--text-secondary)'}}>
-                            <span style={{fontSize:11}}>{on ? '✓' : '＋'}</span>{pr.name}
+                    {groups.map(cl => {
+                      const ids = cl.projects.map(p => p.id)
+                      const n = ids.filter(id => caProjectIds.includes(id)).length
+                      const all = n === ids.length
+                      return (
+                        <div key={cl.id} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:6,padding:'7px 0',borderTop:'1px solid var(--divider)'}}>
+                          <button type="button" title={all ? 'נקה את כל הפרויקטים של הלקוח' : 'סמן את כל הפרויקטים של הלקוח'}
+                            onClick={() => setCaProjectIds(prev => all ? prev.filter(id => !ids.includes(id)) : Array.from(new Set([...prev, ...ids])))}
+                            style={{minWidth:130,textAlign:'right',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',
+                              fontSize:12.5,fontWeight:700,padding:'2px 0',color: n ? 'var(--indigo)' : 'var(--text)'}}>
+                            <span style={{display:'inline-block',width:16}}>{all ? '☑' : n ? '◪' : '☐'}</span> {cl.name}
                           </button>
-                        )
-                      })}
-                    </div>
+                          {cl.projects.map(pr => {
+                            const on = caProjectIds.includes(pr.id)
+                            return (
+                              <button key={pr.id} type="button" onClick={() => toggleAccessProject(pr.id)}
+                                style={{display:'inline-flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:20,
+                                  cursor:'pointer',fontSize:12,fontWeight:on?700:500,fontFamily:'inherit',
+                                  border:'1.5px solid ' + (on ? 'var(--indigo)' : 'var(--border)'),
+                                  background: on ? 'var(--indigo-50,rgba(91,94,244,0.08))' : 'transparent',
+                                  color: on ? 'var(--indigo)' : 'var(--text-secondary)'}}>
+                                <span style={{fontSize:11}}>{on ? '✓' : '＋'}</span>{pr.name}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
                   </div>
                 )
               })()}
@@ -5498,7 +5505,7 @@ const selectProject = async (client, project) => {
               {caEmailExists && (
                 <div style={{display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',borderRadius:10,
                   background:'rgba(245,158,11,0.10)',border:'1px solid rgba(245,158,11,0.35)',fontSize:12.5,lineHeight:1.5}}>
-                  <span style={{color:'#B45309',fontWeight:600}}>למייל הזה כבר יש גישה. שמירה תעדכן את סט הפרויקטים בלי לשלוח מייל.</span>
+                  <span style={{color:'#B45309',fontWeight:600}}>למייל הזה כבר יש גישה (הסימון למעלה משקף אותה). שמירה תעדכן את הפרויקטים אצל הלקוחות שסומנו, בלי לשלוח מייל.</span>
                   <label style={{display:'inline-flex',alignItems:'center',gap:6,cursor:'pointer',color:'var(--text-secondary)'}}>
                     <input type="checkbox" checked={caResendPassword} onChange={e => setCaResendPassword(e.target.checked)} style={{margin:0}} />
                     לשלוח קישור כניסה חדש במייל (הלקוח לא מצא את המייל / שכח סיסמה). הסיסמה הקיימת לא משתנה.
@@ -5507,11 +5514,11 @@ const selectProject = async (client, project) => {
               )}
 
               <button className="btn btn-primary" onClick={addClientAccess}
-                disabled={caSaving || !caEmail || !caClientId || caProjectIds.length === 0}
+                disabled={caSaving || !caEmail || caProjectIds.length === 0}
                 style={{alignSelf:'flex-end',padding:'8px 20px'}}>
                 {caSaving ? 'שומר...'
                   : caEmailExists && !caResendPassword ? `עדכן גישה בלי מייל${caProjectIds.length ? ` (${caProjectIds.length})` : ''}`
-                  : `+ הוסף גישה ושלח קישור${caProjectIds.length ? ` (${caProjectIds.length})` : ''}`}
+                  : `+ הוסף גישה ושלח קישור אחד${caProjectIds.length ? ` (${caProjectIds.length})` : ''}`}
               </button>
             </div>
 
