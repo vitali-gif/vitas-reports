@@ -87,10 +87,8 @@ $$;
 revoke execute on function public.crm_slice_salesforce(uuid, timestamptz, timestamptz) from public, anon, authenticated;
 grant  execute on function public.crm_slice_salesforce(uuid, timestamptz, timestamptz) to service_role;
 
--- אינדקסים לחיתוך: תאריכי היצירה/פגישה כביטויים, ומזהי קישור.
-create index if not exists crm_raw_sf_created_idx
-  on public.crm_raw (project_id, entity, ((payload->>'CreatedDate')::timestamptz))
-  where crm_type = 'salesforce';
+-- אינדקסים לחיתוך: מזהי הקישור בלבד. אינדקס על (payload->>'CreatedDate')::timestamptz אסור
+-- (ההמרה טקסט→timestamptz אינה IMMUTABLE — תלויה ב-timezone), והחיתוך רץ ב-0.4 שנייה גם בסריקה.
 create index if not exists crm_raw_sf_leadid_idx
   on public.crm_raw (project_id, (payload->>'LeadId'))
   where crm_type = 'salesforce' and entity = 'lead_history';
@@ -106,7 +104,6 @@ commit;
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ROLLBACK:
 --   drop function if exists public.crm_slice_salesforce(uuid, timestamptz, timestamptz);
---   drop index if exists public.crm_raw_sf_created_idx;
 --   drop index if exists public.crm_raw_sf_leadid_idx;
 --   drop index if exists public.crm_raw_sf_oppid_idx;
 -- ═══════════════════════════════════════════════════════════════════════════
