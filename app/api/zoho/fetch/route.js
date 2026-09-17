@@ -19,19 +19,13 @@
 
 import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
+import { computeZohoSummary, filterDigitalLeads } from '../../../../lib/crm/zoho-summary.js'
+import { upsertRawRecords, rebuildCompact } from '../../../../lib/crm/raw-store.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // was 60 — per-brand loop (BCureLaser+ISMOOTH) + sequential deals fetch on last30 exceeded 60s → 504 (shown as blank 'HTTP ' in cron alerts)
 
 const ZOHO_TOKEN_URL = 'https://accounts.zoho.com/oauth/v2/token'
-const ZOHO_SCHEMA_VERSION = 2
-
-// BCureLaser: only count these digital sub-sources
-const DIGITAL_SUBSOURCES = new Set([
-  'facebook', 'google', 'אתר חברה', 'וואטסאפ', 'whatsapp',
-  'גוגל', 'פייסבוק', // Hebrew variants
-])
-
 // Zoho brands: match a project by a substring of its Supabase name, then map to the
 // EXACT value stored in the Zoho `segment` field (Zoho `equals` is case-sensitive).
 // BCureLaser + ISMOOTH share one Zoho org (parent client: Arika Carmel Ltd).
@@ -49,22 +43,6 @@ function brandForProjectName(name) {
 function currentMonth() {
   const now = new Date()
   return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')
-}
-
-function num(v) {
-  if (typeof v === 'number') return v
-  if (!v) return 0
-  const n = parseFloat(String(v))
-  return isNaN(n) ? 0 : n
-}
-
-// Normalize a UTM_Campaign value to a clean campaign name: strip bidi/directional
-// control chars and the constant 'Geek-' prefix the agency template injects, then trim.
-function normUtm(v) {
-  if (v === null || v === undefined) return ''
-  let x = String(v).replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\u00ad\u200b\ufeff]/g, '').trim()
-  x = x.replace(/^geek[-_\s]+/i, '')
-  return x.trim()
 }
 
 // ===== Zoho OAuth =====
@@ -193,6 +171,35 @@ async function runSync(opts = {}) {
   }
 
   const { data: projects, error: projectsError } = await supabase.from('projects').select('id, name, client_id')
+
+  // ── רענון עסקאות (שלב 4): עסקאות שהשתנו ב-N הימים האחרונים, לכל מותג, אל crm_raw ──
+  // עסקה של ליד ישן יכולה להיסגר/להתבטל הרבה אחרי החלון של הליד. במקום למשוך מחדש את
+  // כל העסקאות של אלפי לידים, מושכים רק מה שהשתנה (Modified_Time) ודורסים ב-crm_raw.
+  if (opts.dealsRefreshDays) {
+    const days = Math.max(1, Math.min(60, Number(opts.dealsRefreshDays) || 7))
+    const untilTs = new Date(), sinceTs = new Date(Date.now() - days * 86400000)
+    const fmt = (d) => d.toISOString().slice(0, 19) + '+00:00'
+    let accessToken
+    try { accessToken = await getZohoAccessToken() }
+    catch (err) { return { status: 500, body: { error: 'Zoho OAuth failed: ' + (err.message || String(err)) } } }
+    const results = []
+    for (const p of (projects || []).filter(p => brandForProjectName(p.name))) {
+      const brand = brandForProjectName(p.name)
+      const t0 = Date.now()
+      try {
+        const dealFields = 'Deal_Name,Stage,Amount,Closing_Date,Created_Time,Stage_Modified_Time,device_quantity,cancellation_date,LidID,segment'
+        const criteria = `((segment:equals:${brand.segment})and(Modified_Time:between:${fmt(sinceTs)},${fmt(untilTs)}))`
+        const deals = (await searchPaginated(accessToken, 'Deals', criteria, dealFields)).filter(d => d.LidID)
+        const up = await upsertRawRecords(supabase, p.id, 'zoho', 'deals', deals)
+        let compact = null
+        try { compact = await rebuildCompact(supabase, p.id, 'zoho') } catch (e) { compact = { error: String(e?.message || e) } }
+        results.push({ project: p.name, ok: true, deals: up.count, days, ms: Date.now() - t0, compact })
+      } catch (err) {
+        results.push({ project: p.name, ok: false, error: String(err?.message || err).slice(0, 300), ms: Date.now() - t0 })
+      }
+    }
+    return { status: 200, body: { ok: results.every(r => r.ok), mode: 'deals-refresh', days, projects: results } }
+  }
   if (projectsError) return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
 
   // SAFETY: Zoho data must ONLY ever be written to BCureLaser-named projects.
@@ -235,14 +242,7 @@ async function runSync(opts = {}) {
   } catch (err) {
     __allResults.push({ project: __proj.name, error: 'Leads fetch failed: ' + (err.message || String(err)) }); continue
   }
-  // Keep only the approved digital sub-sources
-  // Keep approved digital sub-sources. Besides the explicit whitelist, accept any facebook*/
-  // google* variant (e.g. facebook_minisite, google_minisite) so a NEW ad sub-source isn't
-  // silently dropped — the Zoho query already restricts to Lead_Source='דיגיטל'.
-  const leads = rawLeads.filter(r => {
-    const _s = (r.Sub_Lead_Source || '').toLowerCase().trim()
-    return DIGITAL_SUBSOURCES.has(_s) || _s.startsWith('facebook') || _s.startsWith('google') || _s.startsWith('פייסבוק') || _s.startsWith('גוגל')
-  })
+  const leads = filterDigitalLeads(rawLeads)
   const leadIds = leads.map(l => l.id)
   const leadIdSet = new Set(leadIds)
 
@@ -256,298 +256,21 @@ async function runSync(opts = {}) {
   } catch (err) {
     __allResults.push({ project: __proj.name, error: 'Deals fetch failed: ' + (err.message || String(err)) }); continue
   }
-  linkedDeals = linkedDeals.filter(d => leadIdSet.has(d.LidID))
+  // החישוב — פונקציה טהורה ב-lib/crm/zoho-summary.js (שלב 4 של docs/daily-ranges-plan.md).
+  const R = computeZohoSummary({ leads, deals: linkedDeals }, { since, until, prefiltered: true })
+  const { xlsxRows, summary, opportunities, purchased } = R
 
-  // ===== Compute lead stats =====
-  const IRRELEVANT_STATUSES = new Set(['כפול', 'לא תקין', 'לא מעוניין', 'מטופל על ידי נציג אחר/ליד כפול'])
-  const byStatus = {}
-  const bySource = {}
-  const objections = {}
-  const devices = {}
-
-  for (const lead of leads) {
-    const status = (lead.Lead_Status || 'לא ידוע').trim()
-    byStatus[status] = (byStatus[status] || 0) + 1
-
-    const sub = (lead.Sub_Lead_Source || 'לא ידוע').trim()
-    bySource[sub] = (bySource[sub] || 0) + 1
-
-    const obj = (lead.field9 || '').trim()
-    if (obj) objections[obj] = (objections[obj] || 0) + 1
-
-    const dev = (lead.field20 || 'לא הוצע').trim() || 'לא הוצע'
-    devices[dev] = (devices[dev] || 0) + 1
+  // תמונת מצב גולמית (crm_raw, crm_type=zoho): הלידים כפי שהתקבלו (לפני סינון תת-המקור) והעסקאות
+  // המקושרות. מצטברת עם הזמן; טווח מותאם מחושב ממנה בלי לפנות ל-Zoho. כישלון לא מפיל את הריצה.
+  let snapshot = null
+  if (opts.snapshot !== false) {
+    try {
+      const [ls, ds] = await Promise.all([upsertRawRecords(supabase, __proj.id, 'zoho', 'leads', rawLeads), upsertRawRecords(supabase, __proj.id, 'zoho', 'deals', linkedDeals)])
+      snapshot = { leads: ls, deals: ds }
+      try { snapshot.compact = await rebuildCompact(supabase, __proj.id, 'zoho') } catch (e) { snapshot.compact = { error: String(e?.message || e) } }
+    } catch (e) { snapshot = { error: String(e?.message || e) } }
   }
 
-  // ===== Response time =====
-  const responseTimes = []
-  const byAgent = {}
-
-  for (const lead of leads) {
-    const agentName = (typeof lead.Owner === 'object' ? lead.Owner?.name : lead.Owner) || 'לא ידוע'
-    const answered = num(lead.sumAnswerCalls || 0)
-    const createdStr = (lead.Created_Time || '').replace(' ', 'T')
-    const lastCallStr = (lead.timeOfLastCall || '').replace(' ', 'T')
-
-    if (!answered || !lastCallStr || !createdStr) {
-      if (!byAgent[agentName]) byAgent[agentName] = { count: 0, totalHours: 0, noResponse: 0 }
-      byAgent[agentName].count++; byAgent[agentName].noResponse++
-      responseTimes.push({ agentName, responseHours: null, noResponse: true, source: (lead.Sub_Lead_Source || 'אחר').trim() || 'אחר' })
-      continue
-    }
-
-    const responseHours = Math.max(0, (new Date(lastCallStr) - new Date(createdStr)) / 3600000)
-    if (!byAgent[agentName]) byAgent[agentName] = { count: 0, totalHours: 0, noResponse: 0 }
-    byAgent[agentName].count++; byAgent[agentName].totalHours += responseHours
-    responseTimes.push({ agentName, responseHours, noResponse: false, source: (lead.Sub_Lead_Source || 'אחר').trim() || 'אחר' })
-  }
-
-  const responded = responseTimes.filter(r => !r.noResponse)
-  const avgHours = responded.length ? responded.reduce((s, r) => s + r.responseHours, 0) / responded.length : 0
-  const respondedWithin1h = responded.length ? Math.round(responded.filter(r => r.responseHours <= 1).length / responded.length * 100) : 0
-  const agentStats = Object.entries(byAgent).map(([name, s]) => ({
-    name, count: s.count, noResponse: s.noResponse,
-    avgHours: s.count > s.noResponse ? Math.round((s.totalHours / (s.count - s.noResponse)) * 10) / 10 : null,
-  })).sort((a, b) => b.count - a.count)
-
-  // Response-time distribution buckets + per-source averages (for the response report)
-  const RT_BUCKETS = ['0-15m', '15m-1h', '1h-4h', '4h-8h', '8h-24h', '1d-3d', '3d+']
-  const rtBucketOf = (h) => h <= 0.25 ? '0-15m' : h <= 1 ? '15m-1h' : h <= 4 ? '1h-4h' : h <= 8 ? '4h-8h' : h <= 24 ? '8h-24h' : h <= 72 ? '1d-3d' : '3d+'
-  const rtBuckets = Object.fromEntries(RT_BUCKETS.map(b => [b, 0]))
-  const rtBySourceMap = {}
-  for (const r of responded) {
-    rtBuckets[rtBucketOf(r.responseHours)]++
-    if (!rtBySourceMap[r.source]) rtBySourceMap[r.source] = { count: 0, sumHours: 0 }
-    rtBySourceMap[r.source].count++; rtBySourceMap[r.source].sumHours += r.responseHours
-  }
-  const rtBySource = Object.entries(rtBySourceMap)
-    .map(([source, x]) => ({ source, count: x.count, avgHours: Math.round((x.sumHours / x.count) * 10) / 10 }))
-    .sort((a, b) => b.count - a.count)
-
-  // ===== Compute deal stats (lead-centric via LidID) =====
-  // Opportunities (Id Count): distinct leads that have a linked deal.
-  const opportunities = new Set(linkedDeals.map(d => d.LidID)).size
-  // Purchased (Closing Date Count): linked deals that have a Closing_Date.
-  const closedDeals = linkedDeals.filter(d => d.Closing_Date)
-  const closedWithCancellation = closedDeals.filter(d => d.cancellation_date)
-  const closedNoCancellation = closedDeals.filter(d => !d.cancellation_date)
-
-  const grandTotal = closedDeals.reduce((s, d) => s + num(d.Amount || 0), 0)
-  const netRevenue = closedNoCancellation.reduce((s, d) => s + num(d.Amount || 0), 0)
-  const devicesSold = closedNoCancellation.reduce((s, d) => s + num(d.device_quantity || 1), 0)
-  const avgDealValue = closedNoCancellation.length > 0 ? Math.round(netRevenue / closedNoCancellation.length) : 0
-
-  const purchased = closedDeals.length
-  const totalLeads = leads.length
-  const closingRate = totalLeads > 0 ? Math.round((purchased / totalLeads) * 1000) / 10 : 0
-
-  // ===== Funnel + drop-off (where leads/deals fall off) =====
-  const oppLeadIds = new Set(linkedDeals.map(d => d.LidID))
-  // Leads that never became an opportunity — broken down by Lead_Status (why they died)
-  const notConvertedLeads = leads.filter(l => !oppLeadIds.has(l.id))
-  const leadStatusDrop = {}
-  for (const l of notConvertedLeads) {
-    const st = (l.Lead_Status || 'לא ידוע').trim() || 'לא ידוע'
-    leadStatusDrop[st] = (leadStatusDrop[st] || 0) + 1
-  }
-  // Opportunities that did not purchase (no Closing_Date) — broken down by deal Stage
-  const openDeals = linkedDeals.filter(d => !d.Closing_Date)
-  const openStageDrop = {}
-  for (const d of openDeals) {
-    const st = (d.Stage || 'לא ידוע').trim() || 'לא ידוע'
-    openStageDrop[st] = (openStageDrop[st] || 0) + 1
-  }
-  const cancellations = closedWithCancellation.length
-  const cancelledValue = closedWithCancellation.reduce((acc, d) => acc + num(d.Amount || 0), 0)
-  const netPurchases = purchased - cancellations
-
-  // ===== Per-channel funnel (which channel converts/earns best) =====
-  const leadById = {}
-  for (const l of leads) leadById[l.id] = l
-  const normChan = (l) => ((l && l.Sub_Lead_Source) || 'אחר').trim() || 'אחר'
-  const byChannel = {}
-  const ensureChan = (c) => (byChannel[c] || (byChannel[c] = { leads: 0, opportunities: 0, purchased: 0, netRevenue: 0, cancellations: 0, _oppLeads: new Set() }))
-  for (const l of leads) ensureChan(normChan(l)).leads++
-  for (const d of linkedDeals) {
-    const l = leadById[d.LidID]; if (!l) continue
-    const c = ensureChan(normChan(l))
-    c._oppLeads.add(d.LidID)
-    if (d.Closing_Date) {
-      c.purchased++
-      if (d.cancellation_date) c.cancellations++
-      else c.netRevenue += num(d.Amount || 0)
-    }
-  }
-  // ===== 4-level drill: channel -> campaign(UTM_Campaign) -> adset(UTM_Term) -> ad(UTM_Content) =====
-  // normUtm strips the 'Geek-' prefix + bidi chars from every UTM field. For Google, UTM_Term is
-  // the search keyword and UTM_Content is the numeric ad-id (resolved to a name in the UI).
-  const NO_CAMP = '(ללא קמפיין)', NO_AST = '(ללא adset)', NO_AD = '(ללא מודעה)'
-  const _mkNode = () => ({ leads: 0, purchased: 0, cancellations: 0, netRevenue: 0, _opp: new Set(), children: {} })
-  const _root = {}
-  const _descend = (parts) => {
-    const out = []
-    let level = _root
-    for (const p of parts) {
-      level[p] = level[p] || _mkNode()
-      out.push(level[p])
-      level = level[p].children
-    }
-    return out
-  }
-  const _partsOf = (l) => [normChan(l), normUtm(l.UTM_Campaign) || NO_CAMP, normUtm(l.UTM_Term) || NO_AST, normUtm(l.UTM_Content) || NO_AD]
-  for (const l of leads) { for (const n of _descend(_partsOf(l))) n.leads++ }
-  for (const d of linkedDeals) {
-    const l = leadById[d.LidID]; if (!l) continue
-    const nodes = _descend(_partsOf(l))
-    const buy = !!d.Closing_Date, cancelled = !!d.cancellation_date, amt = num(d.Amount || 0)
-    for (const n of nodes) {
-      n._opp.add(d.LidID)
-      if (buy) { n.purchased++; if (cancelled) n.cancellations++; else n.netRevenue += amt }
-    }
-  }
-  const _fmt = (node, labelKey, label, childKey, childArr) => ({
-    [labelKey]: label, leads: node.leads, opportunities: node._opp.size, purchased: node.purchased,
-    cancellations: node.cancellations, netRevenue: Math.round(node.netRevenue),
-    conversionRate: node.leads > 0 ? Math.round((node.purchased / node.leads) * 1000) / 10 : 0,
-    ...(childKey ? { [childKey]: childArr } : {}),
-  })
-  const campsByChannel = {}
-  for (const ch in _root) {
-    const camps = []
-    for (const cmpName in _root[ch].children) {
-      const cmpNode = _root[ch].children[cmpName]
-      const adSets = []
-      for (const astName in cmpNode.children) {
-        const astNode = cmpNode.children[astName]
-        const ads = []
-        for (const adName in astNode.children) ads.push(_fmt(astNode.children[adName], 'ad', adName))
-        ads.sort((a, b) => b.leads - a.leads)
-        adSets.push(_fmt(astNode, 'adset', astName, 'ads', ads))
-      }
-      adSets.sort((a, b) => b.leads - a.leads)
-      camps.push(_fmt(cmpNode, 'campaign', cmpName, 'adSets', adSets))
-    }
-    camps.sort((a, b) => b.leads - a.leads)
-    campsByChannel[ch] = camps
-  }
-
-  // ===== Per-agent performance (Owner), with per-source breakdown =====
-  const _agentName = (l) => (l && (typeof l.Owner === 'object' ? (l.Owner && l.Owner.name) : l.Owner)) || 'לא ידוע'
-  const agentAgg = {}
-  const ensureAgent = (ag) => agentAgg[ag] || (agentAgg[ag] = { agent: ag, leads: 0, purchased: 0, netRevenue: 0, _opp: new Set(), bySrc: {} })
-  const ensureAgentSrc = (a, src) => a.bySrc[src] || (a.bySrc[src] = { source: src, leads: 0, purchased: 0, netRevenue: 0, _opp: new Set() })
-  for (const l of leads) {
-    const a = ensureAgent(_agentName(l)); a.leads++
-    ensureAgentSrc(a, normChan(l)).leads++
-  }
-  for (const d of linkedDeals) {
-    const l = leadById[d.LidID]; if (!l) continue
-    const a = ensureAgent(_agentName(l)); const sa = ensureAgentSrc(a, normChan(l))
-    a._opp.add(d.LidID); sa._opp.add(d.LidID)
-    if (d.Closing_Date) {
-      a.purchased++; sa.purchased++
-      if (!d.cancellation_date) { const amt = num(d.Amount || 0); a.netRevenue += amt; sa.netRevenue += amt }
-    }
-  }
-  const agentPerformance = Object.values(agentAgg).map(a => ({
-    agent: a.agent, leads: a.leads, opportunities: a._opp.size, purchased: a.purchased,
-    netRevenue: Math.round(a.netRevenue),
-    conversionRate: a.leads > 0 ? Math.round((a.purchased / a.leads) * 1000) / 10 : 0,
-    bySource: Object.values(a.bySrc).map(s => ({
-      source: s.source, leads: s.leads, opportunities: s._opp.size, purchased: s.purchased,
-      netRevenue: Math.round(s.netRevenue),
-      conversionRate: s.leads > 0 ? Math.round((s.purchased / s.leads) * 1000) / 10 : 0,
-    })).sort((x, y) => y.leads - x.leads),
-  })).sort((a, b) => b.leads - a.leads)
-
-  const channelFunnel = Object.entries(byChannel).map(([channel, c]) => ({
-    channel,
-    leads: c.leads,
-    opportunities: c._oppLeads.size,
-    purchased: c.purchased,
-    cancellations: c.cancellations,
-    netRevenue: Math.round(c.netRevenue),
-    conversionRate: c.leads > 0 ? Math.round((c.purchased / c.leads) * 1000) / 10 : 0,
-    campaigns: campsByChannel[channel] || [],
-  })).sort((a, b) => b.leads - a.leads)
-  const conversionRate = closingRate
-
-  // ===== Build xlsxRows for aggregateCrmRows compatibility =====
-  const sourcesMap = {}
-  for (const lead of leads) {
-    const src = (lead.Sub_Lead_Source || 'לא ידוע').trim() || 'לא ידוע'
-    const status = (lead.Lead_Status || '').trim()
-    const isIrrelevant = IRRELEVANT_STATUSES.has(status)
-    if (!sourcesMap[src]) sourcesMap[src] = {
-      totalLeads: 0, relevantLeads: 0, irrelevantLeads: 0,
-      meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0,
-      registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0,
-    }
-    sourcesMap[src].totalLeads++
-    if (isIrrelevant) sourcesMap[src].irrelevantLeads++
-    else sourcesMap[src].relevantLeads++
-  }
-  const xlsxRows = Object.entries(sourcesMap).map(([source, s]) => ({ source, ...s }))
-
-  const summary = {
-    crmType: 'zoho',
-    totalLeads,
-    relevantLeads: leads.filter(l => !IRRELEVANT_STATUSES.has((l.Lead_Status || '').trim())).length,
-    irrelevantLeads: leads.filter(l => IRRELEVANT_STATUSES.has((l.Lead_Status || '').trim())).length,
-    byStatus,
-    bySource,
-    objections,
-    devices,
-    responseTime: {
-      avgHours: Math.round(avgHours * 10) / 10,
-      respondedWithin1h,
-      noResponseCount: responseTimes.length - responded.length,
-      respondedCount: responded.length,
-      byAgent: agentStats,
-      buckets: rtBuckets,
-      bucketOrder: RT_BUCKETS,
-      bySource: rtBySource,
-    },
-    deals: {
-      // ID COUNT — leads that became an opportunity (have a linked deal)
-      opportunities,
-      // CLOSING DATE COUNT — linked deals that have a Closing_Date (purchased)
-      closed: purchased,
-      // אחוז המרה — purchased / leads
-      closingRate,
-      // Revenue
-      grandTotal: Math.round(grandTotal),
-      revenue: Math.round(netRevenue),
-      avgDealValue,
-      devicesSold,
-      cancellations: closedWithCancellation.length,
-      // Pipeline breakdown
-      pipeline: {
-        pending: Math.max(0, opportunities - purchased),
-        closed: purchased,
-      },
-    },
-    // ===== BCureLaser medical funnel (phone-sales): leads -> opportunities -> purchased -> net =====
-    funnel: {
-      leads: totalLeads,
-      opportunities,                       // leads that became a deal
-      purchased,                           // linked deals with a Closing_Date
-      cancellations,                       // of the purchased, how many cancelled
-      netPurchases,                        // purchased minus cancellations
-      conversionRate,                      // purchased / leads  (אחוז המרה לעסקה)
-      netRevenue: Math.round(netRevenue),  // revenue after cancellations
-      grossRevenue: Math.round(grandTotal),
-      cancelledValue: Math.round(cancelledValue),
-      avgDealValue,
-      // drop-off detail
-      leadsNotConverted: notConvertedLeads.length,
-      leadStatusDrop,                      // why leads never became opportunities
-      openStageDrop,                       // why opportunities have not purchased yet
-      byChannel: channelFunnel,            // per-channel funnel (leads/opps/purchased/conv/revenue)
-    },
-    agentPerformance,
-    schemaVersion: ZOHO_SCHEMA_VERSION,
-  }
 
   const { error: upsertErr } = await supabase.from('reports').upsert({
     project_id: __proj.id,
@@ -560,7 +283,7 @@ async function runSync(opts = {}) {
   }, { onConflict: 'project_id,source,month' })
 
   if (upsertErr) __allResults.push({ project: __proj.name, error: upsertErr.message })
-  else __allResults.push({ project: __proj.name, brand: __brand.segment, leads: leads.length, opportunities, purchased, ok: true })
+  else __allResults.push({ project: __proj.name, brand: __brand.segment, leads: leads.length, opportunities, purchased, ok: true, snapshot })
   } // ===== end per-brand loop =====
 
   return { status: 200, body: { ok: true, month: m, projects: __allResults } }
@@ -579,7 +302,7 @@ export async function POST(request) {
     return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
   }
   try {
-    const { status, body: responseBody } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId })
+    const { status, body: responseBody } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId, dealsRefreshDays: gate.admin ? body.dealsRefreshDays : undefined })
     return Response.json(responseBody, { status })
   } catch (err) {
     return Response.json({ error: 'runSync threw: ' + (err.message || String(err)) }, { status: 500 })
