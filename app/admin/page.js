@@ -1211,7 +1211,31 @@ const selectProject = async (client, project) => {
     }
   };
 
-  const createChart = (id, type, labels, datasets, scalesConfig, onSliceClick) => {
+  // תוויות ערך מעל עמודות — העיצוב החדש של "יום מבוקש לפגישה" ו"שעות ללא מענה"
+  const vrBarLabelsPlugin = {
+    id: 'vrBarLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = '700 12px Heebo, Arial, sans-serif';
+      ctx.fillStyle = '#374151';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      chart.data.datasets.forEach((ds, di) => {
+        if (ds.type && ds.type !== 'bar') return;
+        const meta = chart.getDatasetMeta(di);
+        if (meta.hidden) return;
+        meta.data.forEach((bar, i) => {
+          const v = ds.data[i];
+          if (v == null || v === 0) return;
+          ctx.fillText(String(v), bar.x, bar.y - 4);
+        });
+      });
+      ctx.restore();
+    },
+  };
+
+  const createChart = (id, type, labels, datasets, scalesConfig, onSliceClick, extra) => {
     const canvas = document.getElementById(id);
     if (!canvas) return;
     const isDoughnut = type === 'doughnut' || type === 'pie';
@@ -1258,6 +1282,13 @@ const selectProject = async (client, project) => {
         if (els && els.length) { const lbl = labels[els[0].index]; if (lbl != null) onSliceClick(lbl); }
       };
       config.options.onHover = (evt, els) => { if (evt?.native?.target) evt.native.target.style.cursor = els && els.length ? 'pointer' : 'default'; };
+    }
+    // extra: { plugins: [...], options: { plugins: { legend, tooltip }, ... } } — מיזוג לכל מפתח כדי לשמור על העיצוב הבסיסי
+    if (extra && Array.isArray(extra.plugins)) config.plugins.push(...extra.plugins);
+    if (extra && extra.options) {
+      const { plugins: _xp, ..._rest } = extra.options;
+      Object.assign(config.options, _rest);
+      if (_xp) for (const [k, v] of Object.entries(_xp)) config.options.plugins[k] = { ...(config.options.plugins[k] || {}), ...v };
     }
     const chart = new Chart(canvas, config);
     chartsRef.current.push(chart);
@@ -1443,9 +1474,19 @@ const selectProject = async (client, project) => {
     const contactHourMerged = Array.from({ length: 24 }, () => 0);       // first-contact by hour
     const contactMeetingMerged = Array.from({ length: 24 }, () => 0);    // of those, matured to a scheduled meeting
     const noAnswerHourMerged = Array.from({ length: 24 }, () => 0);      // 'אין מענה' by contact-attempt hour
+    // חציון נלקח מהסיכום רק כשיש דוח CRM אחד לטווח (חציונים של כמה דוחות אינם ניתנים למיזוג).
+    // "טרם התקיימה שיחה" (noResponseByUser/BySource) — מסכם רק אם כל הדוחות כוללים את השדה (סכמה v34+).
+    let _rtReports = 0, _pendingComplete = true, _bizMedianOverall = null;
+    const pendingByUser = {}, pendingBySource = {};
     for (const r of crmRows) {
       const rt = r.summary && r.summary.responseTimeStats;
       if (!rt) continue;
+      _rtReports++;
+      if (rt.business && rt.business.medianMinutes != null) _bizMedianOverall = rt.business.medianMinutes;
+      if (rt.noResponseByUser && rt.noResponseBySource) {
+        for (const [k, n] of Object.entries(rt.noResponseByUser)) pendingByUser[k] = (pendingByUser[k] || 0) + n;
+        for (const [k, n] of Object.entries(rt.noResponseBySource)) pendingBySource[k] = (pendingBySource[k] || 0) + n;
+      } else _pendingComplete = false;
       totalLids += rt.totalLids || 0;
       respondedCount += rt.respondedCount || 0;
       noResponseCount += rt.noResponseCount || 0;
@@ -1491,12 +1532,14 @@ const selectProject = async (client, project) => {
         byUserMerged[k].count += v.count;
         byUserMerged[k].sumMinutes += v.avgMinutes * v.count;
         if (bUser[k]) byUserMerged[k].sumBusinessMinutes += bUser[k].avgMinutes * bUser[k].count;
+        if (bUser[k] && bUser[k].medianMinutes != null) byUserMerged[k].bizMedian = bUser[k].medianMinutes;
       }
       for (const [k, v] of Object.entries(rt.bySource || {})) {
         if (!bySourceMerged[k]) bySourceMerged[k] = { count: 0, sumMinutes: 0, sumBusinessMinutes: 0 };
         bySourceMerged[k].count += v.count;
         bySourceMerged[k].sumMinutes += v.avgMinutes * v.count;
         if (bSource[k]) bySourceMerged[k].sumBusinessMinutes += bSource[k].avgMinutes * bSource[k].count;
+        if (bSource[k] && bSource[k].medianMinutes != null) bySourceMerged[k].bizMedian = bSource[k].medianMinutes;
       }
     }
 
@@ -1580,7 +1623,14 @@ const selectProject = async (client, project) => {
         const labels = mdowOrder.map(k => (meetingDowMerged[k] && meetingDowMerged[k].name) || k);
         const counts = mdowOrder.map(k => (meetingDowMerged[k] && meetingDowMerged[k].count) || 0);
         const _max = Math.max(...counts);
-        createChart('meetingDowChart', 'bar', labels, [
+        if (vrResp) {
+          createChart('meetingDowChart', 'bar', ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'], [
+            { label: 'פגישות שתואמו', type: 'bar', data: counts, backgroundColor: '#2EC4B6', borderRadius: 6, maxBarThickness: 40 },
+          ], {
+            x: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' }, color: '#374151' } },
+            y: { beginAtZero: true, grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' }, grace: '15%' },
+          }, undefined, { plugins: [vrBarLabelsPlugin], options: { plugins: { legend: { display: false } } } });
+        } else createChart('meetingDowChart', 'bar', labels, [
           { label: 'פגישות שתואמו (לפי יום הפגישה)', type: 'bar', data: counts,
             backgroundColor: counts.map(c => c === _max && _max > 0 ? '#7C3AED' : '#C4B5FD'),
             borderRadius: 4, maxBarThickness: 46 },
@@ -1605,7 +1655,23 @@ const selectProject = async (client, project) => {
     if (hourHasData) {
       pendingChartsRef.current.push(setTimeout(() => {
         const hLabels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
-        createChart('apptHourChart', 'bar', hLabels, [
+        if (vrResp) {
+          const _idx = Array.from({ length: 24 }, (_, h) => h).filter(h => leadHourMerged[h] > 0 || hourMerged[h] > 0 || contactHourMerged[h] > 0);
+          const _from = _idx.length ? Math.min(..._idx) : 8, _to = _idx.length ? Math.max(..._idx) : 20;
+          const _hours = Array.from({ length: _to - _from + 1 }, (_, i) => _from + i);
+          const _line = (color) => ({ borderColor: color, backgroundColor: color, borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 6,
+            pointBackgroundColor: color, pointBorderColor: '#FFFFFF', pointBorderWidth: 1.5, tension: 0, fill: false });
+          createChart('apptHourChart', 'line', _hours.map(h => h + ':00'), [
+            { label: 'לידים', data: _hours.map(h => leadHourMerged[h]), ..._line('#3B82F6') },
+            { label: 'תיאומי פגישות', data: _hours.map(h => hourMerged[h]), ..._line('#8B5CF6') },
+          ], {
+            x: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' }, color: '#374151', maxRotation: 0 } },
+            y: { beginAtZero: true, grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' } },
+          }, undefined, { options: { plugins: {
+            legend: { position: 'top', align: 'center', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 18, font: { weight: '600', size: 12 }, color: '#374151' } },
+            tooltip: { callbacks: { afterBody: (items) => { const h = _hours[items[0].dataIndex]; const c = contactHourMerged[h]; return c > 0 ? ['יצירת קשר: ' + c, '% המרה לפגישה: ' + contactRate[h] + '%'] : []; } } },
+          } } });
+        } else createChart('apptHourChart', 'bar', hLabels, [
           { label: 'לידים', type: 'bar', data: leadHourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 3 },
           { label: 'יצירת קשר', type: 'bar', data: contactHourMerged.slice(), backgroundColor: '#F59E0B', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 2 },
           { label: 'פגישות שתואמו', type: 'bar', data: hourMerged.slice(), backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
@@ -1626,7 +1692,17 @@ const selectProject = async (client, project) => {
       pendingChartsRef.current.push(setTimeout(() => {
         const hLabels2 = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
         const _mx = Math.max(...noAnswerHourMerged);
-        createChart('noAnswerHourChart', 'bar', hLabels2, [
+        if (vrResp) {
+          const _idx2 = Array.from({ length: 24 }, (_, h) => h).filter(h => noAnswerHourMerged[h] > 0);
+          const _f2 = Math.min(..._idx2), _t2 = Math.max(..._idx2);
+          const _hrs2 = Array.from({ length: _t2 - _f2 + 1 }, (_, i) => _f2 + i);
+          createChart('noAnswerHourChart', 'bar', _hrs2.map(h => h + ':00'), [
+            { label: 'ניסיונות חיוג שלא נענו', type: 'bar', data: _hrs2.map(h => noAnswerHourMerged[h]), backgroundColor: '#F6AD3C', borderRadius: 6, maxBarThickness: 34 },
+          ], {
+            x: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' }, color: '#374151', maxRotation: 0 } },
+            y: { beginAtZero: true, grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' }, grace: '15%' },
+          }, undefined, { plugins: [vrBarLabelsPlugin], options: { plugins: { legend: { display: false } } } });
+        } else createChart('noAnswerHourChart', 'bar', hLabels2, [
           { label: 'לידים "אין מענה" (לפי שעת ניסיון יצירת קשר)', type: 'bar', data: noAnswerHourMerged.slice(),
             backgroundColor: noAnswerHourMerged.map(c => c === _mx && _mx > 0 ? '#DC2626' : '#FCA5A5'),
             borderRadius: 4, maxBarThickness: 26 },
@@ -1650,13 +1726,20 @@ const selectProject = async (client, project) => {
 
     const userList = Object.entries(byUserMerged)
       .filter(([, v]) => v.count > 0)
-      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count) }))
+      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count),
+        bizMedian: _rtReports === 1 && v.bizMedian != null ? v.bizMedian : null, pending: _pendingComplete ? (pendingByUser[name] || 0) : null }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
+    if (vrResp && _pendingComplete) {
+      for (const [name, n] of Object.entries(pendingByUser)) {
+        if (!byUserMerged[name] && n > 0) userList.push({ name, count: 0, avg: null, bizAvg: null, bizMedian: null, pending: n });
+      }
+    }
 
     const sourceList = Object.entries(bySourceMerged)
       .filter(([, v]) => v.count >= 3)
-      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count) }))
+      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count),
+        bizMedian: _rtReports === 1 && v.bizMedian != null ? v.bizMedian : null, pending: _pendingComplete ? (pendingBySource[name] || 0) : null }))
       .sort((a, b) => b.bizAvg - a.bizAvg)
       .slice(0, 10);
 
@@ -1674,7 +1757,7 @@ const selectProject = async (client, project) => {
             <MetricCard label="קיבלו מענה" value={formatNum(respondedCount)} tone="emerald" icon={CheckCircle2} details={_vrRespTips[1]}
               description={totalLids > 0 ? Math.round(respondedCount / totalLids * 100) + '% מהלידים' : undefined} />
             <MetricCard label="זמן מענה ממוצע" value={fmt(overallBusinessMin)} tone="sky" icon={Clock} details={_vrRespTips[2]}
-              description={respondedCount > 0 ? 'שעות עסקים · מתוך ' + formatNum(respondedCount) + ' לידים עם מענה' : undefined} />
+              description={respondedCount > 0 ? (_rtReports === 1 && _bizMedianOverall != null ? 'חציון ' + fmt(_bizMedianOverall) + ' · ' : '') + 'שעות עסקים · מתוך ' + formatNum(respondedCount) + ' לידים עם מענה' : undefined} />
             <MetricCard label="בלי מענה" value={formatNum(noResponseCount)} tone="amber" icon={PhoneOff} details={_vrRespTips[3]}
               description={totalLids > 0 ? 'מתוך ' + formatNum(totalLids) + ' לידים' : undefined}
               onClick={_crmRespLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים בלי מענה', names: _crmRespLeads.noResponse}) : undefined} />
@@ -1730,21 +1813,21 @@ const selectProject = async (client, project) => {
         <div className={vrResp ? 'vrt-patterns' : undefined}>
         {meetingDowHasData && (
           <div className="section">
-            <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>יום מבוקש לפגישה</h2><span className="sub">באיזה יום בשבוע לקוחות רוצים להגיע לפגישה (לפי תאריך הפגישה שנקבע, ללא מבוטלות)</span></div>
+            <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>יום מבוקש לפגישה</h2><span className="sub">{vrResp ? 'מתוך תיאומי פגישות' : 'באיזה יום בשבוע לקוחות רוצים להגיע לפגישה (לפי תאריך הפגישה שנקבע, ללא מבוטלות)'}</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="meetingDowChart"></canvas></div></div>
           </div>
         )}
 
         {hourHasData && (
           <div className="section">
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2><span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, מתי אנשי המכירות יצרו קשר, וכמה פגישות תואמו. הקו האדום = פגישות שנקבעו באותה שעה חלקי יצירות הקשר באותה שעה (אחוז המרה)</span></div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2>{!vrResp && <span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, מתי אנשי המכירות יצרו קשר, וכמה פגישות תואמו. הקו האדום = פגישות שנקבעו באותה שעה חלקי יצירות הקשר באותה שעה (אחוז המרה)</span>}</div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="apptHourChart"></canvas></div></div>
           </div>
         )}
 
         {noAnswerTotal > 0 && (
           <div className="section">
-            <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><h2>שעות אין מענה</h2><span className="sub">באילו שעות נרשמו הכי הרבה לידים עם התנגדות "אין מענה" (Bad Contact / Invalid Phone), לפי שעת ניסיון יצירת הקשר</span></div>
+            <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><h2>{vrResp ? 'שעות ללא מענה' : 'שעות אין מענה'}</h2><span className="sub">{vrResp ? 'ניסיונות חיוג שלא נענו' : 'באילו שעות נרשמו הכי הרבה לידים עם התנגדות "אין מענה" (Bad Contact / Invalid Phone), לפי שעת ניסיון יצירת הקשר'}</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="noAnswerHourChart"></canvas></div></div>
           </div>
         )}
@@ -1755,13 +1838,15 @@ const selectProject = async (client, project) => {
             <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><h2>זמן מענה לפי איש מכירות</h2></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
-                <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
+                <thead><tr><th>איש מכירות</th><th>{vrResp ? 'לידים עם שיחה' : 'לידים'}</th><th>{vrResp ? 'זמן ממוצע' : 'זמן מענה ממוצע'}</th>{vrResp && <th>זמן חציוני</th>}{vrResp && <th>טרם התקיימה שיחה</th>}</tr></thead>
                 <tbody>
                   {userList.map(u => (
                     <tr key={u.name}>
                       <td style={{fontWeight:600}}>{u.name}</td>
                       <td>{u.count}</td>
-                      <td style={{fontWeight:600,color:'var(--accent)'}}>{fmt(u.bizAvg)}</td>
+                      <td style={{fontWeight:600,color:'var(--accent)'}}>{u.count > 0 ? fmt(u.bizAvg) : '—'}</td>
+                      {vrResp && <td>{u.count === 0 ? '—' : u.bizMedian != null ? fmt(u.bizMedian) : 'אין נתון'}</td>}
+                      {vrResp && <td>{u.pending != null ? u.pending : 'אין נתון'}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -1769,16 +1854,17 @@ const selectProject = async (client, project) => {
             </div>
           </div>
           <div className="section">
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="20" x2="2" y2="14"/><line x1="7" y1="20" x2="7" y2="8"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="17" y1="20" x2="17" y2="10"/><line x1="22" y1="20" x2="22" y2="2"/></svg></div><h2>הכי איטיים - לפי מקור</h2></div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="20" x2="2" y2="14"/><line x1="7" y1="20" x2="7" y2="8"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="17" y1="20" x2="17" y2="10"/><line x1="22" y1="20" x2="22" y2="2"/></svg></div><h2>{vrResp ? 'מקורות עם זמן המענה הארוך ביותר' : 'הכי איטיים - לפי מקור'}</h2></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
-                <thead><tr><th>מקור</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
+                <thead><tr><th>מקור</th><th>{vrResp ? 'לידים עם שיחה' : 'לידים'}</th><th>זמן מענה ממוצע</th>{vrResp && <th>טרם התקיימה שיחה</th>}</tr></thead>
                 <tbody>
                   {sourceList.map(s => (
                     <tr key={s.name}>
-                      <td style={{fontWeight:600,fontSize:13}}>{s.name}</td>
+                      <td className={vrResp ? 'vrt-source' : undefined} style={{fontWeight:600,fontSize:13}}>{s.name}</td>
                       <td>{s.count}</td>
                       <td style={{fontWeight:600,color:'var(--accent)'}}>{fmt(s.bizAvg)}</td>
+                      {vrResp && <td>{s.pending != null ? s.pending : 'אין נתון'}</td>}
                     </tr>
                   ))}
                 </tbody>

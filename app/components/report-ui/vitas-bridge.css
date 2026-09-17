@@ -232,9 +232,19 @@
 .vr-ui .vrt-root .vrt-speed .section-head h2, .vr-ui .vrt-root .vrt-patterns .section-head h2, .vr-ui .vrt-root .vrt-tables .section-head h2 { font-size: 18px; }
 .vr-ui .vrt-root .vrt-speed .section-head .sub, .vr-ui .vrt-root .vrt-patterns .section-head .sub { flex-basis: 100%; margin: 0; }
 .vr-ui .vrt-root .chart-card { border: 0; box-shadow: none; background: transparent; padding: 0; }
-.vr-ui .vrt-root .vrt-tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+/* העיצוב המקורי של הטבלאות: זו מתחת לזו, ברוחב מלא, כותרת תכלת, תאים ממורכזים עם קווי הפרדה */
+.vr-ui .vrt-root .vrt-patterns .section-head .ico, .vr-ui .vrt-root .vrt-tables .section-head .ico { display: none; }
+.vr-ui .vrt-root .vrt-tables { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
 .vr-ui .vrt-root .vrt-tables .chart-card { padding: 0 !important; }
+.vr-ui .vrt-root .vrt-tables .data-table { inline-size: 100%; border: 1px solid #D9E2F2; border-radius: 10px; border-collapse: separate; border-spacing: 0; overflow: hidden; }
+.vr-ui .vrt-root .vrt-tables .data-table th { background: #EEF3FB; color: #1E2A4A; font-weight: 800; font-size: 13px; text-align: center; padding: 12px 14px; border-block-end: 1px solid #D9E2F2; border-inline-start: 1px solid #D9E2F2; }
+.vr-ui .vrt-root .vrt-tables .data-table td { text-align: center; padding: 12px 14px; font-size: 14px; font-weight: 600; color: #1E2A4A; border-block-end: 1px solid #E3E9F4; border-inline-start: 1px solid #E3E9F4; background: #fff; }
+.vr-ui .vrt-root .vrt-tables .data-table th:first-child, .vr-ui .vrt-root .vrt-tables .data-table td:first-child { border-inline-start: 0; text-align: start; }
 .vr-ui .vrt-root .vrt-tables .data-table td:first-child { font-weight: 700; }
+.vr-ui .vrt-root .vrt-tables .data-table tr:last-child td { border-block-end: 0; }
+.vr-ui .vrt-root .vrt-tables .data-table td:nth-child(3) { color: #1E2A4A !important; }
+.vr-ui .vrt-root .vrt-tables .data-table td.vrt-source { color: #2563EB; }
+.vr-ui .vrt-root .vrt-tables tbody tr:hover td { background: #F7F9FD; }
 @media (max-width: 1200px) { .vr-ui .vrt-root .vrt-patterns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 850px) { .vr-ui .vrt-root .vrt-tables { grid-template-columns: minmax(0, 1fr); } }
 
