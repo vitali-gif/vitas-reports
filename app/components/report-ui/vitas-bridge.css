@@ -176,6 +176,21 @@
 .vr-ui .vr-demo-block .card { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 .vr-ui .section h3 { font-size: 16px; font-weight: 700; color: var(--vr-text, #142044); margin-block-end: 10px; }
 
+/* ── CRM › מקורות הגעה (.vcs-root מהחבילה השנייה) ─────────────────────────────── */
+/* טבלת המקורות נשארה עם ה-markup הקיים (פתיחת מקור → מודעות, לחיצה על מספר → רשימת לידים);
+   כאן: עמודת המקור דביקה בצד ימין, שורת הסיכום כ-tfoot, גלילה אופקית מקומית (SCREEN-SPEC). */
+.vr-ui .vcs-root .table-wrapper { overflow-x: auto; }
+.vr-ui .vcs-root .data-table { min-inline-size: 1320px; }
+.vr-ui .vcs-root .data-table th:first-child, .vr-ui .vcs-root .data-table td:first-child { position: sticky; inset-inline-start: 0; background: var(--card, #fff); z-index: 1; text-align: start; min-inline-size: 160px; }
+.vr-ui .vcs-root .data-table thead th:first-child { background: #EDF0FC; }
+.vr-ui .vcs-root .data-table tbody tr:nth-child(even) td:first-child { background: #F8FAFF; }
+.vr-ui .vcs-root .data-table tbody tr:last-child td { background: #EAF0FF; font-weight: 750; border-block-start: 2px solid var(--border, #DDE2EC); }
+.vr-ui .vcs-root .vcs-metric-scope { margin-block-end: 12px; }
+.vr-ui .vcs-root .vcs-panel { background: var(--card, #fff); }
+.vr-ui .vcs-root .vcs-stage { border-inline-start-color: var(--indigo, #5B5EF4); }
+/* טאבי הפלטפורמה של המשפך + הכיתוב "הסינון חל על המשפך בלבד" מיושרים לימין */
+.vr-ui .vcs-root .vcs-funnel-toolbar { justify-content: flex-start; }
+
 /* ── טקסט כללי בתוך .vr-ui ──────────────────────────────────────────────────── */
 .vr-ui { font-size: 15px; }
 .vr-ui .welcome-center { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); }

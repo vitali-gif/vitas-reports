@@ -26,6 +26,8 @@ import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
 import { MetaMark, GoogleMark } from '../components/report-ui/BrandMarks'
+import { CohortFunnel } from '../components/report-ui/CrmSources'
+import SourceDistribution from '../components/report-ui/SourceDistribution'
 import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft } from 'lucide-react'
 
 
@@ -431,6 +433,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // יקפוץ בין שני עיצובים במעבר טאב. vrMode — תוכן הטאב "הכל" בלבד (הפיילוט).
   const vrShell = view === 'dashboard' && !isDemoProject && !['zoho', 'salesforce'].includes(_vrCrmType)
   const vrMode = vrShell && dashTab === 'all'
+  // vrCrm — המסך השני של הפיילוט: CRM › מקורות הגעה (design/handoff-crm-sources)
+  const vrCrm = vrShell && dashTab === 'crm' && crmSubTab === 'sources'
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -2191,6 +2195,27 @@ const selectProject = async (client, project) => {
       const anyWeak = rows.some(r => r.value != null && r.weak);
       const missing = rows.filter(r => r.value == null);
 
+      if (vr === 'cohort') {
+        // מקורות הגעה (עיצוב מחודש): פס נתוני פרסום (חשיפות, קליקים) + שלבי הקבוצה + ענף ביטולים —
+        // אותם ערכים/מכנים/אחוזים כמו הסרגל הישן, ברכיב CohortFunnel של החבילה.
+        const byKey = Object.fromEntries(rows.map(r => [r.key, r]));
+        const denomLabel = (r) => r.denom != null ? `מתוך ${formatNum(r.denom)} ${r.ofLabel.replace(/^מ/, '')}` : r.ofLabel;
+        const stage = (k) => { const r = byKey[k]; return { id: k, label: r.label, value: r.value == null ? null : formatNum(r.value),
+          rate: (r.value != null && r.of && r.pct != null) ? fmtPct(r.pct) : null, denominatorLabel: r.of ? denomLabel(r) : '', smallSample: !!(r.value != null && r.weak) }; };
+        const canc = byKey.canc;
+        const model = {
+          advertising: ['impr', 'click'].map(k => ({ id: k, label: byKey[k].label, value: byKey[k].value == null ? null : formatNum(byKey[k].value) })),
+          stages: ['lead', 'cont', 'sched', 'held', 'reg', 'deal'].map(stage),
+          cancellation: canc ? { parentStageId: 'sched', value: canc.value == null ? null : formatNum(canc.value), denominatorLabel: canc.denom != null ? `מתוך ${formatNum(canc.denom)} פגישות שנקבעו` : '' } : null,
+          scopeNote: 'חשיפות וקליקים: נתוני הפרסום בתקופה. מלידים והלאה: התקדמות הלידים שנכנסו בתקופה.' + (missing.length > 0 ? ' "אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + '.' : ''),
+        };
+        const platforms = [{ id: 'all', label: 'הכל' }, chF ? { id: 'facebook', label: 'Facebook' } : null, chG ? { id: 'google', label: 'Google' } : null].filter(Boolean);
+        return (
+          <ReportSection title="משפך לידים" description="מחשיפה ועד חוזה · כל אחוז נמדד מהמכנה הרשום לידו">
+            <CohortFunnel model={model} platforms={platforms} selectedPlatform={funnelChannel} onPlatformChange={setFunnelChannel} />
+          </ReportSection>
+        );
+      }
       if (vr) {
         // עיצוב מחודש: אותן תחנות, אותם מכנים ואותם אחוזים — ברכיב Funnel של report-ui.
         const VR_TONE = { impr: 'indigo', click: 'indigo', lead: 'emerald', cont: 'emerald', sched: 'sky', held: 'terra', canc: 'rose', reg: 'emerald', deal: 'rose' };
@@ -2427,6 +2452,17 @@ const selectProject = async (client, project) => {
       const crmV2Color = { green:'emerald', orange:'terra', pink:'rose', purple:'violet', cyan:'sky', red:'amber', '':'indigo' };
       const v2cls = crmV2Color[color] || 'indigo';
       const _hasNames = namesArr && namesArr.length > 0;
+      if (vrCrm) {
+        // עיצוב מחודש (מקורות הגעה): אותם ערכים, אותה תגית שינוי, אותו הסבר ואותה לחיצה — בכרטיס report-ui
+        const VR_ICON = { 'סה"כ לידים': Users, 'רלוונטיים': CheckCircle2, 'פגישות תואמו': CalendarCheck, 'פגישות בוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'הרשמות': ClipboardList, 'חוזים': FileSignature };
+        const badge = !ch ? null : ch.newVal ? '↑ חדש'
+          : ((ch.pct > 0 ? '↑ ' : ch.pct < 0 ? '↓ ' : '− ') + (ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '-') + Math.abs(ch.pct).toFixed(0) + '%'));
+        return (
+          <MetricCard key={label} label={label} value={value} tone={v2cls} icon={VR_ICON[sl]} description={subNote || undefined}
+            details={tip || undefined} badge={badge}
+            onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} />
+        );
+      }
       return (
         <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} — הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
           <div className="kpi-top">
@@ -2465,7 +2501,7 @@ const selectProject = async (client, project) => {
 
     pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
-      if (sourceNames.length > 0) {
+      if (!vrCrm && sourceNames.length > 0) {
         createChart('crmPieChart', 'doughnut', sourceNames, [{
           label: srcMobileMetric === 'meetings' ? 'פגישות' : 'לידים',
           data: sourceNames.map(n => srcMobileMetric === 'meetings' ? (crmData.sources[n].meetingsScheduled || 0) : crmData.sources[n].totalLeads),
@@ -2548,33 +2584,42 @@ const selectProject = async (client, project) => {
         </>
       );
     }
+    // עיצוב מחודש: 8 כרטיסים בדיוק (4×2); תקציב/עלויות/שווי מקופלים כתיאור בכרטיסים הרלוונטיים
+    const _vrCost = (n) => (vrCrm && _platformSpend > 0 && n > 0) ? formatCurrency(_platformSpend / n) : null;
+    const _vrLeadsNote = vrCrm && _platformSpend > 0 ? ['תקציב ' + formatCurrency(_platformSpend), _vrCost(ct.totalLeads) ? 'עלות לליד ' + _vrCost(ct.totalLeads) : null].filter(Boolean).join(' · ') : undefined;
+    const _vrHeldNote = _vrCost(ct.meetingsCompleted) ? 'עלות לפגישה ' + _vrCost(ct.meetingsCompleted) : undefined;
+    const _vrRegNote = vrCrm && (ct.registrationValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(ct.registrationValue) : undefined;
+    const _vrDealNote = vrCrm ? [(ct.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(ct.contractValue) : null, _vrCost(ct.contracts) ? 'עלות לחוזה ' + _vrCost(ct.contracts) : null].filter(Boolean).join(' · ') || undefined : undefined;
+    // התפלגות לידים לפי מקור לגרף החדש — מערך יציב (memoAgg) כדי שהגרף לא ייבנה מחדש בכל רינדור
+    const _distItems = memoAgg(`crmDist|${selectedMonth}`, () => sourceEntries.map(([name, d]) => ({ id: name, label: name, value: Number.isFinite(d.totalLeads) ? d.totalLeads : null })));
     return (
-      <>
+      <div className={vrCrm ? 'vcs-root' : undefined}>
         <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
           <button onClick={refreshFromBmby} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
             {refreshingCrm ? '⏳' : '🔄'} {refreshingCrm ? 'מושך...' : 'רענן CRM'}
             {!refreshingCrm && crmSchemaVersion > 0 && <span style={{fontSize:10,color:'var(--text-muted)',marginRight:2}}>v{crmSchemaVersion}</span>}
           </button>
         </div>
-        <div className="kpi-grid">
-          {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads)}
+        {vrCrm && <p className="vr-caption vcs-metric-scope">פעילות בתקופה · כולל פעילות מלידים שנכנסו לפני התקופה</p>}
+        <div className={vrCrm ? 'vr-metric-grid' : 'kpi-grid'}>
+          {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads, _vrLeadsNote)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, 'תואמו = כל הפגישות שנקבעו החודש.\nנספר לפי תאריך התיאום (מתי נקבעה הפגישה), בכל סטטוס: עתידיות + שבוצעו + שבוטלו.\nהשורה למטה: כמה מלידים שנכנסו החודש (חדשים) וכמה מלידים מחודשים קודמים.', _crmLeads?.meetingsScheduled, (ct.meetingsScheduledSplit && (ct.meetingsScheduledSplit.fromNewLeads+ct.meetingsScheduledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsScheduledSplit.fromNewLeads+' · קודמים '+ct.meetingsScheduledSplit.fromOldLeads) : null))}
-          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה — רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, (ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null))}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה — רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, [(ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null), _vrHeldNote].filter(Boolean).join(' · ') || undefined)}
           {crmKpi('פגישות עתידיות', formatNum(ct.meetingsUpcoming||0), 'cyan', ct.meetingsUpcoming||0, cp?.meetingsUpcoming, false, 'עתידיות = פגישות שנקבעו וטרם התקיימו.\nמועד הפגישה עתידי (אחרי היום) והיא עדיין פתוחה. כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsUpcoming, (ct.meetingsUpcomingSplit && (ct.meetingsUpcomingSplit.fromNewLeads+ct.meetingsUpcomingSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsUpcomingSplit.fromNewLeads+' · קודמים '+ct.meetingsUpcomingSplit.fromOldLeads) : null))}
           {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled||0), 'red', ct.meetingsCancelled||0, cp?.meetingsCancelled, false, 'בוטלו = פגישות שנקבעו החודש ובוטלו.\nנספר לפי תאריך התיאום, כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsCancelled, (ct.meetingsCancelledSplit && (ct.meetingsCancelledSplit.fromNewLeads+ct.meetingsCancelledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCancelledSplit.fromNewLeads+' · קודמים '+ct.meetingsCancelledSplit.fromOldLeads) : null))}
-          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations)}
-          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts)}
-          {_platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
-          {ct.totalLeads > 0 && _platformSpend > 0 ? crmKpi('עלות לליד', formatCurrency(_platformSpend / ct.totalLeads), 'purple', _platformSpend / ct.totalLeads, null, true) : null}
-          {ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
-          {ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
-          {(ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrencyCompact(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
-          {(ct.registrationValue || 0) > 0 ? crmKpi('שווי הרשמות', formatCurrencyCompact(ct.registrationValue), 'green', ct.registrationValue, cp?.registrationValue || null) : null}
+          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations, _vrRegNote)}
+          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts, _vrDealNote)}
+          {!vrCrm && _platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
+          {!vrCrm && ct.totalLeads > 0 && _platformSpend > 0 ? crmKpi('עלות לליד', formatCurrency(_platformSpend / ct.totalLeads), 'purple', _platformSpend / ct.totalLeads, null, true) : null}
+          {!vrCrm && ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
+          {!vrCrm && ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
+          {!vrCrm && (ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrencyCompact(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
+          {!vrCrm && (ct.registrationValue || 0) > 0 ? crmKpi('שווי הרשמות', formatCurrencyCompact(ct.registrationValue), 'green', ct.registrationValue, cp?.registrationValue || null) : null}
         </div>
 
 
-        {renderFunnelBar()}
+        {renderFunnelBar(vrCrm ? 'cohort' : false)}
 
         {/* CRM Table by Source */}
         <div className="section">
@@ -2688,16 +2733,21 @@ const selectProject = async (client, project) => {
           </ul>
         </div>
 
-        {/* CRM Charts */}
+        {/* CRM Charts — במצב העיצוב המחודש: דונאט + רשימת ערכים (SourceDistribution), מופע Chart.js משלו */}
+        {vrCrm ? (
+          <ReportSection title="התפלגות לידים לפי מקור" description={formatNum(ct.totalLeads) + ' לידים בתקופה · לפי מקור ההגעה כפי שנרשם ב-CRM'}>
+            <div className="vcs-panel"><SourceDistribution items={_distItems} /></div>
+          </ReportSection>
+        ) : (
         <div className="section">
           <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>גרפים</h2></div>
           <div className="chart-grid" style={{gridTemplateColumns: '1fr'}}>
             <div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05dc\u05d9\u05d3\u05d9\u05dd'}</h4><div className="chart-container"><canvas id="crmPieChart"></canvas></div></div>
           </div>
-        </div>
-      </>
+        </div>)}
+      </div>
     );
-  }, [selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric, renderFunnelBar]);
+  }, [vrCrm, selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric, renderFunnelBar]);
 
   const renderDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
@@ -5519,7 +5569,7 @@ const selectProject = async (client, project) => {
                 ? (isFetching
                     ? <PeriodFetching />
                     : <PeriodEmpty onRefresh={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }, { live: !isClientView })} />)
-                : (vrMode ? <VitasPresentation>{renderDashboard()}</VitasPresentation> : renderDashboard())}
+                : (vrShell ? <VitasPresentation>{renderDashboard()}</VitasPresentation> : renderDashboard())}
           </>)}
 
           

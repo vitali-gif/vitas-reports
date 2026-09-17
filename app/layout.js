@@ -2,6 +2,7 @@ import './globals.css';
 // העיצוב המחודש (ענף redesign): פעיל רק בתוך .vr-ui — פיילוט נדל"ן, טאב "הכל". ראה design/handoff-v1.
 import './components/report-ui/vitas-visual.css';
 import './components/report-ui/vitas-bridge.css';
+import './components/report-ui/crm-sources.css';
 
 export const metadata = {
   title: 'VITAS Reports - מערכת דוחות',
