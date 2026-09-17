@@ -5,8 +5,8 @@
 ## הרעיון בשתי שורות
 
 - **מודעות (Meta, Google):** עובדות יומיות בטבלה `ad_daily`; כל טווח = סכום ימים, בתוך Postgres.
-- **CRM (BMBY, Zoho, Salesforce):** רשומות גולמיות ב-`crm_raw` → תמונה דחוסה לפרויקט ב-`crm_compact` →
-  אותה פונקציית חישוב שה-route מריץ על משיכה חיה, רק על הרשומות השמורות.
+- **CRM (BMBY, Zoho, Salesforce):** רשומות גולמיות ב-`crm_raw` → תמונה דחוסה לפרויקט ב-`crm_compact` (BMBY, Zoho)
+  או פרוסה לטווח שנחתכת ב-DB (Salesforce, 60k רשומות) → אותה פונקציית חישוב שה-route מריץ על משיכה חיה.
 
 הדשבורד לא השתנה: `GET /api/reports/range?projectId&since&until` מחזיר שורות בצורת `reports`
 (`{month: 'since_until', source, data, summary, synthetic: true}`), ו-`triggerFetch` ב-`app/admin/page.js`
@@ -17,7 +17,8 @@
 | טבלה | מיגרציה | מה יש בה | מי כותב |
 |---|---|---|---|
 | `crm_raw` | 006 | רשומה גולמית לכל ישות (BMBY: clients/tasks/price_offers/contracts; Zoho: leads/deals; Salesforce: leads/opportunities/line_items/lead_history), PK (project, crm_type, entity, ext_id) | ה-routes של ה-CRM בכל ריצה |
-| `crm_compact` | 009, 010 | שורה אחת לפרויקט: כל הישויות (BMBY מוקרן ל-~30 שדות) + `built_at` | `rebuild_crm_compact()` ב-DB, מיד אחרי כל upsert ל-`crm_raw` |
+| `crm_compact` | 009, 010 | שורה אחת לפרויקט (BMBY מוקרן ל-~30 שדות; Zoho מלא) + `built_at`. **לא ל-Salesforce** | `rebuild_crm_compact()` ב-DB, מיד אחרי כל upsert ל-`crm_raw` |
+| (Salesforce) | 011 | אין תמונה דחוסה: `crm_slice_salesforce(project, from, to)` חותך מ-`crm_raw` רק את רשומות הטווח (לידים/פגישות בחלון, ההיסטוריה שלהם, הזדמנויות בחלון + cohort, פריטים). 60k רשומות → מאות | נקרא מ-`/api/reports/range` |
 | `ad_daily` | 007 | יום × חשבון × מודעה × גיל × מגדר; RPC `ad_daily_aggregate`, `ad_daily_coverage` | `lib/ads/daily-sync.js` |
 | `job_log` | 008 | ריצות רקע (30 יום) | `lib/job-log.js` |
 
