@@ -18,7 +18,7 @@
  */
 import { NextResponse } from 'next/server'
 import { adminClient, requireProjectAccess, monitorTokenOf } from '../../../../lib/auth'
-import { loadRawRecords, loadCompactSnapshot, loadCompactMeta, detectCrmType } from '../../../../lib/crm/raw-store.js'
+import { loadRawRecords, loadCompactSnapshot, loadCompactMeta, detectCrmType, loadSalesforceSlice } from '../../../../lib/crm/raw-store.js'
 import { computeCrmRow, totalKeysFor, getPath } from '../../../../lib/crm/compute.js'
 import { buildAdsRangeRows } from '../../../../lib/ads/range-rows.js'
 
@@ -43,10 +43,21 @@ const compactSet = (k, v) => { COMPACT_CACHE.set(k, v); if (COMPACT_CACHE.size >
 
 // טעינת ה-CRM בשלוש מדרגות: (1) מטא זעיר → (2) תוצאה מוכנה במטמון / payload במטמון → (3) payload מה-DB.
 async function loadCrmForRange(sb, projectId, key, timing) {
-  const meta = await loadCompactMeta(sb, projectId)   // כל סוג CRM שיש לפרויקט (bmby / zoho / salesforce)
-  if (!meta) {   // עוד אין תמונה דחוסה — הרשומות הגולמיות (איטי, נדיר: רק לפני הריצה הראשונה של הקרון)
+  const meta = await loadCompactMeta(sb, projectId)   // bmby / zoho: תמונה דחוסה. salesforce: אין (פרוסה לטווח, מיגרציה 011)
+  if (!meta) {
     const crmType = await detectCrmType(sb, projectId)
     if (!crmType) return { raw: null, shaped: null, cacheKey: null }
+    if (crmType === 'salesforce') {
+      const [since, until] = key.split('_')
+      const raw = await loadSalesforceSlice(sb, projectId, since, until)
+      if (!raw || !raw.total) return { raw: null, shaped: null, cacheKey: null }
+      const cacheKey = `${projectId}|${key}|${raw.fetchedAt}`
+      const hit = cacheGet(cacheKey)
+      timing.crmCache = hit ? 'hit' : 'miss'
+      timing.slice = raw.counts
+      return { raw, shaped: hit, cacheKey }
+    }
+    // עוד אין תמונה דחוסה — הרשומות הגולמיות (איטי, נדיר: רק לפני הריצה הראשונה של הקרון)
     const raw = await loadRawRecords(sb, projectId, crmType)
     return { raw, shaped: null, cacheKey: null }
   }

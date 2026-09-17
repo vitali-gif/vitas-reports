@@ -137,8 +137,12 @@ Authorization: Bearer <MONITOR_TOKEN>
 
 * Requires a token with **`client_slug = '*'`** (monitor scope). A client-scoped token gets `403`,
   because the feed lists every client's projects. A `*` token may also call `/metrics` for any client.
-* Read-only, aggregates only: `ok`, `reds[]`, `issues[]`, `projects[{name, checks[{label,status,detail}]}]`,
-  `cron_heartbeats[{job,last_run,hours_ago}]`. No PII, no business numbers.
+* Read-only, aggregates only: `ok`, `reds[]`, `issues[]`, `projects[{name, checks[{label,status,detail}]}]`
+  (incl. the synthetic project "תשתית · טווחי תאריכים" — daily ad facts, CRM snapshots, prefetch-daily),
+  `cron_heartbeats[{job,last_run,hours_ago}]`, `daily_facts{coverage[], last_runs{}}`,
+  `crm_snapshot[{project, crm_type, counts, source_fetched_at, hours_ago}]`. No PII, no business numbers.
+* `GET /api/reports/range?projectId&since&until&compare=1` is also open to the monitor token: it compares the
+  snapshot-computed CRM totals with the stored live report for that exact key (`identical`, `diff`, `timing`).
 * Same sensors as the hourly health email (`lib/health.js`), so both always agree.
 * Crons run every ~2h from ~07:00 Israel (cron-job.org). An overnight gap is normal, not a fault.
   The old midnight writes in `reports` were the monitor's own `POST fetch` calls, not a cron.

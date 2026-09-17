@@ -76,12 +76,15 @@ export async function GET(request) {
       last_runs: { 'prefetch-daily:recent': syncRecent, 'prefetch-daily:backfill': syncBackfill, 'prefetch-ads:daily-block': adsBlock },
     }
   } catch (e) { dailyFacts = { error: String(e?.message || e) } }
+  // תמונות ה-CRM הדחוסות (crm_compact) — פרויקט, סוג, ספירות, טריות. אגרגטים בלבד.
   let crmSnapshot = null
   try {
-    const { data } = await sb.from('crm_raw').select('project_id, entity, fetched_at')
-      .order('fetched_at', { ascending: false }).limit(1)
-    const { count } = await sb.from('crm_raw').select('*', { count: 'exact', head: true })
-    crmSnapshot = { rows: count ?? null, last_fetched: data?.[0]?.fetched_at || null }
+    const [{ data: cc }, { data: pr }] = await Promise.all([
+      sb.from('crm_compact').select('project_id, crm_type, counts, source_fetched_at, built_at'),
+      sb.from('projects').select('id, name'),
+    ])
+    const nameOf = new Map((pr || []).map(p => [p.id, p.name]))
+    crmSnapshot = (cc || []).map(c => ({ project: nameOf.get(c.project_id) || c.project_id, crm_type: c.crm_type, counts: c.counts, source_fetched_at: c.source_fetched_at, built_at: c.built_at, hours_ago: hoursAgo(c.source_fetched_at || c.built_at) }))
   } catch (e) { crmSnapshot = { error: String(e?.message || e) } }
 
   return J({

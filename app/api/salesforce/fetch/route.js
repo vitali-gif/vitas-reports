@@ -24,7 +24,7 @@
 
 import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
-import { upsertRawRecords, rebuildCompact } from '../../../../lib/crm/raw-store.js'
+import { upsertRawRecords } from '../../../../lib/crm/raw-store.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -178,7 +178,8 @@ async function snapshotSalesforce(supabase, projectsList, raw) {
   for (const p of projectsList) {
     const parts = {}
     for (const [entity, rows] of Object.entries(raw)) parts[entity] = await upsertRawRecords(supabase, p.id, 'salesforce', entity, rows)
-    try { parts.compact = await rebuildCompact(supabase, p.id, 'salesforce') } catch (e) { parts.compact = { error: String(e?.message || e) } }
+    // אין תמונה דחוסה ל-Salesforce: הבנייה לקחה 27 שניות על 60k רשומות ונכשלה במקביליות. נקודת
+    // הטווח חותכת ישירות מ-crm_raw (crm_slice_salesforce, מיגרציה 011).
     out[p.name] = parts
   }
   return out

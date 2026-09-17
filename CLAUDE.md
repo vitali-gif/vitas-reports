@@ -31,6 +31,12 @@ Next.js 14 (App Router) · Supabase · Vercel · אינטגרציות: Meta, Goo
 
 סוכנים חיצוניים (סשני קמפיינים, סוכן הבדיקה היומי) נכנסים רק דרך `/api/v1/*` עם טוקן Bearer מטבלת `api_tokens` — ראה `API_V1_METRICS.md`. הסוכן היומי משתמש ב-`/api/v1/health` עם טוקן בהיקף `client_slug = *`.
 
+## טווחי תאריכים מיידיים
+
+כל טווח תאריכים נטען מ-`/api/reports/range` מתוך `ad_daily` (מודעות) ו-`crm_compact` (CRM), בלי לפנות לספקים
+חיצוניים. איך זה בנוי, אילו קרונים ממלאים, ואיך מתחזקים: **`docs/daily-ranges.md`**. חישובי ה-CRM חיים
+ב-`lib/crm/*-summary.js` — ה-routes משתמשים בהם; `lib/crm/salesforce-shape.js` מיוצר אוטומטית ואין לערוך ידנית.
+
 ## הקמה על מחשב חדש (Windows)
 
 ```
