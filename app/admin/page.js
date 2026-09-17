@@ -488,6 +488,29 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     return metaOk || googleOk || crmOk;
   };
 
+  // שלב 3 של docs/daily-ranges-plan.md: טווח תאריכים (since_until) שאין לו דוח שמור מגיע
+  // מ-/api/reports/range — CRM מתמונת המצב, מודעות מהעובדות היומיות — מיידית, בלי משיכה חיה.
+  // מחזיר את גוף התשובה ({rows, missing}) או null בכשל. שורה סינתטית לא דורסת דוח שמור
+  // לאותו מקור+מפתח (הדוח השמור מגיע מהקרון והוא הרשמי).
+  const loadRangeRows = async (projectId, key) => {
+    if (!projectId || !key || !key.includes('_')) return null;
+    const [since, until] = key.split('_');
+    const res = await apiFetch(`/api/reports/range?projectId=${projectId}&since=${since}&until=${until}`, { headers: {} }).catch(() => null);
+    if (!res || !res.ok) return null;
+    const body = await res.json().catch(() => null);
+    if (!body || !Array.isArray(body.rows)) return null;
+    if (body.rows.length) {
+      setReports(prev => {
+        const stored = new Set((prev || []).filter(r => !r.synthetic).map(r => r.source + '|' + r.month));
+        const fresh = body.rows.filter(r => !stored.has(r.source + '|' + r.month));
+        const ids = new Set(fresh.map(r => r.id));
+        return [...(prev || []).filter(r => !ids.has(r.id)), ...fresh];
+      });
+      monthDataLoaded.current.add(key);   // שורות סינתטיות מגיעות עם data — אין מה לטעון בעצלנות
+    }
+    return body;
+  };
+
   const triggerFetch = async (payload) => {
     if (refreshing) return false;
 
@@ -514,15 +537,40 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       return true;
     }
 
-    // Open period with full cache: render now, refresh all 3 in background.
+    // Open period with full cache: render now, refresh all 3 in background (admin only —
+    // the cron re-warms presets for clients, and a client live-fetch is rate-limited).
     if (haveAll && isOpen) {
-      showToast('\u2713 \u05de\u05d5\u05e6\u05d2 \u05de\u05de\u05d8\u05de\u05d5\u05df, \u05de\u05ea\u05e2\u05d3\u05db\u05df \u05d1\u05e8\u05e7\u05e2...');  // "מוצג ממטמון, מתעדכן ברקע"
-      performLiveFetch(payload, true, { fb: true, gg: true, crm: true });
+      if (!isClientView) {
+        showToast('\u2713 \u05de\u05d5\u05e6\u05d2 \u05de\u05de\u05d8\u05de\u05d5\u05df, \u05de\u05ea\u05e2\u05d3\u05db\u05df \u05d1\u05e8\u05e7\u05e2...');  // "מוצג ממטמון, מתעדכן ברקע"
+        performLiveFetch(payload, true, { fb: true, gg: true, crm: true });
+      }
       return true;
     }
 
+    // טווח תאריכים (since_until) חסר: קודם מהשרת, מיידית — שלב 3 של docs/daily-ranges-plan.md.
+    // רק מה שעדיין חסר אחרי זה (למשל ימים לפני הטעינה ההיסטורית) נמשך חי, ורק על ידי אדמין.
+    let needFb = !haveFb, needGoog = !haveGoog, needCrm = !haveCrm;
+    if (!payload.month && payload.since && payload.until && selectedProject) {
+      const wasEmpty = !reports.some(r => r.month === targetKey);
+      if (wasEmpty) setPeriodLoading(true);
+      const body = await loadRangeRows(selectedProject.id, targetKey);
+      if (wasEmpty) setPeriodLoading(false);
+      if (body) {
+        const got = new Set(body.rows.map(r => r.source));
+        if (got.has('facebook')) needFb = false;
+        if (got.has('google')) needGoog = false;
+        if (got.has('crm')) needCrm = false;
+        if (!needFb && !needGoog && !needCrm) return true;
+        if (isClientView) return body.rows.length > 0;   // לקוח: מציגים מה שיש; לא מושכים חי
+      } else if (isClientView) {
+        return false;
+      }
+    } else if (isClientView) {
+      return false;   // לקוח: חודש קלנדרי חסר — הקרון ישלים; אין משיכה חיה
+    }
+
     // Partial or missing cache: blocking fetch, but only fetch the sources we lack.
-    return await performLiveFetch(payload, false, { fb: !haveFb, gg: !haveGoog, crm: !haveCrm });
+    return await performLiveFetch(payload, false, { fb: needFb, gg: needGoog, crm: needCrm });
   };
 
   const applyPreset = async (preset) => {
@@ -693,7 +741,12 @@ const loadClients = async () => {
       // Merge fresh summaries but PRESERVE any heavy `data` already loaded (avoid flicker on revalidate).
       setReports(prev => {
         const byId = new Map((prev || []).map(r => [r.id, r]));
-        return data.map(fr => { const old = byId.get(fr.id); return (old && old.data != null) ? { ...fr, data: old.data } : fr; });
+        const merged = data.map(fr => { const old = byId.get(fr.id); return (old && old.data != null) ? { ...fr, data: old.data } : fr; });
+        // שורות סינתטיות (מ-/api/reports/range) לא קיימות ב-by-project — משאירים אותן, אלא אם
+        // בינתיים נכתב דוח שמור לאותו מקור+מפתח (הוא גובר).
+        const storedKeys = new Set(data.map(r => r.source + '|' + r.month));
+        const synthetic = (prev || []).filter(r => r.synthetic && !storedKeys.has(r.source + '|' + r.month));
+        return synthetic.length ? [...merged, ...synthetic] : merged;
       });
       if (data.length > 0) {
         setSelectedMonth(prev => (prev && data.some(r => r.month === prev)) ? prev : data[0].month);
@@ -1014,7 +1067,7 @@ const selectProject = async (client, project) => {
   // Replaces the old manual refresh buttons - if Meta/Google/BMBY data is missing
   // for the selected period, fetch it automatically (with debounce).
   useEffect(() => {
-    if (isClientView && activePreset !== 'custom') return; // client: cron covers presets; only fetch for custom ranges
+    if (isClientView && activePreset !== 'custom' && !(selectedMonth || '').includes('_')) return; // client: calendar months come from the cron; ranges load instantly via /api/reports/range
     // פרויקט דמו: הנתונים קפואים ונזרעים ע"י /api/demo. אסור למשוך חי — הקריאות
     // ייכשלו בשקט (אין מיפוי BMBY, אין קמפיין תואם) אבל יציגו באנר "מושך נתונים
     // חיים" באמצע הדגמה ללקוח.
