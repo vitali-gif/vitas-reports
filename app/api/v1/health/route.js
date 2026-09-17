@@ -20,6 +20,7 @@ import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { adminClient } from '../../../../lib/auth'
 import { computeHealth } from '../../../../lib/health'
+import { lastRuns } from '../../../../lib/job-log.js'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -61,6 +62,28 @@ export async function GET(request) {
     if (!error) cronHeartbeats = (data || []).map(b => ({ job: b.job, last_run: b.last_run, hours_ago: hoursAgo(b.last_run) }))
   } catch { /* bootstrap */ }
 
+  // שלב 2/5 של docs/daily-ranges-plan.md — מצב העובדות היומיות ותמונת ה-CRM, אגרגטים בלבד.
+  let dailyFacts = null
+  try {
+    const [cov, syncRecent, syncBackfill, adsBlock] = await Promise.all([
+      sb.rpc('ad_daily_coverage'),
+      lastRuns(sb, 'prefetch-daily:recent', 3),
+      lastRuns(sb, 'prefetch-daily:backfill', 3),
+      lastRuns(sb, 'prefetch-ads:daily-block', 3),
+    ])
+    dailyFacts = {
+      coverage: (cov.data || []).map(c => ({ source: c.source, account: c.account, min_day: c.min_day, max_day: c.max_day, days: c.days, rows: c.rows, last_fetched: c.last_fetched })),
+      last_runs: { 'prefetch-daily:recent': syncRecent, 'prefetch-daily:backfill': syncBackfill, 'prefetch-ads:daily-block': adsBlock },
+    }
+  } catch (e) { dailyFacts = { error: String(e?.message || e) } }
+  let crmSnapshot = null
+  try {
+    const { data } = await sb.from('crm_raw').select('project_id, entity, fetched_at')
+      .order('fetched_at', { ascending: false }).limit(1)
+    const { count } = await sb.from('crm_raw').select('*', { count: 'exact', head: true })
+    crmSnapshot = { rows: count ?? null, last_fetched: data?.[0]?.fetched_at || null }
+  } catch (e) { crmSnapshot = { error: String(e?.message || e) } }
+
   return J({
     generated_at: new Date().toISOString(),
     timezone: 'Asia/Jerusalem',
@@ -69,6 +92,8 @@ export async function GET(request) {
     issues: health.issues,
     projects: health.projects,
     cron_heartbeats: cronHeartbeats,
+    daily_facts: dailyFacts,
+    crm_snapshot: crmSnapshot,
     notes: 'Aggregates only, no PII. Same sensors as the hourly health email (lib/health.js). ' +
            'Crons run every 2h from ~07:00 Israel via cron-job.org; a gap overnight is normal.',
   })

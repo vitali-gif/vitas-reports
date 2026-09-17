@@ -4,6 +4,7 @@
  */
 import { sendAlert } from '../../../../lib/alert'
 import { createClient } from '@supabase/supabase-js'
+import { logJob } from '../../../../lib/job-log.js'
 
 export const dynamic = 'force-dynamic'
 // force-no-store: supabase-js + internal calls go through fetch, which Next caches by
@@ -120,6 +121,12 @@ export async function GET(request) {
       daily.push({ mode, ok: false, error: String(err).slice(0, 200), ms: Date.now() - t0 })
     }
   }
+
+  // רישום התוצאה של הבלוק היומי ב-job_log (מיגרציה 008) — כדי שדילוג/כשל ייראו אחרי המעשה.
+  try {
+    const _su = process.env.NEXT_PUBLIC_SUPABASE_URL, _sk = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (_su && _sk) await logJob(createClient(_su, _sk, { auth: { persistSession: false } }), 'prefetch-ads:daily-block', daily.every(d => d.ok !== false), Date.now() - startedAt, { mainJobsMs: daily.length ? undefined : null, daily })
+  } catch {}
 
   const failed = results.filter(r => !r.ok)
   if (failed.length > 0) {
