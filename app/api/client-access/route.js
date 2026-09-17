@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { requireAdmin, getUser, isAdminEmail, unauthorized, adminClient } from '../../../lib/auth'
+import { requireAdmin, getUser, isAdminEmail, unauthorized, adminClient, escapeHtml } from '../../../lib/auth'
+import { randomBytes } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 
 // לקוח service_role עצל. קודם הוא נוצר ברמת המודול עם נפילה חזרה למפתח
@@ -16,42 +17,44 @@ const supabaseAdmin = new Proxy({}, {
   },
 })
 
-// הרשאה: אדמין מאומת בלבד. ה-route הזה יוצר משתמשי Supabase ומאפס סיסמאות,
+// הרשאה: אדמין מאומת בלבד. ה-route הזה יוצר משתמשי Supabase ומנפיק קישורי כניסה,
 // ולכן הוא היה נתיב ההשתלטות הישיר כשהשומר היה מפתח ה-anon הציבורי.
 
-// Generate a readable temporary password: XXXX-XXXX-XXXX
-function generateTempPassword() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-  const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-  return `${seg()}-${seg()}-${seg()}`
-}
+// ── הזמנה בקישור, בלי סיסמה במייל ─────────────────────────────────────────────
+// עד 17.9 נשלחה סיסמה זמנית בטקסט גלוי — Outlook סימן/חסם את המיילים, וסיסמה במייל היא
+// גם סיכון. עכשיו: המשתמש נוצר עם סיסמה אקראית שאיש לא רואה, ומקבל קישור כניסה חד-פעמי
+// שמוביל למסך "בחר סיסמה" (/client?setpw=1). הוספה חוזרת של מייל קיים לא נוגעת בסיסמה
+// שלו — רק שולחת קישור חדש.
 
-// Create or update Supabase auth user with the given password
-async function upsertAuthUser(email, password) {
-  // Try creating first
+/** יוצר משתמש Auth אם אינו קיים. לעולם לא משנה סיסמה של משתמש קיים. */
+async function ensureAuthUser(email) {
   const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
     email,
-    password,
+    password: randomBytes(24).toString('base64url'),   // לא נשמר ולא נשלח — הלקוח יבחר משלו בקישור
     email_confirm: true,
   })
-  if (!createErr) return { ok: true, userId: created.user?.id }
-
-  // User exists — find and update password
+  if (!createErr) return { ok: true, userId: created.user?.id, created: true }
+  // קיים — בסדר גמור (createUser מחזיר שגיאה על מייל תפוס)
   const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
   const existing = users?.find(u => u.email === email)
   if (!existing) return { ok: false, error: createErr.message }
-  const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(existing.id, { password })
-  if (updateErr) return { ok: false, error: updateErr.message }
-  return { ok: true, userId: existing.id }
+  return { ok: true, userId: existing.id, created: false }
 }
 
-// Send welcome email with temp password via Resend
-async function sendPasswordEmail(toEmail, tempPassword, clientName) {
+/** קישור כניסה חד-פעמי שמוביל למסך קביעת סיסמה. */
+async function inviteLinkFor(email) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
+  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'magiclink', email, options: { redirectTo: `${siteUrl}/client?setpw=1` },
+  })
+  if (error || !data?.properties?.action_link) return { ok: false, error: error?.message || 'Failed to generate link' }
+  return { ok: true, link: data.properties.action_link }
+}
+
+async function sendInviteEmail(toEmail, link, clientName) {
   const resendKey = process.env.RESEND_API_KEY
   if (!resendKey) return { ok: false, error: 'RESEND_API_KEY not set' }
-
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
-
   const html = `
 <!DOCTYPE html>
 <html dir="rtl" lang="he">
@@ -66,24 +69,18 @@ async function sendPasswordEmail(toEmail, tempPassword, clientName) {
 </td></tr>
 <tr><td style="padding:36px 36px 28px">
   <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#0B0F1E">הוזמנת לצפות בדוח הפרויקט</h1>
-  <p style="margin:0 0 24px;font-size:15px;color:#5E6478;line-height:1.6">
-    ${clientName ? `ניתנה לך גישה לדוח הביצועים של <strong style="color:#0B0F1E">${clientName}</strong>.` : 'ניתנה לך גישה לדוח הביצועים.'}
+  <p style="margin:0 0 20px;font-size:15px;color:#5E6478;line-height:1.6">
+    ${clientName ? `ניתנה לך גישה לדוח הביצועים של <strong style="color:#0B0F1E">${escapeHtml(clientName)}</strong>.` : 'ניתנה לך גישה לדוח הביצועים.'}<br>
+    שם המשתמש שלך הוא כתובת המייל הזו: <strong style="color:#0B0F1E;direction:ltr;unicode-bidi:isolate">${escapeHtml(toEmail)}</strong>
   </p>
-  <div style="background:#F5F7FB;border-radius:12px;padding:20px 24px;margin:0 0 24px;border:1px solid #DDE2EC">
-    <p style="margin:0 0 12px;font-size:13px;color:#98A0B2;font-weight:600">פרטי כניסה:</p>
-    <p style="margin:0 0 6px;font-size:14px;color:#0B0F1E">
-      <strong>אתר:</strong> <a href="${siteUrl}/client" style="color:#5B5EF4">${siteUrl}/client</a>
-    </p>
-    <p style="margin:0 0 6px;font-size:14px;color:#0B0F1E">
-      <strong>מייל:</strong> ${toEmail}
-    </p>
-    <p style="margin:0;font-size:14px;color:#0B0F1E">
-      <strong>סיסמה:</strong> <code style="background:#fff;border:1px solid #DDE2EC;padding:2px 8px;border-radius:6px;font-size:15px;letter-spacing:0.05em">${tempPassword}</code>
-    </p>
+  <div style="text-align:center;margin:24px 0">
+    <a href="${link}" style="display:inline-block;background:#5B5EF4;color:#fff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:10px;box-shadow:0 6px 20px rgba(91,94,244,0.35)">כניסה וקביעת סיסמה &rarr;</a>
   </div>
-  <p style="margin:0;font-size:12px;color:#98A0B2;line-height:1.6;text-align:center">
-    אם לא ביקשת גישה — ניתן להתעלם ממייל זה.
+  <p style="margin:0;font-size:13px;color:#5E6478;line-height:1.7">
+    הקישור לשימוש חד-פעמי. בלחיצה תיכנס לדוח ותתבקש לבחור סיסמה משלך לכניסות הבאות.<br>
+    אם הקישור פג תוקף — במסך הכניסה ב-<a href="${siteUrl}/client" style="color:#5B5EF4">${siteUrl}/client</a> לוחצים "שלחו לי קישור כניסה".
   </p>
+  <p style="margin:18px 0 0;font-size:12px;color:#98A0B2;line-height:1.6;text-align:center">אם לא ביקשת גישה — ניתן להתעלם ממייל זה.</p>
 </td></tr>
 <tr><td style="background:#F5F7FB;padding:18px 36px;border-top:1px solid #DDE2EC">
   <p style="margin:0;font-size:11px;color:#98A0B2;text-align:center">VITAS Digital Marketing &bull; vitas.co.il</p>
@@ -93,17 +90,11 @@ async function sendPasswordEmail(toEmail, tempPassword, clientName) {
 </table>
 </body>
 </html>`
-
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: 'VITAS Reports <noreply@vitas.co.il>',
-        to: [toEmail],
-        subject: `גישה לדוח${clientName ? ` — ${clientName}` : ''}`,
-        html,
-      }),
+      body: JSON.stringify({ from: 'VITAS Reports <noreply@vitas.co.il>', to: [toEmail], subject: `גישה לדוח${clientName ? ` — ${clientName}` : ''}`, html }),
     })
     const data = await res.json()
     if (!res.ok) return { ok: false, error: data.message || JSON.stringify(data) }
@@ -144,9 +135,8 @@ export async function POST(req) {
   // project_ids אופציונלי: אם נשלח — מעניקים גישה רק לפרויקטים שנבחרו.
   // בלעדיו נשמרת ההתנהגות הישנה (כל הפרויקטים של הלקוח), כדי לא לשבור
   // קריאות קיימות.
-  // notify=false → עדכון היקף גישה בלבד: לא מאפסים סיסמה ולא שולחים מייל.
-  // בלי זה, כל שינוי בהרשאות היה מנתק את הלקוח (upsertAuthUser מאפס את
-  // הסיסמה הקיימת) ושולח לו מייל מיותר.
+  // notify=false → עדכון היקף גישה בלבד, בלי מייל. notify=true → קישור כניסה חד-פעמי במייל.
+  // הסיסמה של משתמש קיים לעולם לא משתנה כאן.
   const { email, client_id, project_ids, notify } = body
   const shouldNotify = notify !== false
   if (!email || !client_id) return NextResponse.json({ error: 'email and client_id required' }, { status: 400 })
@@ -178,19 +168,23 @@ export async function POST(req) {
 
   const clientName = projects[0]?.clients?.name || ''
 
+  // notify: לוודא שיש משתמש Auth, להנפיק קישור כניסה חד-פעמי ולשלוח. בלי סיסמה, בלי לגעת
+  // בסיסמה של משתמש קיים. הקישור חוזר גם לאדמין (inviteLink) להעברה ידנית אם המייל לא הגיע.
   let emailSent = false
   let emailError = null
-  let tempPassword = null
+  let inviteLink = null
   if (shouldNotify) {
-    tempPassword = generateTempPassword()
-    const authResult = await upsertAuthUser(cleanEmail, tempPassword)
-    if (authResult.ok) {
-      const result = await sendPasswordEmail(cleanEmail, tempPassword, clientName)
-      emailSent = result.ok
-      emailError = result.error || null
-    } else {
-      emailError = authResult.error
-      tempPassword = null
+    const authResult = await ensureAuthUser(cleanEmail)
+    if (!authResult.ok) emailError = authResult.error
+    else {
+      const lk = await inviteLinkFor(cleanEmail)
+      if (!lk.ok) emailError = lk.error
+      else {
+        inviteLink = lk.link
+        const result = await sendInviteEmail(cleanEmail, inviteLink, clientName)
+        emailSent = result.ok
+        emailError = result.error || null
+      }
     }
   }
 
@@ -201,8 +195,9 @@ export async function POST(req) {
     notified: shouldNotify,
     emailSent, emailError,
     email: cleanEmail,
-    tempPassword,
-    loginUrl: 'https://reports.vitas.co.il',
+    inviteLink,
+    tempPassword: null,   // תאימות לאחור: אין יותר סיסמאות זמניות
+    loginUrl: (process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il') + '/client',
   }, { status: 201 })
 }
 

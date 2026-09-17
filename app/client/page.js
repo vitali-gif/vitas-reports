@@ -28,7 +28,14 @@ export default function ClientPage() {
   const [passwordInput, setPasswordInput] = useState('')
   const [loading, setLoading]       = useState(true)
   const [toast, setToast]           = useState('')
-  const [loginError, setLoginError] = useState('')   // נשאר על המסך עד שמתקנים, בניגוד ל-toast שנעלם אחרי 3 שניות
+  const [loginError, setLoginError] = useState('')
+  // ?setpw=1 — הגעה מקישור כניסה (הזמנה / "שכחתי סיסמה"): אחרי שהסשן נוצר מציעים לבחור סיסמה.
+  const wantsSetPw = useRef(typeof window !== 'undefined' && /[?&]setpw=1/.test(window.location.search))
+  const pendingEmailRef = useRef(null)
+  const [newPw, setNewPw] = useState('')
+  const [newPw2, setNewPw2] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [linkSending, setLinkSending] = useState(false)   // נשאר על המסך עד שמתקנים, בניגוד ל-toast שנעלם אחרי 3 שניות
   const [accessList, setAccessList] = useState([])
   const [accessInfo, setAccessInfo] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -109,6 +116,15 @@ export default function ClientPage() {
   }, [])
 
   const handleSessionReady = async (userEmail) => {
+    if (wantsSetPw.current) {
+      // פעם אחת: מסך "בחר סיסמה". הפרמטר נמחק מה-URL כדי שרענון לא יחזיר לכאן.
+      wantsSetPw.current = false
+      pendingEmailRef.current = userEmail
+      try { window.history.replaceState(null, '', window.location.pathname) } catch {}
+      setLoading(false)
+      setStep('setpw')
+      return
+    }
     setLoading(true)
     try {
       const res = await apiFetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`, {
@@ -157,6 +173,37 @@ export default function ClientPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const saveNewPassword = async () => {
+    setLoginError('')
+    if (newPw.length < 8) { setLoginError('הסיסמה צריכה להיות באורך 8 תווים לפחות.'); return }
+    if (newPw !== newPw2) { setLoginError('שתי הסיסמאות לא זהות.'); return }
+    setPwSaving(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPw })
+      if (error) { setLoginError('לא הצלחנו לשמור את הסיסמה: ' + error.message); return }
+      setNewPw(''); setNewPw2('')
+      showToast('✓ הסיסמה נשמרה')
+      await handleSessionReady(pendingEmailRef.current)
+    } finally { setPwSaving(false) }
+  }
+  const skipNewPassword = async () => { setLoginError(''); await handleSessionReady(pendingEmailRef.current) }
+
+  // "שלחו לי קישור כניסה" — מחליף "שכחתי סיסמה": קישור חד-פעמי במייל שמוביל למסך בחירת סיסמה.
+  const requestLoginLink = async () => {
+    const em = emailInput.trim().toLowerCase()
+    if (!em) { setLoginError('הכנס את כתובת המייל ואז לחץ "שלחו לי קישור כניסה".'); return }
+    setLinkSending(true); setLoginError('')
+    try {
+      const res = await fetch('/api/client-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: em }) })
+      const d = await res.json().catch(() => ({}))
+      if (res.status === 429) setLoginError('נשלחו יותר מדי בקשות. נסה שוב בעוד כמה דקות.')
+      else if (d.noAccess) setLoginError('לכתובת המייל הזו אין גישה לאף דוח. פנה ל-VITAS.')
+      else if (!res.ok || !d.ok) setLoginError('לא הצלחנו לשלוח את הקישור. נסה שוב.')
+      else showToast('✓ נשלח קישור כניסה למייל. בדוק גם בספאם.')
+    } catch { setLoginError('שגיאת רשת. בדוק את החיבור לאינטרנט ונסה שוב.') }
+    finally { setLinkSending(false) }
   }
 
   const handlePasswordLogin = async () => {
@@ -219,6 +266,38 @@ export default function ClientPage() {
     </div>
   )
 
+  if (step === 'setpw') return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)',fontFamily:'var(--font)'}}>
+      <div style={{maxWidth:380,width:'100%',padding:'0 24px'}}>
+        <div style={{textAlign:'center',marginBottom:28}}>
+          <img src="/brand/vitas-logo-black.png" alt="VITAS" style={{height:28,marginBottom:24}} />
+          <h2 style={{margin:'0 0 8px',fontSize:22,fontWeight:800,color:'var(--text)'}}>בחר סיסמה</h2>
+          <p style={{margin:0,fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>
+            נכנסת בקישור. כדי להיכנס בפעם הבאה עם מייל וסיסמה, בחר סיסמה משלך.
+            <br /><span dir="ltr" style={{unicodeBidi:'isolate'}}>{pendingEmailRef.current}</span>
+          </p>
+        </div>
+        <input type="password" value={newPw} onChange={e => { setNewPw(e.target.value); if (loginError) setLoginError('') }}
+          placeholder="סיסמה חדשה (8 תווים לפחות)" dir="ltr" autoComplete="new-password"
+          style={{display:'block',width:'100%',padding:'12px 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15,fontFamily:'var(--font)',outline:'none',marginBottom:12,boxSizing:'border-box',background:'var(--card)',color:'var(--text)'}} />
+        <input type="password" value={newPw2} onChange={e => { setNewPw2(e.target.value); if (loginError) setLoginError('') }}
+          onKeyDown={e => e.key === 'Enter' && saveNewPassword()}
+          placeholder="אותה סיסמה שוב" dir="ltr" autoComplete="new-password"
+          style={{display:'block',width:'100%',padding:'12px 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15,fontFamily:'var(--font)',outline:'none',marginBottom:12,boxSizing:'border-box',background:'var(--card)',color:'var(--text)'}} />
+        <button onClick={saveNewPassword} disabled={pwSaving || !newPw || !newPw2}
+          style={{display:'block',width:'100%',padding:'13px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:10,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)',opacity:pwSaving||!newPw||!newPw2?0.6:1}}>
+          {pwSaving ? 'שומר...' : 'שמור והמשך לדוח'}
+        </button>
+        <button onClick={skipNewPassword} type="button"
+          style={{display:'block',width:'100%',marginTop:10,padding:'10px',background:'transparent',color:'var(--text-3)',border:'none',fontSize:13,cursor:'pointer',fontFamily:'var(--font)'}}>
+          לא עכשיו, המשך לדוח
+        </button>
+        {loginError && <p role="alert" style={{marginTop:12,fontSize:13,color:'var(--danger,#B92A46)',textAlign:'center',lineHeight:1.5}}>{loginError}</p>}
+        {toast && <p style={{marginTop:12,fontSize:13,color:'var(--text-3)',textAlign:'center'}}>{toast}</p>}
+      </div>
+    </div>
+  )
+
   if (step === 'login') return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)',fontFamily:'var(--font)'}}>
       <div style={{maxWidth:380,width:'100%',padding:'0 24px'}}>
@@ -242,12 +321,16 @@ export default function ClientPage() {
           style={{display:'block',width:'100%',padding:'13px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:10,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)',opacity:loading||!emailInput.trim()||!passwordInput.trim()?0.6:1}}>
           {loading ? 'נכנס...' : 'כניסה'}
         </button>
+        <button onClick={requestLoginLink} disabled={linkSending} type="button"
+          style={{display:'block',width:'100%',marginTop:10,padding:'10px',background:'transparent',color:'var(--indigo,#5B5EF4)',border:'none',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'var(--font)'}}>
+          {linkSending ? 'שולח...' : 'שכחת סיסמה? שלחו לי קישור כניסה'}
+        </button>
         {loginError && (
           <p role="alert" style={{marginTop:12,fontSize:13,color:'var(--danger,#B92A46)',textAlign:'center',lineHeight:1.5}}>
             {loginError}
           </p>
         )}
-        {toast && <p style={{marginTop:12,fontSize:13,color:'var(--danger)',textAlign:'center'}}>{toast}</p>}
+        {toast && <p style={{marginTop:12,fontSize:13,color:'var(--text-3)',textAlign:'center'}}>{toast}</p>}
       </div>
     </div>
   )
