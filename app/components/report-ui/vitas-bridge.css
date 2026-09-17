@@ -14,6 +14,25 @@
 .vr-ui .vr-inline-tabs { margin: 0; border: 0; gap: 2px; }
 .vr-ui .vr-inline-tabs .client-tab { min-block-size: 36px; font-size: 13.5px; padding-inline: 12px; }
 
+/* ── כרטיסי KPI: הגרדיאנטים של המותג (DESIGN-SPEC: "קלוד יכול למפות אחרי בדיקת הקוד") ── */
+/* החבילה הגיעה עם גרדיאנטים כהים משלה; הסקיצה המאושרת משתמשת בגוונים הבהירים של --g-* הקיימים.
+   הניגודיות של טקסט לבן על --g-* נבדקה כבר בכרטיסים הישנים (.kpi). amber נשאר עם טקסט כהה. */
+.vr-ui .vr-tone-indigo  { --vr-fill: var(--g-indigo,  linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)); }
+.vr-ui .vr-tone-emerald { --vr-fill: var(--g-emerald, linear-gradient(135deg, #14B8A6 0%, #0E9F6E 100%)); }
+.vr-ui .vr-tone-violet  { --vr-fill: var(--g-violet,  linear-gradient(135deg, #A78BFA 0%, #7C3AED 100%)); }
+.vr-ui .vr-tone-sky     { --vr-fill: var(--g-sky,     linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)); }
+.vr-ui .vr-tone-terra   { --vr-fill: var(--g-terra,   linear-gradient(135deg, #FB923C 0%, #EA580C 100%)); }
+.vr-ui .vr-tone-amber   { --vr-fill: var(--g-amber,   linear-gradient(135deg, #FBBF24 0%, #D97706 100%)); }
+.vr-ui .vr-tone-rose    { --vr-fill: var(--g-rose,    linear-gradient(135deg, #FB7185 0%, #E11D48 100%)); }
+.vr-ui .vr-metric.vr-tone-indigo  { box-shadow: var(--shadow-indigo,  var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-emerald { box-shadow: var(--shadow-emerald, var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-violet  { box-shadow: var(--shadow-violet,  var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-sky     { box-shadow: var(--shadow-sky,     var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-terra   { box-shadow: var(--shadow-terra,   var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-amber   { box-shadow: var(--shadow-amber,   var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-rose    { box-shadow: var(--shadow-rose,    var(--shadow-sm)); }
+/* המשפך: הפס הצדדי והאייקון נשארים בצבע המלא (--vr-accent), לא בגרדיאנט */
+
 /* ── כרטיסי KPI: תגית שינוי (VITAS: הרחבה) ─────────────────────────────────── */
 .vr-metric-top { flex-wrap: wrap; }
 .vr-metric-badge { margin-inline-start: auto; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #ffffff2e; border: 1px solid #ffffff4d; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -49,8 +68,11 @@
 .vr-ui .section h3 { font-family: inherit; }
 
 /* ── גלריות מודעות קיימות (Facebook top ads, Google PMax) ─────────────────── */
-.vr-ui .section-top-ads .card, .vr-ui .section-asset-gallery .card { border-radius: var(--r-md, 12px); box-shadow: var(--shadow-sm, 0 2px 8px -2px rgba(11,15,30,0.08)); }
-.vr-ui .section-top-ads > div[style*="grid"], .vr-ui .section-asset-gallery > div[style*="grid"] { gap: 24px; }
+/* DESIGN-SPEC מבקש שתי עמודות; המדיה של פייסבוק היא 4:5 (סרטונים), ובשתי עמודות כרטיס היה
+   מגיע ל-750px גובה. שלוש עמודות בדסקטופ שומרות על התמונה בשלמותה בגודל סביר; ב-<1200 שתיים. */
+.vr-ui .section-top-ads .vr-ad-grid, .vr-ui .section-asset-gallery .vr-ad-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: stretch; }
+.vr-ui .section-top-ads .card, .vr-ui .section-asset-gallery .card { border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); box-shadow: var(--shadow-sm, 0 2px 8px -2px rgba(11,15,30,0.08)); }
+@media (max-width: 1199px) { .vr-ui .section-top-ads .vr-ad-grid, .vr-ui .section-asset-gallery .vr-ad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ── טקסט כללי בתוך .vr-ui ──────────────────────────────────────────────────── */
 .vr-ui { font-size: 15px; }

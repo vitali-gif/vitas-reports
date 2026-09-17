@@ -4670,8 +4670,8 @@ const selectProject = async (client, project) => {
           )
         })()}
 
-        {/* FUNNEL */}
-        <div className="section">
+        {/* FUNNEL — במצב העיצוב המחודש המשפך היחיד הוא "משפך לידים" (renderFunnelBar) למעלה; זה מוצג רק במצב הישן */}
+        {!vrMode && <div className="section">
           <div className="section-head">
             <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
             <h2>משפך שיווקי</h2>
@@ -4797,7 +4797,7 @@ const selectProject = async (client, project) => {
             </div>
             );
           })()}
-        </div>
+        </div>}
 
         {detailPending && (
           <div className="section" style={{display:'flex',alignItems:'center',gap:12,padding:'18px 20px'}}>
@@ -5009,7 +5009,7 @@ const selectProject = async (client, project) => {
           const genderLabel = (g) => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : g === 'unknown' ? '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2' : g;
           const orderedKeys = ['female', 'male', 'unknown'].filter(g => gd[g]);
           return (<div style={{marginBottom: ageNames.length > 0 ? '28px' : 0}}>
-            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}><span style={{fontSize:'1.2em'}}>⚧</span>פילוח מגדרי</h3>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}>{!vrMode && <span style={{fontSize:'1.2em'}}>⚧</span>}פילוח מגדרי</h3>
             <div className="card"><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'gender',label:'\u05de\u05d2\u05d3\u05e8'},{key:'clicks',label:'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'},{key:'impressions',label:'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'},{key:'cpc',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'\u05dc\u05d9\u05d3\u05d9\u05dd'},{key:'cpl',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'},{key:'spend',label:'\u05ea\u05e7\u05e6\u05d9\u05d1 \u05e9\u05e0\u05d5\u05e6\u05dc'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('genders',c.key)}>{c.label}{(()=>{const s=sortConfig['genders'];if(!s||s.key!==c.key)return ' \u21c5';return s.dir==='desc'?' \u25bc':' \u25b2';})()}</th>))}
@@ -5035,7 +5035,7 @@ const selectProject = async (client, project) => {
           const ad = data.ages;
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb; });
           return (<div>
-            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}><span style={{fontSize:'1.2em'}}>📅</span>פילוח גילאי</h3>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}>{!vrMode && <span style={{fontSize:'1.2em'}}>📅</span>}פילוח גילאי</h3>
             <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
@@ -5095,7 +5095,7 @@ const selectProject = async (client, project) => {
                 <h2>המודעות הכי מובילות ב-Facebook</h2>
                 <span className="sub">Top {topAds.length}</span>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'20px'}}>
+              <div className={vrMode ? 'vr-ad-grid' : undefined} style={vrMode ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'20px'}}>
                 {topAds.map((ad, i) => {
                   const metrics = ad.metrics || {};
                   const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
@@ -5104,9 +5104,9 @@ const selectProject = async (client, project) => {
                   // קריאייטיב מקומי של הדמו (/demo/...) מוצג חד; כל מקור חיצוני מטושטש.
                   const demoBlur = (isDemoProject && !String(previewImg || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined;
                   return (
-                    <div key={ad.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
-                      {/* Media: video if available, else image */}
-                      <div style={{position:'relative',width:'100%',aspectRatio:'4/5',background:'#0f172a',overflow:'hidden'}}>
+                    <div key={ad.id || i} className="card" style={vrMode ? {overflow:'hidden',display:'flex',flexDirection:'column'} : {overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+                      {/* Media: video if available, else image. עיצוב מחודש: רקע בהיר, המדיה בשלמותה (contain) */}
+                      <div style={{position:'relative',width:'100%',aspectRatio:'4/5',background: vrMode ? '#EDF1F8' : '#0f172a',overflow:'hidden'}}>
                         {hasVideo ? (
                           <video
                             src={ad.videoUrl}
@@ -5114,10 +5114,10 @@ const selectProject = async (client, project) => {
                             controls
                             playsInline
                             preload="metadata"
-                            style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background:'#000'}}
+                            style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrMode ? 'transparent' : '#000'}}
                           />
                         ) : previewImg ? (
-                          <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background:'#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
+                          <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrMode ? 'transparent' : '#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
                         ) : (
                           <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'3em',color:'#64748b'}}>{'\ud83d\udcf7'}</div>
                         )}
@@ -5215,7 +5215,7 @@ const selectProject = async (client, project) => {
           return (
             <div className="section section-asset-gallery">
               <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קריאייטיב Google PMax</h2></div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
+              <div className={vrMode ? 'vr-ad-grid' : undefined} style={vrMode ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
                   // Handle both old field names (imageUrl, type) and new GAQL names (image_url, field_type)
                   const ft = (a) => (a.field_type || a.type || '').toUpperCase();
