@@ -511,8 +511,14 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     return body;
   };
 
-  const triggerFetch = async (payload) => {
+  // opts.live — משיכה חיה מפורשת מהספקים (כפתור "משיכה חיה" / "נסה למשוך שוב"), לאדמין בלבד.
+  // בלעדיו — אותה חוויה כמו ללקוח: שרת בלבד, מיידי; מה שחסר מוצג כחסר, לא נמשך לבד.
+  const triggerFetch = async (payload, opts = {}) => {
     if (refreshing) return false;
+    const live = !!opts.live && !isClientView;
+    if (live && selectedProject) {
+      return await performLiveFetch(payload, false, { fb: true, gg: true, crm: true });
+    }
 
     // Compute the cache key the same way presetToPayload + applyCustomRange do
     const targetKey = payload.month || (payload.since + '_' + payload.until);
@@ -537,40 +543,23 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       return true;
     }
 
-    // Open period with full cache: render now, refresh all 3 in background (admin only —
-    // the cron re-warms presets for clients, and a client live-fetch is rate-limited).
-    if (haveAll && isOpen) {
-      if (!isClientView) {
-        showToast('\u2713 \u05de\u05d5\u05e6\u05d2 \u05de\u05de\u05d8\u05de\u05d5\u05df, \u05de\u05ea\u05e2\u05d3\u05db\u05df \u05d1\u05e8\u05e7\u05e2...');  // "מוצג ממטמון, מתעדכן ברקע"
-        performLiveFetch(payload, true, { fb: true, gg: true, crm: true });
-      }
-      return true;
-    }
+    // Open period with full cache: render now. הקרונים מרעננים כל שעתיים; רענון ברקע מהדפדפן
+    // בוטל (17.9) — גם לאדמין, כדי שהאדמין יחווה בדיוק מה שהלקוח חווה. משיכה חיה רק בכפתור.
+    if (haveAll && isOpen) return true;
 
-    // טווח תאריכים (since_until) חסר: קודם מהשרת, מיידית — שלב 3 של docs/daily-ranges-plan.md.
-    // רק מה שעדיין חסר אחרי זה (למשל ימים לפני הטעינה ההיסטורית) נמשך חי, ורק על ידי אדמין.
-    let needFb = !haveFb, needGoog = !haveGoog, needCrm = !haveCrm;
+    // טווח תאריכים (since_until) חסר: מהשרת, מיידית — שלב 3 של docs/daily-ranges-plan.md.
+    // מציגים מה שהשרת מחזיר; מה שעדיין חסר (למשל ימים לפני הטעינה ההיסטורית) נשאר חסר,
+    // לכולם. אדמין שרוצה — לוחץ "משיכה חיה".
+    const haveAny = haveFb || haveGoog || haveCrm;
     if (!payload.month && payload.since && payload.until && selectedProject) {
       const wasEmpty = !reports.some(r => r.month === targetKey);
       if (wasEmpty) setPeriodLoading(true);
       const body = await loadRangeRows(selectedProject.id, targetKey);
       if (wasEmpty) setPeriodLoading(false);
-      if (body) {
-        const got = new Set(body.rows.map(r => r.source));
-        if (got.has('facebook')) needFb = false;
-        if (got.has('google')) needGoog = false;
-        if (got.has('crm')) needCrm = false;
-        if (!needFb && !needGoog && !needCrm) return true;
-        if (isClientView) return body.rows.length > 0;   // לקוח: מציגים מה שיש; לא מושכים חי
-      } else if (isClientView) {
-        return false;
-      }
-    } else if (isClientView) {
-      return false;   // לקוח: חודש קלנדרי חסר — הקרון ישלים; אין משיכה חיה
+      return haveAny || !!(body && body.rows.length > 0);
     }
-
-    // Partial or missing cache: blocking fetch, but only fetch the sources we lack.
-    return await performLiveFetch(payload, false, { fb: needFb, gg: needGoog, crm: needCrm });
+    // חודש קלנדרי חסר — הקרון ישלים; אין משיכה חיה אוטומטית (גם לא לאדמין).
+    return haveAny;
   };
 
   const applyPreset = async (preset) => {
@@ -5374,7 +5363,18 @@ const selectProject = async (client, project) => {
               allowedPresets={isDemoProject ? DEMO_PRESETS : undefined}
             />
             {/* לאדמין בלבד: הלקוח לא צריך לדעת מתי הקרון רץ, ומספר "ימים" עלול להיראות לו כתקלה. */}
-            {!isClientView && <LastUpdated reports={reports} selectedMonth={selectedMonth} />}
+            {!isClientView && (
+              <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+                <LastUpdated reports={reports} selectedMonth={selectedMonth} />
+                {/* משיכה חיה מהספקים — רק בלחיצה. כל שאר הטעינות מהשרת, כמו אצל הלקוח. */}
+                <button type="button" disabled={refreshing || !selectedMonth}
+                  onClick={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }, { live: true })}
+                  title="משיכה חיה מ-Meta / Google / CRM לתקופה שנבחרה (10–60 שניות). בדרך כלל לא צריך: הקרונים מרעננים כל שעתיים."
+                  style={{fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'3px 10px',cursor: refreshing ? 'wait' : 'pointer',opacity: refreshing ? 0.6 : 1,fontFamily:'inherit'}}>
+                  {refreshing ? '⏳ מושך...' : '🔄 משיכה חיה'}
+                </button>
+              </div>
+            )}
             {(() => {
               // Budget bar shown for all projects (ש.ברוך + BCureLaser). Inert until a budget is set.
               const _d = new Date();
@@ -5414,7 +5414,7 @@ const selectProject = async (client, project) => {
               : !hasDataForPeriod
                 ? (isFetching
                     ? <PeriodFetching />
-                    : <PeriodEmpty onRefresh={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth })} />)
+                    : <PeriodEmpty onRefresh={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }, { live: !isClientView })} />)
                 : renderDashboard()}
           </>)}
 
