@@ -24,6 +24,7 @@
 
 import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
+import { upsertRawRecords, rebuildCompact } from '../../../../lib/crm/raw-store.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -130,6 +131,59 @@ function pairs(recs, keyField, countField) {
   return m
 }
 
+// ===== raw snapshot (שלב 4ב של docs/daily-ranges-plan.md) =====
+// הרשומות הגולמיות שמהן lib/crm/salesforce-summary.js מחקה את כל השאילתות המצרפיות למעלה.
+// נשמרות ב-crm_raw (crm_type=salesforce) לפי Id, מצטברות עם הזמן, ונדרסות בכל משיכה.
+const RAW_LEAD_FIELDS = 'Id, CreatedDate, LastModifiedDate, IsConverted, ConvertedOpportunityId, Status, LeadSource, Branch_Name__c, meetingDate__c, Unqualified_Reason__c, Other_Unqualified_Reason__c, Competitor_Name__c, Name, Phone, MobilePhone, Email, Salesman__r.Name'
+const RAW_OPP_FIELDS = 'Id, CreatedDate, LastModifiedDate, StageName, TotalPrice_Opp_Product__c, ovala__c, Amount, Branch_Name__c, Salesman__r.Name, Buying_Purpose__c, Loss_Reason__c, Other_Loss_Reason__c, Name, Mobile__c'
+const RAW_ITEM_FIELDS = 'Id, OpportunityId, Product2.Name, TotalPrice'
+const RAW_HIST_FIELDS = 'Id, LeadId, Field, CreatedDate, Lead.CreatedDate, Lead.Branch_Name__c, Lead.meetingDate__c'
+function stripAttrs(r) {
+  if (!r || typeof r !== 'object') return r
+  const out = {}
+  for (const [k, v] of Object.entries(r)) { if (k === 'attributes') continue; out[k] = (v && typeof v === 'object' && !Array.isArray(v)) ? stripAttrs(v) : v }
+  return out
+}
+const dedupeById = (arrs) => { const m = new Map(); for (const a of arrs) for (const r of a) if (r && r.Id) m.set(r.Id, stripAttrs(r)); return [...m.values()] }
+// לטווח: לידים שנוצרו בחלון או שהפגישה שלהם בחלון; הזדמנויות שנוצרו בחלון או שהומרו מלידי החלון
+// (cohort); פריטי ההזדמנויות האלה; היסטוריית סטטוס/פגישה של לידי החלון או שנרשמה בחלון.
+async function fetchSalesforceRaw(auth, FROM, TO) {
+  const LW = `Chain_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
+  const COHORT = `(SELECT ConvertedOpportunityId FROM Lead WHERE ${LW} AND IsConverted=true)`
+  const [l1, l2, o1, o2, i1, i2, h1, h2] = await Promise.all([
+    soql(auth, `SELECT ${RAW_LEAD_FIELDS} FROM Lead WHERE ${LW}`),
+    soql(auth, `SELECT ${RAW_LEAD_FIELDS} FROM Lead WHERE Chain_Name__c='${CHAIN}' AND meetingDate__c>=${FROM} AND meetingDate__c<=${TO}`),
+    soql(auth, `SELECT ${RAW_OPP_FIELDS} FROM Opportunity WHERE Cahin_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`),
+    soql(auth, `SELECT ${RAW_OPP_FIELDS} FROM Opportunity WHERE Id IN ${COHORT}`),
+    soql(auth, `SELECT ${RAW_ITEM_FIELDS} FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.CreatedDate>=${FROM} AND Opportunity.CreatedDate<=${TO}`),
+    soql(auth, `SELECT ${RAW_ITEM_FIELDS} FROM OpportunityLineItem WHERE OpportunityId IN ${COHORT}`),
+    soql(auth, `SELECT ${RAW_HIST_FIELDS} FROM LeadHistory WHERE Field IN ('Status','meetingDate__c') AND Lead.Chain_Name__c='${CHAIN}' AND Lead.CreatedDate>=${FROM} AND Lead.CreatedDate<=${TO}`),
+    soql(auth, `SELECT ${RAW_HIST_FIELDS} FROM LeadHistory WHERE Field IN ('Status','meetingDate__c') AND Lead.Chain_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`),
+  ])
+  return { leads: dedupeById([l1, l2]), opportunities: dedupeById([o1, o2]), line_items: dedupeById([i1, i2]), lead_history: dedupeById([h1, h2]) }
+}
+// רענון: כל מה שהשתנה ב-N הימים האחרונים (סטטוס ליד, שלב הזדמנות, פריטים, היסטוריה חדשה).
+async function fetchSalesforceModified(auth, days) {
+  const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 19) + 'Z'
+  const [l, o, i, h] = await Promise.all([
+    soql(auth, `SELECT ${RAW_LEAD_FIELDS} FROM Lead WHERE Chain_Name__c='${CHAIN}' AND LastModifiedDate>=${since}`),
+    soql(auth, `SELECT ${RAW_OPP_FIELDS} FROM Opportunity WHERE Cahin_Name__c='${CHAIN}' AND LastModifiedDate>=${since}`),
+    soql(auth, `SELECT ${RAW_ITEM_FIELDS} FROM OpportunityLineItem WHERE Opportunity.Cahin_Name__c='${CHAIN}' AND Opportunity.LastModifiedDate>=${since}`),
+    soql(auth, `SELECT ${RAW_HIST_FIELDS} FROM LeadHistory WHERE Field IN ('Status','meetingDate__c') AND Lead.Chain_Name__c='${CHAIN}' AND CreatedDate>=${since}`),
+  ])
+  return { leads: dedupeById([l]), opportunities: dedupeById([o]), line_items: dedupeById([i]), lead_history: dedupeById([h]) }
+}
+async function snapshotSalesforce(supabase, projectsList, raw) {
+  const out = {}
+  for (const p of projectsList) {
+    const parts = {}
+    for (const [entity, rows] of Object.entries(raw)) parts[entity] = await upsertRawRecords(supabase, p.id, 'salesforce', entity, rows)
+    try { parts.compact = await rebuildCompact(supabase, p.id, 'salesforce') } catch (e) { parts.compact = { error: String(e?.message || e) } }
+    out[p.name] = parts
+  }
+  return out
+}
+
 // ===== main sync =====
 async function runSync(opts = {}) {
   const { month, since: sinceOpt, until: untilOpt } = opts
@@ -170,6 +224,18 @@ async function runSync(opts = {}) {
 
   let auth
   try { auth = await getAuth() } catch (e) { return { status: 500, body: { error: 'SF OAuth failed: ' + e.message } } }
+
+  if (opts.modifiedRefreshDays) {
+    const days = Math.max(1, Math.min(60, Number(opts.modifiedRefreshDays) || 3))
+    const t0 = Date.now()
+    try {
+      const raw = await fetchSalesforceModified(auth, days)
+      const snapshot = await snapshotSalesforce(supabase, projectsList, raw)
+      return { status: 200, body: { ok: true, mode: 'modified-refresh', days, counts: Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, v.length])), snapshot, ms: Date.now() - t0 } }
+    } catch (e) {
+      return { status: 500, body: { ok: false, mode: 'modified-refresh', error: String(e?.message || e) } }
+    }
+  }
 
   const LW = `Chain_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
   const OW = `Cahin_Name__c='${CHAIN}' AND CreatedDate>=${FROM} AND CreatedDate<=${TO}`
@@ -218,6 +284,13 @@ async function runSync(opts = {}) {
     ])
   } catch (e) {
     return { status: 500, body: { error: 'Salesforce query failed: ' + e.message } }
+  }
+
+  // תמונת מצב גולמית — לא מפילה את הריצה; מדווחת בשדה snapshot.
+  let snapshot = null
+  if (opts.snapshot !== false) {
+    try { snapshot = await snapshotSalesforce(supabase, projectsList, await fetchSalesforceRaw(auth, FROM, TO)) }
+    catch (e) { snapshot = { error: String(e?.message || e) } }
   }
 
   // ===== response time from LeadHistory =====
@@ -648,7 +721,7 @@ async function runSync(opts = {}) {
     if (upErr) results.push({ project: p.name, error: upErr.message })
     else results.push({ project: p.name, leads: totalLeads, opportunities, paid, ok: true })
   }
-  return { status: 200, body: { ok: true, month: m, totalLeads, opportunities, quotes: quotesTotal, paid, dealValue, projects: results } }
+  return { status: 200, body: { ok: true, month: m, totalLeads, opportunities, quotes: quotesTotal, paid, dealValue, projects: results, snapshot } }
 }
 
 // ===== handlers =====
@@ -663,7 +736,7 @@ export async function POST(request) {
     return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
   }
   try {
-    const { status, body: rb } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId })
+    const { status, body: rb } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId, modifiedRefreshDays: gate.admin ? body.modifiedRefreshDays : undefined })
     return Response.json(rb, { status })
   } catch (e) {
     return Response.json({ error: 'runSync threw: ' + (e.message || String(e)) }, { status: 500 })

@@ -114,9 +114,11 @@ Meta ו-Google מחזירים מספרים ניתנים לחיבור: הוצאה
   זהה שורה-בשורה), `lib/crm/compute.js` (שער אחד לכל סוגי ה-CRM), crm_raw/crm_compact ל-zoho (לידים
   + עסקאות מקושרות), `/api/reports/range` מזהה את סוג ה-CRM של הפרויקט לבד. `prefetch-daily` מרענן
   עסקאות שהשתנו (3 ימים) ומבצע צעד מילוי היסטורי חודש-חודש עד 2026-01 (מצב ב-job_log). `npm run test:crm`.
-- **4ב Salesforce (KLOSS)** — הסיכום נבנה מ-40 שאילתות SOQL מצרפיות (Lead, Opportunity, OpportunityLineItem,
-  LeadHistory). התכנית: לשמור רשומות גולמיות של ארבע הישויות ולשחזר את כל הצבירות ב-JS; compare=1
-  כהשוואה מול הדוח החי.
+- **4ב Salesforce (KLOSS) — קוד מוכן (17.9).** `lib/crm/salesforce-summary.js` מחקה את תוצאות 40 השאילתות
+  המצרפיות מרשומות גולמיות (Lead, Opportunity, OpportunityLineItem, LeadHistory), ו-`salesforce-shape.js`
+  הוא קוד העיצוב של ה-route, *מיוצר אוטומטית* ממנו (המחולל בסקראצ׳ — לשחזר כשה-route משתנה). ה-route
+  נשאר על SOQL בכוונה, כך ש-compare=1 משווה שני מסלולים בלתי תלויים. ה-route שומר את הרשומות ל-crm_raw
+  בכל ריצה; `prefetch-daily` מרענן כל מה שהשתנה ב-3 ימים (modifiedRefreshDays). 36 בדיקות עשן.
 אותו תבנית כמו שלב 1: הפרדת חישוב ממשיכה, תמונת מצב גולמית, חישוב לטווח.
 
 ### שלב 5 — הקשחה (חצי יום)

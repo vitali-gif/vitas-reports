@@ -59,6 +59,17 @@ export async function GET(request) {
       await logJob(sb, 'prefetch-daily:zoho-deals', out.zohoDeals.ok, Date.now() - t0, out.zohoDeals)
     } catch (err) { out.zohoDeals = { ok: false, error: String(err).slice(0, 200) } }
 
+    // Salesforce (KLOSS): מה שהשתנה ב-3 הימים האחרונים — סטטוסים, שלבים, פריטים, היסטוריה.
+    {
+      const t2 = Date.now()
+      try {
+        const r = await fetch(`${base}/api/salesforce/fetch`, { ...internal, body: JSON.stringify({ modifiedRefreshDays: 3 }) })
+        const d = await r.json().catch(() => ({}))
+        out.sfModified = { ok: r.ok && d.ok !== false, ms: Date.now() - t2, counts: d.counts, error: d.error }
+        await logJob(sb, 'prefetch-daily:sf-modified', out.sfModified.ok, Date.now() - t2, out.sfModified)
+      } catch (err) { out.sfModified = { ok: false, error: String(err).slice(0, 200) } }
+    }
+
     // צעד מילוי: החודש שלפני האחרון שמולא (או שלפני שלושת החודשים שהקרון הרגיל מכסה), עד ZOHO_BACKFILL_SINCE.
     const floor = (process.env.ZOHO_BACKFILL_SINCE || '2026-01')
     const prevMonth = (ym) => { const [y, m] = ym.split('-').map(Number); const d = new Date(Date.UTC(y, m - 2, 1)); return d.toISOString().slice(0, 7) }

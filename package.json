@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "check:auth": "node scripts/check-auth-pattern.mjs",
-    "test:crm": "node scripts/tests/bmby-summary.smoke.mjs && node scripts/tests/raw-store.smoke.mjs && node scripts/tests/zoho-summary.smoke.mjs",
+    "test:crm": "node scripts/tests/bmby-summary.smoke.mjs && node scripts/tests/raw-store.smoke.mjs && node scripts/tests/zoho-summary.smoke.mjs && node scripts/tests/salesforce-summary.smoke.mjs",
     "test:ads": "node scripts/tests/ads-range.smoke.mjs",
     "test": "npm run test:crm && npm run test:ads"
   },
