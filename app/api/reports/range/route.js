@@ -32,6 +32,13 @@ const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !N
 const MAX_SPAN_DAYS = 400
 
 // שדות הסכום שמשווים ב-compare — מספריים בלבד, בלי שמות/טלפונים.
+// מטמון תוצאות בזיכרון ה-lambda: (project, key, built_at של התמונה הדחוסה) → שורת CRM מחושבת.
+// חם = צפייה חוזרת באותו טווח (לקוח + אדמין, כל הסשנים על אותה lambda) חוזרת במילישניות.
+// מתאפס כשהתמונה נבנית מחדש (built_at משתנה) או כשה-lambda מתחלפת. עד 64 טווחים.
+const CRM_CACHE = new Map()
+const cacheGet = (k) => { const v = CRM_CACHE.get(k); if (v) { CRM_CACHE.delete(k); CRM_CACHE.set(k, v) } return v || null }
+const cacheSet = (k, v) => { CRM_CACHE.set(k, v); if (CRM_CACHE.size > 64) CRM_CACHE.delete(CRM_CACHE.keys().next().value) }
+
 const TOTAL_KEYS = ['totalLeads', 'relevantLeads', 'nonRelevantLeads', 'meetingsScheduled', 'meetingsCompleted', 'meetingsCancelled', 'meetingsUpcoming', 'leadsToHandle', 'registrations', 'registrationValue', 'contracts', 'contractValue']
 
 export async function GET(request) {
@@ -60,11 +67,14 @@ export async function GET(request) {
   if (!project) return J({ error: 'unknown_project' }, 404)
 
   // CRM מתמונת המצב (שלב 1) ומודעות מהעובדות היומיות (שלב 2) — במקביל, כל אחד אופציונלי.
+  const timing = {}
+  const t0 = Date.now()
   const [rawRes, adsRes] = await Promise.allSettled([
     // התמונה הדחוסה (שורה אחת, מיגרציה 009); הרשומות הגולמיות רק אם היא עוד לא נבנתה.
     loadCompactSnapshot(sb, projectId, 'bmby').then(c => c || loadRawRecords(sb, projectId, 'bmby')),
     compare ? Promise.resolve(null) : buildAdsRangeRows(sb, project, since, until),
   ])
+  timing.loadMs = Date.now() - t0
   const raw = rawRes.status === 'fulfilled' ? rawRes.value : null
   const ads = adsRes.status === 'fulfilled' ? adsRes.value : null
   const problems = {}
@@ -74,8 +84,17 @@ export async function GET(request) {
   const hasCrm = !!(raw && raw.total)
   if (compare && !hasCrm) return J({ error: 'no_snapshot', hint: 'crm_raw has no records for this project yet — the next BMBY cron run fills it', problems }, 404)
 
-  const R = hasCrm ? computeBmbySummary(raw, { since, until, monthKey: key }) : null
-  const shaped = R ? toReportRow(R) : null
+  const cacheKey = hasCrm && raw.compact ? `${projectId}|${key}|${raw.builtAt}` : null
+  let shaped = cacheKey ? cacheGet(cacheKey) : null
+  timing.crmCache = shaped ? 'hit' : (cacheKey ? 'miss' : 'n/a')
+  if (hasCrm && !shaped) {
+    const t1 = Date.now()
+    shaped = toReportRow(computeBmbySummary(raw, { since, until, monthKey: key }))
+    timing.computeMs = Date.now() - t1
+    if (cacheKey) cacheSet(cacheKey, shaped)
+  }
+  timing.totalMs = Date.now() - t0
+  timing.snapshot = raw ? (raw.compact ? 'compact' : 'raw') : null
   const stamp = (raw && raw.fetchedAt) || new Date().toISOString()
   const snapshot = hasCrm ? { fetchedAt: raw.fetchedAt, counts: raw.counts } : null
 
@@ -99,6 +118,7 @@ export async function GET(request) {
       computed: Object.fromEntries(TOTAL_KEYS.map(k => [k, shaped.summary[k] ?? null])),
       differing, diff,
       identical: !!stored && differing === 0,
+      timing,
       note: 'stored = last live BMBY fetch for this exact key (if any); computed = same function over the crm_raw snapshot. ' +
             'Expected drift only in live-state fields (leadsToHandle, relevant flags, upcoming meetings) when the snapshot is newer/older than the stored row.',
     })
@@ -109,5 +129,5 @@ export async function GET(request) {
   if (ads) rows.push(...ads.rows)
   const missing = [...(hasCrm ? [] : ['crm']), ...(ads ? ads.missing : ['facebook', 'google'])]
   if (!rows.length) return J({ error: 'no_data', missing, problems, hint: 'no CRM snapshot and no daily ad facts for this project/range yet' }, 404)
-  return J({ rows, missing, snapshot, ads: ads ? { coverage: ads.coverage } : null, ...(Object.keys(problems).length ? { problems } : {}) })
+  return J({ rows, missing, snapshot, ads: ads ? { coverage: ads.coverage } : null, timing, ...(Object.keys(problems).length ? { problems } : {}) })
 }
