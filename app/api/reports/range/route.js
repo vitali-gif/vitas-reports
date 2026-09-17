@@ -18,7 +18,7 @@
  */
 import { NextResponse } from 'next/server'
 import { adminClient, requireProjectAccess, monitorTokenOf } from '../../../../lib/auth'
-import { loadRawRecords, loadCompactSnapshot } from '../../../../lib/crm/raw-store.js'
+import { loadRawRecords, loadCompactSnapshot, loadCompactMeta } from '../../../../lib/crm/raw-store.js'
 import { computeBmbySummary, toReportRow } from '../../../../lib/crm/bmby-summary.js'
 import { buildAdsRangeRows } from '../../../../lib/ads/range-rows.js'
 
@@ -36,6 +36,32 @@ const MAX_SPAN_DAYS = 400
 // חם = צפייה חוזרת באותו טווח (לקוח + אדמין, כל הסשנים על אותה lambda) חוזרת במילישניות.
 // מתאפס כשהתמונה נבנית מחדש (built_at משתנה) או כשה-lambda מתחלפת. עד 64 טווחים.
 const CRM_CACHE = new Map()
+// מטמון ה-payload הדחוס עצמו (לפי project + built_at): טעינה של 1.7MB פעם אחת ל-lambda, לא פעם לכל טווח.
+const COMPACT_CACHE = new Map()
+const compactGet = (k) => COMPACT_CACHE.get(k) || null
+const compactSet = (k, v) => { COMPACT_CACHE.set(k, v); if (COMPACT_CACHE.size > 8) COMPACT_CACHE.delete(COMPACT_CACHE.keys().next().value) }
+
+// טעינת ה-CRM בשלוש מדרגות: (1) מטא זעיר → (2) תוצאה מוכנה במטמון / payload במטמון → (3) payload מה-DB.
+async function loadCrmForRange(sb, projectId, key, timing) {
+  const meta = await loadCompactMeta(sb, projectId, 'bmby')
+  if (!meta) {   // עוד אין תמונה דחוסה — הרשומות הגולמיות (איטי, נדיר: רק לפני הריצה הראשונה של הקרון אחרי 009)
+    const raw = await loadRawRecords(sb, projectId, 'bmby')
+    return { raw, shaped: null, cacheKey: null }
+  }
+  const cacheKey = `${projectId}|${key}|${meta.built_at}`
+  const hit = cacheGet(cacheKey)
+  const stub = { counts: meta.counts, fetchedAt: meta.source_fetched_at || meta.built_at, builtAt: meta.built_at, total: Object.values(meta.counts || {}).reduce((x, y) => x + (Number(y) || 0), 0), compact: true }
+  if (hit) { timing.crmCache = 'hit'; return { raw: stub, shaped: hit, cacheKey } }
+  const pk = `${projectId}|${meta.built_at}`
+  let raw = compactGet(pk)
+  if (raw) { timing.crmCache = 'payload-hit' }
+  else {
+    timing.crmCache = 'miss'
+    raw = await loadCompactSnapshot(sb, projectId, 'bmby')
+    if (raw) compactSet(pk, raw)
+  }
+  return { raw, shaped: null, cacheKey }
+}
 const cacheGet = (k) => { const v = CRM_CACHE.get(k); if (v) { CRM_CACHE.delete(k); CRM_CACHE.set(k, v) } return v || null }
 const cacheSet = (k, v) => { CRM_CACHE.set(k, v); if (CRM_CACHE.size > 64) CRM_CACHE.delete(CRM_CACHE.keys().next().value) }
 
@@ -70,12 +96,12 @@ export async function GET(request) {
   const timing = {}
   const t0 = Date.now()
   const [rawRes, adsRes] = await Promise.allSettled([
-    // התמונה הדחוסה (שורה אחת, מיגרציה 009); הרשומות הגולמיות רק אם היא עוד לא נבנתה.
-    loadCompactSnapshot(sb, projectId, 'bmby').then(c => c || loadRawRecords(sb, projectId, 'bmby')),
+    loadCrmForRange(sb, projectId, key, timing),
     compare ? Promise.resolve(null) : buildAdsRangeRows(sb, project, since, until),
   ])
   timing.loadMs = Date.now() - t0
-  const raw = rawRes.status === 'fulfilled' ? rawRes.value : null
+  const crmLoad = rawRes.status === 'fulfilled' ? rawRes.value : null
+  const raw = crmLoad ? crmLoad.raw : null
   const ads = adsRes.status === 'fulfilled' ? adsRes.value : null
   const problems = {}
   if (rawRes.status === 'rejected') problems.crm = String(rawRes.reason?.message || rawRes.reason)
@@ -84,9 +110,9 @@ export async function GET(request) {
   const hasCrm = !!(raw && raw.total)
   if (compare && !hasCrm) return J({ error: 'no_snapshot', hint: 'crm_raw has no records for this project yet — the next BMBY cron run fills it', problems }, 404)
 
-  const cacheKey = hasCrm && raw.compact ? `${projectId}|${key}|${raw.builtAt}` : null
-  let shaped = cacheKey ? cacheGet(cacheKey) : null
-  timing.crmCache = shaped ? 'hit' : (cacheKey ? 'miss' : 'n/a')
+  const cacheKey = crmLoad ? crmLoad.cacheKey : null
+  let shaped = crmLoad ? crmLoad.shaped : null
+  if (!timing.crmCache) timing.crmCache = 'n/a'
   if (hasCrm && !shaped) {
     const t1 = Date.now()
     shaped = toReportRow(computeBmbySummary(raw, { since, until, monthKey: key }))
