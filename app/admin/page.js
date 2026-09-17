@@ -25,7 +25,7 @@ import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
-import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake } from 'lucide-react'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft } from 'lucide-react'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -4888,16 +4888,18 @@ const selectProject = async (client, project) => {
             const fontW = level === 0 ? 700 : level === 1 ? 600 : 400;
             const fontSize = level === 2 ? '0.9em' : '1em';
             return (
-              <tr key={key} style={{background: rowBg, cursor: hasChildren ? 'pointer' : 'default', borderRight: level === 1 ? '3px solid rgba(59,130,246,0.3)' : level === 2 ? '3px solid rgba(16,185,129,0.3)' : 'none'}} onClick={hasChildren ? onToggle : undefined}>
+              <tr key={key} className={vrMode ? `vr-tree-row vr-lvl-${level}${hasChildren ? ' vr-expandable' : ''}` : undefined} style={vrMode ? undefined : {background: rowBg, cursor: hasChildren ? 'pointer' : 'default', borderRight: level === 1 ? '3px solid rgba(59,130,246,0.3)' : level === 2 ? '3px solid rgba(16,185,129,0.3)' : 'none'}} onClick={hasChildren ? onToggle : undefined}>
                 <td style={{fontWeight: fontW, fontSize, paddingRight: `${8 + indent}px`, unicodeBidi: 'plaintext', textAlign: 'right'}}>
                   <span style={{display:'inline-block', width:'18px', color:'#64748b', marginLeft:'4px'}}>
-                    {hasChildren ? (isExpanded ? '\u25bc' : '\u25c0') : ''}
+                    {hasChildren ? (vrMode ? (isExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />) : (isExpanded ? '\u25bc' : '\u25c0')) : ''}
                   </span>
-                  {level === 0 && data.source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:data.source.includes('google')?'var(--rose-50)':'var(--sky-50)',color:data.source.includes('google')?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{data.source.includes('google')?'G':'F'}</span> : null}
+                  {level === 0 && data.source ? (vrMode
+                    ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}><i aria-hidden="true">{data.source.includes('google') ? 'G' : 'M'}</i>{data.source.includes('google') ? 'Google' : 'Meta'}</span>
+                    : <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:data.source.includes('google')?'var(--rose-50)':'var(--sky-50)',color:data.source.includes('google')?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{data.source.includes('google')?'G':'F'}</span>) : null}
                   {name}
-                  {level === 0 && data.source ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
+                  {level === 0 && data.source && !vrMode ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
                 </td>
-                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
+                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; if (vrMode) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status none">-</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
                 <td style={{fontSize}}>{formatNum(data.impressions)}</td>
                 <td style={{fontSize}}>{formatCurrency(cpc)}</td>
@@ -5370,7 +5372,7 @@ const selectProject = async (client, project) => {
       })()}
       <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes loadingSlide{0%{margin-right:-40%} 100%{margin-right:100%}} @keyframes loadingSlide{0%{transform:translateX(-150%)} 100%{transform:translateX(300%)}}`}</style>
       <div className={`sidebar-overlay${sidebarOpen ? ' active' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
-      <Header
+      <Header className={vrMode ? 'header-vr' : ''}
         onMenuOpen={() => setSidebarOpen(true)}
         onExport={!isClientView && !isDemoProject ? handleExport : undefined}
         onClientAccess={!isClientView ? handleClientAccess : undefined}
@@ -5384,7 +5386,7 @@ const selectProject = async (client, project) => {
         ) : null}
       />
 
-      <div className="app-layout">
+      <div className={vrMode ? 'app-layout vr-shell' : 'app-layout'}>
         <Sidebar
           clients={visibleClients}
           activeClient={selectedClient?.name}
@@ -5394,6 +5396,7 @@ const selectProject = async (client, project) => {
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
           footerText="VITAS Reports v3.2"
+          brand={vrMode ? { logo: '/brand/vitas-logo-white.png', tagline: 'Real Estate Intelligence' } : null}
           lockedProjects={[]}
           demoProjects={clients.flatMap(c=>(c.projects||[]).filter(p=>p.is_demo).map(p=>p.name))}
           isOpen={sidebarOpen}
@@ -5446,16 +5449,49 @@ const selectProject = async (client, project) => {
               const budgets = selectedProject?.monthly_budgets || {};
               const budget = budgets[ym];
               if (isClientView) {
-                return budget != null ? (
+                return budget != null ? (vrMode ? (
+                  <div className="vr-budget"><div className="vr-budget-main">
+                    <span className="vr-budget-label"><Wallet size={16} aria-hidden="true" />תקציב חודשי</span>
+                    <span className="vr-budget-total"><bdi>{formatCurrency(budget)}</bdi></span>
+                  </div></div>
+                ) : (
                   <div style={{padding:'8px 20px',fontSize:14,fontWeight:600,borderBottom:'1px solid var(--border,#e2e8f0)'}}>💰 תקציב חודשי — {formatCurrency(budget)}</div>
-                ) : null;
+                )) : null;
               }
               const _spend = reports.filter(r => r.month === ym && (r.source==='facebook' || (r.source||'').startsWith('google'))).reduce((a,r)=>a+(r.summary?.spend||0),0);
               const pct = budget ? Math.round(_spend/budget*100) : null;
               const monthOpts = [];
               for (let i=-2;i<=3;i++){ const dd=new Date(_d.getFullYear(),_d.getMonth()+i,1); monthOpts.push(dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')); }
               const shownVal = budgetDraft !== null ? budgetDraft : (budget!=null ? String(budget) : '');
-              return (
+              // עיצוב מחודש: כרטיס לבן עם פס התקדמות (DESIGN-SPEC: משטח לבן, min-height 56, labels גלויים, חודש כתוב)
+              const _lvl = pct == null ? 'none' : pct >= 100 ? 'over' : pct >= 95 ? 'hot' : pct >= 75 ? 'warm' : 'ok';
+              return vrMode ? (
+                <div className="vr-budget">
+                  <div className="vr-budget-main">
+                    <span className="vr-budget-label"><Wallet size={16} aria-hidden="true" />תקציב חודשי</span>
+                    <label className="vr-budget-field"><span className="vr-sr-only">חודש התקציב</span>
+                      <select value={ym} onChange={e=>{ setBudgetMonth(e.target.value); setBudgetDraft(null); }}>
+                        {monthOpts.map(m=><option key={m} value={m}>{formatMonth ? formatMonth(m) : m}</option>)}
+                      </select>
+                    </label>
+                    <label className="vr-budget-field"><span className="vr-sr-only">סכום התקציב בש״ח</span>
+                      <input type="number" min="0" placeholder="₪" value={shownVal} onChange={e=>setBudgetDraft(e.target.value)} />
+                    </label>
+                    <button type="button" className="vr-button vr-budget-save" onClick={async ()=>{ await saveMonthlyBudget(ym, shownVal); setBudgetDraft(null); }}>שמור</button>
+                    <span className="vr-budget-total"><bdi>{budget != null ? formatCurrency(budget) : '—'}</bdi></span>
+                  </div>
+                  <div className="vr-budget-progress" data-level={_lvl}>
+                    <div className="vr-budget-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct != null ? Math.min(100, pct) : 0} aria-label="ניצול התקציב החודשי">
+                      <div className="vr-budget-fill" style={{ width: (pct != null ? Math.min(100, pct) : 0) + '%' }} />
+                    </div>
+                    <span className="vr-budget-used">
+                      {budget != null
+                        ? <>נוצל החודש: <bdi>{formatCurrency(_spend)}</bdi>{pct != null ? <> · <bdi>{pct}%</bdi></> : null}{pct != null && pct >= 100 ? ' · חריגה' : ''}</>
+                        : 'לא הוגדר תקציב לחודש זה'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
                 <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'10px 20px',background:'var(--surface-2,#f8fafc)',borderBottom:'1px solid var(--border,#e2e8f0)',fontSize:13}}>
                   <span style={{fontWeight:700}}>💰 תקציב חודשי</span>
                   <select value={ym} onChange={e=>{ setBudgetMonth(e.target.value); setBudgetDraft(null); }} style={{padding:'4px 8px',borderRadius:6}}>

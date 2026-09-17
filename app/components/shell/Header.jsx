@@ -11,9 +11,9 @@
 //   onLogout         — Logout button handler
 //   loadingIndicator — optional JSX (spinner while fetching)
 
-export default function Header({ onMenuOpen, onExport, onClientAccess, onSessionLogs, onLogout, loadingIndicator = null }) {
+export default function Header({ onMenuOpen, onExport, onClientAccess, onSessionLogs, onLogout, loadingIndicator = null, className = '' }) {
   return (
-    <header className="header">
+    <header className={`header${className ? ' ' + className : ''}`}>
 
       {/* MOBILE ONLY: hamburger — opens the drawer.
           CSS (.h-hamburger) is display:none on desktop, display:inline-flex on ≤768px */}

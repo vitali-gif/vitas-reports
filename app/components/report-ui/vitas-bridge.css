@@ -74,6 +74,75 @@
 .vr-ui .section-top-ads .card, .vr-ui .section-asset-gallery .card { border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); box-shadow: var(--shadow-sm, 0 2px 8px -2px rgba(11,15,30,0.08)); }
 @media (max-width: 1199px) { .vr-ui .section-top-ads .vr-ad-grid, .vr-ui .section-asset-gallery .vr-ad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
+/* ═══ המעטפת (.vr-shell על .app-layout, רק במצב העיצוב המחודש) ═════════════════ */
+/* DESIGN-SPEC: Sidebar 224px --side-bg · Header 64px · TitleBar 30px/700, breadcrumb 13px · תוכן padding-inline 32px */
+.vr-shell { grid-template-columns: 224px minmax(0, 1fr); }
+.vr-shell .main-content { padding: 24px 32px 64px; }
+/* header: הלוגו עבר לסיידבר; נשאר סרגל פעולות בהיר */
+/* ה-header יושב מעל .app-layout ולא בתוכו, לכן מקבל class משלו (header-vr) מ-page.js */
+.header.header-vr { height: 64px; padding-inline: 28px; }
+.header.header-vr .h-brand img, .header.header-vr .h-brand .pipe { display: none; }
+.header.header-vr .h-brand .eyebrow { font-size: 12px; letter-spacing: 0.14em; color: var(--vr-muted, #586581); }
+/* title bar */
+.vr-shell .titlebar { align-items: center; margin-block-end: 24px; }
+.vr-shell .titlebar h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
+.vr-shell .titlebar .crumb { font-size: 13px; }
+
+/* sidebar */
+.vr-shell .sidebar.side-vr { padding: 20px 12px 18px; }
+.vr-shell .side-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 12px 22px; border-block-end: 1px solid var(--side-divider, rgba(255,255,255,0.06)); margin-block-end: 18px; }
+.vr-shell .side-brand img { height: 30px; display: block; }
+.vr-shell .side-tagline { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--side-fg-mute, #6E7388); }
+.vr-shell .sidebar-title { display: flex; align-items: center; gap: 8px; padding: 0 12px 10px; font-size: 11px; letter-spacing: 0.1em; }
+.vr-shell .client-header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--side-fg, #C9CEDC); font-size: 14px; font-weight: 600; cursor: pointer; }
+.vr-shell .client-header:hover { background: rgba(255,255,255,0.04); color: #fff; }
+.vr-shell .client-header.active { color: #fff; font-weight: 800; }
+.vr-shell .side-ico { flex-shrink: 0; opacity: .85; }
+.vr-shell .side-name { flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vr-shell .side-chev { opacity: .6; }
+.vr-shell .project-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin-inline-start: 22px; margin-block: 2px; border-radius: 8px; color: var(--side-fg, #C9CEDC); font-size: 13px; font-weight: 500; cursor: pointer; border-inline-end: 2px solid transparent; }
+.vr-shell .project-item:hover { background: rgba(255,255,255,0.04); color: #fff; }
+.vr-shell .project-item.active { background: var(--side-active, rgba(99,102,241,0.16)); color: #fff; font-weight: 700; border-inline-end-color: var(--indigo, #5B5EF4); }
+.vr-shell .project-item.locked { opacity: .45; cursor: not-allowed; }
+.vr-shell .add-btn { margin-inline-start: 22px; }
+
+/* budget card (DESIGN-SPEC: משטח לבן עם border, min-height 56, labels גלויים) */
+.vr-budget { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); padding: 12px 18px; margin-block-end: 20px; display: flex; flex-direction: column; gap: 10px; min-block-size: 56px; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.vr-budget-main { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vr-budget-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: var(--vr-text, #142044); }
+.vr-budget-label svg { color: var(--indigo, #5B5EF4); }
+.vr-budget-field select, .vr-budget-field input { font: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-xs, 6px); background: var(--surface, #F5F7FB); color: var(--vr-text, #142044); min-block-size: 38px; }
+.vr-budget-field input { inline-size: 130px; font-variant-numeric: tabular-nums; }
+.vr-budget-save { min-block-size: 38px; padding-block: 6px; background: var(--indigo, #5B5EF4); color: #fff; border-color: transparent; font-weight: 700; }
+.vr-budget-total { margin-inline-start: auto; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--vr-text, #142044); }
+.vr-budget-progress { display: flex; align-items: center; gap: 14px; }
+.vr-budget-track { flex: 1 1 auto; block-size: 10px; background: var(--surface, #F5F7FB); border: 1px solid var(--divider, #E5E9F1); border-radius: 999px; overflow: hidden; }
+.vr-budget-fill { block-size: 100%; border-radius: 999px; background: var(--emerald, #10B981); transition: width .3s ease; }
+.vr-budget-progress[data-level="warm"] .vr-budget-fill { background: var(--amber, #F59E0B); }
+.vr-budget-progress[data-level="hot"] .vr-budget-fill, .vr-budget-progress[data-level="over"] .vr-budget-fill { background: var(--rose, #F43F5E); }
+.vr-budget-used { font-size: 13px; color: var(--vr-muted, #586581); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ── טבלת הקמפיינים: שורות היררכיות, תגית פלטפורמה, נקודת סטטוס ──────────── */
+.vr-ui .vr-tree-row.vr-expandable { cursor: pointer; }
+.vr-ui .vr-tree-row.vr-lvl-0 td:first-child { font-weight: 700; }
+.vr-ui .vr-tree-row.vr-lvl-1 { background: #F8FAFF; }
+.vr-ui .vr-tree-row.vr-lvl-1 td:first-child { font-weight: 600; }
+.vr-ui .vr-tree-row.vr-lvl-2 { background: #FCFCFE; font-size: 13.5px; }
+.vr-ui .vr-tree-row td:first-child svg { vertical-align: middle; color: var(--vr-muted, #586581); }
+.vr-platform { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-inline-end: 10px; vertical-align: middle; border: 1px solid var(--border, #DDE2EC); background: var(--surface, #F5F7FB); color: var(--vr-text, #142044); }
+.vr-platform i { font-style: normal; display: inline-grid; place-items: center; inline-size: 16px; block-size: 16px; border-radius: 50%; font-size: 10px; font-weight: 900; color: #fff; }
+.vr-platform.meta i { background: #0866FF; }
+.vr-platform.google i { background: #EA4335; }
+.vr-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.vr-status i { inline-size: 8px; block-size: 8px; border-radius: 50%; background: #98A0B2; }
+.vr-status.on { color: #0E9F6E; } .vr-status.on i { background: #10B981; }
+.vr-status.paused { color: var(--vr-muted, #586581); } .vr-status.paused i { background: #C4CAD6; }
+.vr-status.off { color: var(--vr-muted, #586581); } .vr-status.off i { background: #E5E9F1; }
+.vr-status.none { color: var(--vr-muted, #586581); }
+
+/* פילוח דמוגרפי: כותרות המשנה בתוך הסקשן */
+.vr-ui .section h3 { font-size: 16px; font-weight: 700; color: var(--vr-text, #142044); margin-block-end: 10px; }
+
 /* ── טקסט כללי בתוך .vr-ui ──────────────────────────────────────────────────── */
 .vr-ui { font-size: 15px; }
 .vr-ui .welcome-center { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); }
