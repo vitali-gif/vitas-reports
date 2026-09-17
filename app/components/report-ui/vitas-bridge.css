@@ -39,7 +39,9 @@
 /* ── כרטיסי KPI: תגית שינוי (VITAS: הרחבה) ─────────────────────────────────── */
 .vr-metric-top { flex-wrap: wrap; }
 .vr-metric-badge { margin-inline-start: auto; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #ffffff2e; border: 1px solid #ffffff4d; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.vr-metric.vr-tone-amber .vr-metric-badge { background: #00000014; border-color: #00000022; }
+/* ויטלי (17.9): גם על הכרטיס הכתום הטקסט לבן, כמו בשאר הכרטיסים ובסקיצה */
+.vr-ui .vr-metric.vr-tone-amber { color: #fff; }
+.vr-ui .vr-metric.vr-tone-amber .vr-metric-badge { background: #ffffff2e; border-color: #ffffff4d; }
 .vr-metric-clickable { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
 .vr-metric-clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-md, 0 10px 24px -10px rgba(11,15,30,0.2)); }
 .vr-metric-note { opacity: .92; }

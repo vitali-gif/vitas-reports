@@ -5476,7 +5476,8 @@ const selectProject = async (client, project) => {
                     </label>
                     <label className="vr-budget-field vr-budget-amount"><span className="vr-sr-only">סכום התקציב בש״ח</span>
                       <span className="vr-budget-currency" aria-hidden="true">₪</span>
-                      <input type="number" min="0" placeholder="0" value={shownVal} onChange={e=>setBudgetDraft(e.target.value)} />
+                      {/* שדה טקסט עם מפריד אלפים (type=number לא יודע להציג 25,000); בשמירה נשלחות ספרות בלבד */}
+                      <input type="text" inputMode="numeric" placeholder="0" dir="ltr" value={shownVal !== '' && !isNaN(Number(shownVal)) ? Number(shownVal).toLocaleString('he-IL') : shownVal} onChange={e=>setBudgetDraft(e.target.value.replace(/[^0-9]/g, ''))} />
                     </label>
                     <button type="button" className="vr-button vr-budget-save" onClick={async ()=>{ await saveMonthlyBudget(ym, shownVal); setBudgetDraft(null); }}>שמור</button>
                   </div>
