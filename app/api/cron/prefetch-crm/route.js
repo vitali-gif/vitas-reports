@@ -83,6 +83,18 @@ export async function GET(request) {
   if (only === 'months') jobs = jobs.filter(j => j.kind === 'month')
   else if (only === 'ranges') jobs = jobs.filter(j => j.kind === 'range')
 
+  // תמונת crm_raw (טווחים מיידיים) נכתבת פעם אחת לריצה לכל מקור, לא 13 פעמים:
+  // עד 17.9 כל 13 החלונות כתבו את הרשומות הגולמיות שלהם — חופפים (currentMonth ⊂ q3 ⊃ last30...)
+  // ו-4 במקביל — 60k רשומות Salesforce נכתבו מחדש שוב ושוב, ה-DB נכנס ל-deadlocks ו-statement
+  // timeouts, שרת ה-Auth ענה 504 ולקוחה ראתה דשבורד ריק. עכשיו: BMBY ו-Salesforce כותבים
+  // את התמונה רק ברבעונים (q1..q4 — חלונות זרים שמכסים את השנה), Zoho רק בחודשים (רבעונים
+  // מדולגים אצלו). שאר החלונות כותבים רק את הדוח השמור שלהם. הרבעונים רצים ראשונים כדי
+  // שתקציב הזמן לא יחתוך אותם.
+  const QUARTERS = ['q1', 'q2', 'q3', 'q4']
+  jobs = [...jobs.filter(j => QUARTERS.includes(j.rangeId)), ...jobs.filter(j => !QUARTERS.includes(j.rangeId))]
+  const snapshotFor = (job, source) => source === 'zoho' ? job.kind === 'month' : QUARTERS.includes(job.rangeId)
+  const bodyFor = (job, source) => JSON.stringify({ ...job.payload, snapshot: snapshotFor(job, source) })
+
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
   const internalKey = process.env.CRON_SECRET || ''   // קריאה פנימית שרת-לשרת
   const results = []
@@ -98,16 +110,16 @@ export async function GET(request) {
     const skipZoho = ZOHO_SKIP_RANGES.includes(job.rangeId)
     const zohoPromise = skipZoho
       ? null
-      : fetch(`${base}/api/zoho/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify(job.payload) })
+      : fetch(`${base}/api/zoho/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: bodyFor(job, 'zoho') })
           .then(r => r.json()).catch(() => ({}))
     // Salesforce (KLOSS) in parallel — it only writes to KLOSS-named projects. Uses SOQL
     // aggregates, so quarters are fine (no record-count limit like Zoho).
-    const sfPromise = fetch(`${base}/api/salesforce/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify(job.payload) })
+    const sfPromise = fetch(`${base}/api/salesforce/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: bodyFor(job, 'salesforce') })
       .then(r => r.json()).catch(() => ({}))
     try {
       // cache:'no-store' — see prefetch-ads: without it these internal calls came back from
       // cache in milliseconds and no fresh data / heartbeat was written.
-      const res = await fetch(`${base}/api/bmby/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify(job.payload) })
+      const res = await fetch(`${base}/api/bmby/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: bodyFor(job, 'bmby') })
       const data = await res.json().catch(() => ({}))
       results.push({ kind: job.kind, label: job.label, source: 'bmby', ok: res.ok, status: res.status, ms: Date.now()-t0, ..._slim(data) })
     } catch (err) {

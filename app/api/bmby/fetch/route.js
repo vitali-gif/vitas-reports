@@ -535,6 +535,8 @@ export async function POST(request) {
       debugPhones: gate.admin ? body.debugPhones : undefined,
       stagesOnly: gate.admin ? body.stagesOnly : undefined,
       apptDump: gate.admin ? body.apptDump : undefined,
+      // snapshot:false — רק הדוח השמור, בלי לכתוב crm_raw (הקרון כותב את התמונה פעם אחת לריצה)
+      snapshot: gate.admin && body.snapshot === false ? false : undefined,
     })
     return Response.json(responseBody, { status })
   } catch (err) {
