@@ -20,7 +20,7 @@
 import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { computeZohoSummary, filterDigitalLeads } from '../../../../lib/crm/zoho-summary.js'
-import { upsertRawRecords, rebuildCompact } from '../../../../lib/crm/raw-store.js'
+import { upsertRawRecords, rebuildCompactIfChanged } from '../../../../lib/crm/raw-store.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // was 60 — per-brand loop (BCureLaser+ISMOOTH) + sequential deals fetch on last30 exceeded 60s → 504 (shown as blank 'HTTP ' in cron alerts)
@@ -192,7 +192,7 @@ async function runSync(opts = {}) {
         const deals = (await searchPaginated(accessToken, 'Deals', criteria, dealFields)).filter(d => d.LidID)
         const up = await upsertRawRecords(supabase, p.id, 'zoho', 'deals', deals)
         let compact = null
-        try { compact = await rebuildCompact(supabase, p.id, 'zoho') } catch (e) { compact = { error: String(e?.message || e) } }
+        try { compact = await rebuildCompactIfChanged(supabase, p.id, 'zoho', [up]) } catch (e) { compact = { error: String(e?.message || e) } }
         results.push({ project: p.name, ok: true, deals: up.count, days, ms: Date.now() - t0, compact })
       } catch (err) {
         results.push({ project: p.name, ok: false, error: String(err?.message || err).slice(0, 300), ms: Date.now() - t0 })
@@ -267,7 +267,7 @@ async function runSync(opts = {}) {
     try {
       const [ls, ds] = await Promise.all([upsertRawRecords(supabase, __proj.id, 'zoho', 'leads', rawLeads), upsertRawRecords(supabase, __proj.id, 'zoho', 'deals', linkedDeals)])
       snapshot = { leads: ls, deals: ds }
-      try { snapshot.compact = await rebuildCompact(supabase, __proj.id, 'zoho') } catch (e) { snapshot.compact = { error: String(e?.message || e) } }
+      try { snapshot.compact = await rebuildCompactIfChanged(supabase, __proj.id, 'zoho', [ls, ds]) } catch (e) { snapshot.compact = { error: String(e?.message || e) } }
     } catch (e) { snapshot = { error: String(e?.message || e) } }
   }
 
