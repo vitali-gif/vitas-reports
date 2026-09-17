@@ -86,7 +86,8 @@ async function runSync(opts = {}) {
   // instead we use the breakdownRows below (which already contain campaign_name and adset_name keyed by ad_id).
   const adsFields = [
     'id', 'name', 'effective_status', 'status',
-    'creative{body,title,image_url,thumbnail_url,image_hash,object_story_spec,asset_feed_spec,video_id,effective_object_story_id}',
+    // thumbnail_width/height: בלי זה Meta מחזיר thumbnail_url של 64px, שנמתח לכרטיס בגודל מלא ויוצא מטושטש (17.9)
+    'creative.thumbnail_width(1080).thumbnail_height(1080){body,title,image_url,thumbnail_url,image_hash,object_story_spec,asset_feed_spec,video_id,effective_object_story_id}',
   ].join(',')
   // Filter server-side to ACTIVE ads only; Meta's ?fields=creative{...} is expensive so we need effective_status filter + small limit
   const effectiveStatusFilter = encodeURIComponent(JSON.stringify(['ACTIVE']))
@@ -197,14 +198,18 @@ async function runSync(opts = {}) {
   // Parallel: fire all requests at once, wait for all (Promise.all)
   await Promise.all([...videoIdsSet].map(async (vid) => {
     try {
-      const vu = `https://graph.facebook.com/${META_GRAPH_VERSION}/${vid}?fields=source,permalink_url,picture&access_token=${encodeURIComponent(token)}`
+      // thumbnails{...}: התמונות המלאות של הסרטון (המועדפת או הרחבה ביותר) — לפוסטר חד בכרטיס המודעה
+      const vu = `https://graph.facebook.com/${META_GRAPH_VERSION}/${vid}?fields=source,permalink_url,picture,thumbnails{uri,width,height,is_preferred}&access_token=${encodeURIComponent(token)}`
       const vres = await fetch(vu)
       if (vres.ok) {
         const vjson = await vres.json()
+        const thumbs = (vjson.thumbnails && vjson.thumbnails.data) || []
+        const best = thumbs.find(t => t.is_preferred && t.uri) || [...thumbs].sort((a, b) => (b.width || 0) - (a.width || 0))[0]
         videoUrlById[vid] = {
           source: vjson.source || '',
           permalink: vjson.permalink_url || '',
           picture: vjson.picture || '',
+          poster: (best && best.uri) || '',
         }
       }
     } catch {}
@@ -213,6 +218,9 @@ async function runSync(opts = {}) {
     if (a.videoId && videoUrlById[a.videoId]) {
       a.videoUrl = videoUrlById[a.videoId].source || ''
       a.videoPermalink = videoUrlById[a.videoId].permalink || ''
+      // פוסטר מלא גובר על thumbnail_url הקטן של הקריאייטיב
+      const poster = videoUrlById[a.videoId].poster || ''
+      if (poster) { a.imageUrl = poster; a.thumbnailUrl = poster }
       if (!a.imageUrl && videoUrlById[a.videoId].picture) a.imageUrl = videoUrlById[a.videoId].picture
       if (!a.thumbnailUrl && videoUrlById[a.videoId].picture) a.thumbnailUrl = videoUrlById[a.videoId].picture
     }
