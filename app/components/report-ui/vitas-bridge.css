@@ -79,10 +79,27 @@
 .vr-shell { grid-template-columns: 224px minmax(0, 1fr); }
 .vr-shell .main-content { padding: 24px 32px 64px; }
 /* header: הלוגו עבר לסיידבר; נשאר סרגל פעולות בהיר */
-/* ה-header יושב מעל .app-layout ולא בתוכו, לכן מקבל class משלו (header-vr) מ-page.js */
-.header.header-vr { height: 64px; padding-inline: 28px; }
+/* ה-header יושב מעל .app-layout ולא בתוכו, לכן מקבל class משלו (header-vr) מ-page.js.
+   בסקיצה הסיידבר עולה עד לקצה העליון והכותרת חיה רק מעל התוכן: בדסקטופ הסיידבר הופך fixed
+   בגובה מלא, וה-header והתוכן מפנים לו 224px. במובייל הסיידבר נשאר drawer כמו היום. */
+.header.header-vr { height: 64px; padding-inline: 28px; background: rgba(245,247,251,0.92); border-block-end: 1px solid var(--border, #DDE2EC); }
 .header.header-vr .h-brand img, .header.header-vr .h-brand .pipe { display: none; }
 .header.header-vr .h-brand .eyebrow { font-size: 12px; letter-spacing: 0.14em; color: var(--vr-muted, #586581); }
+.header.header-vr .h-actions { gap: 10px; }
+.header.header-vr .h-actions .btn:not(.h-kebab) { display: inline-flex; align-items: center; gap: 8px; min-block-size: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border, #DDE2EC); background: var(--card, #fff); color: var(--vr-text, #142044); font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.header.header-vr .h-actions .btn:hover { border-color: var(--border-strong, #C4CAD6); background: #fff; }
+.header.header-vr .h-ico { color: var(--vr-muted, #586581); }
+.header.header-vr .h-ico-excel { color: #1D6F42; }
+.header.header-vr .btn-logout { color: var(--rose, #F43F5E); }
+.header.header-vr .btn-logout .h-ico { color: inherit; }
+/* רקע העמוד: אפור-כחלחל בהיר, הכרטיסים הלבנים בולטים (כמו בסקיצה) */
+.vr-shell .main-content { background: var(--surface, #F5F7FB); }
+.vr-ui { background: transparent; }
+@media (min-width: 769px) {
+  .vr-shell { grid-template-columns: minmax(0, 1fr); margin-inline-start: 224px; }   /* RTL: inline-start = ימין */
+  .vr-shell .sidebar.side-vr { position: fixed; top: 0; bottom: 0; inset-inline-start: 0; inline-size: 224px; overflow-y: auto; z-index: 60; }
+  .header.header-vr { margin-inline-start: 224px; }
+}
 /* title bar */
 .vr-shell .titlebar { align-items: center; margin-block-end: 24px; }
 .vr-shell .titlebar h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
