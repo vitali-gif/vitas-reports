@@ -196,7 +196,12 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // התוצאות נשמרות לפי מפתח (תקופה + טאב) ומתאפסות כש-`reports` משתנה — שזה
   // המקור היחיד לנתונים, כולל כשה-data הכבד מגיע בטעינה עצלה.
   const aggCache = useRef(new Map())
-  useEffect(() => { aggCache.current.clear() }, [reports])
+  // ניקוי סינכרוני בזמן הרינדור, לא ב-useEffect: ה-effect רץ *אחרי* הציור, ולכן הרינדור שקיבל
+  // reports חדשים עוד הגיש את הסכומים הישנים מהמטמון — ושום דבר לא גרם לרינדור נוסף. התוצאה
+  // (17.9): כרטיסי "תקציב שנוצל" ו"לידים" הראו 0 בזמן שהמשפך והטבלאות כבר הראו נתונים, עד
+  // שהמשתמש החליף טאב. עכשיו המטמון מתאפס באותו רינדור שבו reports השתנו.
+  const aggReportsRef = useRef(null)
+  if (aggReportsRef.current !== reports) { aggReportsRef.current = reports; aggCache.current.clear() }
   const memoAgg = useCallback((key, compute) => {
     const cache = aggCache.current
     if (cache.has(key)) return cache.get(key)
