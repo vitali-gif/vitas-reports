@@ -1,7 +1,7 @@
 'use client';
 
 import { useId } from 'react';
-import { Ban, Download, RefreshCw } from 'lucide-react';
+import { Ban, Download, RefreshCw, Eye, MousePointerClick, ArrowLeft } from 'lucide-react';
 import { VitasPresentation, MetricGrid, DataState, ReportSection } from './VitasPresentation';
 
 export const SOURCE_COLUMNS = [
@@ -33,25 +33,37 @@ export function SourceTable({ rows, total, sort, onSort, onOpenSource }) {
   </div>;
 }
 
+// VITAS: פריסה לפי הסקיצה — כרטיסי נתוני פרסום (קליקים, חשיפות) בצד ההתחלה, בורר פלטפורמה במרכז,
+// שלבים ככרטיסים לבנים עם אייקון ופס צד צבעוני, חץ עם אחוז המעבר בין השלבים, ענף ביטולים מתחת
+// ל"פגישה נקבעה". stage: {id,label,value,rate,denominatorLabel,smallSample,icon,tone}.
+const AD_ICONS = { impressions: Eye, impr: Eye, clicks: MousePointerClick, click: MousePointerClick };
 export function CohortFunnel({ model, platforms, selectedPlatform, onPlatformChange, state = 'ready' }) {
   const labelId = useId();
   return <div className="vcs-panel">
-    <div className="vcs-funnel-toolbar"><div role="group" aria-labelledby={labelId} className="vcs-segmented">
-      <span id={labelId} className="vr-sr-only">סינון המשפך לפי פלטפורמה</span>
-      {platforms.map(platform => <button key={platform.id} type="button" aria-pressed={platform.id === selectedPlatform} disabled={!onPlatformChange} onClick={() => onPlatformChange(platform.id)}>{platform.label}</button>)}
-    </div><p className="vr-caption">הסינון חל על המשפך בלבד</p></div>
+    <div className="vcs-funnel-toolbar">
+      {state === 'ready' && model && <div className="vcs-adcards">{model.advertising.map(item => { const Icon = AD_ICONS[item.id]; return <div key={item.id} className="vcs-adcard">{Icon && <span className="vcs-adcard-icon"><Icon size={18} aria-hidden="true" /></span>}<div><span className="vcs-adcard-label">{item.label}</span><strong><bdi>{item.value ?? 'אין נתון'}</bdi></strong></div></div>; })}</div>}
+      <div role="group" aria-labelledby={labelId} className="vcs-segmented">
+        <span id={labelId} className="vr-sr-only">סינון המשפך לפי פלטפורמה</span>
+        {platforms.map(platform => <button key={platform.id} type="button" aria-pressed={platform.id === selectedPlatform} disabled={!onPlatformChange} onClick={() => onPlatformChange(platform.id)}>{platform.label}</button>)}
+      </div>
+      <p className="vr-caption vcs-filter-note">הסינון חל על המשפך בלבד</p>
+    </div>
     <DataState state={state}>
       {state === 'ready' && model && <>
-        <div className="vcs-advertising"><span className="vr-caption">נתוני הפרסום בתקופה</span><dl>{model.advertising.map(item => <div key={item.id}><dt>{item.label}</dt><dd><bdi>{item.value ?? 'אין נתון'}</bdi></dd></div>)}</dl></div>
-        <p className="vcs-cohort-label">התקדמות הלידים שנכנסו בתקופה</p>
         <div className="vcs-funnel-scroll" role="region" aria-label="שלבי התקדמות הלידים" tabIndex={0}>
-          <ol className="vcs-funnel">{model.stages.map(stage => <li key={stage.id} className="vcs-stage-column">
-            <div className="vcs-stage"><h3>{stage.label}</h3><p className="vcs-stage-value"><bdi>{stage.value ?? 'אין נתון'}</bdi></p>
-              {stage.rate != null && <p className="vcs-rate"><bdi>{stage.smallSample ? '~' : ''}{stage.rate}</bdi><span>{stage.denominatorLabel}</span></p>}
+          <ol className="vcs-funnel">{model.stages.map((stage, i) => { const Icon = stage.icon; return <li key={stage.id} className="vcs-stage-column">
+            <div className="vcs-stage-row">
+              {i > 0 && <div className="vcs-arrow" aria-hidden="true"><ArrowLeft size={18} /><b>{stage.rate != null ? <bdi>{stage.smallSample ? '~' : ''}{stage.rate}</bdi> : '—'}</b></div>}
+              <div className={`vcs-stage ${stage.tone ? 'vcs-tone-' + stage.tone : ''}`} title={stage.rate != null ? `${stage.rate} ${stage.denominatorLabel}` : undefined}>
+                <div className="vcs-stage-head"><h3>{stage.label}</h3>{Icon && <span className="vcs-stage-icon"><Icon size={20} aria-hidden="true" /></span>}</div>
+                <p className="vcs-stage-value"><bdi>{stage.value ?? 'אין נתון'}</bdi></p>
+                {stage.rate != null && <p className="vcs-rate vr-sr-only">{stage.rate} {stage.denominatorLabel}</p>}
+              </div>
             </div>
             {stage.id === model.cancellation?.parentStageId && <div className="vcs-cancellation"><Ban size={17} aria-hidden="true" /><span>בוטלו <strong><bdi>{model.cancellation.value ?? 'אין נתון'}</bdi></strong></span><small>{model.cancellation.denominatorLabel}</small></div>}
-          </li>)}</ol>
+          </li>; })}</ol>
         </div>
+        <p className="vr-caption vcs-transition-note">אחוזי המעבר מוצגים מהשלב הקודם; הרשמות וחוזים נמדדים מהפגישות שהתקיימו, וביטולים מהפגישות שנקבעו.</p>
         <p className="vr-caption">{model.scopeNote}</p>
         {model.stages.some(stage => stage.smallSample) && <p className="vr-caption">~ אחוז המבוסס על מדגם קטן; יש לפרש בזהירות.</p>}
       </>}

@@ -25,10 +25,10 @@ import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
-import { MetaMark, GoogleMark } from '../components/report-ui/BrandMarks'
+import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
-import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft } from 'lucide-react'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText } from 'lucide-react'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -2200,7 +2200,9 @@ const selectProject = async (client, project) => {
         // אותם ערכים/מכנים/אחוזים כמו הסרגל הישן, ברכיב CohortFunnel של החבילה.
         const byKey = Object.fromEntries(rows.map(r => [r.key, r]));
         const denomLabel = (r) => r.denom != null ? `מתוך ${formatNum(r.denom)} ${r.ofLabel.replace(/^מ/, '')}` : r.ofLabel;
-        const stage = (k) => { const r = byKey[k]; return { id: k, label: r.label, value: r.value == null ? null : formatNum(r.value),
+        const STAGE_ICON = { lead: Users, cont: Phone, sched: CalendarCheck, held: UserCheck, reg: FileText, deal: FileSignature };
+        const STAGE_TONE = { lead: 'indigo', cont: 'emerald', sched: 'sky', held: 'indigo', reg: 'emerald', deal: 'rose' };
+        const stage = (k) => { const r = byKey[k]; return { id: k, label: r.label, icon: STAGE_ICON[k], tone: STAGE_TONE[k], value: r.value == null ? null : formatNum(r.value),
           rate: (r.value != null && r.of && r.pct != null) ? fmtPct(r.pct) : null, denominatorLabel: r.of ? denomLabel(r) : '', smallSample: !!(r.value != null && r.weak) }; };
         const canc = byKey.canc;
         const model = {
@@ -2594,12 +2596,12 @@ const selectProject = async (client, project) => {
     const _distItems = memoAgg(`crmDist|${selectedMonth}`, () => sourceEntries.map(([name, d]) => ({ id: name, label: name, value: Number.isFinite(d.totalLeads) ? d.totalLeads : null })));
     return (
       <div className={vrCrm ? 'vcs-root' : undefined}>
-        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
+        {!vrCrm && <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
           <button onClick={refreshFromBmby} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
             {refreshingCrm ? '⏳' : '🔄'} {refreshingCrm ? 'מושך...' : 'רענן CRM'}
             {!refreshingCrm && crmSchemaVersion > 0 && <span style={{fontSize:10,color:'var(--text-muted)',marginRight:2}}>v{crmSchemaVersion}</span>}
           </button>
-        </div>
+        </div>}
         {vrCrm && <p className="vr-caption vcs-metric-scope">פעילות בתקופה · כולל פעילות מלידים שנכנסו לפני התקופה</p>}
         <div className={vrCrm ? 'vr-metric-grid' : 'kpi-grid'}>
           {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads, _vrLeadsNote)}
@@ -2652,7 +2654,8 @@ const selectProject = async (client, project) => {
                   return (<Fragment key={name}>
                     <tr style={hasChildren ? {cursor:'pointer'} : undefined} onClick={hasChildren ? toggle : undefined}>
                       <td style={{fontWeight:600,whiteSpace:'nowrap'}}>
-                        {hasChildren && <span style={{display:'inline-block',width:'18px',color:'var(--accent)',userSelect:'none'}}>{isOpen ? '▼' : '◀'}</span>}
+                        {hasChildren && <span style={{display:'inline-block',width:'18px',color:'var(--accent)',userSelect:'none'}}>{vrCrm ? (isOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />) : (isOpen ? '▼' : '◀')}</span>}
+                        {vrCrm && <SourceMark name={name} />}
                         {name}
                         {hasChildren && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginRight:'6px'}}>({children.length})</span>}
                       </td>
@@ -4559,12 +4562,19 @@ const selectProject = async (client, project) => {
 
           // BMBY CRM (existing behavior — unchanged)
           return (<>
-            <div className="client-tabs" style={{marginBottom: 15}}>
-              <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
-              <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
-              <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
-              <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
-              <button className={`client-tab ${crmSubTab === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>📅 פגישות שבוצעו</button>
+            <div className={vrShell ? 'vcs-subtabs-row' : undefined}>
+            <div className="client-tabs" style={vrShell ? undefined : {marginBottom: 15}}>
+              <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>{vrShell ? '' : '📂 '}מקורות הגעה</button>
+              <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>{vrShell ? '' : '⏱️ '}זמני תגובה</button>
+              <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>{vrShell ? '' : '🚫 '}התנגדויות</button>
+              <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>{vrShell ? '' : '🏘️ '}יישובים</button>
+              <button className={`client-tab ${crmSubTab === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>{vrShell ? '' : '📅 '}פגישות שבוצעו</button>
+            </div>
+            {vrShell && crmSubTab === 'sources' && (
+              <button type="button" className="vr-button vcs-refresh" onClick={refreshFromBmby} disabled={refreshingCrm} title="משיכה חיה מ-BMBY לתקופה שנבחרה">
+                <RefreshCw size={16} aria-hidden="true" />{refreshingCrm ? 'מרענן נתונים…' : 'רענון נתונים'}
+              </button>
+            )}
             </div>
             {crmSubTab === 'sources' ? (<>{renderCrmDashboard()}{renderCrmAdsDashboard()}</>) : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : crmSubTab === 'meetings' ? renderCrmMeetingsDashboard() : renderCrmReportDashboard()}
           </>)

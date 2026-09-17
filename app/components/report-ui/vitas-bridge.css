@@ -179,17 +179,48 @@
 /* ── CRM › מקורות הגעה (.vcs-root מהחבילה השנייה) ─────────────────────────────── */
 /* טבלת המקורות נשארה עם ה-markup הקיים (פתיחת מקור → מודעות, לחיצה על מספר → רשימת לידים);
    כאן: עמודת המקור דביקה בצד ימין, שורת הסיכום כ-tfoot, גלילה אופקית מקומית (SCREEN-SPEC). */
+/* טבלת המקורות — אותו מראה כמו טבלת הקמפיינים ב"הכל" (ויטלי, 17.9); שורת הסיכום מודגשת */
 .vr-ui .vcs-root .table-wrapper { overflow-x: auto; }
-.vr-ui .vcs-root .data-table { min-inline-size: 1320px; }
-.vr-ui .vcs-root .data-table th:first-child, .vr-ui .vcs-root .data-table td:first-child { position: sticky; inset-inline-start: 0; background: var(--card, #fff); z-index: 1; text-align: start; min-inline-size: 160px; }
-.vr-ui .vcs-root .data-table thead th:first-child { background: #EDF0FC; }
-.vr-ui .vcs-root .data-table tbody tr:nth-child(even) td:first-child { background: #F8FAFF; }
+.vr-ui .vcs-root .data-table td:first-child { text-align: start; font-weight: 700; }
+.vr-ui .vcs-root .data-table td:first-child svg { vertical-align: middle; color: var(--vr-muted, #586581); }
 .vr-ui .vcs-root .data-table tbody tr:last-child td { background: #EAF0FF; font-weight: 750; border-block-start: 2px solid var(--border, #DDE2EC); }
 .vr-ui .vcs-root .vcs-metric-scope { margin-block-end: 12px; }
 .vr-ui .vcs-root .vcs-panel { background: var(--card, #fff); }
-.vr-ui .vcs-root .vcs-stage { border-inline-start-color: var(--indigo, #5B5EF4); }
-/* טאבי הפלטפורמה של המשפך + הכיתוב "הסינון חל על המשפך בלבד" מיושרים לימין */
-.vr-ui .vcs-root .vcs-funnel-toolbar { justify-content: flex-start; }
+.vr-source-mark { display: inline-grid; place-items: center; inline-size: 30px; block-size: 22px; margin-inline-end: 8px; vertical-align: middle; }
+.vr-source-mark svg { display: block; }
+
+/* שורת תתי-הטאבים: הטאבים מימין, כפתור הרענון משמאל (כמו בסקיצה) */
+.vr-ui .vcs-subtabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-block-end: 20px; }
+.vr-ui .vcs-subtabs-row .client-tabs { margin: 0; }
+.vr-ui .vcs-subtabs-row .client-tab { min-block-size: 40px; font-size: 14px; padding-inline: 18px; }
+.vr-ui .vcs-refresh { gap: 8px; min-block-size: 40px; }
+
+/* המשפך לפי הסקיצה */
+.vr-ui .vcs-root .vcs-funnel-toolbar { justify-content: flex-start; gap: 20px; }
+.vr-ui .vcs-root .vcs-adcards { display: flex; gap: 12px; }
+.vr-ui .vcs-root .vcs-adcard { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border: 1px solid var(--border, #DDE2EC); border-radius: 10px; background: var(--card, #fff); min-inline-size: 130px; }
+.vr-ui .vcs-root .vcs-adcard-icon { display: inline-grid; place-items: center; inline-size: 34px; block-size: 34px; border-radius: 8px; background: #EEF1FF; color: var(--indigo, #5B5EF4); }
+.vr-ui .vcs-root .vcs-adcard-label { display: block; font-size: 12px; color: var(--vr-muted, #586581); }
+.vr-ui .vcs-root .vcs-adcard strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.vr-ui .vcs-root .vcs-filter-note { margin-inline-start: auto; }
+.vr-ui .vcs-root .vcs-funnel { display: flex; align-items: flex-start; gap: 0; min-inline-size: 0; grid-template-columns: none; }
+.vr-ui .vcs-root .vcs-stage-column { flex: 1 1 0; min-inline-size: 0; display: flex; flex-direction: column; }
+.vr-ui .vcs-root .vcs-stage-row { display: flex; align-items: center; gap: 0; }
+.vr-ui .vcs-root .vcs-arrow { flex: 0 0 auto; inline-size: 52px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #98A0B2; }
+.vr-ui .vcs-root .vcs-arrow b { font-size: 12.5px; font-weight: 700; color: var(--vr-muted, #586581); font-variant-numeric: tabular-nums; }
+.vr-ui .vcs-root .vcs-stage { flex: 1 1 auto; min-inline-size: 0; padding: 14px 14px 14px 12px; border: 1px solid var(--border, #DDE2EC); border-inline-start: 4px solid var(--vr-accent, var(--indigo, #5B5EF4)); border-radius: 10px; min-block-size: 0; }
+.vr-ui .vcs-root .vcs-stage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vr-ui .vcs-root .vcs-stage-head h3 { font-size: 14px; font-weight: 700; color: var(--vr-text, #142044); }
+.vr-ui .vcs-root .vcs-stage-icon { color: var(--vr-accent, var(--indigo, #5B5EF4)); display: inline-flex; }
+.vr-ui .vcs-root .vcs-stage-value { font-size: 28px; font-weight: 800; margin-block: 6px 0 !important; }
+.vr-ui .vcs-root .vcs-tone-indigo { --vr-accent: var(--indigo, #5B5EF4); } .vr-ui .vcs-root .vcs-tone-emerald { --vr-accent: var(--emerald, #10B981); }
+.vr-ui .vcs-root .vcs-tone-sky { --vr-accent: var(--sky, #0EA5E9); } .vr-ui .vcs-root .vcs-tone-rose { --vr-accent: var(--rose, #F43F5E); }
+.vr-ui .vcs-root .vcs-cancellation { margin-inline-start: 52px; margin-block-start: 22px; }
+.vr-ui .vcs-root .vcs-cancellation::before { block-size: 22px; }
+.vr-ui .vcs-root .vcs-transition-note { margin-block-start: 6px; }
+/* דונאט: מקרא עם ספירה ואחוז */
+.vr-ui .vcs-root .vcs-legend li { padding-block: 14px; }
+.vr-ui .vcs-root .vcs-legend strong em { font-style: normal; color: var(--vr-muted, #586581); font-weight: 600; }
 
 /* ── טקסט כללי בתוך .vr-ui ──────────────────────────────────────────────────── */
 .vr-ui { font-size: 15px; }
