@@ -21,6 +21,7 @@
 | `crm_raw` | 006 | רשומה גולמית לכל ישות (BMBY: clients/tasks/price_offers/contracts; Zoho: leads/deals; Salesforce: leads/opportunities/line_items/lead_history), PK (project, crm_type, entity, ext_id) | ה-routes של ה-CRM בכל ריצה |
 | `crm_compact` | 009, 010 | שורה אחת לפרויקט (BMBY מוקרן ל-~30 שדות; Zoho מלא) + `built_at`. **לא ל-Salesforce** | `rebuild_crm_compact()` ב-DB, מיד אחרי כל upsert ל-`crm_raw` |
 | (Salesforce) | 011 | אין תמונה דחוסה: `crm_slice_salesforce(project, from, to)` חותך מ-`crm_raw` רק את רשומות הטווח (לידים/פגישות בחלון, ההיסטוריה שלהם, הזדמנויות בחלון + cohort, פריטים). 60k רשומות → מאות | נקרא מ-`/api/reports/range` |
+| `crm_sync` | 013 | דופק משיכה: שורה לכל (פרויקט, CRM, ישות) — `synced_at`, `seen`, `written`. ממנו הטריות ב-health ובחיתוך Salesforce | `upsertRawRecords` בכל משיכה |
 | `ad_daily` | 007 | יום × חשבון × מודעה × גיל × מגדר; RPC `ad_daily_aggregate`, `ad_daily_coverage` | `lib/ads/daily-sync.js` |
 | `job_log` | 008 | ריצות רקע (30 יום) | `lib/job-log.js` |
 
@@ -82,5 +83,9 @@ app/api/cron/prefetch-daily/route.js   קרון שעתי (cron-job.org, דקה 2
   `const results = []`, עם החלפת `await soql(...)`/`Promise.all` ב-E) ולעדכן את החיקוי ב-`salesforce-summary.js`
   אם נוספה שאילתה. `npm run test:crm` בודק את שניהם.
 - **שדה חדש בחישוב BMBY:** להוסיף גם להקרנה ב-`rebuild_crm_compact_bmby` (מיגרציה 010).
+- **כתיבה של שינויים בלבד (013):** לכל רשומה ב-`crm_raw` נשמר `payload_hash`; `crm_raw_upsert` מעדכן רק אם ה-hash
+  שונה, ו-`rebuildCompactIfChanged` בונה את התמונה הדחוסה מחדש רק אם משהו נכתב (אחרת `touchCompact`). לכן
+  `fetched_at` של רשומה = "מתי השתנתה", והטריות נקראת מ-`crm_compact.source_fetched_at` / `crm_sync.synced_at`.
+  עד שהמיגרציה רצה הקוד נופל חזרה ל-upsert הרגיל.
 - **חשבון מודעות חדש:** מספיק להוסיף ל-`META_AD_ACCOUNT_IDS` / `GOOGLE_ADS_CUSTOMER_IDS`; backfill מתמלא לבד.
 - **מילוי היסטורי:** `AD_DAILY_BACKFILL_SINCE` (ברירת מחדל 2026-01-01), `ZOHO_BACKFILL_SINCE` (2026-01).
