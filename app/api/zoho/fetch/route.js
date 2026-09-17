@@ -302,7 +302,7 @@ export async function POST(request) {
     return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
   }
   try {
-    const { status, body: responseBody } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId, dealsRefreshDays: gate.admin ? body.dealsRefreshDays : undefined })
+    const { status, body: responseBody } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId, dealsRefreshDays: gate.admin ? body.dealsRefreshDays : undefined, snapshot: gate.admin && body.snapshot === false ? false : undefined })
     return Response.json(responseBody, { status })
   } catch (err) {
     return Response.json({ error: 'runSync threw: ' + (err.message || String(err)) }, { status: 500 })

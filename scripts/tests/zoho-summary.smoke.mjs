@@ -40,6 +40,7 @@ eq('prefiltered path identical', JSON.stringify(R2.summary), JSON.stringify(R.su
 const row = computeCrmRow('zoho', { entities: { leads: rawLeads, deals } }, { since: '2026-09-08', until: '2026-09-15', key: '2026-09-08_2026-09-15' })
 eq('computeCrmRow(zoho) shape', [row.row_count, row.data.length, row.summary.crmType, row.file_name], [2, 2, 'zoho', 'Zoho snapshot (computed)'])
 eq('totalKeysFor(zoho) dotted paths resolve', getPath(row.summary, totalKeysFor('zoho')[3]), 1)
-eq('computeCrmRow(salesforce) not yet', computeCrmRow('salesforce', { entities: {} }, { since: '2026-09-01', until: '2026-09-02', key: 'x' }), null)
+// שלב 4ב: Salesforce מחושב גם הוא (ציפייה ישנה: null)
+eq('computeCrmRow(salesforce) computes', computeCrmRow('salesforce', { entities: {} }, { since: '2026-09-01', until: '2026-09-02', key: 'x' })?.summary?.crmType, 'salesforce')
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')

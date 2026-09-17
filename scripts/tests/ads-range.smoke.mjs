@@ -21,7 +21,7 @@ eq('KLOSS by agency account + keyword', rows.filter(projectRowFilter(kloss, 'fac
 eq('sub-project matcher prefers the longer name', subProjectMatcher(shami.sub_projects)('AD 2 | שמי כללי | x'), 'שמי כללי')
 eq('slim projects', [isSlimProject(hiPark), isSlimProject(kloss)], [true, false])
 const t = computeTotals(rows)
-eq('computeTotals sums + ratios', [t.spend, t.leads, t.cpl, Math.round(t.ctr * 100) / 100], [35, 3, 35 / 3, 5])
+eq('computeTotals sums + ratios', [t.spend, t.leads, t.cpl, Math.round(t.ctr * 100) / 100], [35, 3, 35 / 3, 4.29])   // CTR = 15 קליקים / 350 חשיפות
 
 // daily-store
 const d1 = normalizeDailyRow({ source: 'facebook', account: '111', day: '2026-09-15', campaign_id: 'c', campaign: 'C', adset_id: 's', adset: 'S', ad_id: 'a', ad: 'A', age: '25-34', gender: 'female', spend: '12.5', impressions: '100', reach: '50', clicks: '4', leads: 1 })
