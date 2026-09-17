@@ -27,6 +27,7 @@ const STALE_HOURS = 3
 const JOBS = [
   { job: 'prefetch-ads', label: 'קרון מודעות (Meta/Google)' },
   { job: 'prefetch-crm', label: 'קרון CRM (BMBY/Zoho)' },
+  { job: 'prefetch-daily', label: 'קרון עובדות יומיות (ad_daily / תמונות CRM)' },
 ]
 
 export async function GET(request) {
