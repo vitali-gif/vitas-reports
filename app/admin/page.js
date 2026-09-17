@@ -370,13 +370,13 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
         return
       }
       await loadClientAccess()
-      if (result.tempPassword) {
-        setAccessCreds({ email: result.email, password: result.tempPassword, loginUrl: result.loginUrl, emailSent: result.emailSent, clientName: result.clientName })
+      if (result.inviteLink) {
+        setAccessCreds({ email: result.email, inviteLink: result.inviteLink, loginUrl: result.loginUrl, emailSent: result.emailSent, clientName: result.clientName })
       }
       if (result.emailSent) {
-        showToast(`✓ גישה נוספה ל-${result.clientName} — קישור נשלח במייל`)
+        showToast(`✓ גישה נוספה ל-${result.clientName} — קישור כניסה נשלח במייל`)
       } else {
-        showToast('⚠️ המייל לא נשלח — פרטי הגישה מוצגים למטה להעברה ידנית')
+        showToast('⚠️ המייל לא נשלח — הקישור מוצג להעברה ידנית')
       }
     } else {
       const err = await res.json()
@@ -5435,7 +5435,7 @@ const selectProject = async (client, project) => {
             </div>
             <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:16,lineHeight:1.6}}>
               הוסף מייל של איש קשר, בחר לקוח וסמן <strong>אילו פרויקטים</strong> הוא יראה (ברירת מחדל: כולם).
-              הוא ייכנס ל-<strong>reports.vitas.co.il/client</strong> עם הסיסמה שתישלח אליו במייל.
+              הוא יקבל במייל קישור כניסה חד-פעמי ויבחר סיסמה בעצמו. לא נשלחת סיסמה במייל.
               לעריכת גישה קיימת — לחץ על תגית הפרויקטים בטבלה.
             </p>
 
@@ -5498,10 +5498,10 @@ const selectProject = async (client, project) => {
               {caEmailExists && (
                 <div style={{display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',borderRadius:10,
                   background:'rgba(245,158,11,0.10)',border:'1px solid rgba(245,158,11,0.35)',fontSize:12.5,lineHeight:1.5}}>
-                  <span style={{color:'#B45309',fontWeight:600}}>למייל הזה כבר יש גישה. שמירה תעדכן את סט הפרויקטים בלי לאפס את הסיסמה.</span>
+                  <span style={{color:'#B45309',fontWeight:600}}>למייל הזה כבר יש גישה. שמירה תעדכן את סט הפרויקטים בלי לשלוח מייל.</span>
                   <label style={{display:'inline-flex',alignItems:'center',gap:6,cursor:'pointer',color:'var(--text-secondary)'}}>
                     <input type="checkbox" checked={caResendPassword} onChange={e => setCaResendPassword(e.target.checked)} style={{margin:0}} />
-                    לאפס סיסמה ולשלוח חדשה במייל (הלקוח איבד את הסיסמה)
+                    לשלוח קישור כניסה חדש במייל (הלקוח לא מצא את המייל / שכח סיסמה). הסיסמה הקיימת לא משתנה.
                   </label>
                 </div>
               )}
@@ -5694,7 +5694,7 @@ const selectProject = async (client, project) => {
       )}
 
       {accessCreds && (() => {
-        const _wa = `שלום 👋\nנוצרה עבורך גישה לדשבורד${accessCreds.clientName ? ' של ' + accessCreds.clientName : ''}.\n\nכתובת: ${accessCreds.loginUrl}\nאימייל: ${accessCreds.email}\nסיסמה: ${accessCreds.password}`
+        const _wa = `שלום 👋\nנוצרה עבורך גישה לדשבורד${accessCreds.clientName ? ' של ' + accessCreds.clientName : ''}.\n\nשם משתמש: ${accessCreds.email}\nלכניסה ראשונה ובחירת סיסמה (קישור חד-פעמי):\n${accessCreds.inviteLink}\n\nכניסות הבאות: ${accessCreds.loginUrl}`
         return (
         <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setAccessCreds(null); }} style={{zIndex:9999}}>
           <div className="modal" style={{maxWidth:440,direction:'rtl'}}>
@@ -5702,19 +5702,19 @@ const selectProject = async (client, project) => {
               <h3 style={{margin:0,fontSize:16,fontWeight:700}}>פרטי גישה{accessCreds.clientName ? ' — ' + accessCreds.clientName : ''}</h3>
               <button onClick={() => setAccessCreds(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
             </div>
-            <div style={{fontSize:12,color: accessCreds.emailSent ? '#059669' : '#b45309',marginBottom:14}}>{accessCreds.emailSent ? '✓ נשלח גם במייל' : '⚠️ המייל לא נשלח — שלח את הפרטים ידנית (וואטסאפ)'}</div>
+            <div style={{fontSize:12,color: accessCreds.emailSent ? '#059669' : '#b45309',marginBottom:14}}>{accessCreds.emailSent ? '✓ נשלח במייל קישור כניסה חד-פעמי (הלקוח בוחר סיסמה בעצמו)' : '⚠️ המייל לא נשלח — שלח את הקישור ידנית (וואטסאפ). הקישור לשימוש חד-פעמי.'}</div>
             <div style={{background:'#f8fafc',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',marginBottom:14}}>
               <table style={{width:'100%',fontSize:14}}>
                 <tbody>
                   <tr><td style={{color:'#64748b',padding:'4px 0'}}>כתובת</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{accessCreds.loginUrl}</td></tr>
                   <tr><td style={{color:'#64748b',padding:'4px 0'}}>אימייל</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{accessCreds.email}</td></tr>
-                  <tr><td style={{color:'#64748b',padding:'4px 0'}}>סיסמה</td><td style={{fontWeight:700,direction:'ltr',textAlign:'right',letterSpacing:'0.05em'}}>{accessCreds.password}</td></tr>
+                  <tr><td style={{color:'#64748b',padding:'4px 0',verticalAlign:'top'}}>קישור כניסה</td><td style={{fontSize:11,direction:'ltr',textAlign:'right',wordBreak:'break-all',color:'var(--text-2,#475569)'}}>{accessCreds.inviteLink}</td></tr>
                 </tbody>
               </table>
             </div>
             <div style={{display:'flex',gap:8}}>
               <button onClick={() => { navigator.clipboard?.writeText(_wa).catch(()=>{}); showToast('✓ הודעת וואטסאפ הועתקה'); }} style={{flex:1,background:'#25D366',color:'#fff',border:'none',borderRadius:8,padding:'10px',fontSize:14,fontWeight:600,cursor:'pointer'}}>העתק הודעת וואטסאפ</button>
-              <button onClick={() => { navigator.clipboard?.writeText(accessCreds.password).catch(()=>{}); showToast('✓ הסיסמה הועתקה'); }} style={{background:'#fff',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px',fontSize:14,cursor:'pointer'}}>העתק סיסמה</button>
+              <button onClick={() => { navigator.clipboard?.writeText(accessCreds.inviteLink).catch(()=>{}); showToast('✓ הקישור הועתק'); }} style={{background:'#fff',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px',fontSize:14,cursor:'pointer'}}>העתק קישור</button>
             </div>
           </div>
         </div>

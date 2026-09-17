@@ -122,7 +122,7 @@ export async function POST(req) {
   const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: 'magiclink',
     email: cleanEmail,
-    options: { redirectTo: `${siteUrl}/client` }
+    options: { redirectTo: `${siteUrl}/client?setpw=1` }   // אחרי כניסה בקישור — הצעה לקבוע סיסמה
   })
 
   if (linkError || !linkData?.properties?.action_link) {
