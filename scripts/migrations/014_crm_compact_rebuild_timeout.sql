@@ -15,9 +15,9 @@ alter role service_role set statement_timeout = '60s';
 
 -- בנייה מיידית של ה-compact שהתיישן (רץ כאן כ-postgres, בלי מגבלת ה-8s).
 -- rebuildCompactIfChanged בקרון בונה מחדש רק אחרי שינוי ב-crm_raw, אז לא מחכים לו.
-select p.name, public.rebuild_crm_compact_bmby(p.id)
-from public.projects p
-where p.crm_type = 'bmby';
+select p.name, public.rebuild_crm_compact_bmby(c.project_id)
+from public.crm_compact c join public.projects p on p.id = c.project_id
+where c.crm_type = 'bmby';
 
 -- בדיקה: built_at אמור להיות עכשיו לכל פרויקטי BMBY
 select p.name, c.crm_type, c.built_at, c.source_fetched_at
