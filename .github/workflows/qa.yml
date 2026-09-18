@@ -1,0 +1,97 @@
+name: QA
+
+# ─────────────────────────────────────────────────────────────────────────────
+# שלוש שכבות (docs/qa.md):
+#   1. unit  — בדיקות היחידה של חישובי ה-CRM/המודעות + שומר תבנית ההרשאה. בכל PR ובכל push ל-main.
+#   2. build — next build עם משתני הסביבה הציבוריים. PR שלא נבנה לא מתמזג.
+#   3. e2e   — Playwright בצד הלקוח: אחרי כל פריסת preview של Vercel (מול ה-preview עצמו),
+#              כל בוקר מול פרודקשן (05:30 UTC = 08:30 בישראל, אחרי ריצת הקרונים הראשונה), וידנית.
+#
+# הגדרה חד-פעמית (Settings → Secrets and variables → Actions):
+#   Variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY   (ציבוריים — מוטמעים בדפדפן ממילא)
+#   Secrets:   QA_CLIENT_EMAIL, QA_CLIENT_PASSWORD                        (משתמש QA עם גישה לכל הפרויקטים)
+#              VERCEL_AUTOMATION_BYPASS_SECRET                            (Vercel → Project → Deployment Protection)
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  deployment_status:
+  schedule:
+    - cron: '30 5 * * *'
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'כתובת לבדיקת E2E (ריק = פרודקשן)'
+        required: false
+        default: ''
+
+concurrency:
+  group: qa-${{ github.workflow }}-${{ github.event.pull_request.number || github.event.deployment_status.environment_url || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    name: בדיקות יחידה + שומר הרשאות
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run check:auth
+      - run: npm test
+
+  build:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    name: next build
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Check public env vars
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::error::חסרים repository variables: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY (ראו כותרת הקובץ)"
+            exit 1
+          fi
+      - run: npm run build
+
+  e2e:
+    # deployment_status: רק פריסות preview שהצליחו (פרודקשן נבדק בבוקר). schedule/dispatch: פרודקשן.
+    if: >
+      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success' && github.event.deployment.environment != 'Production')
+      || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: E2E צד הלקוח
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      QA_BASE_URL: ${{ github.event_name == 'deployment_status' && github.event.deployment_status.environment_url || inputs.base_url || 'https://reports.vitas.co.il' }}
+      QA_CLIENT_EMAIL: ${{ secrets.QA_CLIENT_EMAIL }}
+      QA_CLIENT_PASSWORD: ${{ secrets.QA_CLIENT_PASSWORD }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Which target
+        run: |
+          echo "E2E against: $QA_BASE_URL"
+          if [ -z "$QA_CLIENT_EMAIL" ]; then echo "::warning::QA_CLIENT_EMAIL/QA_CLIENT_PASSWORD לא מוגדרים — רצות רק בדיקות מסך הכניסה"; fi
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: playwright-report
+          retention-days: 14
