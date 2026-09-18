@@ -9,6 +9,12 @@
  *
  * הרשאה: Authorization: Bearer <CRON_SECRET> (כמו שאר הקרונים; cron-job.org).
  * מומלץ לתזמן כל שעה בדקה 25 — לא מתנגש עם prefetch-ads (:07) / prefetch-crm (:37) / health (:15).
+ *
+ * תקציב הזמן (18.9.2026): הפונקציה נהרגת ב-300s בלי אזהרה, וכל מה שאחרי — job_log של ה-backfill,
+ * שלבי Zoho/Salesforce, ה-heartbeat — פשוט לא קורה. כך זה היה כמעט בכל ריצה (ב-7 ימים: recent נרשם
+ * 37 פעמים, backfill 3, Zoho/Salesforce 0), והשומר התריע "קרון נתקע" בזמן שהקרון דווקא רץ.
+ * לכן: (1) heartbeat נכתב מיד אחרי recent — השלב הקריטי; (2) כל שלב מקבל deadline קשיח
+ * (HARD_MS) שנאכף גם באמצע משיכה; (3) הרענונים הקצרים של ה-CRM רצים לפני ה-backfill הפתוח.
  */
 import { createClient } from '@supabase/supabase-js'
 import { runDailySync } from '../../../../lib/ads/daily-sync.js'
@@ -18,8 +24,14 @@ export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 export const maxDuration = 300
 
+/** גבול העבודה בפועל — מרווח מול ה-300s של Vercel לכתיבת job_log/heartbeat ולתשובה. */
+const HARD_MS = 280000
+/** תקרה לקריאה פנימית אחת (zoho/salesforce fetch) — הנתיב ממשיך לרוץ בצד שלו גם אם ננתק. */
+const INTERNAL_TIMEOUT_MS = 60000
+
 export async function GET(request) {
   const startedAt = Date.now()
+  const left = () => HARD_MS - (Date.now() - startedAt)
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '').trim()
   if (!process.env.CRON_SECRET || bearer !== process.env.CRON_SECRET) {
@@ -30,72 +42,75 @@ export async function GET(request) {
   if (!supabaseUrl || !supabaseKey) return Response.json({ ok: false, error: 'env missing' }, { status: 500 })
   const sb = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 
+  // heartbeat = "הקרון רץ והשלים את השלב הקריטי". השומר (health) מתריע כשהוא מתיישן.
+  const beat = async () => { try { await sb.from('cron_heartbeat').upsert({ job: 'prefetch-daily', last_run: new Date().toISOString() }, { onConflict: 'job' }) } catch {} }
+
   const out = {}
-  // recent קודם (הנתונים הטריים חשובים יותר), ואז backfill עם מה שנשאר מהתקציב.
+  // ── 1. recent — הנתונים הטריים חשובים יותר מכל השאר ────────────────────────────────
   const recent = await runDailySync(sb, { mode: 'recent', budgetMs: 150000, job: 'prefetch-daily:recent' })
   out.recent = { ok: recent.body.ok, jobs: recent.body.jobs, failed: recent.body.failed, deferred: recent.body.deferred, ms: recent.body.ms,
     errors: (recent.body.results || []).filter(r => !r.ok && !r.deferred).map(r => `${r.source}/${r.account}: ${r.error}`).slice(0, 5) }
-  const left = 270000 - (Date.now() - startedAt)
-  if (left > 40000) {
-    const bf = await runDailySync(sb, { mode: 'backfill', budgetMs: left - 10000, job: 'prefetch-daily:backfill' })
+  await beat()
+
+  // ── 2. CRM (שלב 4): רענונים קצרים לפני ה-backfill הפתוח, כדי שיקבלו בכלל תור ──────────
+  // Zoho: עסקאות שהשתנו ב-3 הימים האחרונים. Salesforce (KLOSS): מה שהשתנה ב-3 הימים האחרונים.
+  // במקביל, כל אחד עם תקרת זמן משלו; הקרון הרגיל (prefetch-crm) מכסה את החודשים/הטווחים.
+  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
+  const internal = (body) => ({ method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.CRON_SECRET || '' }, body: JSON.stringify(body), signal: AbortSignal.timeout(INTERNAL_TIMEOUT_MS) })
+  const callInternal = async (path, body) => {
+    const t0 = Date.now()
+    try {
+      const r = await fetch(`${base}${path}`, internal(body))
+      const d = await r.json().catch(() => ({}))
+      return { ok: r.ok && d.ok !== false, ms: Date.now() - t0, data: d }
+    } catch (err) {
+      return { ok: false, ms: Date.now() - t0, data: {}, error: String(err?.name === 'TimeoutError' ? `timeout after ${INTERNAL_TIMEOUT_MS}ms` : (err?.message || err)).slice(0, 200) }
+    }
+  }
+  if (left() > INTERNAL_TIMEOUT_MS + 90000) {
+    const [z, s] = await Promise.all([
+      callInternal('/api/zoho/fetch', { dealsRefreshDays: 3 }),
+      callInternal('/api/salesforce/fetch', { modifiedRefreshDays: 3 }),
+    ])
+    out.zohoDeals = { ok: z.ok, ms: z.ms, error: z.error, projects: (z.data.projects || []).map(p => ({ project: p.project, ok: p.ok, deals: p.deals, error: p.error })) }
+    await logJob(sb, 'prefetch-daily:zoho-deals', z.ok, z.ms, out.zohoDeals)
+    out.sfModified = { ok: s.ok, ms: s.ms, counts: s.data.counts, error: s.error || s.data.error }
+    await logJob(sb, 'prefetch-daily:sf-modified', s.ok, s.ms, out.sfModified)
+  } else {
+    out.zohoDeals = { skipped: 'time budget' }
+    out.sfModified = { skipped: 'time budget' }
+  }
+
+  // ── 3. backfill של ad_daily — צעד אחד (חודש לכל חשבון), עם מה שנשאר מהתקציב ─────────
+  // 25s מרווח: כתיבת השורות של המשימה האחרונה (נקטעת רק המשיכה, לא ה-upsert) + job_log.
+  const bfBudget = left() - 25000
+  if (bfBudget > 40000) {
+    const bf = await runDailySync(sb, { mode: 'backfill', budgetMs: bfBudget, job: 'prefetch-daily:backfill' })
     out.backfill = { ok: bf.body.ok, done: bf.body.done, jobs: bf.body.jobs, failed: bf.body.failed, deferred: bf.body.deferred, ms: bf.body.ms,
       errors: (bf.body.results || []).filter(r => !r.ok && !r.deferred).map(r => `${r.source}/${r.account} ${r.since}..${r.until}: ${r.error}`).slice(0, 5) }
   } else {
     out.backfill = { skipped: 'time budget' }
   }
 
-  // ── Zoho (שלב 4): רענון עסקאות שהשתנו + צעד מילוי היסטורי של חודש אחד ─────────────
-  // הקרון הרגיל (prefetch-crm) מכסה 3 חודשים + טווחים; ההיסטוריה מ-2026-01 ממולאת כאן חודש-חודש,
-  // חודש אחד לשעה, ומצבו נשמר ב-job_log (החודש האחרון שמולא). בלי טריגר ידני.
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
-  const internal = { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.CRON_SECRET || '' } }
-  const leftZ = 270000 - (Date.now() - startedAt)
-  if (leftZ > 60000) {
-    const t0 = Date.now()
-    try {
-      const r = await fetch(`${base}/api/zoho/fetch`, { ...internal, body: JSON.stringify({ dealsRefreshDays: 3 }) })
-      const d = await r.json().catch(() => ({}))
-      out.zohoDeals = { ok: r.ok && d.ok !== false, ms: Date.now() - t0, projects: (d.projects || []).map(p => ({ project: p.project, ok: p.ok, deals: p.deals, error: p.error })) }
-      await logJob(sb, 'prefetch-daily:zoho-deals', out.zohoDeals.ok, Date.now() - t0, out.zohoDeals)
-    } catch (err) { out.zohoDeals = { ok: false, error: String(err).slice(0, 200) } }
-
-    // Salesforce (KLOSS): מה שהשתנה ב-3 הימים האחרונים — סטטוסים, שלבים, פריטים, היסטוריה.
-    {
-      const t2 = Date.now()
-      try {
-        const r = await fetch(`${base}/api/salesforce/fetch`, { ...internal, body: JSON.stringify({ modifiedRefreshDays: 3 }) })
-        const d = await r.json().catch(() => ({}))
-        out.sfModified = { ok: r.ok && d.ok !== false, ms: Date.now() - t2, counts: d.counts, error: d.error }
-        await logJob(sb, 'prefetch-daily:sf-modified', out.sfModified.ok, Date.now() - t2, out.sfModified)
-      } catch (err) { out.sfModified = { ok: false, error: String(err).slice(0, 200) } }
-    }
-
-    // צעד מילוי: החודש שלפני האחרון שמולא (או שלפני שלושת החודשים שהקרון הרגיל מכסה), עד ZOHO_BACKFILL_SINCE.
-    const floor = (process.env.ZOHO_BACKFILL_SINCE || '2026-01')
-    const prevMonth = (ym) => { const [y, m] = ym.split('-').map(Number); const d = new Date(Date.UTC(y, m - 2, 1)); return d.toISOString().slice(0, 7) }
-    const nowIl = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit' }).format(new Date())
-    const last = (await lastRuns(sb, 'prefetch-daily:zoho-backfill', 1))[0]
-    const target = last?.detail?.month ? prevMonth(last.detail.month) : prevMonth(prevMonth(prevMonth(nowIl)))
-    if (target < floor || last?.detail?.done) {
-      out.zohoBackfill = { done: true, floor }
-    } else if (270000 - (Date.now() - startedAt) > 60000) {
-      const t1 = Date.now()
-      try {
-        const r = await fetch(`${base}/api/zoho/fetch`, { ...internal, body: JSON.stringify({ month: target }) })
-        const d = await r.json().catch(() => ({}))
-        const ok = r.ok && d.ok !== false
-        out.zohoBackfill = { ok, month: target, ms: Date.now() - t1, projects: (d.projects || []).map(p => ({ project: p.project, leads: p.leads, error: p.error })) }
-        await logJob(sb, 'prefetch-daily:zoho-backfill', ok, Date.now() - t1, { month: target, done: prevMonth(target) < floor, projects: out.zohoBackfill.projects })
-      } catch (err) { out.zohoBackfill = { ok: false, month: target, error: String(err).slice(0, 200) } }
-    } else {
-      out.zohoBackfill = { skipped: 'time budget', next: target }
-    }
+  // ── 4. Zoho: צעד מילוי היסטורי של חודש אחד (מ-ZOHO_BACKFILL_SINCE ואילך), רק כשנשאר זמן ──
+  // מצבו נשמר ב-job_log (החודש האחרון שמולא). בלי טריגר ידני.
+  const floor = (process.env.ZOHO_BACKFILL_SINCE || '2026-01')
+  const prevMonth = (ym) => { const [y, m] = ym.split('-').map(Number); const d = new Date(Date.UTC(y, m - 2, 1)); return d.toISOString().slice(0, 7) }
+  const nowIl = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit' }).format(new Date())
+  const last = (await lastRuns(sb, 'prefetch-daily:zoho-backfill', 1))[0]
+  const target = last?.detail?.month ? prevMonth(last.detail.month) : prevMonth(prevMonth(prevMonth(nowIl)))
+  if (target < floor || last?.detail?.done) {
+    out.zohoBackfill = { done: true, floor }
+  } else if (left() > INTERNAL_TIMEOUT_MS + 10000) {
+    const r = await callInternal('/api/zoho/fetch', { month: target })
+    out.zohoBackfill = { ok: r.ok, month: target, ms: r.ms, error: r.error, projects: (r.data.projects || []).map(p => ({ project: p.project, leads: p.leads, error: p.error })) }
+    await logJob(sb, 'prefetch-daily:zoho-backfill', r.ok, r.ms, { month: target, done: prevMonth(target) < floor, projects: out.zohoBackfill.projects })
   } else {
-    out.zohoDeals = { skipped: 'time budget' }
+    out.zohoBackfill = { skipped: 'time budget', next: target }
   }
 
-  // heartbeat + גיזום הלוג
-  try { await sb.from('cron_heartbeat').upsert({ job: 'prefetch-daily', last_run: new Date().toISOString() }, { onConflict: 'job' }) } catch {}
+  // heartbeat סופי + גיזום הלוג
+  await beat()
   if (new Date().getUTCHours() === 3) await pruneJobLog(sb, 30)
 
   const ok = out.recent.ok !== false && out.backfill.ok !== false
