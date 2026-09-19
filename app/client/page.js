@@ -48,6 +48,7 @@ export default function ClientPage() {
   // ── PWA: register service worker + capture install prompt ──────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    window.__vitasHydrated = true;   // הסקריפט ה-inline במסך הטעינה בודק את זה אחרי 15 שניות
     // Register SW
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -251,12 +252,24 @@ export default function ClientPage() {
   }
 
   // ── Auth screens ──────────────────────────────────────────────────────────
+  // הדף הסטטי (לפני hydration) מציג את הספינר הזה. אם ה-JS לא נטען בכלל (קובץ chunk שחזר 502 ברשת
+  // רעועה — נמדד 19.9), React לא עולה ואף קוד שלנו לא רץ: הספינר נשאר לנצח בלי מוצא. לכן סקריפט
+  // inline קטן, שרץ ישר מה-HTML, חושף אחרי 15 שניות כפתור "טען מחדש" אם ה-hydration לא סומן.
   if (loading) return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)'}}>
       <div style={{textAlign:'center'}}>
         <div style={{width:44,height:44,border:'3px solid var(--indigo,#5B5EF4)',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite',margin:'0 auto 16px'}}/>
         <p style={{color:'var(--text-3)',fontSize:14}}>טוען...</p>
+        <div id="vitas-stuck" style={{display:'none',marginTop:18}}>
+          <p style={{color:'var(--text-3)',fontSize:13,margin:'0 0 10px'}}>הטעינה לוקחת יותר מהרגיל.</p>
+          <button type="button" onClick={() => window.location.reload()}
+            style={{padding:'10px 22px',background:'var(--indigo,#5B5EF4)',color:'#fff',border:'none',borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+            טען מחדש
+          </button>
+        </div>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <script dangerouslySetInnerHTML={{ __html:
+          "setTimeout(function(){if(window.__vitasHydrated)return;var e=document.getElementById('vitas-stuck');if(!e)return;e.style.display='block';var b=e.querySelector('button');if(b)b.onclick=function(){location.reload()}},15000);" }} />
       </div>
     </div>
   )

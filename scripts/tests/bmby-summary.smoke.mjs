@@ -43,7 +43,9 @@ eq('crmReportRows: 2 period leads + 1 contract-only row (signed contract of an o
 eq('namedLeads.all.allLeads', R.namedLeads.all.allLeads.map(e => e.name), ['דנה לוי', 'יוסי כהן'])
 eq('adBreakdown node for AD 1 has adId', R.adBreakdown.find(a => a.ad === 'AD 1')?.adId, '111')
 eq('not skipped (short range)', R._skippedBroken, false)
-eq('schema version exported', CRM_SCHEMA_VERSION, 33)
+// v34 (ענף redesign): responseTimeStats.noResponseBySource/ByUser. הקבוע עלה ב-lib/crm/schema-version.js
+// ולא כאן, ולכן הבדיקה נכשלה עוד לפני המיזוג של main. להעלות כאן בכל bump של CRM_SCHEMA_VERSION.
+eq('schema version exported', CRM_SCHEMA_VERSION, 34)
 for (const k of ['hourlyApptStats', 'hourlyLeadStats', 'hourlyContactStats', 'hourlyContactMeeting', 'noAnswerContactHour']) eq(`${k} has 24 buckets`, R[k].length, 24)
 eq('dayOfWeekStats has 7 days', Object.keys(R.dayOfWeekStats).length, 7)
 eq('meetingDayOfWeek has 7 days', Object.keys(R.meetingDayOfWeek).length, 7)

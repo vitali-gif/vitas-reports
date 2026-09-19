@@ -31,6 +31,7 @@ import SourceDistribution from '../components/report-ui/SourceDistribution'
 import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download } from 'lucide-react'
 // צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
+import MeetingsTab from '../components/meetings/MeetingsTab'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -425,6 +426,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // ── Demo mode detection ────────────────────────────────────────────────
   // מוגדר כאן ולא למטה, כי applyPreset/applyCustomRange צריכים אותו.
   const isDemoProject = !!(selectedProject?.is_demo)
+  // ישיבות שיווק (שלב 1, docs/meetings-plan.md). כבוי כברירת מחדל: הטאב מופיע רק כש-
+  // NEXT_PUBLIC_MEETINGS_ENABLED='1'. זו דרך הכיבוי שה-ACCEPTANCE דורש לפיילוט.
+  const meetingsOn = process.env.NEXT_PUBLIC_MEETINGS_ENABLED === '1' && !isDemoProject && !!selectedProject?.id
 
   // ── עיצוב מחודש (ענף redesign, design/handoff-v1): פיילוט נדל"ן, טאב "הכל" בלבד ──
   // opt-in מפורש: לא KLOSS (salesforce), לא BCure (zoho), לא פרויקט הדגמה. כשהדגל דלוק,
@@ -3486,10 +3490,13 @@ const selectProject = async (client, project) => {
           {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}>Google PMax</button>}
             {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
             {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
+            {meetingsOn && <button className={`client-tab ${dashTab === 'meetings' ? 'active' : ''}`} onClick={() => setDashTab('meetings')}>ישיבות שיווק</button>}
             {hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
         </div>
 
-        {dashTab === 'recommendations' ? (() => {
+        {dashTab === 'meetings' ? (
+          <MeetingsTab projectId={selectedProject?.id} isClientView={isClientView} />
+        ) : dashTab === 'recommendations' ? (() => {
           // 60-day rolling window - recommendations are ALWAYS based on the last 60 days,
           // independent of selectedMonth (which only affects the KPI/chart tabs).
           const recWindowMonths = getRecommendationsWindowMonths(60);
@@ -5677,7 +5684,12 @@ const selectProject = async (client, project) => {
         </div>)}
       </>
     );
-  }, [vrMode, vrFb, vrG, vrAds, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
+  }, [vrMode, vrFb, vrG, vrAds, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
+    // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
+    // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
+    // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.
+    // דווקא ה-id ולא האובייקט — עדכון תקציב יוצר אובייקט חדש ואין סיבה לבנות מחדש בגללו.
+    meetingsOn, selectedProject?.id, isClientView]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 

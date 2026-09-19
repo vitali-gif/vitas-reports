@@ -1,0 +1,55 @@
+-- 016_delete_clients_urban_nof_adama.sql
+--
+-- ⚠️ כבר הורץ על הפרודקשן ב-19.9.2026 לבקשת ויטלי. הקובץ הוא תיעוד + rollback, לא משימה להרצה.
+--    אין להריץ שוב: ה-DELETE לא ימצא כלום, וה-rollback ייצור לקוחות חדשים בטעות.
+--
+-- מה נמחק ולמה
+-- ─────────────
+-- 1. "קבוצת אורבן" — לקוח ריק מ-1.6.2026: 0 פרויקטים, 0 דוחות, 0 הרשאות. שארית מניסוי.
+-- 2. "נוף אדמה בע״מ" — הלקוח הבדוי של פרויקט הדמו "אופק ים" (is_demo = true).
+--    ה-FK של projects→clients הוא ON DELETE CASCADE, ומ-projects יורדים בקסקייד גם
+--    reports, client_access, crm_raw, crm_compact ו-vitas_tasks. בפועל ירדו:
+--      projects       1  (אופק ים)
+--      reports        9  (crm/facebook/google × חודש נוכחי, קודם, רבעון)
+--      client_access  2  (vitalidisel@gmail.com, qa@vitas.co.il)
+--      crm_raw / crm_compact / vitas_tasks / crm_sync — 0 שורות
+--
+-- אחרי המחיקה: 4 לקוחות, 7 פרויקטים, 0 פרויקטי דמו, 0 שורות יתומות.
+--
+-- ⚠️ הדמו יכול לחזור בטעות
+-- ────────────────────────
+-- lib/demo-dataset.js עדיין מכיל meta.client = "נוף אדמה בע״מ" ו-meta.project = "אופק ים",
+-- ו-POST /api/demo {action:'seed'} יוצר את הלקוח והפרויקט מחדש אם אין פרויקט עם is_demo.
+-- כלומר כל הרצת seed תחזיר את "נוף אדמה" לסיידבר. אם רוצים שהדמו לא יחזור — לנטרל את
+-- ה-route או להסיר את הקריאה מ-scripts/demo/README.md. אם רוצים דמו בשם אחר — לערוך את
+-- meta.client / meta.project ואז להריץ seed.
+--
+-- הערה ל-E2E: חשבון qa@vitas.co.il איבד גישה לדמו אבל נשאר עם גישה ל-7 הפרויקטים האמיתיים,
+-- ולכן e2e/client.spec.mjs ממשיך לרוץ על אותם מסכים בדיוק פחות אחד.
+
+-- ═══ מה שהורץ ═══
+-- delete from clients where id = '1c9616b9-f888-49f3-a32d-cd96f8cc0006';  -- קבוצת אורבן
+-- delete from clients where id = '6ea5ab38-f0de-4a47-8828-834b5e32ef51';  -- נוף אדמה בע״מ (+ קסקייד)
+
+-- ═══ ROLLBACK ═══
+-- משחזר את שורות הלקוח/הפרויקט/ההרשאות עם אותם מזהים. 9 דוחות הדמו אינם כאן: הם נגזרים
+-- דטרמיניסטית מ-lib/demo-dataset.js, ולכן משחזרים אותם בהרצת seed ולא ב-SQL.
+--
+-- insert into clients (id, name, color, token, created_at) values
+--   ('1c9616b9-f888-49f3-a32d-cd96f8cc0006', 'קבוצת אורבן',  '#6366F1', 'bd4b7791029afbcaf55ff4765c8030c8', '2026-06-01 22:44:23.074939+00'),
+--   ('6ea5ab38-f0de-4a47-8828-834b5e32ef51', 'נוף אדמה בע״מ', '#0EA5E9', '4db9e0675bfda214322928131e6e7e86', '2026-07-28 06:03:59.691359+00');
+--
+-- insert into projects (id, client_id, name, created_at, is_demo, monthly_budgets, budget_alerts_sent) values
+--   ('b176780c-f31a-4dc7-a86c-1e3d5e145acd', '6ea5ab38-f0de-4a47-8828-834b5e32ef51', 'אופק ים',
+--    '2026-07-28 06:04:00.833505+00', true,
+--    '{"2026-08":36000,"2026-09":36000}'::jsonb,
+--    '{"2026-07":[75],"2026-08":[75],"2026-09":[75]}'::jsonb);
+--
+-- insert into client_access (id, email, project_id, label, created_at) values
+--   ('e916a0d6-4778-4769-9fcb-b3b2e938c7df', 'vitalidisel@gmail.com', 'b176780c-f31a-4dc7-a86c-1e3d5e145acd', 'נוף אדמה בע״מ - אופק ים',      '2026-09-18 21:08:01.414094+00'),
+--   ('0a0df231-9845-4e06-a55c-4373bf93e3b1', 'qa@vitas.co.il',        'b176780c-f31a-4dc7-a86c-1e3d5e145acd', 'QA - נוף אדמה בע״מ - אופק ים', '2026-09-18 22:16:18.437728+00');
+--
+-- ואז, לשחזור 9 הדוחות:
+--   curl -X POST https://reports.vitas.co.il/api/demo \
+--     -H "Authorization: Bearer $CRON_SECRET" -H 'Content-Type: application/json' \
+--     -d '{"action":"seed"}'
