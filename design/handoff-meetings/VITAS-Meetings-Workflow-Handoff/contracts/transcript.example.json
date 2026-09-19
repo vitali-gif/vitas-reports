@@ -1,0 +1,11 @@
+{
+  "exampleOnly": true,
+  "artifactVersion": "demo-transcript-v1",
+  "meetingId": "demo-meeting-001",
+  "timezone": "Asia/Jerusalem",
+  "startedAt": "2026-09-19T10:00:00+03:00",
+  "segments": [
+    {"segmentId": "seg-1", "startMs": 10000, "endMs": 16000, "speakerRef": "speaker-1", "text": "בואו נבדוק מסר שמדבר למשפרי דיור."},
+    {"segmentId": "seg-2", "startMs": 22000, "endMs": 32000, "speakerRef": "speaker-2", "text": "סיכמנו שמנהל הקמפיינים יכין גרסת מודעה למשפרי דיור. בפגישה הבאה נבדוק אותה."}
+  ]
+}

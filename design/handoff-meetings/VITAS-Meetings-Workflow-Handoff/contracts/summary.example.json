@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "exampleOnly": true,
+  "meetingId": "demo-meeting-001",
+  "sourceArtifactVersion": "demo-transcript-v1",
+  "status": "draft",
+  "keyPoints": [
+    {"id": "point-1", "text": "נדון ניסוי במסר למשפרי דיור.", "sourceSegmentIds": ["seg-1"]}
+  ],
+  "decisions": [
+    {"id": "decision-1", "text": "להכין גרסת מודעה עם מסר למשפרי דיור ולבדוק אותה בפגישה הבאה.", "sourceSegmentIds": ["seg-2"]}
+  ],
+  "tasks": [
+    {
+      "id": "draft-task-1",
+      "title": "הכנת גרסת מודעה למשפרי דיור",
+      "decisionId": "decision-1",
+      "ownerMention": "מנהל הקמפיינים",
+      "suggestedAssigneeUserId": null,
+      "dueDateMention": null,
+      "suggestedDueDate": null,
+      "reviewMention": "בפגישה הבאה",
+      "suggestedReviewDate": null,
+      "sourceSegmentIds": ["seg-2"],
+      "missingFields": ["assignee", "dueDate", "reviewDate"],
+      "status": "proposed"
+    }
+  ],
+  "openQuestions": [
+    {"id": "question-1", "text": "מי המשתמש שיוגדר כאחראי, ומה מועד הביצוע?", "sourceSegmentIds": ["seg-2"]}
+  ]
+}
