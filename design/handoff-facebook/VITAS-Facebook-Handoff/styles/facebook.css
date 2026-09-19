@@ -1,0 +1,17 @@
+/* Load after globals.css and shared vitas-visual.css. */
+.vfb-root { min-inline-size:0; }
+.vfb-root .vr-section { margin-block-end:32px; }
+.vfb-root .vr-metric-grid { grid-template-columns:repeat(5,minmax(0,1fr)); gap:16px; }
+.vfb-root .vfb-ad-summary { background:#f4f6ff; border:1px solid var(--border,#dce3fa); border-radius:var(--r-md,12px); padding:20px; margin-block-end:16px; }
+.vfb-root .vfb-ad-summary h3 { font-size:16px; margin-block:0 12px; }
+.vfb-root .vfb-ad-summary dl { display:flex; gap:32px; flex-wrap:wrap; margin:0; }
+.vfb-root .vfb-ad-summary dt { color:#55658e; font-size:14px; }
+.vfb-root .vfb-ad-summary dd { font-size:24px; font-weight:700; margin:4px 0; }
+.vfb-root .vr-table th,.vfb-root .vr-table td { padding-block:16px; }
+/* Equal media stages. The asset's intrinsic ratio is preserved by contain. */
+.vfb-root .vr-ad-media { aspect-ratio:auto; height:280px; display:flex; align-items:center; justify-content:center; background:#f5f7fc; }
+.vfb-root .vr-ad-media img { width:100%; height:100%; object-fit:contain; display:block; }
+.vfb-root .vr-ad-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+@media(max-width:1100px) { .vfb-root .vr-metric-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:700px) { .vfb-root .vr-metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .vfb-root .vr-ad-grid { grid-template-columns:1fr; } }
+@media(max-width:380px) { .vfb-root .vr-metric-grid { grid-template-columns:1fr; } }

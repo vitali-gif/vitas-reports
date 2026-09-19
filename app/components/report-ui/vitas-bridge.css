@@ -284,3 +284,30 @@
 .vr-ui .vrm-root .vrm-desc { white-space: pre-wrap; line-height: 1.55; max-inline-size: 560px; min-inline-size: 220px; }
 @media (max-width: 1000px) { .vr-ui .vrc-root .vrc-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; } .vr-ui .vrm-root .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 359px) { .vr-ui .vrm-root .vr-metric-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── טאבי Facebook / Google (.vfb-root, חבילה רביעית design/handoff-facebook; Google באותו עיצוב) ──── */
+/* המבנה: כותרת הטאב → "פעילות בתקופה" (כרטיסים) → קוהורט הערוץ (CohortFunnel) → קמפיינים → פילוחים → מודעות */
+.vr-ui .vfb-root { min-inline-size: 0; }
+.vr-ui .vfb-root .vfb-tab-heading { margin-block-end: 22px; }
+.vr-ui .vfb-root .vfb-tab-heading h2 { font-size: 28px; font-weight: 800; line-height: 1.3; }
+.vr-ui .vfb-root .vfb-activity-heading { margin-block-end: 14px; }
+.vr-ui .vfb-root .vfb-activity-heading h2 { font-size: 20px; }
+.vr-ui .vfb-root .vr-metric-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.vr-ui .vfb-root .vr-section { margin-block-start: 40px; }
+/* המשפך: הפאנל של CohortFunnel חי תחת .vcs-root (crm-sources.css); כאן בלי הריפוד התחתון של מסך המקורות */
+.vr-ui .vfb-root .vfb-funnel { padding-block: 0; }
+/* מודעות: שתי עמודות בדסקטופ, אזור מדיה בגובה אחיד והנכס בשלמותו (contain) — START-HERE-CLAUDE */
+.vr-ui .vfb-root .section-top-ads .vr-ad-grid, .vr-ui .vfb-root .section-asset-gallery .vr-ad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.vr-ui .vr-ad-media-box { position: relative; inline-size: 100%; aspect-ratio: 4 / 5; background: #EDF1F8; overflow: hidden; }
+.vr-ui .vr-ad-media-box.vr-ad-media-wide { aspect-ratio: 16 / 9; }
+.vr-ui .vfb-root .vr-ad-media-box { aspect-ratio: auto; block-size: 380px; }
+/* גוגל: גרפי הקמפיינים בפאנלים לבנים כמו שאר הכרטיסים */
+.vr-ui .vfb-root .chart-card { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+@media (max-width: 1100px) { .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 767px) {
+  .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .vr-ui .vfb-root .section-top-ads .vr-ad-grid, .vr-ui .vfb-root .section-asset-gallery .vr-ad-grid { grid-template-columns: minmax(0, 1fr); }
+  .vr-ui .vfb-root .vr-ad-media-box { block-size: 300px; }
+  .vr-ui .vfb-root .vfb-tab-heading h2 { font-size: 24px; }
+}
+@media (max-width: 380px) { .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: minmax(0, 1fr); } }

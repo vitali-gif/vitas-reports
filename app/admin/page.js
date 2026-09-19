@@ -444,6 +444,11 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const vrObj = vrShell && dashTab === 'crm' && crmSubTab === 'objections'
   const vrCity = vrShell && dashTab === 'crm' && crmSubTab === 'reports'
   const vrMeet = vrShell && dashTab === 'crm' && crmSubTab === 'meetings'
+  // vrFb / vrG — טאבי Facebook ו-Google (design/handoff-facebook; Google באותו עיצוב לפי ויטלי, 19.9).
+  // vrAds — כל טאב מדיה בעיצוב המחודש ("הכל", Facebook, Google): אותם כרטיסים, טבלת קמפיינים, פילוחים וגלריות.
+  const vrFb = vrShell && dashTab === 'facebook'
+  const vrG = vrShell && dashTab === 'google'
+  const vrAds = vrMode || vrFb || vrG
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -2398,7 +2403,9 @@ const selectProject = async (client, project) => {
     // הישנה — שם כל שלב קיבל גוון אחר, מה שרומז על זהויות שונות במקום על רצף אחד.
     // המספרים נשארים בצבע טקסט; הצבע יושב על הפס בלבד. הביטולים הם צבע מצב (ורוד)
     // ומסומנים גם בחץ ↳ וגם בטקסט, כדי שהם לא ייקראו כשלב ברצף.
-    const renderFunnelBar = useCallback((vr = false) => {
+    // channelOverride — טאב Facebook/Google: המשפך מסונן לערוץ הטאב בלי בורר (הבורר נשאר ב"הכל" וב-CRM).
+    const renderFunnelBar = useCallback((vr = false, channelOverride = null) => {
+      const channel = channelOverride || funnelChannel;
       const MIN_N = 30;
       const RAMP = ['#ddd6fe', '#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95'];
       const LEAK = '#e11d48';
@@ -2410,10 +2417,10 @@ const selectProject = async (client, project) => {
 
       const _nlRoot = crmR[0]?.summary?.namedLeads || null;
       const _nl = _nlRoot ? (_nlRoot.all ? _nlRoot : { all: _nlRoot }) : null;
-      const g = _nl ? (funnelChannel === 'facebook' ? _nl.facebook : funnelChannel === 'google' ? _nl.google : _nl.all) : null;
+      const g = _nl ? (channel === 'facebook' ? _nl.facebook : channel === 'google' ? _nl.google : _nl.all) : null;
       const L = (a) => (Array.isArray(a) ? a.length : null);
 
-      const mediaRows = funnelChannel === 'facebook' ? fbR : funnelChannel === 'google' ? gR : [...fbR, ...gR];
+      const mediaRows = channel === 'facebook' ? fbR : channel === 'google' ? gR : [...fbR, ...gR];
       let hasMedia = false, impr = 0, clk = 0;
       for (const r of mediaRows) {
         const sm = r.summary || {};
@@ -2488,6 +2495,15 @@ const selectProject = async (client, project) => {
           cancellation: canc ? { parentStageId: 'sched', value: canc.value == null ? null : formatNum(canc.value), denominatorLabel: canc.denom != null ? `מתוך ${formatNum(canc.denom)} פגישות שנקבעו` : '' } : null,
           scopeNote: 'חשיפות וקליקים: נתוני הפרסום בתקופה. מלידים והלאה: התקדמות הלידים שנכנסו בתקופה.' + (missing.length > 0 ? ' "אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + '.' : ''),
         };
+        if (channelOverride) {
+          // טאב Facebook/Google (design/handoff-facebook): הקוהורט של הערוץ בלבד, בלי בורר פלטפורמה.
+          const _chName = channel === 'facebook' ? 'Facebook' : 'Google';
+          return (
+            <ReportSection title="מה קרה ללידים שנכנסו בתקופה" description={'לידים שנכנסו מ-' + _chName + ' בתקופה, לפי שיוך המקור ב-CRM · חשיפות וקליקים: נתוני הפרסום המצטברים של ' + _chName + ' בתקופה, בנפרד מהקוהורט'}>
+              <div className="vcs-root vfb-funnel"><CohortFunnel model={model} platforms={[]} selectedPlatform={channel} /></div>
+            </ReportSection>
+          );
+        }
         const platforms = [{ id: 'all', label: 'הכל' }, chF ? { id: 'facebook', label: 'Facebook' } : null, chG ? { id: 'google', label: 'Google' } : null].filter(Boolean);
         return (
           <ReportSection title="משפך לידים" description="מחשיפה ועד חוזה · כל אחוז נמדד מהמכנה הרשום לידו">
@@ -3245,7 +3261,7 @@ const selectProject = async (client, project) => {
       const sparkVals = metricKey && trendData.length >= 2 ? trendData.map(d => d[metricKey] || 0) : null;
       const trendPct = ch ? (ch.pct > 0 ? '+' : '') + Math.abs(ch.pct).toFixed(0) + '%' : null;
       const _hasNames = namesArr && namesArr.length > 0;
-      if (vrMode) {
+      if (vrAds) {
         // עיצוב מחודש: אותם ערכים, אותה תגית שינוי, אותה לחיצה לרשימת לידים — בכרטיס report-ui.
         const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'לידים שלא טופלו': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature };
         const badge = !ch ? null : ch.newVal ? '↑ חדש'
@@ -4861,9 +4877,21 @@ const selectProject = async (client, project) => {
             <h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05d8\u05d5\u05d5\u05d7 \u05d4\u05ea\u05d0\u05e8\u05d9\u05db\u05d9\u05dd \u05e9\u05e0\u05d1\u05d7\u05e8'}</h3>
             <p style={{color:'#64748b',marginTop:'8px'}}>{'\u05d1\u05d7\u05e8 \u05d8\u05d5\u05d5\u05d7 \u05d0\u05d7\u05e8 \u05d0\u05d5 \u05d4\u05e8\u05e5 \u05e1\u05e0\u05db\u05e8\u05d5\u05df'}</p>
           </div>
-        ) : (<>
+        ) : (<div className={(vrFb || vrG) ? 'vfb-root' : undefined}>
+        {(vrFb || vrG) && (
+          <div className="vr-section-heading vfb-tab-heading"><div>
+            <h2>{vrFb ? 'Facebook' : 'Google'}</h2>
+            <p>{vrFb ? 'ביצועי הפרסום ב-Meta והתקדמות הלידים המשויכים ל-Facebook ב-CRM' : 'ביצועי הפרסום ב-Google Ads והתקדמות הלידים המשויכים ל-Google ב-CRM'}</p>
+          </div></div>
+        )}
         {vrMode && <p className="vr-caption vr-metrics-section">פעילות בתקופה · כולל פעילות מלידים שנכנסו לפני התקופה</p>}
-        <div className={vrMode ? 'vr-metric-grid' : 'kpi-grid'}>
+        {(vrFb || vrG) && (
+          <div className="vr-section-heading vfb-activity-heading"><div>
+            <h2>פעילות בתקופה</h2>
+            <p>{'כולל פעילות בתקופה מלידים שנכנסו קודם · תקציב, לידים וקליקים לפי ' + (vrFb ? 'Meta' : 'Google Ads') + '; פגישות, הרשמות וחוזים לפי שיוך המקור ב-CRM'}</p>
+          </div></div>
+        )}
+        <div className={vrAds ? 'vr-metric-grid' : 'kpi-grid'}>
           {crmReports[0]?.summary?.crmType === 'zoho' ? (() => {
             const _zr = (crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {};
             const _zf = _zr.funnel || {};
@@ -4898,14 +4926,17 @@ const selectProject = async (client, project) => {
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות שבוטלו', formatNum(_cs.meetingsCancelled || 0), 'red', _cs.meetingsCancelled || 0, prevCrmTotals?.meetingsCancelled, false, _tabCrmLeads?.meetingsCancelled) : null}
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('לידים שלא טופלו', formatNum(_cs.leadsToHandle || 0), 'amber', _cs.leadsToHandle || 0, null, false, null) : null}
           {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations,
-            (vrMode && activeT.spend > 0 && (crmTotals?.registrationValue || 0) > 0) ? ('שווי ' + formatCurrencyCompact(crmTotals.registrationValue)) : undefined) : null}
-          {!vrMode && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
+            (vrAds && activeT.spend > 0 && (crmTotals?.registrationValue || 0) > 0) ? ('שווי ' + formatCurrencyCompact(crmTotals.registrationValue)) : undefined) : null}
+          {!vrAds && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
           {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts,
-            (vrMode && activeT.spend > 0) ? [ (crmTotals?.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(crmTotals.contractValue) : null, (crmTotals?.contracts || 0) > 0 ? 'עלות לחוזה ' + formatCurrency(activeT.spend / crmTotals.contracts) : null ].filter(Boolean).join(' · ') || undefined : undefined) : null}
-          {!vrMode && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
-          {!vrMode && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+            (vrAds && activeT.spend > 0) ? [ (crmTotals?.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(crmTotals.contractValue) : null, (crmTotals?.contracts || 0) > 0 ? 'עלות לחוזה ' + formatCurrency(activeT.spend / crmTotals.contracts) : null ].filter(Boolean).join(' · ') || undefined : undefined) : null}
+          {!vrAds && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
+          {!vrAds && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
           </>)}
         </div>
+
+        {/* Facebook/Google (עיצוב מחודש): קוהורט הערוץ מיד אחרי הכרטיסים, כמו בסקיצה; פילוחי סוכנות/תת-פרויקט אחריו */}
+        {vrFb ? renderFunnelBar('cohort', 'facebook') : vrG ? renderFunnelBar('cohort', 'google') : null}
 
         {(() => {
           const _ab = dashTab === 'facebook' ? (fbReports[0]?.summary?.byAgency)
@@ -5017,7 +5048,7 @@ const selectProject = async (client, project) => {
         })()}
 
         {/* FUNNEL — במצב העיצוב המחודש המשפך היחיד הוא "משפך לידים" (renderFunnelBar) למעלה; זה מוצג רק במצב הישן */}
-        {!vrMode && <div className="section">
+        {!vrAds && <div className="section">
           <div className="section-head">
             <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
             <h2>משפך שיווקי</h2>
@@ -5229,18 +5260,18 @@ const selectProject = async (client, project) => {
             const fontW = level === 0 ? 700 : level === 1 ? 600 : 400;
             const fontSize = level === 2 ? '0.9em' : '1em';
             return (
-              <tr key={key} className={vrMode ? `vr-tree-row vr-lvl-${level}${hasChildren ? ' vr-expandable' : ''}` : undefined} style={vrMode ? undefined : {background: rowBg, cursor: hasChildren ? 'pointer' : 'default', borderRight: level === 1 ? '3px solid rgba(59,130,246,0.3)' : level === 2 ? '3px solid rgba(16,185,129,0.3)' : 'none'}} onClick={hasChildren ? onToggle : undefined}>
+              <tr key={key} className={vrAds ? `vr-tree-row vr-lvl-${level}${hasChildren ? ' vr-expandable' : ''}` : undefined} style={vrAds ? undefined : {background: rowBg, cursor: hasChildren ? 'pointer' : 'default', borderRight: level === 1 ? '3px solid rgba(59,130,246,0.3)' : level === 2 ? '3px solid rgba(16,185,129,0.3)' : 'none'}} onClick={hasChildren ? onToggle : undefined}>
                 <td style={{fontWeight: fontW, fontSize, paddingRight: `${8 + indent}px`, unicodeBidi: 'plaintext', textAlign: 'right'}}>
                   <span style={{display:'inline-block', width:'18px', color:'#64748b', marginLeft:'4px'}}>
-                    {hasChildren ? (vrMode ? (isExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />) : (isExpanded ? '\u25bc' : '\u25c0')) : ''}
+                    {hasChildren ? (vrAds ? (isExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />) : (isExpanded ? '\u25bc' : '\u25c0')) : ''}
                   </span>
-                  {level === 0 && data.source ? (vrMode
+                  {level === 0 && data.source ? (vrAds
                     ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
                     : <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:data.source.includes('google')?'var(--rose-50)':'var(--sky-50)',color:data.source.includes('google')?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{data.source.includes('google')?'G':'F'}</span>) : null}
                   {name}
-                  {level === 0 && data.source && !vrMode ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
+                  {level === 0 && data.source && !vrAds ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
                 </td>
-                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; if (vrMode) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status none">-</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
+                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; if (vrAds) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status none">-</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
                 <td style={{fontSize}}>{formatNum(data.impressions)}</td>
                 <td style={{fontSize}}>{formatCurrency(cpc)}</td>
@@ -5350,14 +5381,14 @@ const selectProject = async (client, project) => {
 
         {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section section-demographics">
           <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>פילוח דמוגרפי</h2><span className="sub">חלוקת ביצועים לפי מגדר וקבוצת גיל</span></div>
-        <div className={vrMode ? 'vr-demo-grid' : undefined} style={vrMode ? undefined : {display:'flex',gap:'20px',alignItems:'flex-start'}}>
-          <div className={vrMode ? 'vr-demo-block' : undefined} style={vrMode ? undefined : {flex:1,minWidth:0}}>
+        <div className={vrAds ? 'vr-demo-grid' : undefined} style={vrAds ? undefined : {display:'flex',gap:'20px',alignItems:'flex-start'}}>
+          <div className={vrAds ? 'vr-demo-block' : undefined} style={vrAds ? undefined : {flex:1,minWidth:0}}>
           {!isPmax && genderNames.length > 0 && (() => {
           const gd = data.genders;
           const genderLabel = (g) => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : g === 'unknown' ? '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2' : g;
           const orderedKeys = ['female', 'male', 'unknown'].filter(g => gd[g]);
           return (<div style={{marginBottom: ageNames.length > 0 ? '28px' : 0}}>
-            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}>{!vrMode && <span style={{fontSize:'1.2em'}}>⚧</span>}פילוח מגדרי</h3>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}>{!vrAds && <span style={{fontSize:'1.2em'}}>⚧</span>}פילוח מגדרי</h3>
             <div className="card"><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'gender',label:'\u05de\u05d2\u05d3\u05e8'},{key:'clicks',label:'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'},{key:'impressions',label:'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'},{key:'cpc',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'\u05dc\u05d9\u05d3\u05d9\u05dd'},{key:'cpl',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'},{key:'spend',label:'\u05ea\u05e7\u05e6\u05d9\u05d1 \u05e9\u05e0\u05d5\u05e6\u05dc'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('genders',c.key)}>{c.label}{(()=>{const s=sortConfig['genders'];if(!s||s.key!==c.key)return ' \u21c5';return s.dir==='desc'?' \u25bc':' \u25b2';})()}</th>))}
@@ -5378,12 +5409,12 @@ const selectProject = async (client, project) => {
           </div>);
         })()}
           </div>
-          <div className={vrMode ? 'vr-demo-block' : undefined} style={vrMode ? undefined : {flex:1,minWidth:0}}>
+          <div className={vrAds ? 'vr-demo-block' : undefined} style={vrAds ? undefined : {flex:1,minWidth:0}}>
           {!isPmax && ageNames.length > 0 && (() => {
           const ad = data.ages;
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb; });
           return (<div>
-            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}>{!vrMode && <span style={{fontSize:'1.2em'}}>📅</span>}פילוח גילאי</h3>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}>{!vrAds && <span style={{fontSize:'1.2em'}}>📅</span>}פילוח גילאי</h3>
             <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
@@ -5441,9 +5472,9 @@ const selectProject = async (client, project) => {
               <div className="section-head">
                 <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="8 6 2 6 2 12 8 12"/><polyline points="16 6 22 6 22 12 16 12"/><path d="M12 19v-7"/><path d="M8 19h8"/><path d="M8 12c0 2.21 1.79 4 4 4s4-1.79 4-4V6H8v6z"/></svg></div>
                 <h2>המודעות הכי מובילות ב-Facebook</h2>
-                <span className="sub">Top {topAds.length}</span>
+                <span className="sub">{vrAds ? 'Top ' + topAds.length + ' · דירוג לפי לידים בתקופה (Meta) · מודעה זהה בכמה קבוצות נספרת פעם אחת' : 'Top ' + topAds.length}</span>
               </div>
-              <div className={vrMode ? 'vr-ad-grid' : undefined} style={vrMode ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'20px'}}>
+              <div className={vrAds ? 'vr-ad-grid' : undefined} style={vrAds ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'20px'}}>
                 {topAds.map((ad, i) => {
                   const metrics = ad.metrics || {};
                   const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
@@ -5452,9 +5483,9 @@ const selectProject = async (client, project) => {
                   // קריאייטיב מקומי של הדמו (/demo/...) מוצג חד; כל מקור חיצוני מטושטש.
                   const demoBlur = (isDemoProject && !String(previewImg || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined;
                   return (
-                    <div key={ad.id || i} className="card" style={vrMode ? {overflow:'hidden',display:'flex',flexDirection:'column'} : {overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+                    <div key={ad.id || i} className="card" style={vrAds ? {overflow:'hidden',display:'flex',flexDirection:'column'} : {overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
                       {/* Media: video if available, else image. עיצוב מחודש: רקע בהיר, המדיה בשלמותה (contain) */}
-                      <div style={{position:'relative',width:'100%',aspectRatio:'4/5',background: vrMode ? '#EDF1F8' : '#0f172a',overflow:'hidden'}}>
+                      <div className={vrAds ? 'vr-ad-media-box' : undefined} style={vrAds ? undefined : {position:'relative',width:'100%',aspectRatio:'4/5',background:'#0f172a',overflow:'hidden'}}>
                         {hasVideo ? (
                           <video
                             src={ad.videoUrl}
@@ -5462,10 +5493,10 @@ const selectProject = async (client, project) => {
                             controls
                             playsInline
                             preload="metadata"
-                            style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrMode ? 'transparent' : '#000'}}
+                            style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrAds ? 'transparent' : '#000'}}
                           />
                         ) : previewImg ? (
-                          <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrMode ? 'transparent' : '#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
+                          <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrAds ? 'transparent' : '#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
                         ) : (
                           <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'3em',color:'#64748b'}}>{'\ud83d\udcf7'}</div>
                         )}
@@ -5563,7 +5594,7 @@ const selectProject = async (client, project) => {
           return (
             <div className="section section-asset-gallery">
               <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קריאייטיב Google PMax</h2></div>
-              <div className={vrMode ? 'vr-ad-grid' : undefined} style={vrMode ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
+              <div className={vrAds ? 'vr-ad-grid' : undefined} style={vrAds ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
                   // Handle both old field names (imageUrl, type) and new GAQL names (image_url, field_type)
                   const ft = (a) => (a.field_type || a.type || '').toUpperCase();
@@ -5587,7 +5618,7 @@ const selectProject = async (client, project) => {
                   return (
                     <div key={ag.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column'}}>
                       {firstImg ? (
-                        <div style={{width:'100%',aspectRatio:'16/9',background:'#0f172a',overflow:'hidden'}}>
+                        <div className={vrAds ? 'vr-ad-media-box vr-ad-media-wide' : undefined} style={vrAds ? undefined : {width:'100%',aspectRatio:'16/9',background:'#0f172a',overflow:'hidden'}}>
                           <img src={imgUrl(firstImg)} alt={ag.name} style={{width:'100%',height:'100%',objectFit:'contain'}} onError={(e)=>{e.target.style.display='none'}} />
                         </div>
                       ) : (
@@ -5643,10 +5674,10 @@ const selectProject = async (client, project) => {
           );
         })()}
 
-        </>)}
+        </div>)}
       </>
     );
-  }, [vrMode, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
+  }, [vrMode, vrFb, vrG, vrAds, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 

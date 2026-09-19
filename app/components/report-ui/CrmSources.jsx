@@ -42,11 +42,12 @@ export function CohortFunnel({ model, platforms, selectedPlatform, onPlatformCha
   return <div className="vcs-panel">
     <div className="vcs-funnel-toolbar">
       {state === 'ready' && model && <div className="vcs-adcards">{model.advertising.map(item => { const Icon = AD_ICONS[item.id]; return <div key={item.id} className="vcs-adcard">{Icon && <span className="vcs-adcard-icon"><Icon size={18} aria-hidden="true" /></span>}<div><span className="vcs-adcard-label">{item.label}</span><strong><bdi>{item.value ?? 'אין נתון'}</bdi></strong></div></div>; })}</div>}
-      <div role="group" aria-labelledby={labelId} className="vcs-segmented">
+      {/* VITAS: בטאב Facebook/Google המשפך כבר מסונן לערוץ — אין בורר ואין הערת סינון */}
+      {platforms.length > 0 && <div role="group" aria-labelledby={labelId} className="vcs-segmented">
         <span id={labelId} className="vr-sr-only">סינון המשפך לפי פלטפורמה</span>
         {platforms.map(platform => <button key={platform.id} type="button" aria-pressed={platform.id === selectedPlatform} disabled={!onPlatformChange} onClick={() => onPlatformChange(platform.id)}>{platform.label}</button>)}
-      </div>
-      <p className="vr-caption vcs-filter-note">הסינון חל על המשפך בלבד</p>
+      </div>}
+      {platforms.length > 0 && <p className="vr-caption vcs-filter-note">הסינון חל על המשפך בלבד</p>}
     </div>
     <DataState state={state}>
       {state === 'ready' && model && <>
