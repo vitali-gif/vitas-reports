@@ -98,9 +98,15 @@ export default function ClientPage() {
     }
 
     // Step 2: onAuthStateChange
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // 🔴 18.9: הקריאה ל-finish רצה *בתוך* ה-callback, ו-handleSessionReady קורא ל-supabase.auth.getSession()
+    // (דרך apiFetch). ב-supabase-js 2.x ה-callback רץ בזמן שנעילת ה-Auth תפוסה, ו-getSession מחכה לאותה
+    // נעילה — deadlock: הספינר "טוען..." לנצח, בלי שגיאה. קרה ברענון העמוד באפליקציה (אחרי מעבר
+    // בין לקוחות), כשהאירוע SIGNED_IN הקדים את getSession של שלב 3. הפתרון המתועד: לצאת מה-callback
+    // עם setTimeout לפני כל קריאה נוספת לספרייה.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user?.email) {
-        finish(session.user.email)
+        const email = session.user.email
+        setTimeout(() => finish(email), 0)
       }
     })
 
@@ -127,8 +133,10 @@ export default function ClientPage() {
     }
     setLoading(true)
     try {
+      // תקרת זמן: מסך "טוען..." בלי סוף הוא הכשל הגרוע ביותר מבחינת הלקוח (אין מה ללחוץ).
+      // אם משהו נתקע (רשת, נעילת Auth) — חוזרים למסך הכניסה עם הסבר במקום ספינר נצחי.
       const res = await apiFetch(`/api/client-access?email=${encodeURIComponent(userEmail)}`, {
-        headers: {}
+        headers: {}, signal: AbortSignal.timeout(20000),
       })
       // 401 כאן (אחרי שה-apiFetch כבר ניסה לרענן) = ההתחברות באמת פגה, לא "אין גישה".
       // מחזירים למסך הכניסה עם הסבר, במקום מסך מנעול שמרמז שהגישה בוטלה.
@@ -168,8 +176,13 @@ export default function ClientPage() {
           if (!localStorage.getItem('vitas_onboarding_seen')) setShowOnboarding(true)
         } catch { /* דפדפן שחוסם אחסון — פשוט לא מציגים */ }
       }
-    } catch {
-      setStep('error')
+    } catch (err) {
+      if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        setStep('login')
+        showToast('הטעינה נתקעה — נסה להיכנס שוב')
+      } else {
+        setStep('error')
+      }
     } finally {
       setLoading(false)
     }
