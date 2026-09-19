@@ -734,6 +734,24 @@ const loadClients = async () => {
     if (data) setClients(data);
   };
 
+  // ברירת המחדל של התקופה בטעינת פרויקט.
+  // 🔴 19.9.2026 (נמצא בבדיקת ה-E2E הראשונה): עד עכשיו נבחרה השורה הראשונה מ-by-project, שממוין לפי
+  // month יורד. הקרון כותב מראש גם את הרבעון הבא ("2026-10-01_2026-12-31", נוצר ב-6.6), והמפתח הזה
+  // גדול מכל מפתח יומי של ספטמבר — ולכן כל לקוח נחת על תקופה עתידית וראה אפסים בכל הכרטיסים, בזמן
+  // שהתגית הציגה "חודש שעבר" (activePreset). סדר עדיפות: מה שכבר נבחר → ברירת המחדל (חודש שעבר) →
+  // החודש הנוכחי → התקופה המאוחרת ביותר שכבר התחילה → הראשונה.
+  const pickDefaultMonth = (rows, prev) => {
+    const keys = new Set(rows.map(r => r.month));
+    if (prev && keys.has(prev)) return prev;
+    for (const p of [activePreset, 'lastMonth', 'currentMonth']) {
+      const r = p && p !== 'custom' ? presetToPayload(p) : null;
+      if (r && keys.has(r.key)) return r.key;
+    }
+    const today = presetToPayload('today').key.slice(0, 10);
+    const started = [...keys].filter(m => m.slice(0, 10) <= today).sort().reverse();
+    return started[0] || rows[0].month;
+  };
+
   const loadProjectReports = async (projectId) => {
     // Stale-while-revalidate: if we've loaded this project before, show the cached light
     // index INSTANTLY (KPIs render from summaries, no blank/loader), then refresh in the
@@ -742,7 +760,7 @@ const loadClients = async () => {
     if (cached && cached.length) {
       monthDataLoaded.current = new Set();
       setReports(cached);
-      setSelectedMonth(prev => (prev && cached.some(r => r.month === prev)) ? prev : cached[0].month);
+      setSelectedMonth(prev => pickDefaultMonth(cached, prev));
       setPeriodLoading(false);
     } else {
       setPeriodLoading(true);
@@ -768,7 +786,7 @@ const loadClients = async () => {
         return synthetic.length ? [...merged, ...synthetic] : merged;
       });
       if (data.length > 0) {
-        setSelectedMonth(prev => (prev && data.some(r => r.month === prev)) ? prev : data[0].month);
+        setSelectedMonth(prev => pickDefaultMonth(data, prev));
       }
     }
     // data === null ⇒ read FAILED. Keep whatever is on screen (cache or prior) — never blank.
