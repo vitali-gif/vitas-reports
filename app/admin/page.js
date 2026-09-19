@@ -24,6 +24,7 @@ const decodeHtmlEntities = (str) => {
 import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
+import MeetingsTab from '../components/meetings/MeetingsTab'
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -418,6 +419,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // ── Demo mode detection ────────────────────────────────────────────────
   // מוגדר כאן ולא למטה, כי applyPreset/applyCustomRange צריכים אותו.
   const isDemoProject = !!(selectedProject?.is_demo)
+  // ישיבות שיווק (שלב 1, docs/meetings-plan.md). כבוי כברירת מחדל: הטאב מופיע רק כש-
+  // NEXT_PUBLIC_MEETINGS_ENABLED='1'. זו דרך הכיבוי שה-ACCEPTANCE דורש לפיילוט.
+  const meetingsOn = process.env.NEXT_PUBLIC_MEETINGS_ENABLED === '1' && !isDemoProject && !!selectedProject?.id
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -3105,10 +3109,13 @@ const selectProject = async (client, project) => {
           {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}>Google PMax</button>}
             {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
             {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
+            {meetingsOn && <button className={`client-tab ${dashTab === 'meetings' ? 'active' : ''}`} onClick={() => setDashTab('meetings')}>ישיבות שיווק</button>}
             {hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
         </div>
 
-        {dashTab === 'recommendations' ? (() => {
+        {dashTab === 'meetings' ? (
+          <MeetingsTab projectId={selectedProject?.id} isClientView={isClientView} />
+        ) : dashTab === 'recommendations' ? (() => {
           // 60-day rolling window - recommendations are ALWAYS based on the last 60 days,
           // independent of selectedMonth (which only affects the KPI/chart tabs).
           const recWindowMonths = getRecommendationsWindowMonths(60);

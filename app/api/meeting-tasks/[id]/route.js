@@ -11,7 +11,7 @@
  * completed_at נרשם כשמסמנים done. implemented_at הוא היום שבו השינוי העסקי הוחל בפועל,
  * והוא יכול להיות שונה — שדה נפרד, לא נגזרת.
  */
-import { meetingsClient } from '../../../../lib/meetings/store'
+import { meetingsClient, requireSignedIn } from '../../../../lib/meetings/store'
 import { requireProjectAccess } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -27,8 +27,13 @@ export async function PATCH(request, { params }) {
   const id = params?.id
   if (!id || !/^[0-9a-f-]{36}$/i.test(String(id))) return json({ error: 'מזהה משימה לא תקין' }, 400)
 
+  // שער זהות לפני כל נגיעה ב-DB: בלעדיו פנייה אנונימית הבדילה בתשובה בין מזהה משימה
+  // שקיים לבין אחד שלא, וקיבלה גם תקלת תצורה מפורטת.
+  const signed = await requireSignedIn(request)
+  if (!signed.ok) return signed.res
+
   let sb
-  try { sb = meetingsClient() } catch (e) { return json({ error: String(e.message) }, 500) }
+  try { sb = meetingsClient() } catch (e) { console.error('[meetings] config:', e?.message || e); return json({ error: 'שירות הישיבות אינו זמין' }, 500) }
 
   const { data: task, error: findErr } = await sb.from('meeting_tasks')
     .select('id, project_id, meeting_id, status, completed_at').eq('id', id).maybeSingle()

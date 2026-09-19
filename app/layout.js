@@ -1,4 +1,5 @@
 import './globals.css';
+import './components/meetings/meetings.css';
 
 export const metadata = {
   title: 'VITAS Reports - מערכת דוחות',
