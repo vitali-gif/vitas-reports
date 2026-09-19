@@ -28,7 +28,9 @@ import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../compone
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
-import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info } from 'lucide-react'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download } from 'lucide-react'
+// צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
+const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -437,6 +439,11 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const vrCrm = vrShell && dashTab === 'crm' && crmSubTab === 'sources'
   // vrResp — המסך השלישי: CRM › זמני תגובה (design/handoff-response-times)
   const vrResp = vrShell && dashTab === 'crm' && crmSubTab === 'response'
+  // vrObj / vrCity / vrMeet — שלושת תת-הטאבים הנותרים של CRM (התנגדויות, יישובים, פגישות שבוצעו) באותה שפה
+  // עיצובית של המסכים הקודמים, בלי חבילה נפרדת: MetricCard, ReportSection, פאנל לבן ודונאט+מקרא של .vcs-root.
+  const vrObj = vrShell && dashTab === 'crm' && crmSubTab === 'objections'
+  const vrCity = vrShell && dashTab === 'crm' && crmSubTab === 'reports'
+  const vrMeet = vrShell && dashTab === 'crm' && crmSubTab === 'meetings'
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -1355,6 +1362,9 @@ const selectProject = async (client, project) => {
 
     pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
+      // העיצוב המחודש: המקרא של Chart.js מוסתר (הדירוג/המקרא מוצגים לצד הגרף), והדונאטים בפלטת .vcs-color-N
+      const _noLegend = vrCity ? { options: { plugins: { legend: { display: false } } } } : undefined;
+      const _pal = (n) => vrCity ? Array.from({ length: n }, (_, i) => VCS_PALETTE[i % VCS_PALETTE.length]) : COLORS.slice(0, n);
       if (cityNames.length > 0) {
         createChart('crmRepCityChart', 'bar', cityNames, [{
           label: metricLabel, data: cityCounts,
@@ -1363,22 +1373,82 @@ const selectProject = async (client, project) => {
         }], {
           y: { beginAtZero: true, position: 'right' },
           indexAxis: 'y',
-        });
+        }, undefined, _noLegend);
       }
       if (isHiPark && lsEntries.length > 0) {
         createChart('crmLivingStatusChart', 'doughnut', lsEntries.map(e => e[0]), [{
-          data: lsEntries.map(e => e[1]), backgroundColor: COLORS.slice(0, lsEntries.length),
-        }]);
+          data: lsEntries.map(e => e[1]), backgroundColor: _pal(lsEntries.length),
+        }], undefined, undefined, _noLegend);
       }
       if (isHiPark && ptEntries.length > 0) {
         createChart('crmPropertyTypeChart', 'doughnut', ptEntries.map(e => e[0]), [{
-          data: ptEntries.map(e => e[1]), backgroundColor: COLORS.slice(0, ptEntries.length),
-        }]);
+          data: ptEntries.map(e => e[1]), backgroundColor: _pal(ptEntries.length),
+        }], undefined, undefined, _noLegend);
       }
     }, 200));
 
     if (cityEntries.length === 0) {
       return <div className="welcome-center"><div className="icon">🏘️</div><h3>אין נתוני יישובים לתקופה זו</h3></div>;
+    }
+
+    if (vrCity) {
+      // העיצוב המחודש: כרטיסים מהאגרגציה הקיימת (repData.cities) — בלי חישובים חדשים.
+      const _cityAll = Object.entries(repData.cities).filter(([n]) => n && n !== 'לא צוין');
+      const _sumLeads = _cityAll.reduce((s, [, c]) => s + (c.leads || 0), 0);
+      const _noCity = repData.cities['לא צוין'] ? (repData.cities['לא צוין'].leads || 0) : 0;
+      const [topCity, topCityData] = cityEntries[0];
+      const _rankList = (entries, unit, dotColor) => (
+        <ul className="vcs-legend" aria-label={'דירוג לפי ' + unit}>
+          {entries.map(([name, v], i) => (
+            <li key={name}>
+              <span className={`vcs-dot${dotColor ? '' : ' vcs-color-' + (i % 7)}`} style={dotColor ? { background: dotColor(i) } : undefined} aria-hidden="true" />
+              <span className="vcs-legend-label"><span className="vrc-rank" aria-hidden="true">{i + 1}</span>{name}</span>
+              <strong><bdi>{formatNum(v)}</bdi> <em>{unit}</em></strong>
+            </li>
+          ))}
+        </ul>
+      );
+      const _dist = (id, entries, unit) => {
+        const _t = entries.reduce((s, [, c]) => s + c, 0);
+        return (
+          <div className="vcs-panel">
+            <div className="vcs-distribution">
+              <div className="vcs-chart-wrap"><canvas id={id}></canvas><div className="vcs-chart-center" aria-hidden="true"><strong>{formatNum(_t)}</strong><span>{unit}</span></div></div>
+              {_rankList(entries, unit)}
+            </div>
+          </div>
+        );
+      };
+      return (
+        <div className="vcs-root vrc-root">
+          <p className="vr-caption vcs-metric-scope">לפי יישוב המגורים כפי שנרשם ב-CRM · לידים ללא יישוב לא נכללים בדירוג</p>
+          <div className="vr-metric-grid">
+            <MetricCard label="יישובים" value={formatNum(_cityAll.length)} tone="indigo" icon={MapPin} description="יישובים שונים שנרשמו בתקופה" />
+            <MetricCard label="יישוב מוביל" value={topCity} tone="amber" icon={Trophy} className="vr-metric-text" description={formatNum(topCityData[metricKey] || 0) + ' ' + metricLabel} />
+            <MetricCard label="לידים עם יישוב" value={formatNum(_sumLeads)} tone="emerald" icon={Users} description="לידים שנרשם להם יישוב מגורים" />
+            <MetricCard label="ללא יישוב" value={formatNum(_noCity)} tone="sky" icon={Building2} description="לידים שלא נרשם להם יישוב" />
+          </div>
+          <ReportSection title="Top 10 יישובים" description={'לפי ' + metricLabel}
+            actions={<div className="client-tabs vr-inline-tabs" role="group" aria-label="בחירת מדד">
+              {[['leads', 'לידים'], ['meetings', 'פגישות'], ['contracts', 'חוזים']].map(([k, l]) => (
+                <button key={k} type="button" className={`client-tab ${cityMetric === k ? 'active' : ''}`} aria-pressed={cityMetric === k} onClick={() => setCityMetric(k)}>{l}</button>
+              ))}
+            </div>}>
+            <div className="vcs-panel">
+              <div className="vrc-grid">
+                <div className="vrc-chart"><canvas id="crmRepCityChart"></canvas></div>
+                {_rankList(cityEntries.map(([n, c]) => [n, c[metricKey] || 0]), metricLabel, (i) => COLORS[i] || 'var(--accent)')}
+              </div>
+            </div>
+          </ReportSection>
+          {isHiPark && lsEntries.length > 0 && (
+            <ReportSection title="מצב דיור" description="לפי לידים · כפי שנרשם בטופס הליד">{_dist('crmLivingStatusChart', lsEntries, 'לידים')}</ReportSection>
+          )}
+          {isHiPark && ptEntries.length > 0 && (
+            <ReportSection title="סוג נכס" description="באיזו דירה מתעניינים · ליד שסימן כמה סוגים נספר בכל אחד">{_dist('crmPropertyTypeChart', ptEntries, 'לידים')}</ReportSection>
+          )}
+        </div>
+      );
     }
 
     return (
@@ -1468,7 +1538,7 @@ const selectProject = async (client, project) => {
       )}
       </>
     );
-  }, [selectedMonth, reports, cityMetric, setCityMetric, selectedProject]);
+  }, [vrCity, selectedMonth, reports, cityMetric, setCityMetric, selectedProject]);
 
   // ==================== CRM RESPONSE TIME SUB-TAB ====================
   const renderCrmResponseDashboard = useCallback(() => {
@@ -1931,6 +2001,10 @@ const selectProject = async (client, project) => {
 
     const objEntries = Object.entries(objCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
     const total = objEntries.reduce((s, [, c]) => s + c, 0);
+    // העיצוב המחודש: האחוזים והמרכז מחושבים מכלל ההתנגדויות (לא רק 10 הראשונות), כדי שכרטיס
+    // "סה"כ התנגדויות" ומרכז הדונאט יראו את אותו מספר.
+    const totalAll = Object.values(objCounts).reduce((s, c) => s + c, 0);
+    const objTypes = Object.keys(objCounts).length;
 
     if (objEntries.length === 0) {
       return <div className="welcome-center"><div className="icon">🚫</div><h3>אין נתוני התנגדויות לתקופה זו</h3></div>;
@@ -1943,9 +2017,43 @@ const selectProject = async (client, project) => {
       destroyCharts();
       createChart('crmObjChart', 'doughnut', topNames, [{
         data: topCounts,
-        backgroundColor: COLORS.slice(0, topNames.length),
-      }], undefined, _openObj);
+        backgroundColor: vrObj ? topNames.map((_, i) => VCS_PALETTE[i % VCS_PALETTE.length]) : COLORS.slice(0, topNames.length),
+      }], undefined, _openObj, vrObj ? { options: { plugins: { legend: { display: false } } } } : undefined);
     }, 200));
+
+    if (vrObj) {
+      const [topName, topCount] = objEntries[0];
+      const _pctOf = (c) => totalAll > 0 ? Math.round(c / totalAll * 100) : 0;
+      const _canOpen = (name) => (_leadsByObj[name] || []).length > 0;
+      return (
+        <div className="vcs-root vro-root">
+          <p className="vr-caption vcs-metric-scope">התנגדויות שנרשמו ללידים בתקופה · ליד עם כמה התנגדויות נספר בכל אחת מהן</p>
+          <div className="vr-metric-grid">
+            <MetricCard label="לידים עם התנגדות" value={formatNum(rowsWithObjection)} tone="rose" icon={Ban} description="לידים שנרשמה להם לפחות התנגדות אחת" />
+            <MetricCard label={'סה"כ התנגדויות'} value={formatNum(totalAll)} tone="indigo" icon={ClipboardList} description="כל ההתנגדויות שנרשמו בתקופה" />
+            <MetricCard label="סוגי התנגדויות" value={formatNum(objTypes)} tone="sky" icon={ListChecks} description="סוגים שונים אחרי איחוד ניסוחים" />
+            <MetricCard label="ההתנגדות המובילה" value={topName} tone="amber" icon={MessageSquareWarning} className="vr-metric-text" description={formatNum(topCount) + ' לידים · ' + _pctOf(topCount) + '%'} onClick={_canOpen(topName) ? () => _openObj(topName) : undefined} />
+          </div>
+          <ReportSection title="התפלגות ההתנגדויות" description="10 ההתנגדויות הנפוצות · לחיצה על התנגדות פותחת את רשימת הלידים">
+            <div className="vcs-panel">
+              <div className="vcs-distribution">
+                <div className="vcs-chart-wrap"><canvas id="crmObjChart"></canvas><div className="vcs-chart-center" aria-hidden="true"><strong>{formatNum(totalAll)}</strong><span>התנגדויות</span></div></div>
+                <ul className="vcs-legend" aria-label="התנגדויות לפי סוג">
+                  {objEntries.map(([name, count], i) => {
+                    const clickable = _canOpen(name);
+                    return (
+                      <li key={name} className={clickable ? 'vro-clickable' : undefined} onClick={clickable ? () => _openObj(name) : undefined} title={clickable ? 'לחיצה לרשימת הלידים' : undefined}>
+                        <span className={`vcs-dot vcs-color-${i % 7}`} aria-hidden="true" /><span className="vcs-legend-label">{name}</span><strong><bdi>{formatNum(count)}</bdi> <em>({_pctOf(count)}%)</em></strong>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          </ReportSection>
+        </div>
+      );
+    }
 
     return (
       <div className="section">
@@ -1985,7 +2093,7 @@ const selectProject = async (client, project) => {
         </ul>
       </div>
     );
-  }, [selectedMonth, reports]);
+  }, [vrObj, selectedMonth, reports]);
 
   // היסטוריית ההערות של ליד — נמשכת חי מ-BMBY בלחיצה, לא נשמרת בדוח.
   // הסיבה: הסנכרון הלילי מושך משימות רק בטווח התקופה שמסונכרנת, אז ליד שנכנס במרץ
@@ -2042,6 +2150,45 @@ const selectProject = async (client, project) => {
       XLSX.writeFile(wb, 'פגישות-שבוצעו_' + (selectedMonth || '') + '.xlsx');
     };
 
+    if (vrMeet) {
+      // העיצוב המחודש: כרטיסים מהרשימה הקיימת בלבד (ספירות), הטבלה והייצוא ללא שינוי.
+      const _uniqLeads = new Set(meetings.map(m => m.cid ? 'c:' + m.cid : m.phone ? 'p:' + m.phone : 'n:' + (m.name || ''))).size;
+      const _bySrc = {};
+      meetings.forEach(m => { const s = m.source || 'ללא מקור'; _bySrc[s] = (_bySrc[s] || 0) + 1; });
+      const _topSrc = Object.entries(_bySrc).sort((a, b) => b[1] - a[1])[0];
+      const _withDesc = meetings.filter(m => (m.description || '').toString().trim()).length;
+      return (
+        <div className="vrm-root">
+          <p className="vr-caption vcs-metric-scope">פגישות שסומנו ב-CRM כבוצעו בתקופה · לחיצה על שורה פותחת את היסטוריית ההערות של הליד</p>
+          <div className="vr-metric-grid">
+            <MetricCard label="פגישות שבוצעו" value={formatNum(meetings.length)} tone="emerald" icon={CalendarCheck} description="פגישות שסומנו כבוצעו בתקופה" />
+            <MetricCard label="לידים שנפגשו" value={formatNum(_uniqLeads)} tone="indigo" icon={Users} description="לידים ייחודיים מאחורי הפגישות" />
+            <MetricCard label="מקור מוביל" value={_topSrc ? _topSrc[0] : 'אין נתון'} tone="sky" icon={Tag} className="vr-metric-text" description={_topSrc ? formatNum(_topSrc[1]) + ' פגישות · ' + formatNum(Object.keys(_bySrc).length) + ' מקורות' : undefined} />
+            <MetricCard label="עם סיכום פגישה" value={formatNum(_withDesc)} tone="violet" icon={NotebookPen} description="פגישות שנרשם להן תיאור ב-CRM" />
+          </div>
+          <ReportSection title="רשימת הפגישות" description={formatNum(meetings.length) + ' פגישות · מהחדשה לישנה'}
+            actions={<button type="button" className="vr-button" onClick={exportMeetings} title="ייצוא הטבלה כפי שהיא לקובץ אקסל"><Download size={16} aria-hidden="true" />ייצוא לאקסל</button>}>
+            <div className="table-wrapper">
+              <table className="data-table vrm-table">
+                <thead><tr><th>{'שם מלא'}</th><th>{'טלפון'}</th><th>{'מקור הגעה'}</th><th>{'תאריך פגישה'}</th><th>{'תיאור'}</th></tr></thead>
+                <tbody>
+                  {meetings.map((m, i) => (
+                    <tr key={i} onClick={m.cid ? () => openLeadNotes(m) : undefined} title={m.cid ? 'לחץ לכל היסטוריית ההערות של הליד' : ''} style={m.cid ? {cursor:'pointer'} : undefined}>
+                      <td className="vrm-name">{m.cid ? <NotebookPen size={14} aria-hidden="true" /> : null}{m.name || '—'}</td>
+                      <td className="vrm-phone">{m.phone || '—'}</td>
+                      <td className="vrm-source"><SourceMark name={m.source || ''} />{m.source || '—'}</td>
+                      <td className="vrm-date">{fmtDate(m.date)}</td>
+                      <td className="vrm-desc">{m.description || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </ReportSection>
+        </div>
+      );
+    }
+
     return (
       <div className="section">
         <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>{'פגישות שבוצעו'}</h2><span className="sub">{meetings.length + ' פגישות בתקופה'}</span>
@@ -2068,7 +2215,7 @@ const selectProject = async (client, project) => {
         </div>
       </div>
     );
-  }, [selectedMonth, reports, openLeadNotes]);
+  }, [vrMeet, selectedMonth, reports, openLeadNotes]);
 
     const renderCrmAdsDashboard = useCallback(() => {
       if (!selectedMonth || reports.length === 0) return null;
@@ -4700,7 +4847,7 @@ const selectProject = async (client, project) => {
               <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>{vrShell ? '' : '🏘️ '}יישובים</button>
               <button className={`client-tab ${crmSubTab === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>{vrShell ? '' : '📅 '}פגישות שבוצעו</button>
             </div>
-            {vrShell && (crmSubTab === 'sources' || crmSubTab === 'response') && (
+            {vrShell && (
               <button type="button" className="vr-button vcs-refresh" onClick={refreshFromBmby} disabled={refreshingCrm} title="משיכה חיה מ-BMBY לתקופה שנבחרה">
                 <RefreshCw size={16} aria-hidden="true" />{refreshingCrm ? 'מרענן נתונים…' : 'רענון נתונים'}
               </button>

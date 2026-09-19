@@ -35,16 +35,17 @@ export function ReportSection({ title, description, actions, children }) {
 
 /**
  * VITAS: הרחבות מעבר לחבילה — badge (תגית שינוי מול התקופה הקודמת, כמו בכרטיס הישן),
- * onClick (פתיחת רשימת הלידים; הכרטיס הופך לכפתור נגיש). שאר ה-API כמו בחבילה.
+ * onClick (פתיחת רשימת הלידים; הכרטיס הופך לכפתור נגיש), className (למשל vr-metric-text לערך
+ * טקסטואלי כמו שם התנגדות/יישוב). שאר ה-API כמו בחבילה.
  */
-export function MetricCard({ label, value, description, tone = 'indigo', icon: Icon, trend, details, badge, onClick }) {
+export function MetricCard({ label, value, description, tone = 'indigo', icon: Icon, trend, details, badge, onClick, className = '' }) {
   const hintId = useId();
   const clickable = typeof onClick === 'function';
   const a11y = clickable ? {
     role: 'button', tabIndex: 0, 'aria-label': `${label} — הצג רשימת לידים`, onClick,
     onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } },
   } : {};
-  return <article className={`vr-metric ${toneClass(tone)}${clickable ? ' vr-metric-clickable' : ''}`} {...a11y}>
+  return <article className={`vr-metric ${toneClass(tone)}${clickable ? ' vr-metric-clickable' : ''}${className ? ' ' + className : ''}`} {...a11y}>
     <div className="vr-metric-top">
       {Icon && <span className="vr-metric-icon"><Icon aria-hidden="true" size={22} strokeWidth={1.7} /></span>}
       <h3>{label}</h3>

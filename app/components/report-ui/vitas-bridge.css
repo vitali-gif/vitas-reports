@@ -260,3 +260,27 @@
 
 /* כותרת סקשן של report-ui: הפעולות (טאבי המשפך) צמודות לכותרת בצד ההתחלה (ימין), לא בקצה השני */
 .vr-ui .vr-section-heading { justify-content: flex-start; gap: 28px; flex-wrap: wrap; }
+
+/* ── CRM › התנגדויות / יישובים / פגישות שבוצעו — אותם רכיבים, בלי חבילה נפרדת ────────── */
+/* ערך טקסטואלי בכרטיס (שם התנגדות / יישוב / מקור) — קטן יותר ממספר, נשבר לשורה שנייה */
+.vr-ui .vr-metric.vr-metric-text .vr-metric-value { font-size: 22px; line-height: 1.35; font-variant-numeric: normal; }
+.vr-ui .vro-root .vro-clickable { cursor: pointer; }
+.vr-ui .vro-root .vro-clickable:hover { background: #F8FAFF; }
+.vr-ui .vro-root .vcs-legend .vcs-legend-label, .vr-ui .vrc-root .vcs-legend .vcs-legend-label { font-weight: 600; color: var(--vr-text, #142044); }
+/* יישובים: גרף עמודות אופקי (10 שורות) לצד הדירוג */
+.vr-ui .vrc-root .vrc-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; align-items: start; }
+.vr-ui .vrc-root .vrc-chart { position: relative; block-size: 420px; min-inline-size: 0; }
+.vr-ui .vrc-root .vrc-rank { display: inline-grid; place-items: center; inline-size: 22px; block-size: 22px; margin-inline-end: 8px; border-radius: 50%; background: #EDF0FC; color: #25315C; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vr-ui .vrc-root .vcs-legend li { padding-block: 12px; }
+/* פגישות: כרטיסים + טבלה רגילה של הגשר, תיאור חופשי עם שבירת שורות */
+.vr-ui .vrm-root .vr-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-block-end: 8px; }
+.vr-ui .vrm-root .vcs-metric-scope { margin-block-end: 12px; }
+.vr-ui .vrm-root .vr-button { gap: 8px; }
+.vr-ui .vrm-root .vrm-table td { vertical-align: top; }
+.vr-ui .vrm-root .vrm-name { font-weight: 700; white-space: nowrap; }
+.vr-ui .vrm-root .vrm-name svg { vertical-align: -2px; margin-inline-end: 6px; color: var(--vr-muted, #586581); }
+.vr-ui .vrm-root .vrm-phone { direction: ltr; text-align: right; white-space: nowrap; }
+.vr-ui .vrm-root .vrm-source, .vr-ui .vrm-root .vrm-date { white-space: nowrap; }
+.vr-ui .vrm-root .vrm-desc { white-space: pre-wrap; line-height: 1.55; max-inline-size: 560px; min-inline-size: 220px; }
+@media (max-width: 1000px) { .vr-ui .vrc-root .vrc-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; } .vr-ui .vrm-root .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 359px) { .vr-ui .vrm-root .vr-metric-grid { grid-template-columns: minmax(0, 1fr); } }
