@@ -1,0 +1,72 @@
+/* app/components/auth/signin.css — מסך הכניסה של הלקוח (design/01, הפאנל הימני).
+   כל הכללים תחת .vsign בלבד. properties לוגיים — המסך RTL.
+   הכפתורים של Google ו-Microsoft נבנים מהסימן הרשמי שלהם ב-SVG ולא מהסקיצה, לפי
+   דרישות המיתוג של שני הספקים: רקע לבן, מסגרת אפורה, טקסט כהה, והסימן ללא שינוי צבע. */
+
+.vsign {
+  --vs-ink: #142044;
+  --vs-muted: #66748f;
+  --vs-border: #dde5f4;
+  --vs-indigo: #1d4ed8;
+  min-block-size: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  background: #f6f8fd;
+  padding: 24px;
+  box-sizing: border-box;
+  color: var(--vs-ink);
+}
+.vsign-card {
+  inline-size: 100%; max-inline-size: 440px;
+  background: #fff; border: 1px solid var(--vs-border); border-radius: 16px;
+  padding: 40px 32px;
+  box-sizing: border-box;
+}
+.vsign-card img { display: block; margin: 0 auto 26px; block-size: 30px; }
+.vsign-card h1 { margin: 0 0 10px; font-size: 30px; font-weight: 800; text-align: center; line-height: 1.3; }
+.vsign-card > p { margin: 0 0 26px; font-size: 15px; color: var(--vs-muted); text-align: center; line-height: 1.7; }
+
+/* כפתור ספק. הסימן בקצה ההתחלה (שמאל ב-RTL), כמו בסקיצה. */
+.vsign-provider {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  inline-size: 100%; min-block-size: 54px; margin-block-end: 12px;
+  background: #fff; border: 1px solid #d3ddef; border-radius: 12px;
+  font: inherit; font-size: 16px; font-weight: 600; color: var(--vs-ink);
+  cursor: pointer; transition: background .12s, border-color .12s;
+}
+.vsign-provider:hover { background: #f6f9ff; border-color: #b9cbea; }
+.vsign-provider:disabled { opacity: .55; cursor: not-allowed; }
+.vsign-provider svg { flex-shrink: 0; }
+
+.vsign-or { display: flex; align-items: center; gap: 14px; margin: 24px 0; color: var(--vs-muted); font-size: 14px; }
+.vsign-or::before, .vsign-or::after { content: ''; flex: 1; block-size: 1px; background: var(--vs-border); }
+
+.vsign-link {
+  display: block; inline-size: 100%; background: none; border: 0; padding: 8px;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--vs-indigo);
+  text-decoration: underline; cursor: pointer; text-align: center;
+}
+
+.vsign-form { display: flex; flex-direction: column; gap: 12px; }
+.vsign-form input {
+  font: inherit; font-size: 15px; color: var(--vs-ink); background: #fff;
+  border: 1px solid #d3ddef; border-radius: 10px; padding: 12px 14px;
+  inline-size: 100%; box-sizing: border-box;
+}
+.vsign-form input:focus { outline: none; border-color: var(--vs-indigo); }
+.vsign-submit {
+  min-block-size: 48px; border: 0; border-radius: 10px;
+  background: var(--vs-indigo); color: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.vsign-submit:disabled { opacity: .6; cursor: not-allowed; }
+.vsign-quiet {
+  background: none; border: 0; padding: 6px; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--vs-indigo); cursor: pointer;
+}
+.vsign-err { margin: 14px 0 0; font-size: 13.5px; color: #b91c4a; text-align: center; line-height: 1.6; }
+.vsign-toast { margin: 14px 0 0; font-size: 13.5px; color: var(--vs-muted); text-align: center; }
+.vsign-note {
+  display: flex; align-items: flex-start; justify-content: center; gap: 8px;
+  margin: 26px 0 0; font-size: 13px; color: var(--vs-muted); line-height: 1.7; text-align: center;
+}
+.vsign-note svg { flex-shrink: 0; margin-block-start: 3px; color: #8ea3c8; }
+.vsign :focus-visible { outline: 3px solid var(--vs-indigo); outline-offset: 2px; }
