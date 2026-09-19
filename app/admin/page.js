@@ -3495,7 +3495,7 @@ const selectProject = async (client, project) => {
         </div>
 
         {dashTab === 'meetings' ? (
-          <MeetingsTab projectId={selectedProject?.id} isClientView={isClientView} />
+          <MeetingsTab projectId={selectedProject?.id} projectName={selectedProject?.name} isClientView={isClientView} />
         ) : dashTab === 'recommendations' ? (() => {
           // 60-day rolling window - recommendations are ALWAYS based on the last 60 days,
           // independent of selectedMonth (which only affects the KPI/chart tabs).
