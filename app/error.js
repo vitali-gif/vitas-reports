@@ -5,8 +5,26 @@
  */
 import { useEffect } from 'react'
 
+/**
+ * קובץ JS של Next שלא נטען (ChunkLoadError): קורה כשלקוח מחזיק דף פתוח ובינתיים עלתה פריסה חדשה,
+ * או ברשת סלולרית שמפילה בקשה אחת (נמדד 19.9 בבדיקות ה-E2E: 502 על chunk אחד → מסך השגיאה הזה).
+ * טעינה מחדש פותרת את זה תמיד, אז עושים אותה אוטומטית — פעם אחת בלבד, כדי לא להיכנס ללולאה.
+ */
+const isChunkError = (e) => /ChunkLoadError|Loading chunk [\w-]+ failed|Failed to fetch dynamically imported module/i.test(String(e?.name || '') + ' ' + String(e?.message || ''))
+
 export default function Error({ error, reset }) {
-  useEffect(() => { console.error(error) }, [error])
+  useEffect(() => {
+    console.error(error)
+    if (!isChunkError(error) || typeof window === 'undefined') return
+    try {
+      const key = 'vitas_chunk_reload'
+      const last = Number(sessionStorage.getItem(key) || 0)
+      if (Date.now() - last > 60_000) {
+        sessionStorage.setItem(key, String(Date.now()))
+        window.location.reload()
+      }
+    } catch { /* אחסון חסום — נשארים במסך עם הכפתור */ }
+  }, [error])
 
   return (
     <div dir="rtl" style={{
