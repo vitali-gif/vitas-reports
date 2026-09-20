@@ -462,12 +462,14 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const vrFb = vrAdsShell && dashTab === 'facebook'
   const vrG = vrAdsShell && dashTab === 'google'
   const vrAds = vrMode || vrFb || vrG
-  // ⚠️ הפרדה שחייבת להישאר: renderFunnelBar בנוי על summary.namedLeads, מבנה של BMBY בלבד.
-  // ל-Zoho ול-Salesforce אין אותו, ולכן החלפת המשפך שלהם במשפך המחודש הייתה מרוקנת אותו —
-  // כל שלבי ה-CRM היו מציגים "אין נתון" במקום הנתונים שקיימים להם היום. הכרטיסים כן
-  // משותפים (kpi() כבר יודע לרנדר MetricCard כשה-vrAds דלוק), המשפך לא.
-  const vrFunnel = vrAds && !_vrOwnCrm
-  const vrFunnelMode = vrMode && !_vrOwnCrm
+  // המשפך ("משפך לידים") בטאב "הכל" קיים לכל שלושת ה-CRM: renderFunnelBar בונה את
+  // התחנות לפי summary.crmType — namedLeads ב-BMBY, funnelCohort ב-Salesforce,
+  // funnel.byChannel ב-Zoho. שלבי המדיה (חשיפות, קליקים) זהים לכולם.
+  const vrFunnelMode = vrMode
+  // ⚠️ הפרדה שחייבת להישאר: המשפך בטאבי Facebook/Google מסונן לערוץ. ל-Salesforce
+  // (KLOSS) אין פילוח ערוץ ב-CRM — הלידים מסווגים לפי מקור הגעה ולא לפי פלטפורמת
+  // מדיה — ולכן משפך "של פייסבוק" שם היה מציג חשיפות של פייסבוק מול כל הלידים.
+  const vrFunnel = vrAds && _vrCrmType !== 'salesforce'
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -2428,7 +2430,6 @@ const selectProject = async (client, project) => {
     // ומסומנים גם בחץ ↳ וגם בטקסט, כדי שהם לא ייקראו כשלב ברצף.
     // channelOverride — טאב Facebook/Google: המשפך מסונן לערוץ הטאב בלי בורר (הבורר נשאר ב"הכל" וב-CRM).
     const renderFunnelBar = useCallback((vr = false, channelOverride = null) => {
-      const channel = channelOverride || funnelChannel;
       const MIN_N = 30;
       const RAMP = ['#ddd6fe', '#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95'];
       const LEAK = '#e11d48';
@@ -2438,10 +2439,20 @@ const selectProject = async (client, project) => {
       const fbR = _rows.filter(r => r.source === 'facebook');
       const gR = _rows.filter(r => r.source && r.source.startsWith('google'));
 
-      const _nlRoot = crmR[0]?.summary?.namedLeads || null;
-      const _nl = _nlRoot ? (_nlRoot.all ? _nlRoot : { all: _nlRoot }) : null;
-      const g = _nl ? (channel === 'facebook' ? _nl.facebook : channel === 'google' ? _nl.google : _nl.all) : null;
-      const L = (a) => (Array.isArray(a) ? a.length : null);
+      // ── תחנות המשפך לפי מבנה ה-CRM ──────────────────────────────────────────
+      // שלבי המדיה (חשיפות, קליקים) זהים לכל הלקוחות. מהלידים והלאה לכל CRM יש
+      // שרשרת משלו: BMBY מחזיק namedLeads (רשימות שמיות לכל שלב), Salesforce מחזיק
+      // funnelCohort, ו-Zoho מחזיק funnel.byChannel.
+      //
+      // אין כאן אף אחוז חדש: כל מכנה נלקח מהמכנים שכבר מוצגים היום במסכים של אותו
+      // לקוח (ב-KLOSS — שדות rate* של funnelCohort ושורות "מה קרה ללידים של החודש";
+      // באריקה — "אחוז המרה לעסקה" שהוא רכישות חלקי לידים). חיבור עיוור של שתי
+      // שורות סמוכות אסור לפי MASTER-INSTRUCTIONS.
+      const _crmType = crmR.find(r => r.summary && r.summary.crmType)?.summary?.crmType || 'bmby';
+      // Salesforce (KLOSS) מסווג לידים לפי מקור הגעה ולא לפי פלטפורמת מדיה — אין לו
+      // פילוח facebook/google, ולכן אין בורר ערוץ (ואין משפך בטאבי Facebook/Google).
+      const _noChannelSplit = _crmType === 'salesforce';
+      const channel = _noChannelSplit ? 'all' : (channelOverride || funnelChannel);
 
       const mediaRows = channel === 'facebook' ? fbR : channel === 'google' ? gR : [...fbR, ...gR];
       let hasMedia = false, impr = 0, clk = 0;
@@ -2451,33 +2462,120 @@ const selectProject = async (client, project) => {
         impr += Number(sm.impressions) || 0;
         clk += Number(sm.clicks) || 0;
       }
-      const chF = fbR.length > 0, chG = gR.length > 0;
+      let chF = fbR.length > 0, chG = gR.length > 0;
 
-      const leads = g ? L(g.allLeads) : null;
-      const noResp = g ? L(g.noResponse) : null;
-      const V = {
-        impr: hasMedia ? impr : null,
-        click: hasMedia ? clk : null,
-        lead: leads,
-        cont: (leads != null && noResp != null) ? leads - noResp : null,
-        sched: g ? L(g.meetingsScheduled) : null,
-        held: g ? L(g.meetingsCompleted) : null,
-        canc: g ? L(g.meetingsCancelled) : null,
-        reg: g ? L(g.registrations) : null,
-        deal: g ? L(g.contracts) : null,
-      };
-
-      const STAGES = [
-        { key: 'impr',  label: 'חשיפות',          of: null,    ofLabel: 'ראש המשפך' },
-        { key: 'click', label: 'קליקים על קישור', of: 'impr',  ofLabel: 'מהחשיפות' },
-        { key: 'lead',  label: 'לידים',            of: 'click', ofLabel: 'מהקליקים' },
-        { key: 'cont',  label: 'נוצר קשר',         of: 'lead',  ofLabel: 'מהלידים' },
-        { key: 'sched', label: 'פגישה נקבעה',      of: 'cont',  ofLabel: 'מנוצר קשר' },
-        { key: 'held',  label: 'פגישות שהגיעו',    of: 'sched', ofLabel: 'מהפגישות שנקבעו' },
-        { key: 'canc',  label: 'פגישות שהתבטלו',   of: 'sched', ofLabel: 'מהפגישות שנקבעו', leak: true },
-        { key: 'reg',   label: 'הרשמות',           of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
-        { key: 'deal',  label: 'חוזים',            of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
+      // שתי תחנות הפתיחה משותפות לכל ה-CRM.
+      const AD_STAGES = [
+        { key: 'impr',  label: 'חשיפות',          of: null,   ofLabel: 'ראש המשפך' },
+        { key: 'click', label: 'קליקים על קישור', of: 'impr', ofLabel: 'מהחשיפות' },
       ];
+      const AD_V = { impr: hasMedia ? impr : null, click: hasMedia ? clk : null };
+      const MEDIA_NOTE = 'חשיפות וקליקים הם נתוני פרסום בתקופה, לא אנשים ייחודיים.';
+
+      let V, STAGES, scopeNote, flowDesc, cohortCfg;
+      if (_crmType === 'salesforce') {
+        // KLOSS: קוהורט הלידים של התקופה. אותן שורות ואותם מכנים כמו "מה קרה ללידים
+        // של החודש" במסך הרשת, ובתוספת שתי תחנות המדיה שמעליהן.
+        const _fc = (crmR.find(r => r.summary && r.summary.funnelCohort)?.summary || {}).funnelCohort || null;
+        const N = (x) => (_fc && x != null ? x : null);
+        V = {
+          ...AD_V,
+          lead:    N(_fc && _fc.leads),
+          sfSched: N(_fc && _fc.meetings),
+          sfNoShow:N(_fc && _fc.noShow),
+          sfArr:   N(_fc && _fc.arrived),
+          sfOpp:   N(_fc && _fc.opportunities),
+          sfQuote: N(_fc && _fc.quotes),
+          sfPaid:  N(_fc && _fc.paid),
+          sfLost:  N(_fc && _fc.lost),
+        };
+        STAGES = [
+          ...AD_STAGES,
+          { key: 'lead',     label: 'לידים',             of: 'click',   ofLabel: 'מהקליקים' },
+          { key: 'sfSched',  label: 'תיאמו פגישה',       of: 'lead',    ofLabel: 'מהלידים' },
+          { key: 'sfNoShow', label: 'לא הגיעו לפגישה',   of: 'sfSched', ofLabel: 'מהפגישות שנקבעו', leak: true },
+          { key: 'sfArr',    label: 'הגיעו לפגישה',      of: 'sfSched', ofLabel: 'מהפגישות שנקבעו' },
+          { key: 'sfOpp',    label: 'עברו להזדמנות',     of: 'sfArr',   ofLabel: 'מהפגישות שהגיעו' },
+          { key: 'sfQuote',  label: 'קיבלו הצעת מחיר',   of: 'sfOpp',   ofLabel: 'מההזדמנויות' },
+          { key: 'sfPaid',   label: 'שילמו מקדמה',       of: 'sfQuote', ofLabel: 'ממי שקיבלו הצעת מחיר' },
+          { key: 'sfLost',   label: 'לא רכשו',           of: 'sfOpp',   ofLabel: 'מההזדמנויות', leak: true },
+        ];
+        flowDesc = 'מחשיפה ועד תשלום מקדמה';
+        scopeNote = 'הלידים שנוצרו בתקופה ומה קרה להם — התוצאות עשויות להתעדכן בהמשך. ' + MEDIA_NOTE
+          + ' "לא הגיעו לפגישה" נמדד מהפגישות שנקבעו ו"לא רכשו" מההזדמנויות — שניהם ענפים ולא תחנות ברצף.';
+        cohortCfg = null; // אין פילוח ערוץ, ולכן אין תצוגת קוהורט בטאבי Facebook/Google
+      } else if (_crmType === 'zoho') {
+        // אריקה כרמל: לידים ← הזדמנויות ← רכישות, עם ענף ביטולים. שמות התחנות זהים
+        // לכרטיסי ה-KPI של הטאב. "עברו להזדמנות" ו"רכשו" נמדדים שניהם מהלידים, כי זה
+        // המכנה של "אחוז המרה לעסקה" הקיים; אין כאן מעבר הזדמנות←רכישה שלא הוצג עד היום.
+        const _zf = (crmR.find(r => r.summary && r.summary.funnel)?.summary || {}).funnel || null;
+        const _byCh = (_zf && _zf.byChannel) || [];
+        const _hasCh = (c) => _byCh.some(x => x.channel === c);
+        chF = chF && _hasCh('facebook');
+        chG = chG && _hasCh('google');
+        const _sc = channel === 'all' ? _zf : (_byCh.find(c => c.channel === channel) || null);
+        // אין שורת ערוץ ב-CRM → אין משפך לערוץ הזה. עדיף לא להציג אותו מאשר להציג
+        // חשיפות וקליקים של פייסבוק מעל שרשרת CRM שכולה "אין נתון".
+        if (channel !== 'all' && !_sc) return null;
+        const N = (x) => (_sc && x != null ? x : null);
+        V = {
+          ...AD_V,
+          lead:   N(_sc && _sc.leads),
+          zOpp:   N(_sc && _sc.opportunities),
+          zBuy:   N(_sc && _sc.purchased),
+          zCanc:  N(_sc && _sc.cancellations),
+        };
+        STAGES = [
+          ...AD_STAGES,
+          { key: 'lead',  label: 'לידים',          of: 'click', ofLabel: 'מהקליקים' },
+          { key: 'zOpp',  label: 'עברו להזדמנות',  of: 'lead',  ofLabel: 'מהלידים' },
+          { key: 'zBuy',  label: 'רכשו',           of: 'lead',  ofLabel: 'מהלידים' },
+          { key: 'zCanc', label: 'ביטולים',        of: 'zBuy',  ofLabel: 'מהרכישות', leak: true },
+        ];
+        flowDesc = 'מחשיפה ועד רכישה';
+        scopeNote = 'לידים שנכנסו בתקופה. ' + MEDIA_NOTE
+          + ' "עברו להזדמנות" ו"רכשו" נמדדים שניהם מהלידים; "ביטולים" נמדד מהרכישות.';
+        cohortCfg = {
+          stageKeys: ['lead', 'zOpp', 'zBuy'],
+          leak: { key: 'zCanc', parentStageId: 'zBuy', denomNoun: 'רכישות' },
+          transitionNote: 'אחוזי המעבר מוצגים מהלידים; הביטולים נמדדים מהרכישות.',
+        };
+      } else {
+        const _nlRoot = crmR[0]?.summary?.namedLeads || null;
+        const _nl = _nlRoot ? (_nlRoot.all ? _nlRoot : { all: _nlRoot }) : null;
+        const g = _nl ? (channel === 'facebook' ? _nl.facebook : channel === 'google' ? _nl.google : _nl.all) : null;
+        const L = (a) => (Array.isArray(a) ? a.length : null);
+        const leads = g ? L(g.allLeads) : null;
+        const noResp = g ? L(g.noResponse) : null;
+        V = {
+          ...AD_V,
+          lead: leads,
+          cont: (leads != null && noResp != null) ? leads - noResp : null,
+          sched: g ? L(g.meetingsScheduled) : null,
+          held: g ? L(g.meetingsCompleted) : null,
+          canc: g ? L(g.meetingsCancelled) : null,
+          reg: g ? L(g.registrations) : null,
+          deal: g ? L(g.contracts) : null,
+        };
+        STAGES = [
+          ...AD_STAGES,
+          { key: 'lead',  label: 'לידים',            of: 'click', ofLabel: 'מהקליקים' },
+          { key: 'cont',  label: 'נוצר קשר',         of: 'lead',  ofLabel: 'מהלידים' },
+          { key: 'sched', label: 'פגישה נקבעה',      of: 'cont',  ofLabel: 'מנוצר קשר' },
+          { key: 'held',  label: 'פגישות שהגיעו',    of: 'sched', ofLabel: 'מהפגישות שנקבעו' },
+          { key: 'canc',  label: 'פגישות שהתבטלו',   of: 'sched', ofLabel: 'מהפגישות שנקבעו', leak: true },
+          { key: 'reg',   label: 'הרשמות',           of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
+          { key: 'deal',  label: 'חוזים',            of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
+        ];
+        flowDesc = 'מחשיפה ועד חוזה';
+        scopeNote = 'לידים שנכנסו בתקופה. ' + MEDIA_NOTE
+          + ' "פגישות שהתבטלו" נמדד מהפגישות שנקבעו, כמו "הגיעו".';
+        cohortCfg = {
+          stageKeys: ['lead', 'cont', 'sched', 'held', 'reg', 'deal'],
+          leak: { key: 'canc', parentStageId: 'sched', denomNoun: 'פגישות שנקבעו' },
+          transitionNote: null, // ברירת המחדל של CohortFunnel
+        };
+      }
       if (STAGES.every(st => V[st.key] == null)) return null;
 
       // "0.035%" חסר משמעות בדיוק כמו אחוז בלי n. מתחת לחצי אחוז עוברים ל"1 מכל N".
@@ -2505,17 +2603,19 @@ const selectProject = async (client, project) => {
       if (vr === 'cohort') {
         // מקורות הגעה (עיצוב מחודש): פס נתוני פרסום (חשיפות, קליקים) + שלבי הקבוצה + ענף ביטולים —
         // אותם ערכים/מכנים/אחוזים כמו הסרגל הישן, ברכיב CohortFunnel של החבילה.
+        if (!cohortCfg) return null;
         const byKey = Object.fromEntries(rows.map(r => [r.key, r]));
         const denomLabel = (r) => r.denom != null ? `מתוך ${formatNum(r.denom)} ${r.ofLabel.replace(/^מ/, '')}` : r.ofLabel;
-        const STAGE_ICON = { lead: Users, cont: Phone, sched: CalendarCheck, held: UserCheck, reg: FileText, deal: FileSignature };
-        const STAGE_TONE = { lead: 'indigo', cont: 'emerald', sched: 'sky', held: 'indigo', reg: 'emerald', deal: 'rose' };
+        const STAGE_ICON = { lead: Users, cont: Phone, sched: CalendarCheck, held: UserCheck, reg: FileText, deal: FileSignature, zOpp: Handshake, zBuy: CheckCircle2 };
+        const STAGE_TONE = { lead: 'indigo', cont: 'emerald', sched: 'sky', held: 'indigo', reg: 'emerald', deal: 'rose', zOpp: 'sky', zBuy: 'emerald' };
         const stage = (k) => { const r = byKey[k]; return { id: k, label: r.label, icon: STAGE_ICON[k], tone: STAGE_TONE[k], value: r.value == null ? null : formatNum(r.value),
           rate: (r.value != null && r.of && r.pct != null) ? fmtPct(r.pct) : null, denominatorLabel: r.of ? denomLabel(r) : '', smallSample: !!(r.value != null && r.weak) }; };
-        const canc = byKey.canc;
+        const canc = cohortCfg.leak ? byKey[cohortCfg.leak.key] : null;
         const model = {
           advertising: ['impr', 'click'].map(k => ({ id: k, label: byKey[k].label, value: byKey[k].value == null ? null : formatNum(byKey[k].value) })),
-          stages: ['lead', 'cont', 'sched', 'held', 'reg', 'deal'].map(stage),
-          cancellation: canc ? { parentStageId: 'sched', value: canc.value == null ? null : formatNum(canc.value), denominatorLabel: canc.denom != null ? `מתוך ${formatNum(canc.denom)} פגישות שנקבעו` : '' } : null,
+          stages: cohortCfg.stageKeys.map(stage),
+          cancellation: canc ? { parentStageId: cohortCfg.leak.parentStageId, value: canc.value == null ? null : formatNum(canc.value), denominatorLabel: canc.denom != null ? `מתוך ${formatNum(canc.denom)} ${cohortCfg.leak.denomNoun}` : '' } : null,
+          transitionNote: cohortCfg.transitionNote,
           scopeNote: 'חשיפות וקליקים: נתוני הפרסום בתקופה. מלידים והלאה: התקדמות הלידים שנכנסו בתקופה.' + (missing.length > 0 ? ' "אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + '.' : ''),
         };
         if (channelOverride) {
@@ -2529,26 +2629,30 @@ const selectProject = async (client, project) => {
         }
         const platforms = [{ id: 'all', label: 'הכל' }, chF ? { id: 'facebook', label: 'Facebook' } : null, chG ? { id: 'google', label: 'Google' } : null].filter(Boolean);
         return (
-          <ReportSection title="משפך לידים" description="מחשיפה ועד חוזה · כל אחוז נמדד מהמכנה הרשום לידו">
+          <ReportSection title="משפך לידים" description={flowDesc + " · כל אחוז נמדד מהמכנה הרשום לידו"}>
             <CohortFunnel model={model} platforms={platforms} selectedPlatform={funnelChannel} onPlatformChange={setFunnelChannel} />
           </ReportSection>
         );
       }
       if (vr) {
         // עיצוב מחודש: אותן תחנות, אותם מכנים ואותם אחוזים — ברכיב Funnel של report-ui.
-        const VR_TONE = { impr: 'indigo', click: 'indigo', lead: 'emerald', cont: 'emerald', sched: 'sky', held: 'terra', canc: 'rose', reg: 'emerald', deal: 'rose' };
-        const VR_ICON = { impr: Eye, click: MousePointerClick, lead: Users, cont: Handshake, sched: CalendarCheck, held: CheckCircle2, canc: XCircle, reg: ClipboardList, deal: FileSignature };
+        const VR_TONE = { impr: 'indigo', click: 'indigo', lead: 'emerald', cont: 'emerald', sched: 'sky', held: 'terra', canc: 'rose', reg: 'emerald', deal: 'rose',
+          sfSched: 'sky', sfNoShow: 'rose', sfArr: 'terra', sfOpp: 'emerald', sfQuote: 'sky', sfPaid: 'emerald', sfLost: 'rose',
+          zOpp: 'sky', zBuy: 'emerald', zCanc: 'rose' };
+        const VR_ICON = { impr: Eye, click: MousePointerClick, lead: Users, cont: Handshake, sched: CalendarCheck, held: CheckCircle2, canc: XCircle, reg: ClipboardList, deal: FileSignature,
+          sfSched: CalendarCheck, sfNoShow: XCircle, sfArr: UserCheck, sfOpp: Handshake, sfQuote: FileText, sfPaid: CheckCircle2, sfLost: Ban,
+          zOpp: Handshake, zBuy: CheckCircle2, zCanc: XCircle };
         const items = rows.map(r => ({
           id: r.key, label: r.label, tone: VR_TONE[r.key], icon: VR_ICON[r.key],
           value: r.value == null ? null : formatNum(r.value),
           rate: (r.value != null && r.of) ? ((r.weak && r.pct != null ? '~' : '') + fmtPct(r.pct)) : null,
           denominatorLabel: r.of ? (r.ofLabel + (r.denom != null ? ' (' + formatNum(r.denom) + ')' : '')) : '',
         }));
-        const notes = ['לידים שנכנסו בתקופה. חשיפות וקליקים הם נתוני פרסום בתקופה, לא אנשים ייחודיים. "פגישות שהתבטלו" נמדד מהפגישות שנקבעו, כמו "הגיעו".'];
+        const notes = [scopeNote];
         if (anyWeak) notes.push('~ אחוז על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו.');
         if (missing.length > 0) notes.push('"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — אין מקור נתונים לשלב הזה בטווח הנבחר.');
-        if (funnelChannel === 'all' && chF && chG) notes.push('תצוגת "הכל" מערבבת טופס מיידי ודף נחיתה; להשוואה אמיתית בחר ערוץ בודד.');
-        const actions = (chF || chG) ? (
+        if (!_noChannelSplit && funnelChannel === 'all' && chF && chG) notes.push('תצוגת "הכל" מערבבת טופס מיידי ודף נחיתה; להשוואה אמיתית בחר ערוץ בודד.');
+        const actions = (!_noChannelSplit && (chF || chG)) ? (
           <div className="client-tabs vr-inline-tabs" role="tablist" aria-label="ערוץ המשפך">
             <button type="button" className={`client-tab ${funnelChannel === 'all' ? 'active' : ''}`} onClick={() => setFunnelChannel('all')}>הכל</button>
             {chF && <button type="button" className={`client-tab ${funnelChannel === 'facebook' ? 'active' : ''}`} onClick={() => setFunnelChannel('facebook')}>Facebook</button>}
@@ -2556,7 +2660,7 @@ const selectProject = async (client, project) => {
           </div>
         ) : null;
         return (
-          <ReportSection title="משפך לידים" description="מחשיפה ועד חוזה · כל אחוז נמדד מהמכנה הרשום מתחתיו" actions={actions}>
+          <ReportSection title="משפך לידים" description={flowDesc + " · כל אחוז נמדד מהמכנה הרשום מתחתיו"} actions={actions}>
             <Funnel items={items} description={notes.join(' ')} />
           </ReportSection>
         );
@@ -2567,10 +2671,10 @@ const selectProject = async (client, project) => {
           <div className="section-head">
             <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
             <h2>משפך לידים</h2>
-            <span className="sub">מחשיפה ועד חוזה · כל אחוז נמדד מהמכנה הרשום מתחתיו</span>
+            <span className="sub">{flowDesc + ' · כל אחוז נמדד מהמכנה הרשום מתחתיו'}</span>
           </div>
 
-          {(chF || chG) && (
+          {!_noChannelSplit && (chF || chG) && (
             <div className="client-tabs" style={{ marginBottom: 14 }}>
               <button type="button" className={`client-tab ${funnelChannel === 'all' ? 'active' : ''}`} onClick={() => setFunnelChannel('all')}>הכל</button>
               {chF && <button type="button" className={`client-tab ${funnelChannel === 'facebook' ? 'active' : ''}`} onClick={() => setFunnelChannel('facebook')}>Facebook</button>}
@@ -2578,7 +2682,7 @@ const selectProject = async (client, project) => {
             </div>
           )}
 
-          {funnelChannel === 'all' && chF && chG && (
+          {!_noChannelSplit && funnelChannel === 'all' && chF && chG && (
             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '9px 12px', marginBottom: 14, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
               <b>{'תצוגת "הכל" מערבבת סוגי משפך.'}</b>{' טופס מיידי ודף נחיתה אינם ברי-השוואה, והלידים כוללים גם מקורות ללא מדיה. להשוואה אמיתית בחר ערוץ בודד.'}
             </div>
@@ -2630,7 +2734,9 @@ const selectProject = async (client, project) => {
           </div>
 
           <div style={{ marginTop: 4, fontSize: 11.5, color: '#64748b', lineHeight: 1.75 }}>
-            <div><span style={{ color: LEAK, fontWeight: 700 }}>▼ פגישות שהתבטלו</span>{' הוא ענף ולא שלב: הוא נמדד מהפגישות שנקבעו, כמו "הגיעו", ולא ממנו.'}</div>
+            {rows.filter(r => r.leak).map(r => (
+              <div key={r.key}><span style={{ color: LEAK, fontWeight: 700 }}>{'▼ ' + r.label}</span>{' הוא ענף ולא שלב: הוא נמדד ' + r.ofLabel + ', ולא מהשלב שלפניו.'}</div>
+            ))}
             {anyWeak && <div><b style={{ color: '#b45309' }}>~</b>{' אחוז שחושב על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו, ולא להתייחס אליו כעובדה.'}</div>}
             {missing.length > 0 && <div>{'"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — חסר מקור נתונים לשלב הזה בטווח הנבחר.'}</div>}
           </div>

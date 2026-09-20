@@ -64,7 +64,9 @@ export function CohortFunnel({ model, platforms, selectedPlatform, onPlatformCha
             {stage.id === model.cancellation?.parentStageId && <div className="vcs-cancellation"><Ban size={17} aria-hidden="true" /><span>בוטלו <strong><bdi>{model.cancellation.value ?? 'אין נתון'}</bdi></strong></span><small>{model.cancellation.denominatorLabel}</small></div>}
           </li>; })}</ol>
         </div>
-        <p className="vr-caption vcs-transition-note">אחוזי המעבר מוצגים מהשלב הקודם; הרשמות וחוזים נמדדים מהפגישות שהתקיימו, וביטולים מהפגישות שנקבעו.</p>
+        {/* VITAS: הניסוח תלוי במבנה ה-CRM (המכנים שונים בין ש.ברוך לאריקה), ולכן ניתן
+            להחלפה דרך המודל. ברירת המחדל היא הנוסח של ש.ברוך, שכבר אושר. */}
+        <p className="vr-caption vcs-transition-note">{model.transitionNote || 'אחוזי המעבר מוצגים מהשלב הקודם; הרשמות וחוזים נמדדים מהפגישות שהתקיימו, וביטולים מהפגישות שנקבעו.'}</p>
         <p className="vr-caption">{model.scopeNote}</p>
         {model.stages.some(stage => stage.smallSample) && <p className="vr-caption">~ אחוז המבוסס על מדגם קטן; יש לפרש בזהירות.</p>}
       </>}
