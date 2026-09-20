@@ -24,6 +24,7 @@ const decodeHtmlEntities = (str) => {
 import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
+import BackToTop from '../components/BackToTop'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
@@ -5206,8 +5207,10 @@ const selectProject = async (client, project) => {
           )
         })()}
 
-        {/* FUNNEL — במצב העיצוב המחודש המשפך היחיד הוא "משפך לידים" (renderFunnelBar) למעלה; זה מוצג רק במצב הישן */}
-        {!vrFunnel && <div className="section">
+        {/* FUNNEL — במצב העיצוב המחודש המשפך היחיד הוא "משפך לידים" (renderFunnelBar) למעלה; זה מוצג רק במצב הישן.
+            התנאי הוא vrAds ולא vrFunnel: ב-KLOSS אין משפך בטאבי Facebook/Google (אין פילוח ערוץ ב-Salesforce),
+            אבל הטאב כן בעיצוב המחודש — ולכן "משפך שיווקי" הישן חזר להופיע שם לצד "משפך לידים" (ויטלי, 20.9). */}
+        {!vrAds && <div className="section">
           <div className="section-head">
             <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
             <h2>משפך שיווקי</h2>
@@ -5396,8 +5399,12 @@ const selectProject = async (client, project) => {
           const campaignNames = Object.keys(tree).filter(n => _hasActivity(tree[n])).sort((a,b) => treeCmp(a, b, n => tree[n]));
           const toggleCampaign = (c) => setExpandedCampaigns(prev => { const next = new Set(prev); if (next.has(c)) next.delete(c); else next.add(c); return next; });
           const toggleAdSet = (k) => setExpandedAdSets(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
+          // עמודת "פלטפורמה" נפרדת (ויטלי, 20.9): הלוגו ישב בתוך תא השם, ומכיוון ששמות
+          // הקמפיינים מעורבים עברית/אנגלית הוא נדד ימינה או שמאלה לפי השם — עמודה משלו
+          // מיישרת אותו בכל השורות. sort=false כי אין מה למיין לפיו ברמות 1 ו-2.
           const cols = [
             { key:'name', label:'\u05e7\u05de\u05e4\u05d9\u05d9\u05df / \u05e7\u05d1\u05d5\u05e6\u05d4 / \u05de\u05d5\u05d3\u05e2\u05d4' },
+            { key:'platform', label:'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4', noSort: true },
             { key:'status', label:'\u05e1\u05d8\u05d0\u05d8\u05d5\u05e1' },
             { key:'clicks', label:'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd' },
             { key:'impressions', label:'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea' },
@@ -5420,15 +5427,19 @@ const selectProject = async (client, project) => {
             const fontSize = level === 2 ? '0.9em' : '1em';
             return (
               <tr key={key} className={vrAds ? `vr-tree-row vr-lvl-${level}${hasChildren ? ' vr-expandable' : ''}` : undefined} style={vrAds ? undefined : {background: rowBg, cursor: hasChildren ? 'pointer' : 'default', borderRight: level === 1 ? '3px solid rgba(59,130,246,0.3)' : level === 2 ? '3px solid rgba(16,185,129,0.3)' : 'none'}} onClick={hasChildren ? onToggle : undefined}>
-                <td style={{fontWeight: fontW, fontSize, paddingRight: `${8 + indent}px`, unicodeBidi: 'plaintext', textAlign: 'right'}}>
-                  <span style={{display:'inline-block', width:'18px', color:'#64748b', marginLeft:'4px'}}>
+                {/* dir=rtl על התא + bdi סביב השם: החץ יושב תמיד בקצה הימני, והשם עצמו
+                    עדיין מוצג בכיוון שלו (אנגלית LTR, עברית RTL). קודם התא כולו היה
+                    unicodeBidi:'plaintext', ולכן שורה ששמה מתחיל באנגלית התהפכה כולה. */}
+                <td dir="rtl" style={{fontWeight: fontW, fontSize, paddingInlineStart: `${8 + indent}px`, textAlign: 'right'}}>
+                  <span style={{display:'inline-block', width:'18px', color:'#64748b', marginInlineEnd:'4px'}}>
                     {hasChildren ? (vrAds ? (isExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />) : (isExpanded ? '\u25bc' : '\u25c0')) : ''}
                   </span>
+                  <bdi>{name}</bdi>
+                </td>
+                <td style={{fontSize, whiteSpace:'nowrap'}}>
                   {level === 0 && data.source ? (vrAds
                     ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
-                    : <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:data.source.includes('google')?'var(--rose-50)':'var(--sky-50)',color:data.source.includes('google')?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{data.source.includes('google')?'G':'F'}</span>) : null}
-                  {name}
-                  {level === 0 && data.source && !vrAds ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
+                    : <span className={`platform-tag${data.source.includes('google')?' google':''}`}>{data.source.includes('google')?'GOOGLE':'FACEBOOK'}</span>) : <span style={{color:'#cbd5e1'}}>-</span>}
                 </td>
                 <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; if (vrAds) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status none">-</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
@@ -5448,7 +5459,7 @@ const selectProject = async (client, project) => {
               <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:'12px',textAlign:'right'}}>{'\ud83d\udca1 \u05dc\u05d7\u05e5 \u05e2\u05dc \u05e7\u05de\u05e4\u05d9\u05d9\u05df \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea, \u05d5\u05e2\u05dc \u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>
               <div className="table-wrapper">
                 <table className="data-table">
-                  <thead><tr>{cols.map(c => <th key={c.key} style={{whiteSpace:'nowrap',cursor:'pointer',userSelect:'none'}} onClick={() => handleSort('campTree', c.key)}>{c.label}{treeSort.key === c.key ? (treeSort.dir === 'desc' ? ' \u25bc' : ' \u25b2') : ' \u21c5'}</th>)}</tr></thead>
+                  <thead><tr>{cols.map(c => <th key={c.key} style={{whiteSpace:'nowrap',cursor:c.noSort?'default':'pointer',userSelect:'none'}} onClick={c.noSort ? undefined : (() => handleSort('campTree', c.key))}>{c.label}{c.noSort ? '' : (treeSort.key === c.key ? (treeSort.dir === 'desc' ? ' \u25bc' : ' \u25b2') : ' \u21c5')}</th>)}</tr></thead>
                   <tbody>
                     {campaignNames.flatMap(cName => {
                       const cData = tree[cName];
@@ -5603,7 +5614,6 @@ const selectProject = async (client, project) => {
           const activeAdsList = fbReports.flatMap(r => r.summary?.activeAds || []);
           if (activeAdsList.length === 0) return null;
           // activeAds hold ALL active ads (API no longer trims); we dedupe by name + take the top by leads below
-          const _isZohoClient = crmReports[0]?.summary?.crmType === 'zoho';
           let _adsPool = activeAdsList;
           {
             // Dedupe the same creative shown across multiple campaigns/adsets — group by normalized name, sum metrics.
@@ -5623,9 +5633,11 @@ const selectProject = async (client, project) => {
             }
             _adsPool = Object.values(_byName);
           }
+          // Top 10 לכל הלקוחות (ויטלי, 20.9). קודם זה היה 6, ו-10 ל-Zoho בלבד —
+          // שלושה מספרים שונים לאותו רכיב בלי סיבה. הבריכה עצמה לא מוגבלת.
           const topAds = [..._adsPool]
             .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
-            .slice(0, _isZohoClient ? 10 : 6);
+            .slice(0, 10);
           return (
             <div className="section section-top-ads">
               <div className="section-head">
@@ -5744,15 +5756,19 @@ const selectProject = async (client, project) => {
           // view) + dedupe by id (the same group can appear across google/google_pmax reports).
           // Removed/paused/0-spend groups are hidden — they cluttered the gallery and confused clients.
           const _agSeen = new Set();
-          const groups = allGroups.filter(g => {
+          // מדורגות לפי לידים ואז לפי הוצאה, כמו המודעות המובילות של Facebook.
+          // בטאב "הכל" מוצגות שתיים בלבד (ויטלי, 20.9); בטאב Google — כולן.
+          const _agAll = allGroups.filter(g => {
             if (!g || (g.spend || 0) <= 0) return false;
             if (g.id != null) { if (_agSeen.has(g.id)) return false; _agSeen.add(g.id); }
             return true;
-          });
+          }).sort((a, b) => ((b.conversions || b.leads || 0) - (a.conversions || a.leads || 0)) || ((b.spend || 0) - (a.spend || 0)));
+          const _agCap = dashTab === 'all' ? 2 : _agAll.length;
+          const groups = _agAll.slice(0, _agCap);
           if (groups.length === 0) return null;
           return (
             <div className="section section-asset-gallery">
-              <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קריאייטיב Google PMax</h2></div>
+              <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קריאייטיב Google PMax</h2><span className="sub">{dashTab === 'all' ? ('Top ' + groups.length + ' \u00b7 \u05d3\u05d9\u05e8\u05d5\u05d2 \u05dc\u05e4\u05d9 \u05dc\u05d9\u05d3\u05d9\u05dd \u00b7 \u05db\u05dc \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d4\u05e0\u05db\u05e1\u05d9\u05dd \u05d1\u05d8\u05d0\u05d1 Google') : ('\u05db\u05dc \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d4\u05e0\u05db\u05e1\u05d9\u05dd \u05e9\u05d4\u05d5\u05e6\u05d9\u05d0\u05d5 \u05d1\u05ea\u05e7\u05d5\u05e4\u05d4 (' + groups.length + ')')}</span></div>
               <div className={vrAds ? 'vr-ad-grid' : undefined} style={vrAds ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
                   // Handle both old field names (imageUrl, type) and new GAQL names (image_url, field_type)
@@ -5787,19 +5803,21 @@ const selectProject = async (client, project) => {
                         {(() => { const agSt = _agStatusOf(ag); const isAgA = agSt === 'ENABLED'; const isAgP = agSt === 'PAUSED'; const agC = isAgA ? '#059669' : isAgP ? '#d97706' : '#64748b'; const agL = isAgA ? 'פעיל' : isAgP ? 'מושהה' : agSt || 'לא ידוע'; return <div style={{fontSize:'0.75em',color:agC,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {agL}</div>; })()}
                         <div style={{fontWeight:700,fontSize:'1em',color:'#0f172a'}}>{ag.name}</div>
                         <div style={{fontSize:'0.72em',color:'#94a3b8',unicodeBidi:'plaintext'}}>{'\ud83d\udcca'} {ag.campaign || '-'}</div>
+                        {/* כל הכותרות והתיאורים, לא רק החמש/שלוש הראשונות (ויטלי, 20.9).
+                            הרשימה נגללת בתוך הקארד כדי שהגובה לא יתפוצץ. */}
                         {headlines.length > 0 && (
                           <div>
                             <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05db\u05d5\u05ea\u05e8\u05d5\u05ea'} ({headlines.length})</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'80px',overflowY:'auto'}}>
-                              {headlines.slice(0,5).map((h,j) => <div key={j} style={{fontSize:'0.82em',color:'#334155',unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{h.text}</div>)}
+                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'150px',overflowY:'auto'}}>
+                              {headlines.map((h,j) => <div key={j} style={{fontSize:'0.82em',color:'#334155',unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{h.text}</div>)}
                             </div>
                           </div>
                         )}
                         {descriptions.length > 0 && (
                           <div>
                             <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05ea\u05d9\u05d0\u05d5\u05e8\u05d9\u05dd'} ({descriptions.length})</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'80px',overflowY:'auto'}}>
-                              {descriptions.slice(0,3).map((d,j) => <div key={j} style={{fontSize:'0.8em',color:'#475569',lineHeight:1.4,unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{d.text}</div>)}
+                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'150px',overflowY:'auto'}}>
+                              {descriptions.map((d,j) => <div key={j} style={{fontSize:'0.8em',color:'#475569',lineHeight:1.4,unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{d.text}</div>)}
                             </div>
                           </div>
                         )}
@@ -5811,17 +5829,38 @@ const selectProject = async (client, project) => {
                             <div style={{textAlign:'center'}}><div style={{fontSize:'0.65em',color:'#64748b'}}>CPL</div><div style={{fontWeight:700,fontSize:'0.95em'}}>{'\u20aa'}{Math.round(cpl)}</div></div>
                           </div>
                         )}
+                        {/* כל התמונות, לא ארבע (ויטלי, 20.9). לחיצה פותחת את הקובץ המלא
+                            בלשונית חדשה — הנכס יושב ב-CDN של גוגל ואין לנו גרסה גדולה יותר בדף. */}
                         {images.length > 1 && (
-                          <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
-                            {images.slice(1,5).map((img,j) => (
-                              <img key={j} src={imgUrl(img)} alt="" style={{width:'44px',height:'44px',objectFit:'cover',borderRadius:'4px',border:'1px solid #e2e8f0'}} onError={(e)=>{e.target.style.display='none'}} />
-                            ))}
-                            {images.length > 5 && <div style={{fontSize:'0.75em',color:'#64748b',alignSelf:'center'}}>{'+'}{images.length - 5}</div>}
+                          <div>
+                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05ea\u05de\u05d5\u05e0\u05d5\u05ea'} ({images.length})</div>
+                            <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+                              {images.slice(1).map((img,j) => (
+                                <a key={j} href={imgUrl(img)} target="_blank" rel="noopener noreferrer" title={'\u05e4\u05ea\u05d9\u05d7\u05ea \u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05d1\u05d2\u05d5\u05d3\u05dc \u05de\u05dc\u05d0'}>
+                                  <img src={imgUrl(img)} alt="" loading="lazy" style={{width:'52px',height:'52px',objectFit:'cover',borderRadius:'6px',border:'1px solid #e2e8f0',display:'block'}} onError={(e)=>{e.target.style.display='none'}} />
+                                </a>
+                              ))}
+                            </div>
                           </div>
                         )}
+                        {/* סרטונים: עד היום הוצג רק מספרם. עכשיו תמונה ממוזערת מ-YouTube,
+                            ולחיצה על "נגן כאן" פורשת נגן מוטמע בתוך הקארד. */}
                         {videos.length > 0 && (
-                          <div style={{fontSize:'0.72em',color:'#64748b',marginTop:'4px'}}>
-                            {'\ud83c\udfac'} {videos.length} {'\u05e1\u05e8\u05d8\u05d5\u05e0\u05d9\u05dd'}
+                          <div>
+                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05e1\u05e8\u05d8\u05d5\u05e0\u05d9\u05dd'} ({videos.length})</div>
+                            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                              {videos.map((v,j) => { const vid = v.youtube_id || v.youtubeId; return (
+                                <details key={j}>
+                                  <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:'8px'}}>
+                                    <img src={`https://img.youtube.com/vi/${vid}/mqdefault.jpg`} alt="" loading="lazy" style={{width:'88px',height:'50px',objectFit:'cover',borderRadius:'6px',border:'1px solid #e2e8f0',flexShrink:0}} onError={(e)=>{e.target.style.display='none'}} />
+                                    <span style={{fontSize:'0.78em',color:'#4f46e5',fontWeight:600}}>{'\u25b6 \u05e0\u05d2\u05df \u05db\u05d0\u05df'}</span>
+                                  </summary>
+                                  <div style={{marginTop:'6px',aspectRatio:'16/9',width:'100%'}}>
+                                    <iframe src={`https://www.youtube.com/embed/${vid}`} title={v.name || ('\u05e1\u05e8\u05d8\u05d5\u05df ' + (j+1))} allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen loading="lazy" style={{width:'100%',height:'100%',border:0,borderRadius:'8px'}} />
+                                  </div>
+                                </details>
+                              ); })}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -6563,6 +6602,7 @@ const selectProject = async (client, project) => {
       )}
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
+      <BackToTop />
     </div>
   );
 }

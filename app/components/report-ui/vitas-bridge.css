@@ -160,6 +160,9 @@
 .vr-ui .vr-tree-row td:first-child svg { vertical-align: middle; color: var(--vr-muted, #586581); }
 .vr-platform { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-inline-end: 10px; vertical-align: middle; border: 1px solid var(--border, #DDE2EC); background: var(--surface, #F5F7FB); color: var(--vr-text, #142044); }
 .vr-platform svg { flex-shrink: 0; }
+/* בטבלת הקמפיינים התג יושב בעמודה משלו ולא בתוך תא השם, ולכן אין צורך במרווח שמפריד
+   אותו מהטקסט שלידו (ויטלי, 20.9). */
+.vr-ui .vr-tree-row .vr-platform { margin-inline-end: 0; }
 .vr-platform.meta { color: #1C2B33; }
 .vr-platform.google { color: #3C4043; }
 .vr-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }

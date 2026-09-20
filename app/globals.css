@@ -3981,3 +3981,31 @@ textarea:focus-visible,
     animation-iteration-count: infinite !important;
   }
 }
+
+/* ── כפתור חזרה לראש העמוד (app/components/BackToTop.jsx) ──────────────────────
+   צף בפינה התחתונה. inset-inline-start ולא left: בעמוד RTL הפינה ה"התחלתית"
+   היא הימנית, והכפתור צריך לשבת בצד ההפוך לתוכן שהעין קוראת — כלומר משמאל. */
+.back-to-top {
+  position: fixed;
+  inset-block-end: 22px;
+  inset-inline-start: 22px;
+  z-index: 900;
+  inline-size: 46px;
+  block-size: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  color: var(--violet, #6d28d9);
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.14);
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.back-to-top:hover { background: var(--violet, #6d28d9); color: #fff; transform: translateY(-2px); box-shadow: 0 10px 26px rgba(15, 23, 42, 0.2); }
+.back-to-top:focus-visible { outline: 2px solid var(--violet, #6d28d9); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .back-to-top { transition: none; } .back-to-top:hover { transform: none; } }
+
+/* במובייל הכפתור יושב מעט גבוה יותר, שלא יתנגש בסרגל הדפדפן. */
+@media (max-width: 640px) { .back-to-top { inset-block-end: 16px; inset-inline-start: 16px; inline-size: 42px; block-size: 42px; } }

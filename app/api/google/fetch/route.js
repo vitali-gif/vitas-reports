@@ -310,10 +310,23 @@ async function runSync(opts = {}) {
 
     const pt = computeTotals(mine)
 
-    // Gather asset groups whose campaign name contains the project name
+    // קבוצות הנכסים של הפרויקט.
+    //
+    // ⚠️ הבאג שהיה כאן: השיוך נעשה לפי campaign.includes(needle) בלבד, בעוד שורות
+    // המדידה משויכות ב-`mine` לפי כללי הניתוב (klossGoogleAgencyOf). ב-KLOSS קמפייני
+    // ה-PMax נקראים "P-max | Ongoing | General" ו-"P-max | Ongoing | New Client" —
+    // בלי המילה kloss — ולכן הקמפיינים נשמרו אבל הקריאייטיב שלהם נזרק בשקט, וגלריית
+    // "קריאייטיב Google PMax" הייתה ריקה. (ביוני זה עוד עבד רק כי היה קמפיין בשם
+    // "Kloss-6/2026-PMAX".)
+    //
+    // התיקון: קבוצת נכסים שייכת לפרויקט אם הקמפיין שלה כבר שויך לפרויקט ב-`mine`.
+    // הבדיקה הישנה נשארת כגיבוי. הנרמול מסיר סימני כיווניות בלתי נראים שגוגל מחזירה
+    // בתוך שמות קמפיינים — בלעדיו ההשוואה נכשלת בשקט על שמות מעורבים עברית/אנגלית.
+    const _campKey = (c) => String(c || '').replace(/[​-‏‪-‮⁦-⁩﻿]/g, '').trim().toLowerCase()
+    const mineCampaigns = new Set(mine.map(r => _campKey(r.campaign)))
     const projectAssetGroups = []
     for (const [campLower, groups] of Object.entries(assetGroupsByCampaign)) {
-      if (campLower.includes(needle)) projectAssetGroups.push(...groups)
+      if (mineCampaigns.has(_campKey(campLower)) || campLower.includes(needle)) projectAssetGroups.push(...groups)
     }
 
     let byAgency = null
