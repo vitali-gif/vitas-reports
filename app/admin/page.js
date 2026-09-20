@@ -1901,7 +1901,11 @@ const selectProject = async (client, project) => {
     // שני פרטים שנראים טכניים ואינם: תצוגת RTL על החוברת, אחרת אקסל פותח את
     // הגיליון משמאל לימין ועברית נראית שבורה; ורוחבי עמודות, כי "תיאור" הוא
     // טקסט חופשי ארוך שבלי רוחב מפורש נחתך לעמודה צרה.
-    const exportMeetings = () => {
+    // XLSX נטען כאן ב-import דינמי, כמו בשאר הייצואים בקובץ. קודם הוא לא נטען בכלל
+    // בפונקציה הזאת, והכפתור נפל על "XLSX is not defined" בכל לחיצה. נמצא ב-20.09
+    // בהרצה הראשונה של ESLint.
+    const exportMeetings = async () => {
+      const XLSX = await import('xlsx');
       const rows = meetings.map(m => ({
         'שם מלא': m.name || '',
         'טלפון': m.phone || '',
@@ -5276,7 +5280,11 @@ const selectProject = async (client, project) => {
         </>)}
       </>
     );
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch]);
+    // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
+    // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
+    // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.
+    // דווקא ה-id ולא האובייקט — עדכון תקציב יוצר אובייקט חדש ואין סיבה לבנות מחדש בגללו.
+  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch, meetingsOn, selectedProject?.id, isClientView]);
 
   if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
 

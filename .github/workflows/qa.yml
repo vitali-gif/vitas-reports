@@ -41,6 +41,12 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      # ESLint נוסף ב-20.09.2026. הרקע: next build מקמפל אבל לא בודק שמות משתנים ולא
+      # תלויות של hooks, ושלושה באגים אמיתיים עברו דרכו — כפתור "ישיבות שיווק" שלא
+      # הופיע (meetingsOn חסר במערך התלויות), משתנה daily שנשאר בתשובת קרון אחרי
+      # שהבלוק שהגדיר אותו הוסר, וכפתור "ייצוא לאקסל" בפגישות שנפל על XLSX לא מוגדר.
+      # השלישי נמצא בהרצה הראשונה של הכלי.
+      - run: npm run lint
       - run: npm run check:auth
       - run: npm test
 
