@@ -65,15 +65,18 @@ export async function GET(request) {
   // שלב 2/5 של docs/daily-ranges-plan.md — מצב העובדות היומיות ותמונת ה-CRM, אגרגטים בלבד.
   let dailyFacts = null
   try {
-    const [cov, syncRecent, syncBackfill, adsBlock] = await Promise.all([
+    // prefetch-ads:daily-block הוסר ב-20.09.2026 — הוא הריץ את אותה משיכה יומית כמו
+    // prefetch-daily, ושני הקרונים יחד הגיעו לתקרת המכסה של Google Ads. ה-job נשאר
+    // מדווח כאן כל עוד יש לו ריצות היסטוריות, ויתרוקן מעצמו; מי שקורא את הבריאות לא
+    // אמור להסיק ממנו שמשהו נשבר.
+    const [cov, syncRecent, syncBackfill] = await Promise.all([
       sb.rpc('ad_daily_coverage'),
       lastRuns(sb, 'prefetch-daily:recent', 3),
       lastRuns(sb, 'prefetch-daily:backfill', 3),
-      lastRuns(sb, 'prefetch-ads:daily-block', 3),
     ])
     dailyFacts = {
       coverage: (cov.data || []).map(c => ({ source: c.source, account: c.account, min_day: c.min_day, max_day: c.max_day, days: c.days, rows: c.rows, last_fetched: c.last_fetched })),
-      last_runs: { 'prefetch-daily:recent': syncRecent, 'prefetch-daily:backfill': syncBackfill, 'prefetch-ads:daily-block': adsBlock },
+      last_runs: { 'prefetch-daily:recent': syncRecent, 'prefetch-daily:backfill': syncBackfill },
     }
   } catch (e) { dailyFacts = { error: String(e?.message || e) } }
   // תמונות ה-CRM הדחוסות (crm_compact) — פרויקט, סוג, ספירות, טריות. אגרגטים בלבד.
