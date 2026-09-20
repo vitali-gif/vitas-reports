@@ -4,7 +4,6 @@
  */
 import { sendAlert } from '../../../../lib/alert'
 import { createClient } from '@supabase/supabase-js'
-import { logJob } from '../../../../lib/job-log.js'
 
 export const dynamic = 'force-dynamic'
 // force-no-store: supabase-js + internal calls go through fetch, which Next caches by
@@ -104,29 +103,16 @@ export async function GET(request) {
     if (inFlight.size > 0) await Promise.race(inFlight)
   }
 
-  // ── עובדות יומיות (שלב 2 של docs/daily-ranges-plan.md) ────────────────────────
-  // recent: 7 ימים אחורה כולל היום, בכל ריצה (Meta מעדכנת המרות באיחור).
-  // backfill: צעד אחד של מילוי היסטורי לכל חשבון, עד שההיסטוריה מלאה — בלי טריגר ידני.
-  // לא נכנס לרשימת הכשלים של המייל: הדוחות הרגילים לא תלויים בזה; שלב 5 מוסיף חיישן health.
-  const daily = []
-  for (const mode of ['recent', 'backfill']) {
-    if (Date.now() - startedAt > 200000) { daily.push({ mode, skipped: 'time budget' }); continue }
-    const t0 = Date.now()
-    try {
-      const res = await fetch(`${base}/api/ads/daily-sync`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify({ mode }) })
-      const d = await res.json().catch(() => ({}))
-      daily.push({ mode, ok: res.ok && d.ok !== false, status: res.status, jobs: d.jobs, failed: d.failed, deferred: d.deferred, done: d.done, ms: Date.now() - t0,
-        errors: (d.results || []).filter(r => !r.ok && !r.deferred).map(r => `${r.source}/${r.account} ${r.since}..${r.until}: ${r.error}`).slice(0, 5) })
-    } catch (err) {
-      daily.push({ mode, ok: false, error: String(err).slice(0, 200), ms: Date.now() - t0 })
-    }
-  }
-
-  // רישום התוצאה של הבלוק היומי ב-job_log (מיגרציה 008) — כדי שדילוג/כשל ייראו אחרי המעשה.
-  try {
-    const _su = process.env.NEXT_PUBLIC_SUPABASE_URL, _sk = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (_su && _sk) await logJob(createClient(_su, _sk, { auth: { persistSession: false } }), 'prefetch-ads:daily-block', daily.every(d => d.ok !== false), Date.now() - startedAt, { mainJobsMs: daily.length ? undefined : null, daily })
-  } catch {}
+  // ── עובדות יומיות: הוסרו מכאן (20.09.2026) ────────────────────────────────────
+  // עד היום רץ כאן בלוק שקרא ל-/api/ads/daily-sync במצבים recent ו-backfill. בדיוק אותה
+  // עבודה רצה ב-/api/cron/prefetch-daily, שנוצר במקור *בגלל* שהבלוק הזה נהרג בחוסר זמן.
+  // הבלוק מעולם לא הוסר, ולכן שני הקרונים משכו כל שעה את אותם 11 החשבונות באותו חלון
+  // תאריכים — prefetch-ads בדקה :07 ו-prefetch-daily בדקה :25. נמדד ב-job_log ב-19.09:
+  // שתי הריצות, אותם jobs, אותו טווח, אותן שגיאות.
+  //
+  // המחיר היה כפול קריאות ל-Google Ads API, וב-19.09 זה הגיע לתקרת המכסה: ארבעה חשבונות
+  // חזרו 429 RESOURCE_EXHAUSTED במשך ארבע שעות. מאז שנשאר קרון אחד — אין כפילות.
+  // אם מחזירים את הבלוק לכאן, יש לכבות את prefetch-daily, לא להריץ את שניהם.
 
   const failed = results.filter(r => !r.ok)
   if (failed.length > 0) {
@@ -187,5 +173,5 @@ export async function GET(request) {
       await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-ads', last_run: new Date().toISOString() }, { onConflict: 'job' })
     }
   } catch {}
-  return Response.json({ ok: failed.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, elapsedMs: Date.now()-startedAt }, daily, results })
+  return Response.json({ ok: failed.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, elapsedMs: Date.now()-startedAt }, results })
 }

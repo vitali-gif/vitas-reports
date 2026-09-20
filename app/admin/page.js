@@ -1901,7 +1901,11 @@ const selectProject = async (client, project) => {
     // שני פרטים שנראים טכניים ואינם: תצוגת RTL על החוברת, אחרת אקסל פותח את
     // הגיליון משמאל לימין ועברית נראית שבורה; ורוחבי עמודות, כי "תיאור" הוא
     // טקסט חופשי ארוך שבלי רוחב מפורש נחתך לעמודה צרה.
-    const exportMeetings = () => {
+    // XLSX נטען כאן ב-import דינמי, כמו בשאר הייצואים בקובץ. קודם הוא לא נטען בכלל
+    // בפונקציה הזאת, והכפתור נפל על "XLSX is not defined" בכל לחיצה. נמצא ב-20.09
+    // בהרצה הראשונה של ESLint.
+    const exportMeetings = async () => {
+      const XLSX = await import('xlsx');
       const rows = meetings.map(m => ({
         'שם מלא': m.name || '',
         'טלפון': m.phone || '',
