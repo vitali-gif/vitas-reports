@@ -441,8 +441,13 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const _vrCrmType = reports.find(r => r.month === selectedMonth && r.source === 'crm')?.summary?.crmType || null
   // vrShell — המעטפת (סיידבר, header, כותרת, תקציב) בעיצוב החדש בכל הטאבים של פרויקט נדל"ן, כדי שהמסך לא
   // יקפוץ בין שני עיצובים במעבר טאב. vrMode — תוכן הטאב "הכל" בלבד (הפיילוט).
-  const vrShell = view === 'dashboard' && !isDemoProject && !['zoho', 'salesforce'].includes(_vrCrmType)
-  const vrMode = vrShell && dashTab === 'all'
+  const _vrOwnCrm = ['zoho', 'salesforce'].includes(_vrCrmType)
+  const vrShell = view === 'dashboard' && !isDemoProject && !_vrOwnCrm
+  // טאבי המדיה ("הכל", Facebook, Google) זהים בין כל הלקוחות — אותם כרטיסים, אותה טבלת
+  // קמפיינים, אותם פילוחים וגלריות. לכן הם מקבלים את העיצוב המחודש גם ב-KLOSS וב-אריקה
+  // (ויטלי, 20.9), בעוד שטאב ה-CRM נשאר לפי מבנה ה-CRM של כל לקוח.
+  const vrAdsShell = view === 'dashboard' && !isDemoProject && ['all', 'facebook', 'google'].includes(dashTab)
+  const vrMode = vrAdsShell && dashTab === 'all'
   // vrCrm — המסך השני של הפיילוט: CRM › מקורות הגעה (design/handoff-crm-sources)
   const vrCrm = vrShell && dashTab === 'crm' && crmSubTab === 'sources'
   // vrResp — המסך השלישי: CRM › זמני תגובה (design/handoff-response-times)
@@ -454,9 +459,15 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const vrMeet = vrShell && dashTab === 'crm' && crmSubTab === 'meetings'
   // vrFb / vrG — טאבי Facebook ו-Google (design/handoff-facebook; Google באותו עיצוב לפי ויטלי, 19.9).
   // vrAds — כל טאב מדיה בעיצוב המחודש ("הכל", Facebook, Google): אותם כרטיסים, טבלת קמפיינים, פילוחים וגלריות.
-  const vrFb = vrShell && dashTab === 'facebook'
-  const vrG = vrShell && dashTab === 'google'
+  const vrFb = vrAdsShell && dashTab === 'facebook'
+  const vrG = vrAdsShell && dashTab === 'google'
   const vrAds = vrMode || vrFb || vrG
+  // ⚠️ הפרדה שחייבת להישאר: renderFunnelBar בנוי על summary.namedLeads, מבנה של BMBY בלבד.
+  // ל-Zoho ול-Salesforce אין אותו, ולכן החלפת המשפך שלהם במשפך המחודש הייתה מרוקנת אותו —
+  // כל שלבי ה-CRM היו מציגים "אין נתון" במקום הנתונים שקיימים להם היום. הכרטיסים כן
+  // משותפים (kpi() כבר יודע לרנדר MetricCard כשה-vrAds דלוק), המשפך לא.
+  const vrFunnel = vrAds && !_vrOwnCrm
+  const vrFunnelMode = vrMode && !_vrOwnCrm
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -3275,7 +3286,14 @@ const selectProject = async (client, project) => {
       const _hasNames = namesArr && namesArr.length > 0;
       if (vrAds) {
         // עיצוב מחודש: אותם ערכים, אותה תגית שינוי, אותה לחיצה לרשימת לידים — בכרטיס report-ui.
-        const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'לידים שלא טופלו': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature };
+        const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'לידים שלא טופלו': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature,
+          // מדדים שקיימים רק אצל אריקה (Zoho) ו-KLOSS (Salesforce). בלעדיהם הכרטיסים שלהם
+          // היו מקבלים את העיצוב אבל בלי אייקון, בזמן שהשאר כן.
+          'תקציב שנוצל': Wallet, 'עלות ממוצעת לקליק': MousePointerClick, 'עברו להזדמנות': Handshake, 'הזדמנויות': Handshake,
+          'רכשו': CheckCircle2, 'אחוז המרה': Trophy, 'אחוז המרה לעסקה': Trophy, 'שווי מכירות': Trophy, 'שווי עסקאות': Trophy,
+          'ביטולים': XCircle, 'ערך ממוצע לעסקה': Tag, 'עלות מכירת מכשיר': Wallet, 'ROAS לא כולל מע"מ': Trophy,
+          'פגישות שנקבעו': CalendarCheck, 'הצעות מחיר': FileText, 'הזמנות (שולמה מקדמה)': FileSignature,
+          'הובלה והרכבה': ClipboardList, 'עלות להזמנה': Wallet, 'זמן תגובה חציוני': Clock };
         const badge = !ch ? null : ch.newVal ? '↑ חדש'
           : ((ch.pct > 0 ? '↑ ' : ch.pct < 0 ? '↓ ' : '− ') + (ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '-') + Math.abs(ch.pct).toFixed(0) + '%'));
         return (
@@ -4971,7 +4989,7 @@ const selectProject = async (client, project) => {
         </div>
 
         {/* Facebook/Google (עיצוב מחודש): קוהורט הערוץ מיד אחרי הכרטיסים, כמו בסקיצה; פילוחי סוכנות/תת-פרויקט אחריו */}
-        {vrFb ? renderFunnelBar('cohort', 'facebook') : vrG ? renderFunnelBar('cohort', 'google') : null}
+        {vrFunnel && vrFb ? renderFunnelBar('cohort', 'facebook') : vrFunnel && vrG ? renderFunnelBar('cohort', 'google') : null}
 
         {(() => {
           const _ab = dashTab === 'facebook' ? (fbReports[0]?.summary?.byAgency)
@@ -5009,7 +5027,7 @@ const selectProject = async (client, project) => {
             מדיה-בלבד לא היה רואה אותו כלל, למרות שחצי מהמשפך שלו כן קיים.
             כאן הוא מוצג בטאב "הכל": שלבי המדיה עם נתונים, ושלבי ה-CRM כ"אין נתון".
             ברגע שה-CRM יחובר, טאב ה-CRM ייווצר והסרגל יעבור לשם מעצמו. */}
-        {dashTab === 'all' && (!hasCrm || vrMode) ? renderFunnelBar(vrMode) : null}
+        {dashTab === 'all' && (!hasCrm || vrFunnelMode) ? renderFunnelBar(vrFunnelMode) : null}
 
         {/* פילוח פנימי לפי פרויקט — לקוח בחשבון מודעות אחד שמזהה את הבניין ברמת המודעה.
             הסכום למעלה נשאר סך החשבון; כאן רואים ממה הוא מורכב. כל שקל בדלי אחד בלבד,
@@ -5083,7 +5101,7 @@ const selectProject = async (client, project) => {
         })()}
 
         {/* FUNNEL — במצב העיצוב המחודש המשפך היחיד הוא "משפך לידים" (renderFunnelBar) למעלה; זה מוצג רק במצב הישן */}
-        {!vrAds && <div className="section">
+        {!vrFunnel && <div className="section">
           <div className="section-head">
             <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
             <h2>משפך שיווקי</h2>
@@ -5712,7 +5730,7 @@ const selectProject = async (client, project) => {
         </div>)}
       </>
     );
-  }, [vrMode, vrFb, vrG, vrAds, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
+  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
     // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
     // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
     // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.
@@ -5927,7 +5945,7 @@ const selectProject = async (client, project) => {
                 ? (isFetching
                     ? <PeriodFetching />
                     : <PeriodEmpty onRefresh={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }, { live: !isClientView })} />)
-                : (vrShell ? <VitasPresentation>{renderDashboard()}</VitasPresentation> : renderDashboard())}
+                : ((vrShell || vrAds) ? <VitasPresentation>{renderDashboard()}</VitasPresentation> : renderDashboard())}
           </>)}
 
           
