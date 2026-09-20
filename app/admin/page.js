@@ -471,6 +471,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // (KLOSS) אין פילוח ערוץ ב-CRM — הלידים מסווגים לפי מקור הגעה ולא לפי פלטפורמת
   // מדיה — ולכן משפך "של פייסבוק" שם היה מציג חשיפות של פייסבוק מול כל הלידים.
   const vrFunnel = vrAds && _vrCrmType !== 'salesforce'
+  // vrZohoCrm — טאב ה-CRM של אריקה כרמל (BCureLaser ו-ISMOOTH), חבילת VITAS-Erika-CRM-Handoff.
+  // אותה שפה של ש.ברוך: 11 כרטיסים ברכיב המשותף ושתי טבלאות נפתחות. אין תתי-טאבים.
+  const vrZohoCrm = view === 'dashboard' && !isDemoProject && dashTab === 'crm' && _vrCrmType === 'zoho'
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -3391,7 +3394,8 @@ const selectProject = async (client, project) => {
       const sparkVals = metricKey && trendData.length >= 2 ? trendData.map(d => d[metricKey] || 0) : null;
       const trendPct = ch ? (ch.pct > 0 ? '+' : '') + Math.abs(ch.pct).toFixed(0) + '%' : null;
       const _hasNames = namesArr && namesArr.length > 0;
-      if (vrAds) {
+      // גם טאב ה-CRM של אריקה מקבל את הכרטיס המשותף — אותם ערכים, אותה תגית שינוי.
+      if (vrAds || vrZohoCrm) {
         // עיצוב מחודש: אותם ערכים, אותה תגית שינוי, אותה לחיצה לרשימת לידים — בכרטיס report-ui.
         const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'לידים שלא טופלו': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature,
           // מדדים שקיימים רק אצל אריקה (Zoho) ו-KLOSS (Salesforce). בלעדיהם הכרטיסים שלהם
@@ -4852,8 +4856,9 @@ const selectProject = async (client, project) => {
     const _spCamp = (ch,camp) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return _fbQnSpend; return _fbCampSpend[_normName(camp)]||0 }
     const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), t=_nn(adset); if(!t||t.indexOf('ללא')>=0) return null; const exact=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset)===t); if(exact.length) return {spend:exact.reduce((a,x)=>a+x.spend,0)}; const m=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset).includes(t)); return m.length===1 ? {spend:m[0].spend} : null }
     const _spAd = (ch,camp,adset,label) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), a=_nn(adset); const L=_nn(label); if(!L) return null; const inA=x=>(!a||a.indexOf('ללא')>=0||_nn(x.adset).includes(a)); let m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L && inA(x)); if(m.length) return {spend:m.reduce((z,x)=>z+x.spend,0)}; m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L); if(m.length===1) return {spend:m[0].spend}; const tok=(_nn(label).match(/ad\d+/)||[])[0]; if(tok){ const m2=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName).indexOf(tok)===0 && inA(x)); if(m2.length===1) return {spend:m2[0].spend}; } return null }
-    const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
-    const _roasCell = (rev, res, fs) => { const sp=res==null?null:(typeof res==='object'?res.spend:res); if(sp==null||sp<=0) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const r=(rev||0)/sp; return <td style={{fontSize:fs,whiteSpace:'nowrap',fontWeight:600,color:r>=1?'var(--emerald)':'var(--rose)'}}>{r.toFixed(2)}x</td> }
+    const _naT = 'לא זמין — נתוני הוצאה ו-ROAS קיימים ל-Facebook בלבד'
+    const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">—</span></td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
+    const _roasCell = (rev, res, fs) => { const sp=res==null?null:(typeof res==='object'?res.spend:res); if(sp==null||sp<=0) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">—</span></td>; const r=(rev||0)/sp; return <td style={{fontSize:fs,whiteSpace:'nowrap',fontWeight:600,color:r>=1?'var(--emerald)':'var(--rose)'}}>{r.toFixed(2)}x</td> }
             const _agents = _zs.agentPerformance || []
             const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
 
@@ -4943,16 +4948,41 @@ const selectProject = async (client, project) => {
               </div>
             )
 
-            return (<>
-
-
-                <div className="kpi-grid">
+            // ── שברון נגיש (חבילת אריקה) ──────────────────────────────────────────
+            // עד היום הפתיחה הייתה שורה שנלחצת עם תו "◀" — בלי מקלדת, בלי focus,
+            // ובלי דרך למקריא מסך לדעת אם הפירוט פתוח. stopPropagation הכרחי כי
+            // הכפתור יושב בתוך שורה שגם היא נלחצת.
+            const _twist = (has, open, rowLabel, onToggle) => has ? (
+              <button type="button" className="vr-erika-twist" aria-expanded={open}
+                aria-label={(open ? 'סגירת פירוט ' : 'פתיחת פירוט ') + rowLabel}
+                onClick={(e) => { e.stopPropagation(); onToggle(); }}>
+                {open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
+              </button>
+            ) : <span className="vr-erika-twist-empty" aria-hidden="true" />
+            // תווית רמה. ברמת ה-adset הנתון מגיע מ-UTM_Term, ובגוגל זו לרוב מילת חיפוש
+            // ולא קבוצת מודעות — המפרט אוסר לקרוא לה "קבוצת מודעות" באופן גורף.
+            const _isG = (ch) => /google|גוגל/i.test(ch || '')
+            const _lvlTag = (txt) => <span className="vr-erika-lvl">{txt}</span>
+            // "(ללא קמפיין)" הוא ערך טכני מהנתונים; המפרט מחייב תווית מפורשת שלא
+            // תיקרא כשם קמפיין אמיתי. השורה עצמה נשארת — אין למחוק אותה.
+            const _NOCAMP = '(ללא קמפיין)'
+            const _campLabel = (nm) => nm === _NOCAMP ? 'ללא שיוך לקמפיין' : nm
+            // המעטפת המשותפת: הרכיבים והמידות של ש.ברוך פעילים רק בתוך .vr-ui,
+            // ו-.vr-erika מתחם את התוספות של המסך הזה לשני פרויקטי אריקה בלבד.
+            return (<VitasPresentation className="vr-erika">
+                {/* היקף הנתונים. בלי המשפט הזה "רכשו" נקרא כמספר סופי, והוא לא:
+                    עסקה שתיסגר בשבוע הבא עדיין תשויך ללידים של התקופה הזו. */}
+                <div className="vr-erika-scope">
+                  <p>תוצאות הלידים שנוצרו בתקופה שנבחרה</p>
+                  <p>רכישות וביטולים עשויים להתעדכן גם לאחר סיום התקופה.</p>
+                </div>
+                <div className={vrZohoCrm ? 'vr-metric-grid' : 'kpi-grid'}>
                   {zohoKpiCards({ leads:_fn.leads, opportunities:_fn.opportunities, purchased:_fn.purchased, cancellations:_fn.cancellations, netRevenue:_fn.netRevenue, conversionRate:_fn.conversionRate }, ((fbTotals && fbTotals.spend) || 0) + ((gTotals && gTotals.spend) || 0), null)}
                 </div>
                 <div className="section">
-                  <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2></div>
+                  <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2><span className="sub">לחצו על שורה לפירוט</span></div>
                   <div style={_tblBar}>
-                    <div style={_tblHint}>💡 לחץ על ערוץ ← קמפיין ← adset ← מודעה כדי לצלול פנימה · תקציב FB: קמפיין מדויק, adset/מודעה משוער (~)</div>
+                    <div style={_tblHint}>💡 לחץ על ערוץ ← קמפיין ← קבוצת מודעות / מילת חיפוש ← מודעה כדי לצלול פנימה · הוצאה ו-ROAS קיימים ל-Facebook בלבד: קמפיין מדויק, רמות עמוקות יותר משוערות (~)</div>
                     <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                       <button onClick={toggleFunnelAll} style={_btnOpen}>{_funnelAllOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
                       <button onClick={exportFunnelCsv} style={_btnCsv}>{'⬇ ייצוא ל-CSV'}</button>
@@ -4968,8 +4998,8 @@ const selectProject = async (client, project) => {
                             const camps = c.campaigns || [];
                             const chOpen = expandedFunnelCh.has(c.channel);
                             out.push(
-                              <tr key={c.channel} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
-                                <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{camps.length ? (chOpen ? '▼' : '◀') : ''}</span>{c.channel}</td>
+                              <tr key={c.channel} className={'vr-erika-lvl0' + (chOpen ? ' vr-erika-open' : '')} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
+                                <td style={{fontWeight:600}}>{_twist(camps.length > 0, chOpen, 'הערוץ ' + c.channel, () => toggleFunnelCh(c.channel))}{_lvlTag('ערוץ')}<bdi>{c.channel}</bdi></td>
                                 <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>{_fbCell(_isFb(c.channel) ? _fbTotalSpend : null)}{_roasCell(c.netRevenue, _isFb(c.channel) ? _fbTotalSpend : null)}
                               </tr>
                             );
@@ -4979,8 +5009,8 @@ const selectProject = async (client, project) => {
                               const adSets = cm.adSets || [];
                               const cmOpen = expandedFunnelCamp.has(campKey);
                               out.push(
-                                <tr key={campKey} style={{background:'rgba(59,130,246,0.05)', cursor: adSets.length ? 'pointer' : 'default'}} onClick={adSets.length ? () => toggleFunnelCamp(campKey) : undefined}>
-                                  <td style={{paddingRight:24,fontSize:'0.9em',textAlign:'right',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{adSets.length ? (cmOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{cm.campaign}</span></td>
+                                <tr key={campKey} className={'vr-erika-lvl1' + (cmOpen ? ' vr-erika-open' : '')} style={{cursor: adSets.length ? 'pointer' : 'default'}} onClick={adSets.length ? () => toggleFunnelCamp(campKey) : undefined}>
+                                  <td className="vr-erika-name" style={{paddingInlineStart:26,fontSize:'0.9em'}}>{_twist(adSets.length > 0, cmOpen, 'הקמפיין ' + _campLabel(cm.campaign), () => toggleFunnelCamp(campKey))}{_lvlTag('קמפיין')}<bdi>{_campLabel(cm.campaign)}</bdi></td>
                                   <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>{_fbCell(_spCamp(c.channel, cm.campaign), '0.9em')}{_roasCell(cm.netRevenue, _spCamp(c.channel, cm.campaign), '0.9em')}
                                 </tr>
                               );
@@ -4990,16 +5020,16 @@ const selectProject = async (client, project) => {
                                 const ads = as.ads || [];
                                 const asOpen = expandedFunnelAst.has(astKey);
                                 out.push(
-                                  <tr key={astKey} style={{background:'rgba(59,130,246,0.09)', cursor: ads.length ? 'pointer' : 'default'}} onClick={ads.length ? () => toggleFunnelAst(astKey) : undefined}>
-                                    <td style={{paddingRight:44,fontSize:'0.85em',textAlign:'right',color:'#475569',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{ads.length ? (asOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{as.adset}</span></td>
+                                  <tr key={astKey} className={'vr-erika-lvl2' + (asOpen ? ' vr-erika-open' : '')} style={{cursor: ads.length ? 'pointer' : 'default'}} onClick={ads.length ? () => toggleFunnelAst(astKey) : undefined}>
+                                    <td className="vr-erika-name" style={{paddingInlineStart:46,fontSize:'0.85em',color:'#475569'}}>{_twist(ads.length > 0, asOpen, as.adset, () => toggleFunnelAst(astKey))}{_lvlTag(_isG(c.channel) ? 'מילת חיפוש (UTM Term)' : 'קבוצת מודעות')}<bdi>{as.adset}</bdi></td>
                                     <td style={{fontSize:'0.85em'}}>{formatNum(as.leads)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.opportunities)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.purchased)}</td><td style={{fontSize:'0.85em',color:'var(--violet)'}}>{(as.conversionRate||0)+'%'}</td><td style={{fontSize:'0.85em'}}>{formatCurrency(as.netRevenue||0)}</td>{_fbCell(_spAdset(c.channel, cm.campaign, as.adset), '0.85em')}{_roasCell(as.netRevenue, _spAdset(c.channel, cm.campaign, as.adset), '0.85em')}
                                   </tr>
                                 );
                                 if (!asOpen) return;
                                 ads.forEach(ad => {
                                   out.push(
-                                    <tr key={astKey+'|'+ad.ad} style={{background:'rgba(59,130,246,0.13)'}}>
-                                      <td style={{paddingRight:62,fontSize:'0.8em',unicodeBidi:'plaintext',textAlign:'right',color:'#64748b'}}>{_resolveAd(c.channel, ad.ad)}</td>
+                                    <tr key={astKey+'|'+ad.ad} className="vr-erika-lvl3">
+                                      <td className="vr-erika-name" style={{paddingInlineStart:66,fontSize:'0.8em',color:'#64748b'}}><span className="vr-erika-twist-empty" aria-hidden="true" />{_lvlTag('מודעה')}<bdi>{_resolveAd(c.channel, ad.ad)}</bdi></td>
                                       <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>{_fbCell(_spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}{_roasCell(ad.netRevenue, _spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}
                                     </tr>
                                   );
@@ -5017,14 +5047,24 @@ const selectProject = async (client, project) => {
                           <td style={{fontWeight:700}}>{formatNum(_fn.opportunities||0)}</td>
                           <td style={{fontWeight:700}}>{formatNum(_fn.purchased||0)}</td>
                           <td style={{fontWeight:700,color:'var(--violet)'}}>{(_fn.conversionRate||0)+'%'}</td>
-                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}}>{formatCurrency(_fbTotalSpend)}</td><td style={{fontWeight:700}}>{_fbTotalSpend>0 ? ((_fn.netRevenue||0)/_fbTotalSpend).toFixed(2)+'x' : '—'}</td>
+                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}}>{formatCurrency(_fbTotalSpend)}</td><td style={{fontWeight:700}} title="הכנסות מכל הערוצים חלקי תקציב Facebook בלבד — ראו ההערה מתחת לטבלה">{_fbTotalSpend>0 ? ((_fn.netRevenue||0)/_fbTotalSpend).toFixed(2)+'x' : '—'}</td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
+                  {/* ⚠️ אי-התאמה ידועה (DATA-NOTES של חבילת אריקה, סעיף 5): ה-ROAS בשורת
+                      הסיכום מחלק את ההכנסות מ*כל* הערוצים בתקציב של Facebook בלבד, ולכן
+                      הוא גבוה מה-ROAS שבכרטיס למעלה. לא שיניתי את הנוסחה — המפרט אוסר
+                      לשנות חישוב במסגרת עיצוב — אבל גם אסור להציג אותו כנתון אמין בשקט.
+                      התיקון מוצע לוויטלי בנפרד. */}
+                  {_fbTotalSpend > 0 && ((_fn.netRevenue || 0) > 0) ? (
+                    <p className="vr-erika-warn">
+                      ⚠️ ה-ROAS בשורת הסיכום מחושב כהכנסות מכל הערוצים חלקי תקציב Facebook בלבד, ולכן הוא גבוה מה-ROAS שבכרטיס למעלה. הנוסחה לא שונתה — היא ממתינה להכרעה.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="section">
-                  <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>ביצועי אנשי מכירות</h2></div>
+                  <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>ביצועי אנשי מכירות</h2><span className="sub">פירוט לפי נציג ומקור ליד</span></div>
                   <div style={_tblBar}>
                     <div style={_tblHint}>💡 לחץ על נציג כדי לראות פילוח לפי מקור ליד</div>
                     <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -5040,14 +5080,14 @@ const selectProject = async (client, project) => {
                           const srcs = ag.bySource || [];
                           const isOpen = expandedAgents.has(ag.agent);
                           const rows = [
-                            <tr key={ag.agent} style={{fontWeight:600, cursor: srcs.length ? 'pointer' : 'default'}} onClick={srcs.length ? () => toggleAgent(ag.agent) : undefined}>
-                              <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{srcs.length ? (isOpen ? '\u25bc' : '\u25c0') : ''}</span>{ag.agent}</td>
+                            <tr key={ag.agent} className={'vr-erika-lvl0' + (isOpen ? ' vr-erika-open' : '')} style={{fontWeight:600, cursor: srcs.length ? 'pointer' : 'default'}} onClick={srcs.length ? () => toggleAgent(ag.agent) : undefined}>
+                              <td style={{fontWeight:600}}>{_twist(srcs.length > 0, isOpen, 'הנציג ' + ag.agent, () => toggleAgent(ag.agent))}<bdi>{ag.agent}</bdi></td>
                               <td>{formatNum(ag.leads)}</td><td>{formatNum(ag.opportunities)}</td><td>{formatNum(ag.purchased)}</td><td>{formatCurrency(ag.netRevenue||0)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(ag.conversionRate||0)+'%'}</td>
                             </tr>
                           ];
                           if (isOpen) srcs.forEach(sr => rows.push(
-                            <tr key={ag.agent+'|'+sr.source} style={{background:'rgba(16,185,129,0.05)'}}>
-                              <td style={{paddingRight:30,fontSize:'0.9em'}}>{sr.source}</td>
+                            <tr key={ag.agent+'|'+sr.source} className="vr-erika-lvl1">
+                              <td className="vr-erika-name" style={{paddingInlineStart:26,fontSize:'0.9em'}}><span className="vr-erika-twist-empty" aria-hidden="true" />{_lvlTag('מקור ליד')}<bdi>{sr.source}</bdi></td>
                               <td style={{fontSize:'0.9em'}}>{formatNum(sr.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(sr.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(sr.purchased)}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(sr.netRevenue||0)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(sr.conversionRate||0)+'%'}</td>
                             </tr>
                           ));
@@ -5057,7 +5097,7 @@ const selectProject = async (client, project) => {
                     </table>
                   </div>
                 </div>
-            </>)
+            </VitasPresentation>)
           }
 
           // BMBY CRM (existing behavior — unchanged)
@@ -5922,7 +5962,7 @@ const selectProject = async (client, project) => {
         </div>)}
       </>
     );
-  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
+  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
     // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
     // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
     // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.

@@ -6,6 +6,7 @@ import './components/report-ui/crm-sources.css';
 import './components/report-ui/response-times.css';
 import './components/report-ui/facebook.css';
 import './components/report-ui/kloss.css';
+import './components/report-ui/erika.css';
 import './components/meetings/meetings.css';
 import './components/auth/signin.css';
 
