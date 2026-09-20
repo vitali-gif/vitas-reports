@@ -75,3 +75,62 @@
   .vr-ui .vr-kloss-bar-rail { grid-area: rail; }
   .vr-ui .vr-kloss-bar-note { grid-area: note; }
 }
+
+/* ── סניפים (חבילת VITAS-KLOSS-Branches-Handoff) ─────────────────────────────
+   המסך משתמש ב-.section / .data-table הקיימים, שכבר מקבלים את המידות של השפה
+   המשותפת מ-vitas-bridge.css ברגע שהם יושבים בתוך .vr-ui. מה שאין שם הוא כפתור
+   פתיחת השורה ורקע השורה הפתוחה, והם מוגדרים כאן. */
+
+/* המפרט אוסר להקטין טקסט כדי לדחוס עמודות; ט' הסניפים רחבה, ולכן גלילה אופקית
+   בתוך המיכל בלבד — לא של העמוד. .table-wrapper כבר עושה זאת. */
+.vr-ui.vr-kloss-branches .section-head h2 { display: inline-flex; align-items: center; }
+
+/* כפתור פתיחת פירוט הסניף. הוא יושב בתחילת השורה (inline-start = ימין ב-RTL),
+   כמו שהמפרט מבקש, ולא בקצה השמאלי שבסקיצה. */
+.vr-ui .vr-kloss-expand {
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 26px; block-size: 26px;
+  margin-inline-end: 8px; vertical-align: middle;
+  border: 1px solid var(--border, #dde2ec); border-radius: 7px;
+  background: var(--surface, #fff); color: var(--text-secondary, #66748f);
+  cursor: pointer; padding: 0;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.vr-ui .vr-kloss-expand:hover { background: var(--violet, #7c6cf5); border-color: var(--violet, #7c6cf5); color: #fff; }
+/* focus נראה: ניווט במקלדת בלי טבעת מיקוד הוא ניווט עיוור. */
+.vr-ui .vr-kloss-expand:focus-visible { outline: 2px solid var(--violet, #7c6cf5); outline-offset: 2px; }
+.vr-ui .vr-kloss-expand[aria-expanded='true'] { background: var(--violet, #7c6cf5); border-color: var(--violet, #7c6cf5); color: #fff; }
+
+/* שורה פתוחה — רקע כחול־לבנדר עדין, כדי שהפירוט שנפרש מתחתיה ייקרא כשייך אליה.
+   הכלל גובר על ה-hover ועל פסי הזברה של .data-table, ולכן !important: אחרת
+   העכבר מעל שורה פתוחה היה מבטל את הסימון בדיוק כשמסתכלים עליה. */
+.vr-ui .data-table tbody tr.vr-kloss-row-open,
+.vr-ui .data-table tbody tr.vr-kloss-row-open:hover { background: #eef1fd !important; }
+
+@media (prefers-reduced-motion: reduce) { .vr-ui .vr-kloss-expand { transition: none; } }
+
+/* ── אנשי מכירות ומוצרים (VITAS-KLOSS-Sales-Products-Handoff) ────────────────
+   הטבלאות משתמשות ב-.data-table המשותף. שתי התאמות בלבד:
+   th של שורה (שם הנציג / שם המוצר) צריך להיראות כמו תא רגיל ולא כמו כותרת, ושמות
+   ארוכים צריכים להישבר במקום לדחוק את שאר העמודות. */
+.vr-ui.vr-kloss-people .data-table tbody th {
+  background: transparent; color: inherit; font-weight: 600;
+  padding-block: 15px; padding-inline: 14px;
+  border-block-end: 1px solid var(--divider, #e5e9f1);
+  white-space: normal; text-align: start;
+}
+.vr-ui.vr-kloss-people .data-table tbody tr:last-child th { border-block-end: 0; }
+/* עמודת המוצר רחבה; הכמות והשווי בעמודות צרות ועקביות. */
+.vr-ui.vr-kloss-people .data-table td { white-space: nowrap; }
+
+/* ── זמנים (VITAS-KLOSS-Timing-Handoff) ──────────────────────────────────────
+   הגרפים נשארים כפי שהם — אותן סדרות, אותם דליים, אותם מכנים. כאן רק כותרות
+   הקבוצות ("כניסת לידים", "פגישות", "המרה וזמן טיפול") מקבלות את המידות של
+   כותרות המשנה בשפה המשותפת, במקום h3 קטן בגודל טקסט רגיל. */
+.vr-ui.vr-kloss-timing h3 {
+  font-size: 17px; font-weight: 700; color: var(--text, #142044);
+  margin-block: 34px 2px; margin-inline: 4px;
+}
+.vr-ui.vr-kloss-timing h3:first-of-type { margin-block-start: 6px; }
+/* הגרפים גוללים בתוך עצמם במסך צר; העמוד עצמו לעולם לא גולל אופקית. */
+.vr-ui.vr-kloss-timing .section > div[style*='overflow-x'] { scrollbar-width: thin; }

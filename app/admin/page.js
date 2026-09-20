@@ -4358,8 +4358,13 @@ const selectProject = async (client, project) => {
             const _lensBtn = (v, label) => (<button type="button" onClick={(e)=>{e.preventDefault();e.stopPropagation();setSfBranchLens(v);}} style={{fontSize:12,fontWeight:600,padding:'4px 12px',borderRadius:6,cursor:'pointer',border:'1px solid '+(_bLens===v?'#7c6cf5':'var(--border)'),background:_bLens===v?'#7c6cf5':'transparent',color:_bLens===v?'#fff':'var(--text-secondary)'}}>{label}</button>)
             const branchesSec = (
               <div className="section">
-                <div className="section-head">{ICO('emerald', "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z")}<h2>ביצועים לפי סניף</h2><span className="sub">{_bLens==='cohort'?'מה קרה ללידים של החודש':'פעילות החודש (כולל לידים קודמים)'}</span></div>
-                <div style={{display:'flex',gap:8,padding:'0 2px 12px'}}>{_lensBtn('cohort','לידים של החודש')}{_lensBtn('period','פעילות החודש')}</div>
+                {/* תג סוג התקופה, אותו רכיב ואותם צבעים של מסך הרשת — כדי ששני המסכים
+                    יאמרו "לידים של התקופה" ו"פעילות בתקופה" באותה שפה. */}
+                <div className="section-head">{ICO('emerald', "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z")}<h2>ביצועים לפי סניף<span className={`vr-kloss-tag vr-kloss-tag-${_bLens==='cohort'?'cohort':'period'}`}>{_bLens==='cohort'?'לידים של התקופה':'פעילות בתקופה'}</span></h2><span className="sub">{_bLens==='cohort'?'מה קרה ללידים של החודש':'פעילות החודש (כולל לידים קודמים)'}</span></div>
+                <div style={{display:'flex',gap:8,padding:'0 2px 4px'}}>{_lensBtn('cohort','לידים של החודש')}{_lensBtn('period','פעילות החודש')}</div>
+                {/* המפרט דורש להגיד במפורש על מה הבורר חל — הוא אינו משפיע על מקטעי
+                    ההתנגדויות שמתחת, ובלי המשפט הזה זו הנחה סבירה וגם שגויה. */}
+                <div className="sub" style={{padding:'0 2px 12px',fontSize:12.5}}>הבחירה חלה על הטבלה והשוואת הסניפים</div>
                 <div className="table-wrapper">
                   <table className="data-table">
                     <thead><tr><th>סניף</th><th>לידים</th><th>פגישות</th><th>הזדמנויות</th><th>הצעות</th><th>רכשו</th><th>שווי</th><th>המרה</th><th>מוביל</th></tr></thead>
@@ -4374,8 +4379,18 @@ const selectProject = async (client, project) => {
                       const _sm = _bLens==='cohort' ? (b.cohortSalesmen||[]) : (b.salesmen||[])
                       const _pr = _bLens==='cohort' ? (b.cohortProducts||[]) : (b.products||[])
                       return (<Fragment key={b.branch}>
-                        <tr onClick={() => toggleBranch(b.branch)} style={{cursor:'pointer'}}>
-                          <td style={{fontWeight:600}}>{open ? '▾ ' : '▸ '}{b.branch}</td>
+                        {/* כפתור אמיתי ולא רק שורה שנלחצת: aria-expanded אומר למקריא המסך
+                            אם הפירוט פתוח, ו-Enter/Space עובדים בלי עכבר. stopPropagation
+                            הכרחי — בלעדיו הלחיצה מגיעה גם לשורה, והשורה מתקפלת מיד בחזרה. */}
+                        <tr onClick={() => toggleBranch(b.branch)} style={{cursor:'pointer'}} className={open ? 'vr-kloss-row-open' : undefined}>
+                          <td style={{fontWeight:600}}>
+                            <button type="button" className="vr-kloss-expand" aria-expanded={open}
+                              aria-label={(open ? 'סגירת פירוט הסניף ' : 'פתיחת פירוט הסניף ') + b.branch}
+                              onClick={(e) => { e.stopPropagation(); toggleBranch(b.branch); }}>
+                              {open ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />}
+                            </button>
+                            <bdi>{b.branch}</bdi>
+                          </td>
                           <td>{formatNum(b.leads)}</td>
                           <td>{formatNum(b.meetings)}</td>
                           <td>{formatNum(oOpps)}</td>
@@ -4385,9 +4400,9 @@ const selectProject = async (client, project) => {
                           <td style={{color:'var(--violet)',fontWeight:600}}>{oConv}%</td>
                           <td className="sub">{oTop || '—'}</td>
                         </tr>
-                        {open && (<tr><td colSpan={9} style={{background:'#f8fafc',padding:'14px 18px'}}>
+                        {open && (<tr className="vr-kloss-row-open"><td colSpan={9} style={{background:'#f8fafc',padding:'18px 20px'}}>
                           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:20,width:'100%'}}>
-                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px',overflowX:'auto'}}>
+                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'16px 18px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אנשי מכירות</div>
                               {_sm.length === 0 ? <div className="sub">—</div> : (
                                 <table className="data-table" style={{width:'100%'}}>
@@ -4405,7 +4420,7 @@ const selectProject = async (client, project) => {
                                 </table>
                               )}
                             </div>
-                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px',overflowX:'auto'}}>
+                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'16px 18px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>מוצרים מובילים</div>
                               {_pr.length === 0 ? <div className="sub">—</div> : (
                                 <table className="data-table" style={{width:'100%'}}>
@@ -4448,6 +4463,11 @@ const selectProject = async (client, project) => {
                   {_bcSeries.map(sr => (<span key={sr.key}><span style={{display:'inline-block',width:10,height:10,background:sr.color,borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>{sr.label}</span>))}
                   <span style={{marginInlineStart:'auto',color:'#94a3b8'}}>האחוז מימין = מעבר מהשלב הקודם</span>
                 </div>
+                {/* בלי המשפט הזה הכרטיסים נראים כמו השוואת נפחים על סקאלה משותפת, והם לא:
+                    בר "לידים" מלא בכל סניף, גם בסניף עם עשרה לידים וגם בסניף עם מאתיים. */}
+                <p className="vr-caption" style={{margin:'0 2px 14px',fontSize:12.5,color:'#66748f'}}>
+                  אורך הבר בכל כרטיס מנורמל ללידים של אותו סניף — כלומר הכרטיסים משווים שיעורי מעבר, לא נפחים. להשוואת נפחים יש את הטבלה שלמעלה.
+                </p>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:12}}>
                   {_bcRows.map(b => {
                     const v = _bcVal(b)
@@ -4494,14 +4514,29 @@ const selectProject = async (client, project) => {
                 <div className="section">
                   <div className="section-head">{ICO(ico[0], ico[1])}<h2>{title}</h2><span className="sub">{subtitle}</span></div>
                   {opts.takeaway && peakI >= 0 ? <div style={{padding:'0 2px 6px',fontSize:13}}><b style={{color}}>{opts.takeaway}: {items[peakI].label}{opts.suffix && items[peakI].value != null ? ' (' + items[peakI].value + opts.suffix + ')' : ''}</b></div> : null}
+                  {/* מקרא הנפח הנמוך. הכלל עצמו כבר היה בקוד (minSample), אבל הוא השפיע רק
+                      על בחירת השיא ולא נאמר למסך — כלומר עמודת 100% שמבוססת על שלושה
+                      לידים נראתה זהה לעמודה שמבוססת על מאתיים. עכשיו היא מעומעמת ומוסברת. */}
+                  {opts.samples ? (
+                    <div className="sub" style={{padding:'0 2px 8px',fontSize:12,display:'flex',alignItems:'center',gap:6}}>
+                      <span aria-hidden="true" style={{display:'inline-block',width:10,height:10,borderRadius:3,background:color,opacity:0.3}} />
+                      {'פחות מ־' + (opts.minSample || 0) + ' לידים — נתון בנפח נמוך'}
+                    </div>
+                  ) : null}
                   <div style={{display:'flex',alignItems:'flex-end',gap:opts.tight?3:8,padding:'6px 2px',minHeight:130,overflowX:'auto'}}>
-                    {items.map((it, i) => (
-                      <div key={i} style={{flex:'1 0 auto',minWidth:opts.tight?16:26,textAlign:'center'}}>
+                    {items.map((it, i) => {
+                      const _low = !!opts.samples && !_elig(i)
+                      // tooltip לכל עמודה: בגרף של 24 שעות התוויות דלילות, ובלי זה אי אפשר
+                      // לדעת לאיזו שעה שייכת עמודה. כשיש samples — גם בסיס הספירה.
+                      const _tip = it.label + ': ' + (it.value == null ? 'אין נתון' : formatNum(it.value) + (opts.suffix || ''))
+                        + (opts.samples ? ' · ' + formatNum(opts.samples[i] || 0) + ' לידים' : '')
+                      return (
+                      <div key={i} title={_tip} style={{flex:'1 0 auto',minWidth:opts.tight?16:26,textAlign:'center'}}>
                         <div style={{fontSize:10,marginBottom:3,color:'#334155',fontWeight:i===peakI?700:400}}>{it.value==null?'':formatNum(it.value)}{it.value!=null&&opts.suffix?opts.suffix:''}</div>
-                        <div style={{height:Math.round((it.value||0)/max*104)+3,background:(opts.colors?opts.colors[i]:color),borderRadius:'3px 3px 0 0',opacity:(opts.highlightMax&&i!==peakI)?0.45:1}}></div>
+                        <div style={{height:Math.round((it.value||0)/max*104)+3,background:(opts.colors?opts.colors[i]:color),borderRadius:'3px 3px 0 0',opacity:_low?0.3:((opts.highlightMax&&i!==peakI)?0.45:1)}}></div>
                         <div className="sub" style={{fontSize:10,marginTop:4,fontWeight:i===peakI?700:400}}>{it.label}</div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
               )
@@ -4511,8 +4546,8 @@ const selectProject = async (client, project) => {
             const _respColors = ['#10b981','#22c55e','#84cc16','#eab308','#f59e0b','#ef4444']
             const timingSec = (!_timing.data) ? (<div className="section"><div className="sub" style={{padding:'10px 4px'}}>אין נתונים — לחצו "רענן CRM" למשיכת נתוני הזמנים.</div></div>) : (<>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'2px 4px 14px'}}>
-                <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>זמנים לפי:</span>
-                <select value={_tb} onChange={(e)=>setSfTimeBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
+                <label htmlFor="sf-time-branch" style={{fontSize:13,fontWeight:600,color:'#334155'}}>זמנים לפי:</label>
+                <select id="sf-time-branch" value={_tb} onChange={(e)=>setSfTimeBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
                   {_timeBranches.map(b => (<option key={b} value={b}>{b==='הכל'?'כל הרשת':b}</option>))}
                 </select>
               </div>
@@ -4562,8 +4597,6 @@ const selectProject = async (client, project) => {
                 const _rz = _td.resp || [], _rm = _td.respMeet || []
                 const _cd = _tRespLabels.map((lb, i) => { const L = _rz[i]||0, M = _rm[i]||0; return { lb, L, M, pc: L>0?Math.round(M/L*100):0 } })
                 const _MINS = 10
-                const _eligible = _cd.filter(c => c.L >= _MINS)
-                const _best = _eligible.length ? Math.max(..._eligible.map(c => c.pc)) : -1
                 const _col = (pc) => pc>=30 ? {c:'#0f9d58',bg:'#e1f5ee'} : pc>=20 ? {c:'#b45309',bg:'#fef3c7'} : {c:'#dc2626',bg:'#fee2e2'}
                 return (
                   <div className="section">
@@ -4573,7 +4606,10 @@ const selectProject = async (client, project) => {
                         <div key={c.lb} style={{background:'var(--surface-2, #fff)',border: best ? '2px solid '+cc.c : '1px solid var(--border)',borderRadius:14,padding:'14px 16px',opacity: small ? 0.7 : 1}}>
                           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                             <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>{c.lb}</span>
-                            {best ? null : (small ? <span style={{fontSize:10,fontWeight:600,color:'#94a3b8',background:'#f1f5f9',padding:'2px 8px',borderRadius:20}}>מדגם קטן</span> : null)}
+                            {/* תג "מדגם קטן" מוצג תמיד כשהמדגם קטן, גם בכרטיס המודגש. קודם הוא
+                                הוסתר בכרטיס הראשון, ולכן "תוך שעה" עם שלושה לידים הראה 100%
+                                בהדגשה ובלי שום סייג. המפרט אוסר זאת במפורש. */}
+                            {small ? <span style={{fontSize:10,fontWeight:600,color:'#94a3b8',background:'#f1f5f9',padding:'2px 8px',borderRadius:20}}>{'מדגם קטן · פחות מ־' + _MINS + ' לידים'}</span> : null}
                           </div>
                           <div style={{display:'flex',alignItems:'baseline',gap:6}}>
                             <span style={{fontSize:30,fontWeight:700,color:cc.c,lineHeight:1}}>{c.pc}%</span>
@@ -4667,22 +4703,30 @@ const selectProject = async (client, project) => {
               </div>
             )
 
+            // אנשי מכירות ומוצרים (חבילת VITAS-KLOSS-Sales-Products-Handoff).
+            // שתי טבלאות בלבד — בלי KPI, גרפים, מיון או דירוג שלא קיימים היום. מה שהשתנה
+            // כאן הוא רק חזותי ונגישותי: scope על כותרות העמודות, bidi isolation סביב שמות
+            // וסכומים, וערך מלא ב-title כשהסכום מקוצר (המפרט מחייב גישה לערך המלא).
+            const _fullMoney = (v) => formatCurrency(Math.round(v || 0))
+            const _money = (v) => <bdi title={_fullMoney(v)}>{formatCurrencyCompact(v || 0)}</bdi>
             const peopleSec = (<>
               <div className="section">
                 <div className="section-head">{ICO('violet', "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2")}<h2>ביצועי אנשי מכירות</h2><span className="sub">כלל הרשת</span></div>
                 <div className="table-wrapper">
                   <table className="data-table">
-                    <thead><tr><th>איש מכירות</th><th>הזדמנויות</th><th>הצעות מחיר</th><th>שווי הצעות</th><th>מכירות</th><th>שווי מכירות</th><th>ממוצע לעסקה</th><th>% המרה</th></tr></thead>
-                    <tbody>{_salesmen.map(a => (
+                    <thead><tr><th scope="col">איש מכירות</th><th scope="col">הזדמנויות</th><th scope="col">הצעות מחיר</th><th scope="col">שווי הצעות</th><th scope="col">מכירות</th><th scope="col">שווי מכירות</th><th scope="col">ממוצע לעסקה</th><th scope="col">% המרה</th></tr></thead>
+                    <tbody>{_salesmen.length === 0 ? (
+                      <tr><td colSpan={8} className="sub" style={{padding:'14px 4px'}}>אין נתוני אנשי מכירות לתקופה שנבחרה</td></tr>
+                    ) : _salesmen.map(a => (
                       <tr key={a.name}>
-                        <td style={{fontWeight:600}}>{a.name}</td>
+                        <th scope="row" style={{fontWeight:600,whiteSpace:'normal',textAlign:'start'}}><bdi>{a.name}</bdi></th>
                         <td>{formatNum(a.opportunities || 0)}</td>
                         <td>{formatNum(a.quotesTotal || 0)}</td>
-                        <td>{formatCurrencyCompact(a.quotesValueTotal || 0)}</td>
+                        <td>{_money(a.quotesValueTotal)}</td>
                         <td style={{fontWeight:600}}>{formatNum(a.orders || 0)}</td>
-                        <td>{formatCurrencyCompact(a.value || 0)}</td>
-                        <td>{formatCurrency(a.avgDeal || 0)}</td>
-                        <td style={{color:'var(--violet)',fontWeight:600}}>{(a.convToDeal || 0) + '%'}</td>
+                        <td>{_money(a.value)}</td>
+                        <td><bdi>{formatCurrency(a.avgDeal || 0)}</bdi></td>
+                        <td style={{color:'var(--violet)',fontWeight:600}}><bdi>{(a.convToDeal || 0) + '%'}</bdi></td>
                       </tr>
                     ))}</tbody>
                   </table>
@@ -4692,9 +4736,12 @@ const selectProject = async (client, project) => {
                 <div className="section-head">{ICO('emerald', "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z")}<h2>המוצרים הנמכרים ביותר</h2><span className="sub">כלל הרשת</span></div>
                 <div className="table-wrapper">
                   <table className="data-table">
-                    <thead><tr><th>מוצר</th><th>כמות</th><th>שווי</th></tr></thead>
-                    <tbody>{_products.map(pr => (
-                      <tr key={pr.name}><td style={{fontWeight:600}}>{pr.name}</td><td>{formatNum(pr.units)}</td><td>{formatCurrencyCompact(pr.value)}</td></tr>
+                    <thead><tr><th scope="col">מוצר</th><th scope="col">כמות</th><th scope="col">שווי</th></tr></thead>
+                    <tbody>{_products.length === 0 ? (
+                      <tr><td colSpan={3} className="sub" style={{padding:'14px 4px'}}>אין נתוני מוצרים לתקופה שנבחרה</td></tr>
+                    ) : /* שם מוצר ארוך נשבר לשורות ולא נחתך — המפרט אוסר לצמצם פונט או לחתוך טקסט. */
+                      _products.map(pr => (
+                      <tr key={pr.name}><th scope="row" style={{fontWeight:600,whiteSpace:'normal',textAlign:'start',maxWidth:420}}><bdi>{pr.name}</bdi></th><td>{formatNum(pr.units)}</td><td>{_money(pr.value)}</td></tr>
                     ))}</tbody>
                   </table>
                 </div>
@@ -4734,13 +4781,13 @@ const selectProject = async (client, project) => {
             const _objScope = _ob === 'all' ? 'כלל הרשת' : ('סניף: ' + _ob)
             const objectionsSec = (<>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'2px 4px 12px'}}>
-                <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>התנגדויות לפי:</span>
-                <select value={_ob} onChange={(e)=>setSfObjBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
+                <label htmlFor="sf-obj-branch" style={{fontSize:13,fontWeight:600,color:'#334155'}}>התנגדויות לפי:</label>
+                <select id="sf-obj-branch" value={_ob} onChange={(e)=>setSfObjBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
                   <option value="all">כל הרשת</option>
                   {_objBranchList.map(b => (<option key={b} value={b}>{b}</option>))}
                 </select>
                 <span className="sub" style={{fontSize:12,color:'#94a3b8'}}>לידים ─(אי המרה)─▶ הזדמנויות ─(נסגר ללא הצלחה)─▶ רכשו</span>
-                <span style={{marginInlineStart:'auto',fontSize:11,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:6,padding:'3px 9px',whiteSpace:'nowrap'}}>מבוסס פעילות החודש · לא מושפע מהעדשה למעלה</span>
+                <span style={{marginInlineStart:'auto',fontSize:11,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:6,padding:'3px 9px',whiteSpace:'nowrap'}}>מבוסס פעילות החודש · לא מושפע מהבחירה למעלה</span>
               </div>
               {_objBlock('נשירת ליד — סיבת אי המרה', 'לידים שלא הומרו החודש · ' + _objScope, ['amber', "M18 6 6 18M6 6l12 12"], _unqR, _unqT, _otherUnqualF, 'lead', '#eda100')}
               {_objBlock('נשירת הזדמנות — נסגר ללא הצלחה', 'הזדמנויות שנסגרו ללא הצלחה החודש · ' + _objScope, ['rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"], _lossR, _lossT, _otherLossF, 'opp', '#e24b4a')}
@@ -4759,13 +4806,13 @@ const selectProject = async (client, project) => {
                 <button type="button" className={`client-tab ${sfTab === 'timing' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('timing'); }}>זמנים</button>
                 <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
-              {/* מסך רשת בלבד עוטף ב-VitasPresentation: הרכיבים המשותפים פעילים רק בתוך
-                  .vr-ui, ו-.vr-kloss מתחם את התוספות למסך הזה. ארבעת תתי-הטאבים האחרים של
-                  KLOSS עדיין בעיצוב הישן וייעשו בנפרד, לפי החבילה שלהם. */}
+              {/* כל תת-טאב עוטף ב-VitasPresentation בנפרד: הרכיבים והמידות המשותפים פעילים
+                  רק בתוך .vr-ui, ו-.vr-kloss-* מתחם את התוספות של כל מסך. "מקורות וסטטוסים"
+                  נשאר בעיצוב הישן בכוונה — אין לו חבילת מפרט, וויטלי ביקש להשאירו כך. */}
               {sfTab === 'network' ? (<VitasPresentation className="vr-kloss">{netCards}{cohortFunnel}{periodFunnel}</VitasPresentation>)
-                : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}{objectionsSec}</>)
-                : sfTab === 'people' ? peopleSec
-                : sfTab === 'timing' ? timingSec
+                : sfTab === 'branches' ? (<VitasPresentation className="vr-kloss vr-kloss-branches">{branchesSec}{branchesChart}{objectionsSec}</VitasPresentation>)
+                : sfTab === 'people' ? (<VitasPresentation className="vr-kloss vr-kloss-people">{peopleSec}</VitasPresentation>)
+                : sfTab === 'timing' ? (<VitasPresentation className="vr-kloss vr-kloss-timing">{timingSec}</VitasPresentation>)
                 : (<>
                     {sourcesSec}
                     {simple('סטטוסי לידים', ent(_s.byStatus).map(([k, v]) => [({ 'New': 'חדש', 'Working': 'נוצר קשר ראשוני', 'Nurturing': 'תואמה פגישה', 'Qualified': 'הומר', 'Unqualified': 'לא הומר' })[k] || k, v]), 'סטטוס', 'לידים', 'amber')}
