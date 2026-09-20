@@ -250,6 +250,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
+      // הסברי המדדים במסך רשת של KLOSS הם <details> של MetricCard — נגישים למקלדת,
+      // אבל הדפדפן לא סוגר אותם ב-Escape. המפרט דורש שכן, אז סוגרים כאן.
+      const openHelp = typeof document !== 'undefined' ? document.querySelector('.vr-kloss details[open]') : null;
+      if (openHelp) { openHelp.removeAttribute('open'); return; }
       if (sfInfo) return setSfInfo(null);
       if (sfNoteModal) return setSfNoteModal(null);
       if (noteModal) return setNoteModal(null);
@@ -4086,16 +4090,14 @@ const selectProject = async (client, project) => {
             const _cpl = _leads > 0 ? _spend / _leads : 0
             const _clicks = ((fbTotals && fbTotals.clicks) || 0) + ((gTotals && gTotals.clicks) || 0)
 
-            const CARD = (label, value, color, info, cur, sub) => (
-              <div key={label} style={{position:'relative'}}>
-                {kpi(label, value, color, cur === undefined ? null : cur, null)}
-                {sub ? (<span style={{position:'absolute',bottom:9,insetInlineStart:13,fontSize:11,fontWeight:600,color:'rgba(255,255,255,.9)',letterSpacing:'.2px'}}>{sub}</span>) : null}
-                <span role="button" aria-label="הסבר" onClick={() => setSfInfo(sfInfo === label ? null : label)}
-                  style={{position:'absolute',insetInlineStart:10,top:10,zIndex:5,cursor:'pointer',width:17,height:17,borderRadius:'50%',background:'rgba(255,255,255,.28)',color:'#fff',fontSize:11,lineHeight:'17px',textAlign:'center',fontWeight:700,userSelect:'none'}}>!</span>
-                {sfInfo === label && (
-                  <div onClick={() => setSfInfo(null)} style={{position:'absolute',zIndex:60,top:'100%',insetInlineEnd:0,marginTop:6,width:265,background:'#0f172a',color:'#fff',fontSize:12,lineHeight:1.7,padding:'10px 12px',borderRadius:8,boxShadow:'0 8px 24px rgba(0,0,0,.22)',cursor:'pointer',textAlign:'right'}}>{info}</div>
-                )}
-              </div>
+            // כרטיס מדד במסך רשת. עבר מ-kpi() + בועה מצוירת ביד ל-MetricCard המשותף
+            // (חבילת KLOSS-Network). מה שהרווחנו: ההסבר הוא <details> אמיתי — נפתח
+            // ברווח/Enter, יש לו focus נראה ו-aria-expanded מובנה, וקורא מסך מקריא אותו.
+            // ה-Escape מטופל ב-effect נפרד, כי <details> לא נסגר בו מעצמו.
+            // sub נשאר: ההוראות אומרות במפורש ששורות המשנה הקיימות נשמרות.
+            const CARD = (label, value, tone, icon, info, sub) => (
+              <MetricCard key={label} label={label} value={value} tone={tone} icon={icon}
+                description={sub || undefined} details={info} />
             )
 
             const _arrived2 = _f.arrived !== undefined ? _f.arrived : Math.max(0, _meet - _noShow)
@@ -4104,89 +4106,108 @@ const selectProject = async (client, project) => {
             const _costCustomer = _paid > 0 ? _spend / _paid : 0
             const _quotesAmount = (_bs['קיבל הצעת מחיר'] || {}).amount || 0
             const _dealAmount = (_bs['הזמנה - שולמה מקדמה'] || {}).amount || 0
+            // 16 קארדים, ארבע שורות על ארבע עמודות. הסדר מחייב ומגיע מטבלת ה-DESIGN-SPEC,
+            // לא מהסקיצה — בסקיצה סדר חלק מהקארדים בשורות 2 ו-4 שונה, והמפרט גובר.
+            // הצבע קבוע לכל מדד ואינו משתנה לפי טוב/רע.
             const netCards = (
-              <div className="section">
-                <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>מסך רשת</h2><span className="sub">קבוצת הלידים שנוצרו החודש · מה קרה להם עד כה · לחיצה על ! להסבר</span></div>
-                <div className="kpi-grid">
-                  {CARD('תקציב שנוצל', formatCurrency(_spend), '', 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.', _spend)}
-                  {CARD('סה"כ לידים', formatNum(_leads), 'green', 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו. אחוז ההמרה מקליקים יוצג אוטומטית כשיחוברו חשבונות הפרסום.', _leads, _clicks > 0 ? pctOf(_leads, _clicks) + ' מהקליקים' : null)}
-                  {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'purple', 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.', _cpl)}
-                  {CARD('טרם טופלו / חדשים', formatNum(_untreated), 'amber', 'לידים שסטטוסם עדיין "חדש" (New) ולא נגעו בהם.', _untreated)}
-                  {CARD('פגישות שנקבעו', formatNum(_meet), 'sky', 'סכום שלושת סטטוסי הפגישה: "תואמה פגישה בסניף" (טרם התקיימה) + "הומר" (הגיע) + "לא הגיעו לפגישה". נספר לפי סטטוס ולא לפי תאריך הפגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא. השורה התחתונה: אחוז מסך הלידים.', _meet, pctOf(_meet, _leads) + ' מהלידים')}
-                  {CARD('פגישות עתידיות', formatNum(_sched), 'amber', 'לידים בסטטוס "תואמה פגישה בסניף" — הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.', _sched)}
-                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'cyan', 'לידים בסטטוס "הומר" (Qualified) — הגיעו לפגישה בפועל. אחוז מהפגישות שנקבעו: ' + pctOf(_arrived2, _meet) + '. השורה התחתונה: אחוז מסך הלידים.', _arrived2, pctOf(_arrived2, _leads) + ' מהלידים')}
-                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'red', 'לידים בסטטוס "לא הגיעו לפגישה" — פגישות שנקבעו ולא התקיימו. השורה התחתונה: שיעור הביטול מתוך הפגישות שנקבעו.', _noShow, pctOf(_noShow, _meet) + ' מהפגישות')}
-                  {CARD('עברו להזדמנות', formatNum(_opps), 'cyan', 'מתוך הלידים שנוצרו החודש — כמה נפתחה להם הזדמנות (הגיעו לפגישה ונפתח תיק). לא כולל הזדמנויות מלידים של חודשים קודמים. השורה התחתונה: אחוז מסך הלידים.', _opps, pctOf(_opps, _leads) + ' מהלידים')}
-                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'orange', 'מתוך הלידים של החודש — כמה קיבלו הצעת מחיר (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps) + '. השורה התחתונה: אחוז מסך הלידים.', _quotes, pctOf(_quotes, _leads) + ' מהלידים')}
-                  {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), 'orange', 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של הזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — פוטנציאל שטרם נסגר. לשם השוואה, בשדה Amount הסטנדרטי של Salesforce הסכום הוא ' + formatCurrencyCompact(_quotesAmount) + ' (כולל הובלה ותוספות).', _quotesVal)}
-                  {CARD('שילמו מקדמה', formatNum(_paid), 'pink', 'מתוך הלידים של החודש — כמה כבר שילמו מקדמה (רכשו). לא כולל עסקאות שנסגרו החודש מלידים קודמים. השורה התחתונה: אחוז מסך הלידים.', _paid, pctOf(_paid, _leads) + ' מהלידים')}
-                  {CARD('עלות פגישה שהגיעה', _spend > 0 ? formatCurrency(_costArrived) : '—', 'amber', 'תקציב שנוצל חלקי מספר הלידים שהגיעו לפגישה בפועל (סטטוס "הומר"). מוצג רק כשיש נתוני מדיה.', _costArrived)}
-                  {CARD('עלות לקוח', _spend > 0 ? formatCurrency(_costCustomer) : '—', 'red', 'תקציב שנוצל חלקי מספר ההזמנות ששולמה בהן מקדמה — כמה עולה לנו לקוח משלם. מוצג רק כשיש נתוני מדיה.', _costCustomer)}
-                  {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), 'pink', 'סכום "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. ההובלה וההרכבה בנפרד. בשדה Amount הסטנדרטי: ' + formatCurrencyCompact(_dealAmount) + '.', _dealVal)}
-                  {CARD('החליטו לא לרכוש', formatNum(_lost), '', 'מתוך הלידים של החודש — כמה מההזדמנויות נסגרו ללא רכישה. אחוז מההזדמנויות: ' + pctOf(_lost, _opps), _lost)}
+              <ReportSection title="מסך רשת" description="תמונת מצב ללידים שנוצרו בתקופה שנבחרה.">
+                <div className="vr-metric-grid">
+                  {CARD('תקציב שנוצל', formatCurrency(_spend), 'indigo', Wallet, 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.')}
+                  {CARD('סה"כ לידים', formatNum(_leads), 'emerald', Users, 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו. אחוז ההמרה מקליקים יוצג אוטומטית כשיחוברו חשבונות הפרסום.', _clicks > 0 ? pctOf(_leads, _clicks) + ' מהקליקים' : null)}
+                  {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'violet', Tag, 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.')}
+                  {CARD('טרם טופלו / חדשים', formatNum(_untreated), 'indigo', ClipboardList, 'לידים שסטטוסם עדיין "חדש" (New) ולא נגעו בהם.')}
+                  {CARD('פגישות שנקבעו', formatNum(_meet), 'violet', CalendarCheck, 'סכום שלושת סטטוסי הפגישה: "תואמה פגישה בסניף" (טרם התקיימה) + "הומר" (הגיע) + "לא הגיעו לפגישה". נספר לפי סטטוס ולא לפי תאריך הפגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא. השורה התחתונה: אחוז מסך הלידים.', pctOf(_meet, _leads) + ' מהלידים')}
+                  {CARD('פגישות עתידיות', formatNum(_sched), 'indigo', CalendarClock, 'לידים בסטטוס "תואמה פגישה בסניף" — הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.')}
+                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'sky', UserCheck, 'לידים בסטטוס "הומר" (Qualified) — הגיעו לפגישה בפועל. אחוז מהפגישות שנקבעו: ' + pctOf(_arrived2, _meet) + '. השורה התחתונה: אחוז מסך הלידים.', pctOf(_arrived2, _leads) + ' מהלידים')}
+                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'terra', UserX, 'לידים בסטטוס "לא הגיעו לפגישה" — פגישות שנקבעו ולא התקיימו. השורה התחתונה: שיעור הביטול מתוך הפגישות שנקבעו.', pctOf(_noShow, _meet) + ' מהפגישות')}
+                  {CARD('עברו להזדמנות', formatNum(_opps), 'emerald', Handshake, 'מתוך הלידים שנוצרו החודש — כמה נפתחה להם הזדמנות (הגיעו לפגישה ונפתח תיק). לא כולל הזדמנויות מלידים של חודשים קודמים. השורה התחתונה: אחוז מסך הלידים.', pctOf(_opps, _leads) + ' מהלידים')}
+                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'sky', FileText, 'מתוך הלידים של החודש — כמה קיבלו הצעת מחיר (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps) + '. השורה התחתונה: אחוז מסך הלידים.', pctOf(_quotes, _leads) + ' מהלידים')}
+                  {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), 'terra', Tag, 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של הזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — פוטנציאל שטרם נסגר. לשם השוואה, בשדה Amount הסטנדרטי של Salesforce הסכום הוא ' + formatCurrencyCompact(_quotesAmount) + ' (כולל הובלה ותוספות).')}
+                  {CARD('שילמו מקדמה', formatNum(_paid), 'amber', CheckCircle2, 'מתוך הלידים של החודש — כמה כבר שילמו מקדמה (רכשו). לא כולל עסקאות שנסגרו החודש מלידים קודמים. השורה התחתונה: אחוז מסך הלידים.', pctOf(_paid, _leads) + ' מהלידים')}
+                  {CARD('עלות פגישה שהגיעה', _spend > 0 ? formatCurrency(_costArrived) : '—', 'indigo', Users, 'תקציב שנוצל חלקי מספר הלידים שהגיעו לפגישה בפועל (סטטוס "הומר"). מוצג רק כשיש נתוני מדיה.')}
+                  {CARD('עלות לקוח', _spend > 0 ? formatCurrency(_costCustomer) : '—', 'amber', Wallet, 'תקציב שנוצל חלקי מספר ההזמנות ששולמה בהן מקדמה — כמה עולה לנו לקוח משלם. מוצג רק כשיש נתוני מדיה.')}
+                  {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), 'rose', Trophy, 'סכום "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. ההובלה וההרכבה בנפרד. בשדה Amount הסטנדרטי: ' + formatCurrencyCompact(_dealAmount) + '.')}
+                  {CARD('החליטו לא לרכוש', formatNum(_lost), 'violet', Ban, 'מתוך הלידים של החודש — כמה מההזדמנויות נסגרו ללא רכישה. אחוז מההזדמנויות: ' + pctOf(_lost, _opps))}
                 </div>
-              </div>
+              </ReportSection>
             )
 
             const _fc = _s.funnelCohort || {}
             const _fp = _s.funnelPeriod || {}
-            const funnelBars = (title, subtitle, ico, steps, showStepPct) => {
+            /**
+             * שורות הברים של שני הדוחות (חבילת KLOSS-Network).
+             *
+             * מה שהמפרט דורש ושונה ממה שהיה כאן:
+             *  • המספר יושב בעמודה קבועה לפני המסילה ולא בתוך הבר, כדי שלא ייחתך כשהבר קצר.
+             *  • האחוזים גלויים בטקסט. בסקיצה הם הוסתרו מאחורי "בפירוט השלב" — המפרט אומר
+             *    במפורש שזה אינו מימוש מאושר.
+             *  • כל אחוז נושא את המכנה שלו בכתב ("מהלידים" / "מהפגישות"), כי שני הדוחות
+             *    משתמשים בבסיסים שונים.
+             *  • אותו שלב מקבל את אותו צבע בשני הדוחות, והמידע קיים גם בלי הבחנת צבע.
+             *
+             * רוחב הבר הוא היחיד שנשאר inline — הוא נתון מחושב, לא בחירת עיצוב.
+             */
+            const funnelBars = (title, tagText, tagTone, description, steps, showStepPct) => {
               const mainSteps = steps.filter(x => !x.aux)
               const mx = Math.max(1, mainSteps[0] ? mainSteps[0].v : 1)
               const leadsTot = mainSteps[0] ? mainSteps[0].v : 0
+              const heading = (<>{title}<span className={`vr-kloss-tag vr-kloss-tag-${tagTone}`}>{tagText}</span></>)
               return (
-                <div className="section">
-                  <div className="section-head">{ICO(ico, "M3 4h18l-7 8v6l-4 2v-8z")}<h2>{title}</h2><span className="sub">{subtitle}</span></div>
-                  <div style={{padding:'14px 4px'}}>
+                <ReportSection title={heading} description={description}>
+                  <ol className="vr-kloss-bars">
                     {steps.map((st, i) => {
-                      const w = Math.max(4, Math.round(st.v / mx * 100))
+                      const w = Math.max(2, Math.round(st.v / mx * 100))
                       const prevMain = (() => { for (let j = i - 1; j >= 0; j--) { if (!steps[j].aux) return steps[j].v } return null })()
                       const dropPct = (showStepPct && prevMain !== null && !st.aux) ? pctOf(st.v, prevMain) : null
                       return (
-                        <div key={st.label} style={{display:'flex',alignItems:'center',gap:12,marginBottom:9,opacity: st.aux ? 0.92 : 1}}>
-                          <div style={{width:150,fontSize:13,fontWeight:600,textAlign:'left',flexShrink:0,color: st.aux ? '#ef4444' : '#334155'}}>{st.aux ? '↳ ' : ''}{st.label}</div>
-                          <div style={{flex:1,position:'relative',height:st.aux?26:34,background:'#f1f5f9',borderRadius:8,overflow:'hidden'}}>
-                            <div style={{position:'absolute',insetInlineStart:0,top:0,height:'100%',width:w+'%',background:st.color,borderRadius:8,transition:'width .5s ease',display:'flex',alignItems:'center',paddingInline:12,minWidth:50,gap:8}}>
-                              <span style={{color:'#fff',fontWeight:700,fontSize:st.aux?12:14}}>{formatNum(st.v)}</span>
-                              {st.note ? <span style={{color:'rgba(255,255,255,.92)',fontWeight:600,fontSize:11}}>· {st.note}</span> : null}
-                            </div>
-                          </div>
-                          <div style={{width:120,fontSize:12,flexShrink:0,textAlign:'right'}}>
-                            {st.aux ? <span style={{color:'#f87171'}}>{pctOf(st.v, st.of || leadsTot)} {st.ofLabel || 'מהלידים'}</span>
-                              : i === 0 ? <span style={{color:'#94a3b8'}}>100%</span>
-                              : (<><span style={{color:'#7c6cf5',fontWeight:600}}>{pctOf(st.v, leadsTot)}</span><span style={{color:'#94a3b8'}}> מהלידים</span>{dropPct ? <span style={{color:'#cbd5e1'}}> · {dropPct} מהקודם</span> : null}</>)}
-                          </div>
-                        </div>
+                        <li key={st.label} className={`vr-kloss-bar${st.aux ? ' vr-kloss-bar-aux' : ''}`}>
+                          <span className="vr-kloss-bar-label">{st.aux ? '↳ ' : ''}{st.label}</span>
+                          <span className="vr-kloss-bar-value"><bdi>{formatNum(st.v)}</bdi></span>
+                          <span className="vr-kloss-bar-rail">
+                            <span className={`vr-kloss-bar-fill vr-kloss-fill-${st.fill}`} style={{ inlineSize: w + '%' }} />
+                          </span>
+                          <span className="vr-kloss-bar-note">
+                            {st.aux
+                              ? <><bdi>{pctOf(st.v, st.of || leadsTot)}</bdi> {st.ofLabel || 'מהלידים'}</>
+                              : i === 0
+                                ? <><bdi>100%</bdi> מהלידים</>
+                                : (<><strong><bdi>{pctOf(st.v, leadsTot)}</bdi></strong> מהלידים{dropPct ? <> · <bdi>{dropPct}</bdi> מהשלב הקודם</> : null}</>)}
+                            {st.note ? <> · <span className="vr-kloss-bar-amount"><bdi>{st.note}</bdi></span></> : null}
+                          </span>
+                        </li>
                       )
                     })}
-                  </div>
-                </div>
+                  </ol>
+                </ReportSection>
               )
             }
+            // הניסוחים בשתי המסגרות מגיעים מילה במילה מה-DESIGN-SPEC.
             const cohortFunnel = funnelBars(
-              'מה קרה ללידים של החודש', 'קבוצת הלידים שנוצרו החודש — כל שלב מתוך אותם לידים · האחוז הוא מהשלב הקודם',
-              'emerald',
+              'מה קרה ללידים של החודש', 'לידים של התקופה', 'cohort',
+              'מעקב אחר הלידים שנוצרו בתקופה — התוצאות עשויות להתעדכן בהמשך.',
               [
-                { label: 'לידים', v: _fc.leads || 0, color: '#10b981' },
-                { label: 'תיאמו פגישה', v: _fc.meetings || 0, color: '#3b82f6' },
-                { label: 'לא הגיעו לפגישה', v: _fc.noShow || 0, color: '#ef4444', aux: true, of: _fc.meetings || 0, ofLabel: 'מהפגישות' },
-                { label: 'הגיעו לפגישה', v: _fc.arrived || 0, color: '#14b8a6' },
-                { label: 'עברו להזדמנות', v: _fc.opportunities || 0, color: '#06b6d4' },
-                { label: 'קיבלו הצעת מחיר', v: _fc.quotes || 0, color: '#f97316', note: formatCurrencyCompact(_fc.quotesValue || 0) },
-                { label: 'שילמו מקדמה', v: _fc.paid || 0, color: '#a855f7', note: formatCurrencyCompact(_fc.paidValue || 0) },
-                { label: 'לא רכשו', v: _fc.lost || 0, color: '#94a3b8', aux: true, of: _fc.opportunities || 0, ofLabel: 'מההזדמנויות' },
+                { label: 'לידים', v: _fc.leads || 0, fill: 'leads' },
+                { label: 'תיאמו פגישה', v: _fc.meetings || 0, fill: 'meetings' },
+                { label: 'לא הגיעו לפגישה', v: _fc.noShow || 0, fill: 'noshow', aux: true, of: _fc.meetings || 0, ofLabel: 'מהפגישות' },
+                { label: 'הגיעו לפגישה', v: _fc.arrived || 0, fill: 'arrived' },
+                { label: 'עברו להזדמנות', v: _fc.opportunities || 0, fill: 'opps' },
+                { label: 'קיבלו הצעת מחיר', v: _fc.quotes || 0, fill: 'quotes', note: formatCurrencyCompact(_fc.quotesValue || 0) },
+                { label: 'שילמו מקדמה', v: _fc.paid || 0, fill: 'paid', note: formatCurrencyCompact(_fc.paidValue || 0) },
+                { label: 'לא רכשו', v: _fc.lost || 0, fill: 'lost', aux: true, of: _fc.opportunities || 0, ofLabel: 'מההזדמנויות' },
               ], true)
+            // showStepPct=false בכוונה: זהו דוח פעילות ולא מסלול מעבר של אותם אנשים,
+            // ולכן אסור לייצר ממנו שיעור המרה מחלוקת שתי שורות סמוכות (DESIGN-SPEC).
             const periodFunnel = funnelBars(
-              'דוח ביצועים — פעילות החודש', 'כל מה שנוצר/התקיים החודש, כולל לידים מחודשים קודמים',
-              'violet',
+              'דוח ביצועים — פעילות החודש', 'פעילות בתקופה', 'period',
+              'כולל פעילות על לידים שנוצרו בחודשים קודמים.',
               [
-                { label: 'לידים שנוצרו', v: _fp.leads || 0, color: '#10b981' },
-                { label: 'הזדמנויות שנפתחו', v: _fp.opportunities || 0, color: '#06b6d4' },
-                { label: 'פגישות שהתקיימו', v: _fp.meetings || 0, color: '#3b82f6' },
-                { label: 'לא הגיעו לפגישה', v: _fp.noShow || 0, color: '#ef4444', aux: true, of: _fp.meetings || 0, ofLabel: 'מהפגישות' },
-                { label: 'קיבלו הצעת מחיר', v: _fp.quotes || 0, color: '#f97316', note: formatCurrencyCompact(_fp.quotesValue || 0) },
-                { label: 'שילמו מקדמה', v: _fp.paid || 0, color: '#a855f7', note: formatCurrencyCompact(_fp.paidValue || _fp.dealValue || 0) },
-                { label: 'לא רכשו', v: _fp.lost || 0, color: '#94a3b8', aux: true, of: _fp.opportunities || 0, ofLabel: 'מההזדמנויות' },
+                { label: 'לידים שנוצרו', v: _fp.leads || 0, fill: 'leads' },
+                { label: 'הזדמנויות שנפתחו', v: _fp.opportunities || 0, fill: 'opps' },
+                { label: 'פגישות שהתקיימו', v: _fp.meetings || 0, fill: 'meetings' },
+                { label: 'לא הגיעו לפגישה', v: _fp.noShow || 0, fill: 'noshow', aux: true, of: _fp.meetings || 0, ofLabel: 'מהפגישות' },
+                { label: 'קיבלו הצעת מחיר', v: _fp.quotes || 0, fill: 'quotes', note: formatCurrencyCompact(_fp.quotesValue || 0) },
+                { label: 'שילמו מקדמה', v: _fp.paid || 0, fill: 'paid', note: formatCurrencyCompact(_fp.paidValue || _fp.dealValue || 0) },
+                { label: 'לא רכשו', v: _fp.lost || 0, fill: 'lost', aux: true, of: _fp.opportunities || 0, ofLabel: 'מההזדמנויות' },
               ], false)
 
             const maxH = Math.max(1, ...Object.values(_hours))
@@ -4613,7 +4634,10 @@ const selectProject = async (client, project) => {
                 <button type="button" className={`client-tab ${sfTab === 'timing' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('timing'); }}>זמנים</button>
                 <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
-              {sfTab === 'network' ? (<>{netCards}{cohortFunnel}{periodFunnel}</>)
+              {/* מסך רשת בלבד עוטף ב-VitasPresentation: הרכיבים המשותפים פעילים רק בתוך
+                  .vr-ui, ו-.vr-kloss מתחם את התוספות למסך הזה. ארבעת תתי-הטאבים האחרים של
+                  KLOSS עדיין בעיצוב הישן וייעשו בנפרד, לפי החבילה שלהם. */}
+              {sfTab === 'network' ? (<VitasPresentation className="vr-kloss">{netCards}{cohortFunnel}{periodFunnel}</VitasPresentation>)
                 : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}{objectionsSec}</>)
                 : sfTab === 'people' ? peopleSec
                 : sfTab === 'timing' ? timingSec

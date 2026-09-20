@@ -1,0 +1,77 @@
+/* app/components/report-ui/kloss.css — מסך רשת של KLOSS בשפה של ש.ברוך.
+   חבילה: 01-Handoffs/VITAS-KLOSS-Network-Handoff.
+
+   כל הכללים תחת .vr-kloss בלבד, שיושב בתוך .vr-ui. הסיבה לתיחום: ההוראות בחבילה
+   אוסרות במפורש שינוי עיצוב או לוגיקה של BMBY או Zoho כתוצאת לוואי, ו-KLOSS הוא
+   הלקוח היחיד על Salesforce.
+
+   הקארדים והמעטפת מגיעים מהרכיבים המשותפים (MetricCard, ReportSection ב-
+   VitasPresentation.jsx). מה שאין שם הוא שורות הברים של שני הדוחות, והן מוגדרות כאן.
+   צבעים ורדיוסים מהטוקנים המשותפים ב-:root — לא צבעים חדשים. */
+
+/* ── רשת הקארדים: ארבע על ארבע ───────────────────────────────────────────
+   vr-metric-grid המשותף הוא auto-fill ולכן נותן חמש עמודות ברוחב 1440, והקארד
+   ה-16 נופל לשורה בודדת. המפרט מחייב ארבע שורות על ארבע עמודות. */
+.vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px)  { .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: 1fr; } }
+
+/* ── מסגרת דוח: תג סוג תקופה ליד הכותרת ─────────────────────────────────── */
+.vr-ui .vr-kloss-tag {
+  display: inline-flex; align-items: center;
+  padding: 3px 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  margin-inline-start: 10px; vertical-align: middle;
+}
+/* "לידים של התקופה" — קבוצה סגורה שנמדדת לאורך זמן. */
+.vr-ui .vr-kloss-tag-cohort { background: var(--emerald-50, #e4f6ee); color: var(--emerald, #0e9f6e); }
+/* "פעילות בתקופה" — מה שקרה בחלון, כולל לידים ישנים. */
+.vr-ui .vr-kloss-tag-period { background: var(--violet-50, #f0ebfd); color: var(--violet, #7c6cf5); }
+
+/* ── שורת בר ────────────────────────────────────────────────────────────────
+   סדר RTL: תווית, כמות בעמודה ברוחב קבוע, מסילת הבר, ואז האחוזים.
+   העמודות קבועות כדי שהמספרים יהיו מיושרים בין השורות ובין שני הדוחות. */
+.vr-ui .vr-kloss-bars { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+
+.vr-ui .vr-kloss-bar {
+  display: grid;
+  grid-template-columns: 140px 58px minmax(0, 1fr) 230px;
+  align-items: center; gap: 12px;
+}
+.vr-ui .vr-kloss-bar-label { font-size: 14px; font-weight: 600; color: var(--text, #142044); }
+/* המספר לא נחתך כשהבר קצר — הוא יושב בעמודה משלו ולא בתוך הבר. */
+.vr-ui .vr-kloss-bar-value { font-size: 15px; font-weight: 800; text-align: start; }
+/* display: block הכרחי — אלה span-ים, ו-block-size על אלמנט inline אינו עושה דבר.
+   בלעדיו המסילה קיימת אבל המילוי בגובה אפס, והברים נראים ריקים לגמרי. */
+.vr-ui .vr-kloss-bar-rail {
+  display: block; block-size: 30px; border-radius: 8px; overflow: hidden;
+  background: var(--bar-track, #eef1f7);
+}
+.vr-ui .vr-kloss-bar-fill { display: block; block-size: 100%; border-radius: 8px; min-inline-size: 6px; transition: inline-size .45s ease; }
+.vr-ui .vr-kloss-bar-note { font-size: 12.5px; color: var(--text-secondary, #66748f); }
+.vr-ui .vr-kloss-bar-note strong { color: var(--violet, #7c6cf5); font-weight: 700; }
+.vr-ui .vr-kloss-bar-amount { font-size: 12.5px; font-weight: 700; color: var(--text-secondary, #66748f); }
+
+/* צבע המילוי לפי שלב. מחלקה ולא inline style, כדי שלא ייווצרו סגנונות עיצוב חדשים
+   בקוד — ההוראות בחבילה אוסרות זאת. אותו שלב מקבל את אותו צבע בשני הדוחות. */
+.vr-ui .vr-kloss-fill-leads    { background: #10b981; }
+.vr-ui .vr-kloss-fill-meetings { background: #3b82f6; }
+.vr-ui .vr-kloss-fill-arrived  { background: #14b8a6; }
+.vr-ui .vr-kloss-fill-opps     { background: #06b6d4; }
+.vr-ui .vr-kloss-fill-quotes   { background: #f97316; }
+.vr-ui .vr-kloss-fill-paid     { background: #a855f7; }
+.vr-ui .vr-kloss-fill-noshow   { background: #ef4444; }
+.vr-ui .vr-kloss-fill-lost     { background: #94a3b8; }
+
+/* הסתעפות (לא הגיעו לפגישה / לא רכשו) — מוזחת ומסומנת, ואינה שלב שעוברים בו. */
+.vr-ui .vr-kloss-bar-aux .vr-kloss-bar-label { padding-inline-start: 16px; color: var(--rose, #e24b4a); font-weight: 600; }
+.vr-ui .vr-kloss-bar-aux .vr-kloss-bar-rail { block-size: 22px; }
+.vr-ui .vr-kloss-bar-aux .vr-kloss-bar-value { color: var(--rose, #e24b4a); }
+
+@media (max-width: 900px) {
+  .vr-ui .vr-kloss-bar { grid-template-columns: minmax(0, 1fr) 54px; grid-template-areas: 'label value' 'rail rail' 'note note'; gap: 6px 10px; }
+  .vr-ui .vr-kloss-bar-label { grid-area: label; }
+  .vr-ui .vr-kloss-bar-value { grid-area: value; text-align: end; }
+  .vr-ui .vr-kloss-bar-rail { grid-area: rail; }
+  .vr-ui .vr-kloss-bar-note { grid-area: note; }
+}
