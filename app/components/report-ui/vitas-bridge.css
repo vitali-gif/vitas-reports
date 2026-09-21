@@ -368,3 +368,51 @@
 .vr-tbl-btn svg { flex-shrink: 0; }
 .vr-tbl-btn-export { color: #047857; border-color: #a7f3d0; background: #ecfdf5; }
 .vr-tbl-btn-export:hover { color: #065f46; border-color: #6ee7b7; }
+
+/* ============================================================
+   Tovno Mobile · משפך אנכי
+   (Tovno-Mobile-Handoff · MOBILE-SYSTEM §גרפים ומשפכים)
+
+   "משפך אופקי בדסקטופ הופך לסדרה אנכית, תוך שמירת כל שלב, הסתעפות,
+   אחוז ומכנה." אין כאן נרמול חדש ואין סקאלה מומצאת — אותם שלבים,
+   אותם אחוזים, רק כיוון אחר.
+   ============================================================ */
+@media (max-width: 767px) {
+  /* המעטפת הגוללת מיותרת כשהמשפך אנכי — גלילה אופקית על תוכן שלא
+     חורג היא מלכודת מגע. */
+  .vr-ui .vcs-root .vcs-funnel-scroll { overflow-x: visible; }
+  .vr-ui .vcs-root .vcs-funnel { flex-direction: column; align-items: stretch; gap: 0; }
+  .vr-ui .vcs-root .vcs-stage-column { flex: 0 0 auto; inline-size: 100%; }
+
+  /* השלב מתחת לחץ ולא לצידו. */
+  .vr-ui .vcs-root .vcs-stage-row { flex-direction: column; align-items: stretch; gap: 0; }
+  .vr-ui .vcs-root .vcs-stage { inline-size: 100%; }
+
+  /* החץ מסתובב לכיוון הזרימה החדשה. ArrowLeft (←) בסיבוב ‎-90°‎ מצביע
+     מטה; האחוז נשאר לידו ולא מאבד את המכנה. */
+  .vr-ui .vcs-root .vcs-arrow {
+    flex-direction: row;
+    inline-size: auto;
+    justify-content: flex-start;
+    gap: 8px;
+    padding-inline-start: 18px;
+    padding-block: 8px;
+  }
+  .vr-ui .vcs-root .vcs-arrow svg { transform: rotate(-90deg); }
+
+  /* הסתעפות הביטולים נשארת מוזחת מתחת לשלב שלה, כמו בדסקטופ. */
+  .vr-ui .vcs-root .vcs-cancellation { margin-inline-start: 18px; margin-block-start: 14px; }
+
+  /* כרטיסי נתוני הפרסום מעל המשפך — שניים בשורה במקום שורה אחת שנדחסת. */
+  .vr-ui .vcs-root .vcs-funnel-toolbar { flex-direction: column; align-items: stretch; gap: 12px; }
+  .vr-ui .vcs-root .vcs-adcards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .vr-ui .vcs-root .vcs-segmented { flex-wrap: wrap; }
+
+  /* הערך במשפך קטן מעט — 28px על שורה מלאה נראה צועק בנייד. */
+  .vr-ui .vcs-root .vcs-stage-value { font-size: 24px; }
+
+  /* יעדי מגע: המפרט דורש 44×44 לכל פקד. */
+  .vr-ui .vcs-root .vcs-segmented button,
+  .vr-ui .vcs-root .vcs-source-link,
+  .vr-ui .vcs-root .vcs-sort { min-block-size: 44px; }
+}

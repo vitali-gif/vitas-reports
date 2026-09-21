@@ -11,6 +11,17 @@ import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodSt
 import { CRM_SCHEMA_VERSION, GOOGLE_SCHEMA_VERSION } from '../../lib/crm/schema-version'
 import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
+
+// גודל גופן מינימלי בגרפים במובייל. המפרט (Tovno-Mobile-Handoff, §גרפים):
+// "תוויות 12px ומעלה". Chart.js מצייר על canvas ולא רואה media queries,
+// ולכן הרף נקבע כאן ומוחל כברירת מחדל גלובלית בכל בניית גרף.
+// ⚠️ קונפיגורציות שמגדירות font.size מפורשות (ticks של כמה גרפים, 10–11px)
+// עדיין גוברות על ברירת המחדל — נשאר מעבר ייעודי.
+const applyChartFontFloor = () => {
+  if (typeof window === 'undefined') return
+  const narrow = window.matchMedia('(max-width: 768px)').matches
+  Chart.defaults.font.size = narrow ? 12 : 11
+}
 import Header from '../components/shell/Header'
 
 // BMBY note/remark fields arrive with HTML numeric entities (e.g. &#1493; = ו). Decode for display.
@@ -1438,6 +1449,7 @@ const selectProject = async (client, project) => {
   const createChart = (id, type, labels, datasets, scalesConfig, onSliceClick, extra) => {
     const canvas = document.getElementById(id);
     if (!canvas) return;
+    applyChartFontFloor();
     const isDoughnut = type === 'doughnut' || type === 'pie';
     const enhancedDatasets = datasets.map(ds => isDoughnut
       ? { borderColor: '#FFFFFF', borderWidth: 3, hoverOffset: 8, ...ds }

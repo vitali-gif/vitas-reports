@@ -2685,8 +2685,16 @@
   .crumb { font-size: 9.5px; margin-bottom: 0; gap: 6px; }
 
   .controls { flex-wrap: wrap; gap: 6px; }
-  .controls .switch,            /* comparison mode toggle */
-  .controls .switch-compare { display: none !important; }
+  /* מתג "השוואה לאותה תקופה" — היה מוסתר במובייל, אבל הסקיצות (לוחות
+     01 ו-04) מציגות אותו מפורשות. הוא חוזר, ברוחב מלא ובגובה יעד מגע.
+     (החולשה של הפיצ'ר עצמו מטופלת ב-D11 בלוח המשימות, לא בהסתרה.) */
+  .controls .switch,
+  .controls .switch-compare {
+    inline-size: 100%;
+    min-block-size: 44px;
+    gap: 10px;
+    font-size: 13px;
+  }
 
   /* Date-range pill: full-width, compact 28px */
   .pill {
@@ -2795,18 +2803,18 @@
   .section { margin-bottom: 8px; }
   .section-head { gap: 8px; margin-bottom: 6px; }
   .section-head h2 { font-size: 13px; }
-  .section-head .sub { display: none; }
+  /* ה-.sub נושא את המכנה ("לפי לידים" / "לפי פגישות") — בלעדיו המספר
+     שמתחת חסר משמעות. המפרט: "שומרים הסבר קצר ליד כל חלק". */
+  .section-head .sub { font-size: 11.5px; }
   .section-head .ico { width: 22px; height: 22px; border-radius: 6px; }
   .section-head .ico svg { width: 12px; height: 12px; }
-  .section-head .head-right { display: none; }
+  .section-head .head-right { display: none; }   /* אין לו שימוש ב-JSX */
 
   /* Standalone time-series chart sections add too much chrome for
      dense mobile (section head + card padding + chart-box).
      Drop them — KPI trend % and the funnel already carry the trend
      story. Re-enable a specific one by removing this rule. */
-  /* :has(> .chart-card) removed — not supported by cssnano in this Next.js version.
-     To hide a chart section on mobile, add class="section mobile-hide" to its wrapper. */
-  .section.mobile-hide { display: none; }
+  /* :has(> .chart-card) removed — not supported by cssnano in this Next.js version. */
 
   /* ---------------------------------------------------------------
      9 · Funnel — 3×2 mini grid
@@ -2851,23 +2859,28 @@
   .unit .lbl .tech { font-size: 9px; }
 
   /* ---------------------------------------------------------------
-     10 · Charts — single column, ultra-compact 70px
+     10 · Charts — עמודה אחת, גובה קריא
+
+     🔴 שינוי מדיניות (Tovno-Mobile-Handoff, MOBILE-SYSTEM §גרפים):
+     עד כאן הגרפים נדחסו ל-70px ו-.chart-meta הוסתר. גרף של 24 שעות
+     בגובה 70px אינו קריא, וזו אותה גישה של "שיתאים בכוח" שהסתירה את
+     הטבלאות. המפרט: "גובה שטח ציור טיפוסי 240–320px, תוויות 12px
+     ומעלה; כותרת ומקרא מחוץ לשטח הקנבס."
      --------------------------------------------------------------- */
   .two-col,
   .chart-grid,
   .demo-grid {
     grid-template-columns: 1fr !important;
-    gap: 6px;
+    gap: 12px;
   }
-  .chart-card { padding: 8px 10px; }
+  .chart-card { padding: 14px 12px; }
   .chart-card .chart-box {
-    height: 70px !important;
-    min-height: 60px;
+    height: 260px !important;
+    min-height: 240px;
   }
-  .chart-card .chart-box.tall { height: 100px !important; }
-  .chart-card .chart-head { margin-bottom: 4px; }
-  .chart-card .chart-title { font-size: 11.5px; }
-  .chart-card .chart-meta { display: none; }
+  .chart-card .chart-box.tall { height: 320px !important; }
+  .chart-card .chart-head { margin-bottom: 10px; }
+  .chart-card .chart-title { font-size: 15px; }
 
   /* ---------------------------------------------------------------
      11 · Data tables → גלילה אופקית, לא הסתרה
@@ -2881,15 +2894,22 @@
      --------------------------------------------------------------- */
 
   /* ---------------------------------------------------------------
-     12 · CRM — objections list
-     Hide the desktop ranked-list table; render top-3 as cards.
-     Cards are opt-in: <ul class="objections-mobile"><li>…
-     --------------------------------------------------------------- */
-  .rank-list.objections,
-  .crm-objections-table { display: none !important; }
+     12 · CRM — מקורות והתנגדויות
 
+     🔴 שינוי מדיניות (Tovno-Mobile-Handoff): עד כאן הטבלה האמיתית
+     הוסתרה במובייל והוצגה במקומה רשימת כרטיסים של חמש השורות
+     המובילות בלבד. המפרט: "אין לקצץ את הטבלה לטופ 10 בגלל הגרף",
+     "אין להסתיר מדד משום שלא נכנס לצילום".
+
+     הטבלאות גוללות עכשיו (סעיף 11) ומציגות את כל השורות, ולכן
+     ה-<ul class="objections-mobile"> הפך לכפילות חלקית ונשאר מוסתר
+     בנייד בדיוק כמו בדסקטופ. ה-CSS שלו נשאר להיסטוריה; אם יוחלט
+     בעתיד על תצוגת כרטיסים במקום טבלה, היא תצטרך להציג את כל השורות.
+     --------------------------------------------------------------- */
+
+  /* הבורר לידים/פגישות שלט רק ברשימת הכרטיסים שלמעלה. משהסתתרה,
+     הוא פקד בלי השפעה נראית — ולכן נשאר מוסתר גם הוא. */
   .src-metric-toggle {
-    display: flex !important;
     gap: 8px;
     margin: 0 0 10px;
     justify-content: center;
@@ -2913,14 +2933,14 @@
     background: var(--indigo-50, rgba(99,102,241,0.1));
     color: var(--indigo, #6366f1);
   }
+  /* נשאר display:none (ראה ההערה בראש סעיף 12) — רשימה מקוצצת אינה
+     תחליף לטבלה המלאה, שכעת נגללת ומציגה את כל השורות. */
   .objections-mobile {
-    display: grid !important;
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 4px;
     margin: 0; padding: 0;
     list-style: none;
   }
-  .objections-mobile { gap: 4px !important; }
   .objections-mobile li {
     display: flex; align-items: center; gap: 8px;
     padding: 8px 10px;
@@ -3651,27 +3671,15 @@ body.drp-no-scroll { overflow: hidden; }
      possible; otherwise tag via specific section selectors.)
      --------------------------------------------------------------- */
 
-  /* CRM details that are useful on desktop but redundant on mobile:
-     - "פילוח לפי יום בשבוע" — day-of-week breakdown
-     - "זמן מענה לפי איש מכירות" — per-rep response time table
-     - "הכי איטיים - לפי מקור" — slowest by source
-     - "נתונים לפי מקור הגעה" — source breakdown table (already a table,
-        will hit the .table-wrapper hide path)
-     - "המודעות הכי מובילות ב-Facebook" — top ads gallery
-     These all live inside .section blocks; opt them in via .mobile-hide
-     in JSX. For now, hide any .chart-grid that lives inside a section
-     marked .mobile-hide. */
-  .section.mobile-hide,
-  .section.mobile-hide ~ .section.mobile-hide { display: none !important; }
+  /* 🔴 שינוי מדיניות (Tovno-Mobile-Handoff): הסעיף הזה נועד להסתיר
+     סקשנים שלמים במובייל — פילוח לפי יום בשבוע, זמן מענה לפי איש
+     מכירות, הכי איטיים לפי מקור, נתונים לפי מקור הגעה וגלריית
+     המודעות. PAGE-SPECS דורש את כולם מפורשות ("שומרים את כל רכיבי
+     המסך", ומונה אותם אחד־אחד), ולכן ההסתרות ירדו.
 
-  /* Demographics gender+age grid inside Facebook — hidden via
-     .demo-grid path. Already covered in original mobile.css; the
-     desktop-only-msg next to it carries the "פתח מהמחשב" notice. */
-
-  /* "המודעות הכי מובילות" gallery — uses .rec-ads-preview but inside
-     a non-reco .section. Hide the section heading + body via a
-     dedicated class hook the JSX can opt into: .section-top-ads. */
-  .section-top-ads { display: none !important; }
+     .mobile-hide נשאר ככלי — אף רכיב ב-JSX לא משתמש בו היום, והוא
+     דורש הצמדה מפורשת בקוד. אין להצמיד אותו למשהו שהמפרט מונה. */
+  .section.mobile-hide { display: none !important; }
 
   /* ---------------------------------------------------------------
      P2-7 · Tooltip / InfoTip popovers — keep them compact on mobile,
