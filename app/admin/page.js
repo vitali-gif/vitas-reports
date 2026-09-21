@@ -17,11 +17,25 @@ import Chart from 'chart.js/auto'
 // ולכן הרף נקבע כאן ומוחל כברירת מחדל גלובלית בכל בניית גרף.
 // ⚠️ קונפיגורציות שמגדירות font.size מפורשות (ticks של כמה גרפים, 10–11px)
 // עדיין גוברות על ברירת המחדל — נשאר מעבר ייעודי.
+const isNarrowViewport = () =>
+  typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+
 const applyChartFontFloor = () => {
   if (typeof window === 'undefined') return
-  const narrow = window.matchMedia('(max-width: 768px)').matches
-  Chart.defaults.font.size = narrow ? 12 : 11
+  Chart.defaults.font.size = isNarrowViewport() ? 12 : 11
 }
+
+/**
+ * cfs — "chart font size". מעלה רצפה של 12px במסך צר ומשאיר את גודל
+ * הדסקטופ כפי שהוא.
+ *
+ * למה לא פשוט 12 בכל מקום: הדסקטופ מציג גרפים צפופים עם הרבה תוויות,
+ * ו-12px שם היה חותך או מדלל אותן. הדרישה ל-12px היא של המובייל בלבד
+ * ("תוויות 12px ומעלה", MOBILE-SYSTEM §גרפים), ולכן זו רצפה ולא ערך קבוע.
+ * נקרא בזמן בניית הגרף, וה-createChart נבנה מחדש בכל רינדור — כלומר
+ * מעבר בין רוחבים מקבל את הגודל הנכון.
+ */
+const cfs = (n) => (isNarrowViewport() ? Math.max(n, 12) : n)
 import Header from '../components/shell/Header'
 
 // BMBY note/remark fields arrive with HTML numeric entities (e.g. &#1493; = ו). Decode for display.
@@ -1497,8 +1511,8 @@ const selectProject = async (client, project) => {
       if (indexAxis) config.options.indexAxis = indexAxis;
       config.options.scales = scalesConfig ? _scaleAxes : {
         y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
-             ticks: { font: { size: 11 }, color: '#6B7280' } },
-        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#6B7280' } }
+             ticks: { font: { size: cfs(11) }, color: '#6B7280' } },
+        x: { grid: { display: false }, ticks: { font: { size: cfs(11) }, color: '#6B7280' } }
       };
     }
     // אופציונלי: לחיצה על פלח מחזירה את התווית שלו (משמש בגרף ההתנגדויות)
@@ -1862,11 +1876,11 @@ const selectProject = async (client, project) => {
           pointBackgroundColor: '#F59E0B', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
           fill: false, yAxisID: 'y1', order: 1 },
       ], {
-        x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } },
+        x: { grid: { display: false }, ticks: { font: { size: cfs(10), weight: '600' } } },
         y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
-             title: { display: true, text: 'מספר לידים', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+             title: { display: true, text: 'מספר לידים', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
         y1: { beginAtZero: true, position: 'left', max: 100,
-              title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+              title: { display: true, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' },
               ticks: { callback: v => v + '%' }, grid: { drawOnChartArea: false } },
       });
     }, 200));
@@ -1895,9 +1909,9 @@ const selectProject = async (client, project) => {
         ], {
           x: { grid: { display: false } },
           y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
-               title: { display: true, text: 'כמות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: 'כמות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
           y1: { beginAtZero: true, position: 'left', max: 100,
-                title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                title: { display: true, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' },
                 ticks: { callback: v => v + '%' }, grid: { drawOnChartArea: false } },
         });
       }, 300));
@@ -1925,7 +1939,7 @@ const selectProject = async (client, project) => {
         ], {
           x: { grid: { display: false } },
           y: { beginAtZero: true, grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
-               title: { display: true, text: 'מספר פגישות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: 'מספר פגישות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
         });
       }, 300));
     }
@@ -1953,7 +1967,7 @@ const selectProject = async (client, project) => {
             { label: 'לידים', data: _hours.map(h => leadHourMerged[h]), ..._line('#3B82F6') },
             { label: 'תיאומי פגישות', data: _hours.map(h => hourMerged[h]), ..._line('#8B5CF6') },
           ], {
-            x: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' }, color: '#374151', maxRotation: 0 } },
+            x: { grid: { display: false }, ticks: { font: { size: cfs(11), weight: '600' }, color: '#374151', maxRotation: 0 } },
             y: { beginAtZero: true, grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' } },
           }, undefined, { options: { plugins: {
             legend: { position: 'top', align: 'center', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 18, font: { weight: '600', size: 12 }, color: '#374151' } },
@@ -1965,11 +1979,11 @@ const selectProject = async (client, project) => {
           { label: 'פגישות שתואמו', type: 'bar', data: hourMerged.slice(), backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
           { label: '% המרה לפגישה', type: 'line', data: contactRate, borderColor: '#EF4444', backgroundColor: '#EF4444', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, spanGaps: true, yAxisID: 'y1', order: 0 },
         ], {
-          x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' }, maxRotation: 0, autoSkip: false } },
+          x: { grid: { display: false }, ticks: { font: { size: cfs(9), weight: '600' }, maxRotation: 0, autoSkip: isNarrowViewport() } },
           y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
-               title: { display: true, text: 'כמות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: 'כמות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
           y1: { beginAtZero: true, suggestedMax: 100, position: 'left', grid: { display: false }, ticks: { precision: 0, callback: (v) => v + '%' },
-               title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#EF4444' } },
+               title: { display: true, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#EF4444' } },
         });
       }, 350));
     }
@@ -1987,7 +2001,7 @@ const selectProject = async (client, project) => {
           createChart('noAnswerHourChart', 'bar', _hrs2.map(h => h + ':00'), [
             { label: 'ניסיונות חיוג שלא נענו', type: 'bar', data: _hrs2.map(h => noAnswerHourMerged[h]), backgroundColor: '#F6AD3C', borderRadius: 6, maxBarThickness: 34 },
           ], {
-            x: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' }, color: '#374151', maxRotation: 0 } },
+            x: { grid: { display: false }, ticks: { font: { size: cfs(11), weight: '600' }, color: '#374151', maxRotation: 0 } },
             y: { beginAtZero: true, grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' }, grace: '15%' },
           }, undefined, { plugins: [vrBarLabelsPlugin], options: { plugins: { legend: { display: false } } } });
         } else createChart('noAnswerHourChart', 'bar', hLabels2, [
@@ -1995,9 +2009,9 @@ const selectProject = async (client, project) => {
             backgroundColor: noAnswerHourMerged.map(c => c === _mx && _mx > 0 ? '#DC2626' : '#FCA5A5'),
             borderRadius: 4, maxBarThickness: 26 },
         ], {
-          x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' }, maxRotation: 0, autoSkip: false } },
+          x: { grid: { display: false }, ticks: { font: { size: cfs(9), weight: '600' }, maxRotation: 0, autoSkip: isNarrowViewport() } },
           y: { beginAtZero: true, grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
-               title: { display: true, text: 'מספר לידים', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: 'מספר לידים', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
         });
       }, 380));
     }
@@ -3816,11 +3830,11 @@ const selectProject = async (client, project) => {
             pointBackgroundColor: '#F43F5E', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
             yAxisID: 'y1', order: 1 }
         ], {
-          x: { grid: { display: false }, ticks: { font: { size: 10.5, weight: '700' }, autoSkip: false, maxRotation: 0, minRotation: 0 } },
+          x: { grid: { display: false }, ticks: { font: { size: cfs(10.5), weight: '700' }, autoSkip: false, maxRotation: 0, minRotation: 0 } },
           y: { position: 'right', beginAtZero: true, grid: { color: '#F2F4F8' },
-               title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
           y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false },
-                title: { display: true, text: '\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3 \u20aa', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                title: { display: true, text: '\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3 \u20aa', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' },
                 ticks: { callback: v => '\u20aa' + Math.round(v) } }
         }, null, {
           options: { plugins: {
@@ -3850,10 +3864,10 @@ const selectProject = async (client, project) => {
             yAxisID: 'y1', order: 1 }],
           { x: { grid: { display: false } },
             y: { position: 'right', beginAtZero: true, grid: { color: '#F2F4F8' },
-                 title: { display: true, text: '\u05d4\u05d5\u05e6\u05d0\u05d4 (\u20aa)', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                 title: { display: true, text: '\u05d4\u05d5\u05e6\u05d0\u05d4 (\u20aa)', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' },
                  ticks: { callback: v => '\u20aa' + v.toLocaleString() } },
             y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false },
-                  title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: 10.5, weight: '700' }, color: '#5E6478' } } });
+                  title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } } });
         const ageCPLdata = an.map(a => data.ages[a].leads > 0 ? data.ages[a].spend / data.ages[a].leads : 0);
         const ageCPLcolors = ageCPLdata.map(v => v < 80 ? '#10b981' : v < 120 ? '#3b82f6' : v < 150 ? '#8b5cf6' : '#ef4444');
         const ageCPLbg = ageCPLdata.map(v => v < 80 ? 'rgba(16,185,129,0.15)' : v < 120 ? 'rgba(59,130,246,0.15)' : v < 150 ? 'rgba(139,92,246,0.15)' : 'rgba(239,68,68,0.15)');
