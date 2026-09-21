@@ -1357,18 +1357,26 @@ const selectProject = async (client, project) => {
    * לאותה מחרוזת, ואז אי אפשר לדעת איזו עמודה שייכת למי. לכן כשיש התנגשות,
    * הקיצור מתארך עד שהוא ייחודי.
    */
-  const shortenLabels = (names, max = 18) => {
-    const cut = (n, len) => {
-      const t = String(n || '').trim();
-      return t.length <= len ? t : t.slice(0, len - 1).trimEnd() + '\u2026';
+  const shortenLabels = (names, max = 34) => {
+    // Chart.js מצייר תווית שהיא מערך כמה שורות. לכן לא חותכים עם "…" אלא שוברים
+    // לשתי שורות — ככה שם כמו "P-max | Ongoing | New Client" נקרא במלואו, במקום
+    // להיחתך ל-"P-max | Ongoing…" שנראה זהה ל"P-max | Ongoing | General".
+    const wrap = (n) => {
+      const t = String(n || '').trim().replace(/\s*\|\s*/g, ' | ');
+      if (t.length <= Math.ceil(max / 2)) return [t];
+      const words = t.split(' ');
+      const lines = ['', ''];
+      let i = 0;
+      for (const w of words) {
+        if (i === 0 && (lines[0] + ' ' + w).trim().length > Math.ceil(max / 2) && lines[0]) i = 1;
+        lines[i] = (lines[i] ? lines[i] + ' ' : '') + w;
+      }
+      // שורה שנייה ארוכה מדי נחתכת, אבל רק היא — ההתחלה תמיד נשארת שלמה,
+      // וההתחלה היא מה שמבדיל בין קמפיינים דומים.
+      if (lines[1].length > max) lines[1] = lines[1].slice(0, max - 1).trimEnd() + '\u2026';
+      return lines[1] ? [lines[0], lines[1]] : [lines[0]];
     };
-    let len = max;
-    let out = names.map(n => cut(n, len));
-    while (new Set(out).size !== out.length && len < 60) {
-      len += 8;
-      out = names.map(n => cut(n, len));
-    }
-    return out;
+    return names.map(wrap);
   };
 
   /**
@@ -3681,7 +3689,23 @@ const selectProject = async (client, project) => {
       const extremes = {};
       cols.forEach(c => { if (c.key === 'name' || c.key === 'spend') return; const vals = entries.map(([n,d]) => c.get(d,n)).filter(v => typeof v === 'number' && v > 0); if (vals.length < 2) return; extremes[c.key] = {min: Math.min(...vals), max: Math.max(...vals)}; });
       const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {color:'#059669',fontWeight:800} : {color:'#dc2626',fontWeight:800}; if (val === e.min) return col.higher ? {color:'#dc2626',fontWeight:800} : {color:'#059669',fontWeight:800}; return {}; };
-      return (<><div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map((c,ci)=>(<Fragment key={c.key}><th style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>{ci===0 && source ? <th style={{whiteSpace:'nowrap'}}>{'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4'}</th> : null}</Fragment>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}>{/* שם הקמפיין בתא RTL עם bdi, והפלטפורמה בעמודה משלה (ויטלי, 21.9) */}<td dir="rtl" style={{fontWeight: 600, textAlign:'start', whiteSpace:'normal'}}><bdi>{name}</bdi></td>{source ? <td style={{whiteSpace:'nowrap'}}>{vrAds ? <span className={`vr-platform ${source==='google'?'google':'meta'}`}>{source==='google' ? <GoogleMark size={14} /> : <MetaMark size={16} />}{source==='google'?'Google':'Meta'}</span> : <span className={`platform-tag${source==='google'?' google':''}`}>{source==='google'?'GOOGLE':'FACEBOOK'}</span>}</td> : null}<td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{formatNum(Math.round(d.leads))} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>
+      // ייצוא לאקסל לכל טבלה שנבנית כאן — קמפיינים, קבוצות מודעות ומודעות בכל
+      // טאבי המדיה (ויטלי, 21.9). אין כאן היררכיה, ולכן אין כפתור פתח/כווץ.
+      const _exportRows = () => downloadXlsx(entries.map(([name, d]) => {
+        const _cpl = d.leads > 0 ? d.spend / d.leads : 0;
+        const _cpc = d.clicks > 0 ? d.spend / d.clicks : 0;
+        const _ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0;
+        const _cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0;
+        const r = { [labelName]: name };
+        if (source) r['פלטפורמה'] = source === 'google' ? 'Google' : 'Meta';
+        return { ...r,
+          'קליקים': d.clicks || 0, 'חשיפות': d.impressions || 0,
+          'עלות לקליק': Math.round(_cpc * 100) / 100, 'CTR': Math.round(_ctr * 100) / 100,
+          'CPM': Math.round(_cpm * 100) / 100, 'לידים': Math.round(d.leads || 0),
+          'עלות לליד': Math.round(_cpl * 100) / 100, 'תקציב שנוצל': Math.round(d.spend || 0),
+        };
+      }), labelName + '_' + (selectedMonth || ''), labelName);
+      return (<>{tableToolbar({ onExport: entries.length ? _exportRows : undefined })}<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map((c,ci)=>(<Fragment key={c.key}><th style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>{ci===0 && source ? <th style={{whiteSpace:'nowrap'}}>{'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4'}</th> : null}</Fragment>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}>{/* שם הקמפיין בתא RTL עם bdi, והפלטפורמה בעמודה משלה (ויטלי, 21.9) */}<td dir="rtl" style={{fontWeight: 600, textAlign:'start', whiteSpace:'normal'}}><bdi>{name}</bdi></td>{source ? <td style={{whiteSpace:'nowrap'}}>{vrAds ? <span className={`vr-platform ${source==='google'?'google':'meta'}`}>{source==='google' ? <GoogleMark size={14} /> : <MetaMark size={16} />}{source==='google'?'Google':'Meta'}</span> : <span className={`platform-tag${source==='google'?' google':''}`}>{source==='google'?'GOOGLE':'FACEBOOK'}</span>}</td> : null}<td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{formatNum(Math.round(d.leads))} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>
           <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div></>);
     };
 
@@ -5722,7 +5746,12 @@ const selectProject = async (client, project) => {
               של Chart.js שהוחלף, ועכשיו זה עובד גם במקלדת. */}
           <div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4>
             <div className="vr-camp-chart">
-              <div className="chart-container"><canvas id="campSpend" role="img" aria-label={'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05d4\u05ea\u05e7\u05e6\u05d9\u05d1 \u05d1\u05d9\u05df ' + campLegend.length + ' \u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd. \u05d4\u05e4\u05d9\u05e8\u05d5\u05d8 \u05d4\u05de\u05dc\u05d0 \u05d1\u05de\u05e7\u05e8\u05d0 \u05e9\u05dc\u05d9\u05d3 \u05d5\u05d1\u05d8\u05d1\u05dc\u05d4 \u05e9\u05de\u05ea\u05d7\u05ea.'}></canvas></div>
+              {/* כיתוב במרכז הדונאט, כמו בעיצוב. שכבה מעל ה-canvas ולא תוסף של
+                  Chart.js — הוא לא צריך להיות חלק מהציור, והוא נשאר קריא לכל גודל. */}
+              <div className="chart-container vr-camp-donut">
+                <canvas id="campSpend" role="img" aria-label={'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05d4\u05ea\u05e7\u05e6\u05d9\u05d1 \u05d1\u05d9\u05df ' + campLegend.length + ' \u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd. \u05d4\u05e4\u05d9\u05e8\u05d5\u05d8 \u05d4\u05de\u05dc\u05d0 \u05d1\u05de\u05e7\u05e8\u05d0 \u05e9\u05dc\u05d9\u05d3 \u05d5\u05d1\u05d8\u05d1\u05dc\u05d4 \u05e9\u05de\u05ea\u05d7\u05ea.'}></canvas>
+                <span className="vr-camp-center" aria-hidden="true">תקציב<br />פרסום</span>
+              </div>
               <ul className="vr-camp-legend">
                 {campLegend.map((it, i) => {
                   const hidden = campHidden.has(it.name);

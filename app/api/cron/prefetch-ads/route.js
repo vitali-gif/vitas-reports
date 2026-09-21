@@ -3,6 +3,7 @@
  * Runs at 07:00 + 14:00 Israel time. BMBY handled separately by /api/cron/prefetch-crm.
  */
 import { sendAlert } from '../../../../lib/alert'
+import { logJob } from '../../../../lib/job-log'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -165,11 +166,24 @@ export async function GET(request) {
   } catch {}
 
   // heartbeat for the health watchdog (explicit timestamp -> updates every run)
+  //
+  // ⚠️ למה גם job_log וגם heartbeat (21.9): ה-heartbeat נכתב רק בסוף הריצה, ולכן
+  // ריצה שנפלה באמצע לא משאירה שום עקבה — השומר רואה "לא רץ" ואי אפשר לדעת אם
+  // היא לא התחילה, קרסה, או נחסמה ב-429 של גוגל. עד 20.9 הפער הזה היה מכוסה
+  // במקרה, כי הבלוק היומי שרץ כאן רשם `prefetch-ads:daily-block` ל-job_log בכל
+  // ריצה. הבלוק הוסר (הוא שכפל את prefetch-daily), ואיתו נעלמה גם ההיסטוריה.
+  // עכשיו הרישום מפורש: כל ריצה נרשמת, גם כושלת, עם מספר הכשלים והשגיאה הראשונה.
   try {
     const _su = process.env.NEXT_PUBLIC_SUPABASE_URL
     const _sk = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (_su && _sk) {
       const _hb = createClient(_su, _sk, { auth: { persistSession: false } })
+      await logJob(_hb, 'prefetch-ads', failed.length === 0, Date.now() - startedAt, {
+        totalJobs: jobs.length,
+        completed: results.length,
+        failed: failed.length,
+        firstError: failed.length ? String(failed[0]?.error || failed[0]?.label || '').slice(0, 200) : null,
+      })
       await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-ads', last_run: new Date().toISOString() }, { onConflict: 'job' })
     }
   } catch {}

@@ -103,7 +103,17 @@
 /* ── קמפיינים (Google): דונאט + מקרא אנכי ───────────────────────────────────
    המקרא היה שורה אחת מתחת לגרף ונמתח על פני חצי מסך. עכשיו הוא עמודה לצד
    הדונאט, נגישה למקלדת, עם שם מלא בריחוף ובמיקוד. */
-.vr-ui .vr-camp-chart { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; align-items: center; }
+/* סדר RTL: הדונאט בעמודה הראשונה (ימין) והמקרא משמאלו — כמו בעיצוב שנמסר. */
+.vr-ui .vr-camp-chart { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 16px; align-items: center; container-type: inline-size; }
+/* הכיתוב במרכז הדונאט. pointer-events: none כדי שלא יחסום ריחוף על הפלחים. */
+.vr-ui .vr-camp-donut { position: relative; }
+.vr-ui .vr-camp-center {
+  position: absolute; inset: 0; margin: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none; text-align: center;
+  font-size: 14px; font-weight: 700; line-height: 1.3;
+  color: var(--text, #142044);
+}
 .vr-ui .vr-camp-legend {
   max-block-size: 260px; overflow-y: auto;
   margin: 0; padding: 0; list-style: none;
