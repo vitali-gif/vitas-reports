@@ -134,6 +134,34 @@ const downloadCsv = (rows, filename) => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
+/**
+ * ייצוא טבלה לאקסל (ויטלי, 21.9).
+ *
+ * xlsx אמיתי ולא CSV: העמודות בעברית, והמספרים נשארים מספרים במקום להפוך
+ * למחרוזות כשאקסל מפרש קובץ CSV בלוקאל אחר. הספרייה נטענת דינמית — היא כבדה,
+ * ורוב הכניסות לדשבורד לא מייצאות כלום.
+ *
+ * rows הוא מערך של אובייקטים; מפתחות האובייקט הראשון הם העמודות, בסדר שנקבע
+ * בקוד הקורא. נפילה חזרה ל-CSV אם הטעינה נכשלת, כדי שהכפתור לא יהיה כפתור דמה.
+ */
+const downloadXlsx = async (rows, filename, sheetName = 'נתונים') => {
+  if (!rows || !rows.length) return;
+  const safe = String(filename).replace(/[\\/:*?"<>|]/g, '-');
+  try {
+    const XLSX = await import('xlsx');
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // רוחב עמודה לפי התוכן הארוך ביותר, עד 48 תווים — אחרת כל העמודות ברוחב
+    // ברירת המחדל ושמות קמפיינים נחתכים.
+    const cols = Object.keys(rows[0]);
+    ws['!cols'] = cols.map(c => ({ wch: Math.min(48, Math.max(10, ...rows.map(r => String(r[c] ?? '').length), c.length + 2)) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
+    XLSX.writeFile(wb, safe + '.xlsx');
+  } catch {
+    downloadCsv(rows, filename);
+  }
+};
+
 export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null }) {
   // שמות הדמו מגיעים מה-DB (הפרויקט/הלקוח שסומנו is_demo) ולא מקודדים בקוד,
   // אחרת הכותרת והסיידבר מציגים שני שמות שונים.
@@ -1342,6 +1370,33 @@ const selectProject = async (client, project) => {
     }
     return out;
   };
+
+  /**
+   * סרגל פעולות אחיד מעל טבלה: פתח/כווץ הכל + ייצוא לאקסל (ויטלי, 21.9).
+   *
+   * onToggleAll ו-allOpen אופציונליים — טבלה שאין בה היררכיה מקבלת רק ייצוא,
+   * ולא כפתור פתיחה שלא עושה דבר. הייצוא תמיד מוציא את העץ המלא בכל הרמות,
+   * ולא רק את מה שפתוח על המסך, אחרת שני משתמשים מקבלים קבצים שונים מאותה
+   * תקופה לפי מה שבמקרה היה פתוח אצלם.
+   */
+  const tableToolbar = ({ hint, allOpen, onToggleAll, onExport, exportLabel = 'ייצוא לאקסל' }) => (
+    <div className="vr-tbl-bar">
+      {hint ? <p className="vr-tbl-hint">{hint}</p> : <span />}
+      <div className="vr-tbl-actions">
+        {onToggleAll && (
+          <button type="button" className="vr-tbl-btn" onClick={onToggleAll} aria-pressed={!!allOpen}>
+            {allOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
+            {allOpen ? 'כווץ הכל' : 'פתח הכל'}
+          </button>
+        )}
+        {onExport && (
+          <button type="button" className="vr-tbl-btn vr-tbl-btn-export" onClick={onExport}>
+            <Download size={14} aria-hidden="true" />{exportLabel}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   const createChart = (id, type, labels, datasets, scalesConfig, onSliceClick, extra) => {
     const canvas = document.getElementById(id);
@@ -3119,6 +3174,34 @@ const selectProject = async (client, project) => {
         {/* CRM Table by Source */}
         <div className="section">
           <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>נתונים לפי מקור הגעה</h2><span className="sub"> <InfoTip text="פירוט לידים, רלוונטיים, פגישות וחוזים לפי מקור" /></span></div>
+          {(() => {
+            const _parents = sourceEntries.filter(([, d]) => Array.isArray(d.children) && d.children.length).map(([n]) => n);
+            const _allOpen = _parents.length > 0 && _parents.every(n => expandedCrmSources.has(n));
+            const _row = (level, src, d) => ({
+              'רמה': level, 'מקור': src,
+              'סה"כ לידים': d.totalLeads || 0, 'רלוונטיים': d.relevantLeads || 0, 'לא רלוונטיים': d.irrelevantLeads || 0,
+              'תואמו': d.meetingsScheduled || 0,
+              '% תיאום': (d.totalLeads > 0 ? Math.round(d.meetingsScheduled / d.totalLeads * 1000) / 10 : 0),
+              'בוצעו': d.meetingsCompleted || 0,
+              '% ביצוע': (d.totalLeads > 0 ? Math.round(d.meetingsCompleted / d.totalLeads * 1000) / 10 : 0),
+              'בוטלו': d.meetingsCancelled || 0,
+              'הרשמות': d.registrations || 0, 'שווי הרשמות': Math.round(d.registrationValue || 0),
+              'חוזים': d.contracts || 0, 'שווי חוזים': Math.round(d.contractValue || 0),
+            });
+            return tableToolbar({
+              hint: 'לחצו על מקור כדי לראות את הקמפיינים שמתחתיו',
+              allOpen: _allOpen,
+              onToggleAll: _parents.length ? () => setExpandedCrmSources(_allOpen ? new Set() : new Set(_parents)) : undefined,
+              onExport: () => {
+                const out = [];
+                sourceEntries.forEach(([n, d]) => {
+                  out.push(_row('מקור', n, d));
+                  (Array.isArray(d.children) ? d.children : []).forEach(ch => out.push(_row('קמפיין', ch.name, ch)));
+                });
+                downloadXlsx(out, 'נתונים-לפי-מקור-הגעה_' + (selectedMonth || ''), 'מקורות הגעה');
+              },
+            });
+          })()}
           <div className="table-wrapper">
             <table className="data-table">
               <thead><tr>
@@ -4490,6 +4573,45 @@ const selectProject = async (client, project) => {
                 {/* המפרט דורש להגיד במפורש על מה הבורר חל — הוא אינו משפיע על מקטעי
                     ההתנגדויות שמתחת, ובלי המשפט הזה זו הנחה סבירה וגם שגויה. */}
                 <div className="sub" style={{padding:'0 2px 12px',fontSize:12.5}}>הבחירה חלה על הטבלה והשוואת הסניפים</div>
+                {(() => {
+                  const _names = _bd.map(b => b.branch);
+                  const _allOpen = _names.length > 0 && _names.every(n => expandedFunnelCh.has(n));
+                  return tableToolbar({
+                    hint: 'לחצו על סניף כדי לראות אנשי מכירות ומוצרים',
+                    allOpen: _allOpen,
+                    onToggleAll: () => setExpandedFunnelCh(_allOpen ? new Set() : new Set(_names)),
+                    onExport: () => {
+                      const out = [];
+                      _bd.forEach(b => {
+                        const isC = _bLens === 'cohort';
+                        out.push({
+                          'רמה': 'סניף', 'סניף': b.branch, 'שם': '',
+                          'לידים': b.leads || 0, 'פגישות': b.meetings || 0,
+                          'הזדמנויות': (isC ? b.cohortOpps : b.opportunities) || 0,
+                          'הצעות': (isC ? b.cohortQuotesTotal : b.quotesTotal) || 0,
+                          'רכשו': (isC ? b.cohortPaid : b.paid) || 0,
+                          'שווי': Math.round((isC ? b.cohortValue : b.value) || 0),
+                          'המרה %': (isC ? b.cohortConvLeadToPaid : b.convLeadToPaid) || 0,
+                          'מוביל': (isC ? b.cohortTopSalesman : b.topSalesman) || '',
+                        });
+                        ((isC ? b.cohortSalesmen : b.salesmen) || []).forEach(a => out.push({
+                          'רמה': 'איש מכירות', 'סניף': b.branch, 'שם': a.name,
+                          'לידים': '', 'פגישות': '',
+                          'הזדמנויות': a.opportunities || 0, 'הצעות': a.quotesTotal || 0,
+                          'רכשו': a.orders || 0, 'שווי': Math.round(a.value || 0),
+                          'המרה %': a.convToDeal || 0, 'מוביל': '',
+                        }));
+                        ((isC ? b.cohortProducts : b.products) || []).forEach(pr => out.push({
+                          'רמה': 'מוצר', 'סניף': b.branch, 'שם': pr.name,
+                          'לידים': '', 'פגישות': '', 'הזדמנויות': '', 'הצעות': '',
+                          'רכשו': pr.units || 0, 'שווי': Math.round(pr.value || 0),
+                          'המרה %': '', 'מוביל': '',
+                        }));
+                      });
+                      downloadXlsx(out, 'ביצועים-לפי-סניף_' + (_bLens === 'cohort' ? 'לידים-של-החודש' : 'פעילות-החודש') + '_' + (selectedMonth || ''), 'סניפים');
+                    },
+                  });
+                })()}
                 <div className="table-wrapper">
                   <table className="data-table">
                     <thead><tr><th>סניף</th><th>לידים</th><th>פגישות</th><th>הזדמנויות</th><th>הצעות</th><th>רכשו</th><th>שווי</th><th>המרה</th><th>מוביל</th></tr></thead>
@@ -4839,6 +4961,12 @@ const selectProject = async (client, project) => {
             const peopleSec = (<>
               <div className="section">
                 <div className="section-head">{ICO('violet', "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2")}<h2>ביצועי אנשי מכירות</h2><span className="sub">כלל הרשת</span></div>
+                {tableToolbar({ onExport: () => downloadXlsx(_salesmen.map(a => ({
+                  'איש מכירות': a.name, 'הזדמנויות': a.opportunities || 0, 'הצעות מחיר': a.quotesTotal || 0,
+                  'שווי הצעות': Math.round(a.quotesValueTotal || 0), 'מכירות': a.orders || 0,
+                  'שווי מכירות': Math.round(a.value || 0), 'ממוצע לעסקה': Math.round(a.avgDeal || 0),
+                  '% המרה': a.convToDeal || 0,
+                })), 'ביצועי-אנשי-מכירות_' + (selectedMonth || ''), 'אנשי מכירות') })}
                 <div className="table-wrapper">
                   <table className="data-table">
                     <thead><tr><th scope="col">איש מכירות</th><th scope="col">הזדמנויות</th><th scope="col">הצעות מחיר</th><th scope="col">שווי הצעות</th><th scope="col">מכירות</th><th scope="col">שווי מכירות</th><th scope="col">ממוצע לעסקה</th><th scope="col">% המרה</th></tr></thead>
@@ -4861,6 +4989,9 @@ const selectProject = async (client, project) => {
               </div>
               <div className="section">
                 <div className="section-head">{ICO('emerald', "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z")}<h2>המוצרים הנמכרים ביותר</h2><span className="sub">כלל הרשת</span></div>
+                {tableToolbar({ onExport: () => downloadXlsx(_products.map(pr => ({
+                  'מוצר': pr.name, 'כמות': pr.units || 0, 'שווי': Math.round(pr.value || 0),
+                })), 'מוצרים-נמכרים_' + (selectedMonth || ''), 'מוצרים') })}
                 <div className="table-wrapper">
                   <table className="data-table">
                     <thead><tr><th scope="col">מוצר</th><th scope="col">כמות</th><th scope="col">שווי</th></tr></thead>
@@ -5033,7 +5164,7 @@ const selectProject = async (client, project) => {
                 })
               })
               add('סה"כ', '', '', '', '', _fn, _fbTotalSpend)
-              downloadCsv(rows, 'משפך-לפי-ערוץ_' + (selectedMonth || ''))
+              downloadXlsx(rows, 'משפך-לפי-ערוץ_' + (selectedMonth || ''), 'משפך לפי ערוץ')
             }
 
             const _agentPaths = _agents.filter(a => (a.bySource || []).length).map(a => a.agent)
@@ -5050,7 +5181,7 @@ const selectProject = async (client, project) => {
                 add('נציג', ag.agent, '', ag)
                 ;(ag.bySource || []).forEach(sr => add('מקור', ag.agent, sr.source, sr))
               })
-              downloadCsv(rows, 'ביצועי-אנשי-מכירות_' + (selectedMonth || ''))
+              downloadXlsx(rows, 'ביצועי-אנשי-מכירות_' + (selectedMonth || ''), 'אנשי מכירות')
             }
             const _tblBar  = { display:'flex', flexWrap:'wrap', gap:10, alignItems:'center', marginBottom:10 }
             const _tblHint = { fontSize:'0.85em', color:'#64748b', flex:'1 1 220px', textAlign:'right' }
@@ -5108,13 +5239,11 @@ const selectProject = async (client, project) => {
                 </div>
                 <div className="section">
                   <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2><span className="sub">לחצו על שורה לפירוט</span></div>
-                  <div style={_tblBar}>
-                    <div style={_tblHint}>💡 לחץ על ערוץ ← קמפיין ← קבוצת מודעות / מילת חיפוש ← מודעה כדי לצלול פנימה · הוצאה ו-ROAS קיימים ל-Facebook בלבד: קמפיין מדויק, רמות עמוקות יותר משוערות (~)</div>
-                    <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                      <button onClick={toggleFunnelAll} style={_btnOpen}>{_funnelAllOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
-                      <button onClick={exportFunnelCsv} style={_btnCsv}>{'⬇ ייצוא ל-CSV'}</button>
-                    </div>
-                  </div>
+                  {/* אותו סרגל פעולות של כל שאר הטבלאות במערכת (ויטלי, 21.9). */}
+                  {tableToolbar({
+                    hint: '💡 לחץ על ערוץ ← קמפיין ← קבוצת מודעות / מילת חיפוש ← מודעה כדי לצלול פנימה · הוצאה ו-ROAS קיימים ל-Facebook בלבד: קמפיין מדויק, רמות עמוקות יותר משוערות (~)',
+                    allOpen: _funnelAllOpen, onToggleAll: toggleFunnelAll, onExport: exportFunnelCsv,
+                  })}
                   <div className="table-wrapper">
                     <table className="data-table">
                       <thead><tr><th scope="col">ערוץ</th><th scope="col">סוג</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">רכשו</th><th scope="col">אחוז המרה</th><th scope="col">שווי נטו</th><th scope="col" title="בשורות: Facebook בלבד. בשורת הסיכום: Facebook + Google">תקציב</th><th scope="col" title="בשורות: מול תקציב Facebook. בשורת הסיכום: מול התקציב הכולל">ROAS</th></tr></thead>
@@ -5198,13 +5327,10 @@ const selectProject = async (client, project) => {
                 </div>
                 <div className="section">
                   <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>ביצועי אנשי מכירות</h2><span className="sub">פירוט לפי נציג ומקור ליד</span></div>
-                  <div style={_tblBar}>
-                    <div style={_tblHint}>💡 לחץ על נציג כדי לראות פילוח לפי מקור ליד</div>
-                    <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                      <button onClick={toggleAgentsAll} style={_btnOpen}>{_agentsAllOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
-                      <button onClick={exportAgentsCsv} style={_btnCsv}>{'⬇ ייצוא ל-CSV'}</button>
-                    </div>
-                  </div>
+                  {tableToolbar({
+                    hint: '💡 לחץ על נציג כדי לראות פילוח לפי מקור ליד',
+                    allOpen: _agentsAllOpen, onToggleAll: toggleAgentsAll, onExport: exportAgentsCsv,
+                  })}
                   <div className="table-wrapper">
                     <table className="data-table">
                       <thead><tr><th scope="col">נציג</th><th scope="col">מקור</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">מכירות</th><th scope="col">שווי מכירות</th><th scope="col">אחוז המרה</th></tr></thead>
@@ -5732,7 +5858,43 @@ const selectProject = async (client, project) => {
           return (
             <div className="section">
               <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd, \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05d5\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</h2><span className="sub"><InfoTip text="טבלאה מאוחדת עם כל הרמות של החשבון הפרסומי" /></span></div>
-              <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:'12px',textAlign:'right'}}>{'\ud83d\udca1 \u05dc\u05d7\u05e5 \u05e2\u05dc \u05e7\u05de\u05e4\u05d9\u05d9\u05df \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea, \u05d5\u05e2\u05dc \u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>
+              {(() => {
+                // "פתח הכל" נוגע רק ברמת הקמפיין ובקבוצות שלו; פתיחה של כל העץ
+                // בחשבון עם מאות מודעות תוקעת את הדפדפן, ולכן אין כאן רמה שלישית.
+                const _allCampsOpen = campaignNames.length > 0 && campaignNames.every(n => expandedCampaigns.has(n));
+                const _toggleAllCamps = () => {
+                  if (_allCampsOpen) { setExpandedCampaigns(new Set()); setExpandedAdSets(new Set()); return; }
+                  setExpandedCampaigns(new Set(campaignNames));
+                };
+                const _exportTree = () => {
+                  const out = [];
+                  const row = (level, camp, adset, ad, d) => out.push({
+                    'רמה': level, 'קמפיין': camp, 'קבוצת מודעות': adset, 'מודעה': ad,
+                    'פלטפורמה': (d.source || '').includes('google') ? 'Google' : (d.source ? 'Meta' : ''),
+                    'סטטוס': d.status || '', 'קליקים': d.clicks || 0, 'חשיפות': d.impressions || 0,
+                    'עלות לקליק': Math.round(((d.clicks || 0) > 0 ? d.spend / d.clicks : 0) * 100) / 100,
+                    'CTR': Math.round(((d.impressions || 0) > 0 ? d.clicks / d.impressions * 100 : 0) * 100) / 100,
+                    'CPM': Math.round(((d.impressions || 0) > 0 ? d.spend / d.impressions * 1000 : 0) * 100) / 100,
+                    'לידים': Math.round(d.leads || 0),
+                    'עלות לליד': Math.round(((d.leads || 0) > 0 ? d.spend / d.leads : 0) * 100) / 100,
+                    'תקציב שנוצל': Math.round(d.spend || 0),
+                  });
+                  campaignNames.forEach(cn => {
+                    const cd = tree[cn];
+                    row('קמפיין', cn, '', '', cd);
+                    Object.keys(cd.adSets || {}).forEach(an => {
+                      const ad2 = cd.adSets[an];
+                      row('קבוצת מודעות', cn, an, '', ad2);
+                      Object.keys(ad2.ads || {}).forEach(adn => row('מודעה', cn, an, adn, ad2.ads[adn]));
+                    });
+                  });
+                  downloadXlsx(out, 'קמפיינים-קבוצות-ומודעות_' + (selectedMonth || ''), 'קמפיינים');
+                };
+                return tableToolbar({
+                  hint: '\ud83d\udca1 \u05dc\u05d7\u05e5 \u05e2\u05dc \u05e7\u05de\u05e4\u05d9\u05d9\u05df \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea, \u05d5\u05e2\u05dc \u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea',
+                  allOpen: _allCampsOpen, onToggleAll: _toggleAllCamps, onExport: _exportTree,
+                });
+              })()}
               <div className="table-wrapper">
                 <table className="data-table">
                   <thead><tr>{cols.map(c => <th key={c.key} style={{whiteSpace:'nowrap',cursor:c.noSort?'default':'pointer',userSelect:'none'}} onClick={c.noSort ? undefined : (() => handleSort('campTree', c.key))}>{c.label}{c.noSort ? '' : (treeSort.key === c.key ? (treeSort.dir === 'desc' ? ' \u25bc' : ' \u25b2') : ' \u21c5')}</th>)}</tr></thead>

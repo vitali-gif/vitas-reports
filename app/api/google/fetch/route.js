@@ -8,7 +8,7 @@ import { GOOGLE_SCHEMA_VERSION } from '../../../../lib/crm/schema-version.js'
 // עזרי Google Ads והניתוב לפרויקטים עברו ל-lib/ads (שלב 2 של docs/daily-ranges-plan.md) — משותפים
 // לעובדות היומיות. הקוד זהה; רק המיקום השתנה.
 import { GOOGLE_ADS_API_VERSION, num, credsFor, getAccessToken, mintAccessToken, gaqlSearch, extractAdText } from '../../../../lib/ads/google-api.js'
-import { klossGoogleAgencyOf, computeTotals } from '../../../../lib/ads/routing.js'
+import { googleAgencyOf, googleSourcesForProject, computeTotals } from '../../../../lib/ads/routing.js'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -301,8 +301,11 @@ async function runSync(opts = {}) {
   for (const p of projectsList) {
     const needle = (p.name || '').toLowerCase().trim()
     if (!needle) continue
-    const isKloss = needle === 'kloss'
-    const mine = isKloss ? allRows.filter(r => klossGoogleAgencyOf(r) !== null) : allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
+    // לקוח עם כללי ניתוב משלו (KLOSS, שמי נדל"ן) משויך לפי חשבון + מילת מפתח;
+    // כל השאר לפי שם הפרויקט בשם הקמפיין, כמו קודם.
+    const _srcRules = googleSourcesForProject(p.name)
+    const _agencyOf = (r) => googleAgencyOf(_srcRules, r)
+    const mine = _srcRules ? allRows.filter(r => _agencyOf(r) !== null) : allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
     if (mine.length === 0) {
       results.push({ project: p.name, skipped: true, reason: 'no matching campaigns' })
       continue
@@ -330,10 +333,10 @@ async function runSync(opts = {}) {
     }
 
     let byAgency = null
-    if (isKloss) {
+    if (_srcRules) {
       byAgency = {}
       for (const r of mine) {
-        const ag = klossGoogleAgencyOf(r) || 'אחר'
+        const ag = _agencyOf(r) || 'אחר'
         const o = byAgency[ag] || (byAgency[ag] = { spend: 0, impressions: 0, clicks: 0, leads: 0 })
         o.spend += r.spend; o.impressions += r.impressions; o.clicks += r.clicks; o.leads += r.leads
       }

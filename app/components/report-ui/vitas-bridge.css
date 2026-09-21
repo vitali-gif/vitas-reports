@@ -341,3 +341,23 @@
 }
 .vr-ag-video:hover span { background: rgba(15, 23, 42, 0.12); }
 .vr-ag-video:focus-visible { outline: 2px solid var(--indigo, #4f46e5); outline-offset: 2px; }
+
+/* ── סרגל פעולות אחיד מעל טבלה (פתח/כווץ + ייצוא לאקסל) ─────────────────────
+   עד היום לכל טבלה היה סרגל משלה, או שלא היה בכלל. אותו רכיב, אותן מידות
+   ואותו מיקום בכל הטבלאות (ויטלי, 21.9). */
+.vr-tbl-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-block-end: 12px; }
+.vr-tbl-hint { font-size: 13px; color: var(--vr-muted, #66748f); margin: 0; flex: 1 1 240px; min-inline-size: 0; }
+.vr-tbl-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vr-tbl-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  padding: 7px 12px; border-radius: 8px;
+  border: 1px solid var(--border, #dde2ec);
+  background: var(--surface, #fff); color: var(--vr-text, #142044);
+  cursor: pointer;
+}
+.vr-tbl-btn:hover { border-color: var(--indigo, #5b5ef4); color: var(--indigo, #5b5ef4); }
+.vr-tbl-btn:focus-visible { outline: 2px solid var(--indigo, #5b5ef4); outline-offset: 2px; }
+.vr-tbl-btn svg { flex-shrink: 0; }
+.vr-tbl-btn-export { color: #047857; border-color: #a7f3d0; background: #ecfdf5; }
+.vr-tbl-btn-export:hover { color: #065f46; border-color: #6ee7b7; }
