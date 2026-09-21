@@ -22,7 +22,7 @@ function buildClients(accessList) {
   const map = new Map();
   for (const a of accessList) {
     const cName  = a.projects?.clients?.name  || 'לקוח';
-    const cColor = a.projects?.clients?.color || '#5B5EF4';
+    const cColor = a.projects?.clients?.color || '#315CF5';
     const cId    = a.projects?.client_id;
     if (!map.has(cName)) map.set(cName, { id: cId, name: cName, color: cColor, projects: [] });
     map.get(cName).projects.push({ id: a.project_id, name: a.projects?.name, is_demo: !!a.projects?.is_demo });
@@ -494,7 +494,7 @@ export default function ClientPage() {
           <span style={{ fontSize: 14, fontWeight: 600 }}>הוסף לסרגל הבית</span>
           <button
             onClick={() => { installPrompt.prompt(); installPrompt.userChoice.then(() => setInstallPrompt(null)); }}
-            style={{ background: '#5B5EF4', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ background: 'var(--tv-brand, #315CF5)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             התקן
           </button>
           <button onClick={() => setInstallPrompt(null)}
@@ -573,7 +573,7 @@ export default function ClientPage() {
               onClick={dismissOnboarding}
               style={{
                 display: 'block', width: '100%', padding: '13px',
-                background: '#5B5EF4', color: '#fff', border: 'none',
+                background: 'var(--tv-brand, #315CF5)', color: '#fff', border: 'none',
                 borderRadius: 10, fontSize: 15, fontWeight: 700,
                 cursor: 'pointer', fontFamily: 'inherit',
                 boxShadow: '0 6px 20px rgba(91,94,244,0.35)',

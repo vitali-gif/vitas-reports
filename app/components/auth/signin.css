@@ -3,14 +3,17 @@
    הכפתורים של Google ו-Microsoft נבנים מהסימן הרשמי שלהם ב-SVG ולא מהסקיצה, לפי
    דרישות המיתוג של שני הספקים: רקע לבן, מסגרת אפורה, טקסט כהה, והסימן ללא שינוי צבע. */
 
+/* ויטלי, 21.9: המסך הזה נשאר עם פלטה משלו אחרי המיתוג — הכפתור היה
+   ‎#1d4ed8‎ ולא הכחול של Tovno. נמדד בדפדפן על הדף החי. הטוקנים ממופים
+   עכשיו ל-‎--tv-*‎, בדיוק כמו ב-globals, עם fallback לערכים הישנים. */
 .vsign {
-  --vs-ink: #142044;
-  --vs-muted: #66748f;
-  --vs-border: #dde5f4;
-  --vs-indigo: #1d4ed8;
+  --vs-ink: var(--tv-text, #142044);
+  --vs-muted: var(--tv-text-muted, #66748f);
+  --vs-border: var(--tv-border, #dde5f4);
+  --vs-indigo: var(--tv-brand, #315CF5);
   min-block-size: 100vh;
   display: flex; align-items: center; justify-content: center;
-  background: #f6f8fd;
+  background: var(--tv-canvas, #f6f8fd);
   padding: 24px;
   box-sizing: border-box;
   color: var(--vs-ink);
