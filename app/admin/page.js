@@ -3718,7 +3718,14 @@ const selectProject = async (client, project) => {
       // מסך והציר היה שורה אחת של אפסים. עכשיו הגרפים מסננים בדיוק כמו הטבלה שמתחת:
       // רק קמפיין שהוציא כסף בתקופה, ממוין מהגדול לקטן. הטבלה מסננת רחב יותר (גם
       // חשיפות או קליקים בלבד) כי שם שורה נוספת לא שוברת את התצוגה.
-      const campNames2 = Object.keys(data.campaigns)
+      // ⚠️ הגרפים והמקרא שייכים לסקשן "קמפיינים", שמרונדר רק בטאב Google (isPmax).
+      // בטאבים אחרים ה-canvas לא קיים ו-createChart פשוט חוזר — אבל המקרא כן נכתב,
+      // ובטאב "הכל" data.campaigns מכיל גם קמפייני פייסבוק. התוצאה שוויטלי ראה
+      // (21.9): מעבר ל-Google הציג מקרא עם קמפיינים של פייסבוק, שנשאר מהטאב הקודם.
+      // הבדיקה היא על קיום ה-canvas בפועל ולא על isPmax, כי ה-timeout הזה רץ אחרי
+      // הרינדור והמצב יכול להשתנות בין השניים.
+      const _hasCampCanvas = typeof document !== 'undefined' && !!document.getElementById('campSpend');
+      const campNames2 = !_hasCampCanvas ? [] : Object.keys(data.campaigns)
         .filter(n => (data.campaigns[n].spend || 0) > 0)
         .sort((a, b) => (data.campaigns[b].spend || 0) - (data.campaigns[a].spend || 0));
       if (campNames2.length > 0) {

@@ -277,7 +277,16 @@ async function runSync(opts = {}) {
       if (!_assetGroupsMerged[k]) _assetGroupsMerged[k] = []
       for (const ag of arr) _assetGroupsMerged[k].push(ag)
     }
-    _custDiag.push({ customer: customerId, rows: allRows.length, ...(_creds.isOverride ? { credsOverride: true, login: _creds.loginCustomerId || null } : {}) })
+    // מספר קבוצות הנכסים לכל חשבון נרשם בנפרד. בלעדיו "הגלריה ריקה" יכולה להיות
+    // גם שאילתה שנכשלה, גם חשבון בלי הרשאה, וגם פשוט אין PMax — ואי אפשר להבדיל
+    // בלי לקרוא לוגים (ויטלי, 21.9: רואים קבוצות רק מחשבון אחד מתוך שניים).
+    _custDiag.push({
+      customer: customerId,
+      rows: allRows.length,
+      assetGroups: Object.values(assetGroupsByCampaign).reduce((a, arr) => a + arr.length, 0),
+      assetGroupCampaigns: Object.keys(assetGroupsByCampaign).length,
+      ...(_creds.isOverride ? { credsOverride: true, login: _creds.loginCustomerId || null } : {}),
+    })
   } // ===== end per-customer loop =====
 
   const allRows = _allRowsMerged
