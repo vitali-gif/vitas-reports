@@ -110,9 +110,20 @@ async function closeSidebarIfOpen(page) {
   await expect(overlay).toHaveCount(0)
 }
 
-/** ערכי ה-KPI המוצגים כרגע. */
+/**
+ * ערכי ה-KPI המוצגים כרגע.
+ *
+ * 21.9 — שתי שכבות עיצוב חיות זו לצד זו: הכרטיס הישן מרנדר ‎.kpi-value‎,
+ * וה-MetricCard של report-ui מרנדר ‎.vr-metric-value‎. אותו ערך בדיוק —
+ * kpi() ב-admin/page.js מעביר את אותו value לשניהם — רק העטיפה שונה,
+ * לפי הטאב והלקוח. הבדיקה בודקת שיש מספרים, לא באיזו מחלקה הם יושבים,
+ * ולכן הסלקטור מכסה את שתיהן. בלי זה היא נכשלה על כל מסך שעבר לעיצוב
+ * החדש, אף שהמספרים היו שם.
+ */
+const KPI_VALUE = '.kpi-value, .vr-metric-value'
+
 async function kpiTexts(page) {
-  return (await page.locator('.kpi-value').allTextContents()).map(t => t.trim()).filter(Boolean)
+  return (await page.locator(KPI_VALUE).allTextContents()).map(t => t.trim()).filter(Boolean)
 }
 const allZero = (texts) => texts.length > 0 && texts.every(t => /^[^\d]*0(\.00)?[^\d]*$/.test(t) || !/\d/.test(t))
 
@@ -156,7 +167,7 @@ test.describe('צד הלקוח (מחובר)', () => {
   test('כניסה מגיעה לדשבורד עם מספרים בכרטיסי ה-KPI', async ({ page }) => {
     const errors = watchErrors(page)
     await login(page)
-    const kpis = page.locator('.kpi-value')
+    const kpis = page.locator(KPI_VALUE)
     await expect(kpis.first()).toBeVisible({ timeout: 60_000 })
     // לפחות כרטיס אחד עם ספרה — לא מסך של "אין נתון" בלבד.
     await expect.poll(async () => (await kpis.allTextContents()).some(t => /\d/.test(t)), { timeout: 60_000 }).toBe(true)
@@ -198,7 +209,7 @@ test.describe('צד הלקוח (מחובר)', () => {
         await expectDashboard(page)
         // "מושכים נתונים לתקופה הזו" מותר לרגע — לא לדקה. ברירת המחדל חייבת להיות במטמון של הקרון.
         await expect(page.getByText('מושכים נתונים לתקופה הזו')).toHaveCount(0, { timeout: 60_000 })
-        await expect(page.locator('.kpi-value').first()).toBeVisible({ timeout: 30_000 })
+        await expect(page.locator(KPI_VALUE).first()).toBeVisible({ timeout: 30_000 })
         opened.push(name)
         // כל הכרטיסים אפס = כמעט תמיד נתונים חסרים, לא לקוח בלי פעילות. לא מפיל (יש פרויקטי דמו/רדומים), אבל מדווח.
         if (allZero(await kpiTexts(page))) zeros.push(name)
@@ -254,7 +265,7 @@ test.describe('צד הלקוח (מחובר)', () => {
     await expectDashboard(page)
     await page.reload()
     await expectDashboard(page, { timeout: 20_000 })
-    await expect(page.locator('.kpi-value').first()).toBeVisible({ timeout: 60_000 })
+    await expect(page.locator(KPI_VALUE).first()).toBeVisible({ timeout: 60_000 })
     expect(errors).toEqual([])
   })
 })
