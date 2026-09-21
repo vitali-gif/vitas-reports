@@ -1416,6 +1416,106 @@
 }
 .client-tab.active .subtab-badge { background: var(--text); color: white; }
 
+/* ── תגית PRO ──────────────────────────────────────────────────────────────
+   שילוט לפיצ'ר שנמכר בנפרד. היא יושבת על הכפתור עצמו, ולכן היא חייבת להיראות
+   שונה מ-.subtab-badge (מונה) — זהב ולא כחול, אותיות ולא ספרות.
+   ⚠️ תגית ואינה הרשאה: האכיפה בשרת, ראה app/components/ProGate.jsx. */
+.pro-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: middle;
+  margin-inline-start: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #F5C451, #E0A21C);
+  color: #3D2B00;
+  font-size: 9.5px; font-weight: 900;
+  letter-spacing: .08em;
+  line-height: 1.5;
+  box-shadow: 0 1px 2px rgba(180, 130, 20, .35);
+  /* PRO הוא לטינית בתוך שורה עברית — בלי בידוד הוא קופץ לצד הלא נכון של המילה. */
+  unicode-bidi: isolate;
+  flex-shrink: 0;
+}
+
+/* ── מסך שדרוג (במקום תוכן הטאב ללקוח שאינו PRO) ────────────────────────── */
+.pro-lock {
+  display: flex; justify-content: center;
+  padding: 24px 0 40px;
+}
+.pro-lock-card {
+  inline-size: min(520px, 100%);
+  text-align: center;
+  background: var(--tv-surface, #fff);
+  border: 1px solid var(--tv-border, #DDE2EC);
+  border-radius: 18px;
+  padding: 36px 28px 30px;
+  box-shadow: 0 8px 28px rgba(11, 15, 30, .06);
+}
+.pro-lock-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 52px; block-size: 52px;
+  border-radius: 14px;
+  background: var(--tv-brand-soft, #EEF2FF);
+  color: var(--tv-brand, #315CF5);
+  margin-block-end: 16px;
+}
+.pro-lock-card h2 {
+  margin: 0 0 8px;
+  font-size: 21px; font-weight: 800;
+  color: var(--tv-text, #0B0F1E);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-wrap: wrap;
+}
+.pro-lock-card h2 .pro-badge { margin-inline-start: 0; }
+.pro-lock-lead {
+  margin: 0 0 18px;
+  font-size: 15px; line-height: 1.65;
+  color: var(--tv-text-secondary, #5E6478);
+}
+.pro-lock-list {
+  margin: 0 0 22px; padding: 0;
+  list-style: none;
+  text-align: start;
+  display: grid; gap: 9px;
+}
+.pro-lock-list li {
+  position: relative;
+  padding-inline-start: 24px;
+  font-size: 14px; line-height: 1.55;
+  color: var(--tv-text, #0B0F1E);
+}
+.pro-lock-list li::before {
+  content: '';
+  position: absolute; inset-inline-start: 0; inset-block-start: 6px;
+  inline-size: 14px; block-size: 14px;
+  border-radius: 50%;
+  background: var(--tv-brand-soft, #EEF2FF);
+  box-shadow: inset 0 0 0 2px var(--tv-brand, #315CF5);
+}
+.pro-lock-cta {
+  display: inline-block;
+  background: var(--tv-brand, #315CF5);
+  color: #fff;
+  font-size: 15px; font-weight: 700;
+  text-decoration: none;
+  padding: 13px 32px;
+  border-radius: 10px;
+  transition: background var(--dur, .2s) var(--ease-out, ease);
+}
+.pro-lock-cta:hover { background: var(--tv-brand-hover, #2549D8); }
+.pro-lock-note {
+  margin: 16px 0 0;
+  font-size: 12.5px; line-height: 1.6;
+  color: var(--tv-text-secondary, #5E6478);
+}
+@media (max-width: 760px) {
+  .pro-lock { padding: 12px 0 28px; }
+  .pro-lock-card { padding: 28px 18px 24px; border-radius: 14px; }
+  .pro-lock-card h2 { font-size: 18px; }
+  .pro-lock-lead { font-size: 14px; }
+  .pro-lock-cta { display: block; padding: 13px 20px; }
+}
+
 /* --- KPI cards (old class names map to new gradients) --- */
 .kpi-grid {
   display: grid;

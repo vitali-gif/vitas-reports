@@ -118,7 +118,9 @@ export async function GET(req) {
 
   let query = supabaseAdmin
     .from('client_access')
-    .select('*, projects(id, name, client_id, is_demo, clients(name, color))')
+    // plan נשלח כדי שהדשבורד יידע להציג תגית PRO ומסך שדרוג. זו תצוגה בלבד —
+    // האכיפה היא ב-lib/auth.js (requireProjectPlan), ולא כאן.
+    .select('*, projects(id, name, client_id, is_demo, clients(name, color, plan))')
 
   if (scopeEmail) query = query.eq('email', scopeEmail).order('created_at', { ascending: true })
   else query = query.order('created_at', { ascending: false })

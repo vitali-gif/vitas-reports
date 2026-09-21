@@ -60,6 +60,7 @@ import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle
 // צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
+import { ProBadge, MeetingsProLock } from '../components/ProGate'
 
 // טאב "המלצות חכמות" מוסתר בכל הלקוחות עד שהתוכן שלו ישופר (ויטלי, 21.9).
 // להחזרה: להפוך ל-true. הרינדור עצמו נשאר בקוד ולא נמחק.
@@ -530,6 +531,16 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // ישיבות שיווק (שלב 1, docs/meetings-plan.md). כבוי כברירת מחדל: הטאב מופיע רק כש-
   // NEXT_PUBLIC_MEETINGS_ENABLED='1'. זו דרך הכיבוי שה-ACCEPTANCE דורש לפיילוט.
   const meetingsOn = process.env.NEXT_PUBLIC_MEETINGS_ENABLED === '1' && !isDemoProject && !!selectedProject?.id
+
+  // ── מנוי PRO (מיגרציה 020) ───────────────────────────────────────────────
+  // "ישיבות שיווק" נמכר בנפרד. המנוי יושב על הלקוח (clients.plan) וכל הפרויקטים
+  // שלו יורשים אותו. כאן זה לתצוגה בלבד — איזה טאב נפתח ומה כתוב עליו.
+  // ⚠️ זו אינה ההרשאה. מי שיפנה ל-/api/meetings ישירות ייחסם ב-lib/auth.js
+  //    (requireProjectPlan), ולא בגלל מה שקורה בשורה הזאת. CLAUDE.md אוסר
+  //    להסתמך על הסתרה בממשק.
+  // אדמין (isClientView=false) רואה הכל: לצוות VITAS יש גישה לכל לקוח.
+  const clientIsPro = selectedClient?.plan === 'pro'
+  const meetingsUnlocked = !isClientView || clientIsPro
 
   // ── עיצוב מחודש (ענף redesign, design/handoff-v1): פיילוט נדל"ן, טאב "הכל" בלבד ──
   // opt-in מפורש: לא KLOSS (salesforce), לא BCure (zoho), לא פרויקט הדגמה. כשהדגל דלוק,
@@ -1176,6 +1187,19 @@ const loadClients = async () => {
     for (const name of projects) { await supabase.from('projects').insert({ client_id: client.id, name }); }
     setNewClientName(''); setNewClientProjects(''); setShowAddClient(false);
     await loadClients(); showToast('Client "' + client.name + '" added');
+  };
+
+  // ── מנוי PRO של לקוח (מיגרציה 020) ───────────────────────────────────────
+  // כתיבה ישירה ל-clients מהדפדפן, בדיוק כמו addClient ו-saveMonthlyBudget:
+  // המדיניות "admins manage clients" (מיגרציה 001) היא מי שמאשר אותה, ו-is_admin()
+  // נבדק במסד עצמו. אם המיגרציה עוד לא רצה, העמודה חסרה והעדכון נכשל בהודעה
+  // מפורשת — ולא בשקט.
+  const setClientPlan = async (clientId, plan) => {
+    const { error } = await supabase.from('clients').update({ plan }).eq('id', clientId);
+    if (error) { showToast('שגיאה: ' + error.message); return; }
+    setClients(prev => prev.map(c => (c.id === clientId ? { ...c, plan } : c)));
+    if (selectedClient?.id === clientId) setSelectedClient(prev => (prev ? { ...prev, plan } : prev));
+    showToast(plan === 'pro' ? '✓ הלקוח שודרג ל-PRO' : '✓ הלקוח הוחזר ל-Basic');
   };
 
   const saveMonthlyBudget = async (ym, amount) => {
@@ -3933,14 +3957,21 @@ const selectProject = async (client, project) => {
           {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}>Google PMax</button>}
             {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
             {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
-            {meetingsOn && <button className={`client-tab ${dashTab === 'meetings' ? 'active' : ''}`} onClick={() => setDashTab('meetings')}>ישיבות שיווק</button>}
+            {/* הכפתור מוצג גם ללקוח שאינו PRO — התגית היא השילוט, והלחיצה מגיעה
+                למסך שדרוג ולא לתוכן. להסתיר אותו לגמרי היה משאיר את הלקוח בלי
+                לדעת שהפיצ'ר קיים. */}
+            {meetingsOn && <button className={`client-tab ${dashTab === 'meetings' ? 'active' : ''}`} onClick={() => setDashTab('meetings')}>ישיבות שיווק<ProBadge /></button>}
             {/* "המלצות חכמות" מוסתר לכל הלקוחות עד שנשפר אותו (ויטלי, 21.9). הקוד של
                 הטאב נשאר במקומו — רק הכניסה אליו חסומה, כדי שהחזרה תהיה שינוי של שורה. */}
             {RECOMMENDATIONS_TAB_ON && hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
         </div>
 
         {dashTab === 'meetings' ? (
-          <MeetingsTab projectId={selectedProject?.id} projectName={selectedProject?.name} isClientView={isClientView} />
+          meetingsUnlocked ? (
+            <MeetingsTab projectId={selectedProject?.id} projectName={selectedProject?.name} isClientView={isClientView} />
+          ) : (
+            <MeetingsProLock />
+          )
         ) : dashTab === 'recommendations' ? (() => {
           // 60-day rolling window - recommendations are ALWAYS based on the last 60 days,
           // independent of selectedMonth (which only affects the KPI/chart tabs).
@@ -6462,7 +6493,9 @@ const selectProject = async (client, project) => {
     // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
     // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.
     // דווקא ה-id ולא האובייקט — עדכון תקציב יוצר אובייקט חדש ואין סיבה לבנות מחדש בגללו.
-    meetingsOn, selectedProject?.id, isClientView]);
+    // meetingsUnlocked מכריע בין MeetingsTab למסך השדרוג, ומשתנה כשנבחר לקוח אחר —
+    // בלעדיו לקוח PRO שעבר מלקוח basic (אדמין בסיידבר) היה נשאר עם המסך הנעול.
+    meetingsOn, meetingsUnlocked, selectedProject?.id, isClientView]);
 
   if (loading && !isClientView) return <div className="loading-page"><TovnoLoader hint={'\u05d8\u05d5\u05e2\u05df \u05d0\u05ea \u05d4\u05d3\u05e9\u05d1\u05d5\u05e8\u05d3\u2026'} /></div>;
 
@@ -6876,6 +6909,37 @@ const selectProject = async (client, project) => {
                 </table>
               )
             })()}
+
+            {/* ── מנויי PRO ─────────────────────────────────────────────────
+                המנוי יושב על הלקוח, ולכן הוא חל על כל הפרויקטים שלו. השינוי כאן
+                נכנס לתוקף מיד — גם בשרת, שקורא את אותה עמודה בכל בקשה. */}
+            <div style={{marginTop:24,paddingTop:18,borderTop:'1px solid var(--border)'}}>
+              <h4 style={{margin:'0 0 4px',fontSize:14,fontWeight:700}}>מנויי PRO</h4>
+              <p style={{margin:'0 0 12px',fontSize:12,color:'var(--text-secondary)',lineHeight:1.6}}>
+                מנוי PRO פותח את טאב <strong>ישיבות שיווק</strong> בצד הלקוח. המנוי חל על כל הפרויקטים של הלקוח.
+                לקוח ללא מנוי רואה את הכפתור עם תגית PRO, ובלחיצה מגיע למסך שדרוג.
+              </p>
+              <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                {clients.map(cl => {
+                  const isPro = cl.plan === 'pro'
+                  return (
+                    <div key={cl.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'8px 4px',borderTop:'1px solid var(--divider)'}}>
+                      <span style={{fontSize:13,fontWeight:600,display:'inline-flex',alignItems:'center'}}>
+                        {cl.name}{isPro && <ProBadge />}
+                      </span>
+                      <button type="button" onClick={() => setClientPlan(cl.id, isPro ? 'basic' : 'pro')}
+                        title={isPro ? 'הורדת הלקוח חזרה ל-Basic' : 'שדרוג הלקוח ל-PRO'}
+                        style={{cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:700,padding:'5px 14px',borderRadius:20,
+                          border:'1.5px solid ' + (isPro ? 'var(--border)' : 'var(--indigo)'),
+                          background:'transparent',
+                          color: isPro ? 'var(--text-secondary)' : 'var(--indigo)'}}>
+                        {isPro ? 'הורדה ל-Basic' : 'שדרוג ל-PRO'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
 
             <div style={{marginTop:20,padding:'12px',background:'#eff6ff',borderRadius:8,fontSize:12,color:'#1e40af',lineHeight:1.6}}>
               <strong>קישור לדאשבורד לקוח:</strong>{' '}

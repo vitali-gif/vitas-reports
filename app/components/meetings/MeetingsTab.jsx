@@ -21,6 +21,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../../../lib/api-fetch';
+import { MeetingsProLock } from '../ProGate';
 import {
   CalendarDays, CalendarClock, Plus, ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle,
   Trash2, Send, Loader2, ClipboardList, Users, Clock, Video, Info, Pencil, Link2,
@@ -706,6 +707,10 @@ export default function MeetingsTab({ projectId, projectName, isClientView = fal
   const [view, setView] = useState({ name: 'list' });
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
+  // הפיצ'ר הוא PRO (מיגרציה 020). app/admin/page.js כבר חוסם לפי clients.plan שבדפדפן,
+  // אבל הנתון הזה יכול להיות ישן — למשל אם המנוי הורד בזמן שהטאב פתוח. השרת הוא מקור
+  // האמת, ולכן 403 עם code: 'PLAN_REQUIRED' מציג את מסך השדרוג ולא שגיאה אדומה.
+  const [planLocked, setPlanLocked] = useState(false);
   // בשלב 1 הלקוח צופה בלבד. מי עורך ומי מאשר ייקבע במדיניות בשלב 3, יחד עם הזהויות.
   const canEdit = !isClientView;
 
@@ -715,13 +720,16 @@ export default function MeetingsTab({ projectId, projectName, isClientView = fal
     try {
       const res = await apiFetch(`/api/meetings?projectId=${encodeURIComponent(projectId)}`);
       const j = await res.json().catch(() => ({}));
+      if (res.status === 403 && j.code === 'PLAN_REQUIRED') { setPlanLocked(true); setData(null); return; }
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      setPlanLocked(false);
       setData(j);
     } catch (e) { setErr(e.message || String(e)); }
   }, [projectId]);
 
   useEffect(() => { setView({ name: 'list' }); load(); }, [load]);
 
+  if (planLocked) return <MeetingsProLock />;
   if (err && !data) return <div className="vmeet-root"><div className="vmeet-panel"><div className="vmeet-error">{err}</div></div></div>;
   if (!data) return <div className="vmeet-root"><div className="vmeet-panel">טוען…</div></div>;
 
