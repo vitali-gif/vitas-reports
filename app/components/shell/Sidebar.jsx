@@ -56,7 +56,7 @@ export default function Sidebar({
       <div className="sidebar-inner" style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 60px)' }}>
         {vr && (
           <div className="side-brand">
-            <img src={brand.logo} alt="VITAS" />
+            <img src={brand.logo} alt="Tovno by Vitas" />
             {brand.tagline && <span className="side-tagline">{brand.tagline}</span>}
           </div>
         )}

@@ -2,8 +2,8 @@
 import { LogOut, Users, Link2, FileSpreadsheet } from 'lucide-react'
 
 // VITAS v2 Header — design-v2-playbook classes (h-brand / h-actions / btn)
-// Mobile: hamburger ☰ (right, RTL) · VITAS logo (center) · kebab ⋮ + logout (left)
-// Desktop: logo + pipe + eyebrow · spacer · export · client-access · logout
+// Mobile: hamburger ☰ (right, RTL) · Tovno logo (center) · kebab ⋮ + logout (left)
+// Desktop: logo · spacer · export · client-access · logout
 //
 // Props:
 //   onMenuOpen       — opens the mobile sidebar drawer
@@ -33,11 +33,10 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onSession
         </svg>
       </button>
 
-      {/* Brand: logo · pipe · eyebrow */}
+      {/* Brand: הלוגו בלבד. ה-eyebrow "REPORTS" הוסר (ויטלי, 21.9) — הלוגו של
+          Tovno כבר נושא את "by Vitas", ותוספת טקסט לידו הכפילה את המיתוג. */}
       <div className="h-brand">
         <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" />
-        <div className="pipe" />
-        <span className="eyebrow">REPORTS</span>
       </div>
 
       <div className="h-spacer" />

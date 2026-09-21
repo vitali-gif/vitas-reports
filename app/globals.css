@@ -207,7 +207,9 @@
     gap: 24px;
   }
   .h-brand { display: flex; align-items: center; gap: 14px; }
-  .h-brand img { height: 22px; display: block; }
+  /* הלוגו הוגדל (ויטלי, 21.9). SVG, ולכן ההגדלה לא פוגעת בחדות.
+     block-size: auto שומר על יחס הממדים — ערכת הלוגו אוסרת מתיחה. */
+  .h-brand img { inline-size: 120px; block-size: auto; display: block; }
   .h-brand .pipe { width: 1px; height: 18px; background: var(--border-strong); }
   .h-brand .eyebrow {
     font-size: 10.5px; font-weight: 800; letter-spacing: 0.16em;
@@ -2535,7 +2537,8 @@
     transform: translateX(-50%);
     gap: 0;
   }
-  .h-brand img { height: 16px; }
+  /* במובייל הלוגו ממורכז ולכן צר יותר, אבל עדיין קריא. */
+  .h-brand img { inline-size: 96px; block-size: auto; }
   .h-brand .pipe,
   .h-brand .eyebrow { display: none; }
 

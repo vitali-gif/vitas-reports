@@ -88,7 +88,11 @@
    בסקיצה הסיידבר עולה עד לקצה העליון והכותרת חיה רק מעל התוכן: בדסקטופ הסיידבר הופך fixed
    בגובה מלא, וה-header והתוכן מפנים לו 224px. במובייל הסיידבר נשאר drawer כמו היום. */
 .header.header-vr { height: 64px; padding-inline: 28px; background: rgba(245,247,251,0.92); border-block-end: 1px solid var(--border, #DDE2EC); }
-.header.header-vr .h-brand img, .header.header-vr .h-brand .pipe { display: none; }
+/* במעטפת המחודשת הלוגו חי בסיידבר, ולכן ה-header לא מציג אותו שוב.
+   ⚠️ עד 21.9 הוסתרו כאן רק התמונה והקו, וה-eyebrow "REPORTS" נשאר לבדו —
+   מילה מרחפת בלי לוגו לידה. הוא הוסר מה-JSX; הכלל כאן מכסה גם אותו למקרה
+   שמישהו יחזיר אותו. */
+.header.header-vr .h-brand img, .header.header-vr .h-brand .pipe, .header.header-vr .h-brand .eyebrow { display: none; }
 .header.header-vr .h-brand .eyebrow { font-size: 12px; letter-spacing: 0.14em; color: var(--vr-muted, #586581); }
 .header.header-vr .h-actions { gap: 10px; }
 .header.header-vr .h-actions .btn:not(.h-kebab) { display: inline-flex; align-items: center; gap: 8px; min-block-size: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border, #DDE2EC); background: var(--card, #fff); color: var(--vr-text, #142044); font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
@@ -112,8 +116,11 @@
 
 /* sidebar */
 .vr-shell .sidebar.side-vr { padding: 20px 12px 18px; }
-.vr-shell .side-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 12px 22px; border-block-end: 1px solid var(--side-divider, rgba(255,255,255,0.06)); margin-block-end: 18px; }
-.vr-shell .side-brand img { height: 30px; display: block; }
+/* הלוגו הוגדל ואין לצידו טאגליין (ויטלי, 21.9). הוא SVG, ולכן ההגדלה לא
+   פוגעת בחדות. inline-size עם block-size:auto שומר על יחס הממדים — ערכת
+   הלוגו אוסרת מתיחה. */
+.vr-shell .side-brand { display: flex; flex-direction: column; align-items: flex-start; padding: 10px 12px 22px; border-block-end: 1px solid var(--side-divider, rgba(255,255,255,0.06)); margin-block-end: 18px; }
+.vr-shell .side-brand img { inline-size: min(168px, 100%); block-size: auto; display: block; }
 .vr-shell .side-tagline { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--side-fg-mute, #6E7388); }
 .vr-shell .sidebar-title { display: flex; align-items: center; gap: 8px; padding: 0 12px 10px; font-size: 11px; letter-spacing: 0.1em; }
 .vr-shell .client-header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--side-fg, #C9CEDC); font-size: 14px; font-weight: 600; cursor: pointer; }

@@ -6474,7 +6474,7 @@ const selectProject = async (client, project) => {
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
           footerText="Tovno by Vitas · v3.2"
-          brand={vrChrome ? { logo: '/brand/tovno/tovno-logo-white.svg', tagline: 'Marketing Intelligence' } : null}
+          brand={vrChrome ? { logo: '/brand/tovno/tovno-logo-white.svg' } : null}
           lockedProjects={[]}
           demoProjects={clients.flatMap(c=>(c.projects||[]).filter(p=>p.is_demo).map(p=>p.name))}
           isOpen={sidebarOpen}
