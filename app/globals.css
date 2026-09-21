@@ -1865,6 +1865,9 @@
   color: var(--text-3);
   text-align: center;
 }
+/* במסך "ברוכים הבאים" האנימציה היא סימן המותג ולא חיווי — היא תופסת את
+   מקומו של האימוג'י שהיה שם, ולכן צריכה את אותו מרווח שהיה ל-.icon. */
+.welcome-center .tovno-loader.welcome-mark { margin-bottom: 18px; }
 
 /* --- Recommendation cards (preserved from Stage 4 work) --- */
 .rec-card {

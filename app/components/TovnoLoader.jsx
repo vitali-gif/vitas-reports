@@ -15,6 +15,10 @@
  *
  * tone="dark" מחליף לעותק בצבעי רקע כהה (#EDF2FF / #7191FF) — לשימוש על
  * --tv-sidebar ועל כל משטח כהה אחר.
+ *
+ * decorative — כשהאנימציה היא סימן מותג ולא חיווי טעינה (מסך "ברוכים הבאים",
+ * שם לא נטען כלום ופשוט עוד לא נבחר פרויקט). אז אין role="status" ואין
+ * aria-label: קורא מסך שיכריז "טוען" במסך שלא טוען כלום פשוט משקר.
  */
 const RATIO = 94 / 280  // היחס המקורי של הנכס (955×320)
 
@@ -23,6 +27,7 @@ export default function TovnoLoader({
   hint = null,
   width = 280,
   tone = 'light',
+  decorative = false,
   className = '',
 }) {
   const base = tone === 'dark' ? '/brand/tovno/tovno-loader-dark' : '/brand/tovno/tovno-loader'
@@ -32,8 +37,7 @@ export default function TovnoLoader({
     <div
       className={['tovno-loader', className].filter(Boolean).join(' ')}
       style={{ '--tovno-loader-w': `${width}px` }}
-      role="status"
-      aria-label={label}
+      {...(decorative ? { 'aria-hidden': 'true' } : { role: 'status', 'aria-label': label })}
     >
       {/* alt ריק בכוונה: ה-aria-label על המעטפת הוא ההכרזה, ותמונה עם alt
           משלה הייתה גורמת לקורא מסך להקריא את המותג פעמיים. */}
