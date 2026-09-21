@@ -182,7 +182,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [customSince, setCustomSince] = useState('')
   const [customUntil, setCustomUntil] = useState('')
   const [compareEnabled, setCompareEnabled] = useState(false)
-  const [activePreset, setActivePreset] = useState('lastMonth')
+  // ויטלי, 21.9: נפתח על החודש הנוכחי ולא על חודש שעבר. אם עוד אין שורה
+  // לחודש הנוכחי (תחילת חודש, לפני שהקרון כתב), pickDefaultMonth נופל
+  // אחורה לחודש שעבר — ראה שם.
+  const [activePreset, setActivePreset] = useState('currentMonth')
   const [refreshing, setRefreshing] = useState(false)
   const [refreshingCrm, setRefreshingCrm] = useState(false)
   const [periodLoading, setPeriodLoading] = useState(false)  // spinner while switching date range / loading reports
@@ -803,7 +806,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const refreshAll = async () => {
     // Re-fetch the current period
     if (!selectedMonth) {
-      const r = presetToPayload('lastMonth');
+      // אותה ברירת מחדל כמו בפתיחת פרויקט — החודש הנוכחי.
+      const r = presetToPayload('currentMonth');
       if (r) await triggerFetch(r.payload);
       return;
     }
@@ -836,12 +840,14 @@ const loadClients = async () => {
   // 🔴 19.9.2026 (נמצא בבדיקת ה-E2E הראשונה): עד עכשיו נבחרה השורה הראשונה מ-by-project, שממוין לפי
   // month יורד. הקרון כותב מראש גם את הרבעון הבא ("2026-10-01_2026-12-31", נוצר ב-6.6), והמפתח הזה
   // גדול מכל מפתח יומי של ספטמבר — ולכן כל לקוח נחת על תקופה עתידית וראה אפסים בכל הכרטיסים, בזמן
-  // שהתגית הציגה "חודש שעבר" (activePreset). סדר עדיפות: מה שכבר נבחר → ברירת המחדל (חודש שעבר) →
-  // החודש הנוכחי → התקופה המאוחרת ביותר שכבר התחילה → הראשונה.
+  // שהתגית הציגה "חודש שעבר" (activePreset). סדר עדיפות: מה שכבר נבחר → ברירת המחדל →
+  // החודש הנוכחי → חודש שעבר → התקופה המאוחרת ביותר שכבר התחילה → הראשונה.
+  // ויטלי, 21.9: החודש הנוכחי לפני חודש שעבר. חודש שעבר נשאר ברשת הביטחון —
+  // ב-1 בחודש, לפני שהקרון כתב את השורה הראשונה, אין עדיין מה להציג.
   const pickDefaultMonth = (rows, prev) => {
     const keys = new Set(rows.map(r => r.month));
     if (prev && keys.has(prev)) return prev;
-    for (const p of [activePreset, 'lastMonth', 'currentMonth']) {
+    for (const p of [activePreset, 'currentMonth', 'lastMonth']) {
       const r = p && p !== 'custom' ? presetToPayload(p) : null;
       if (r && keys.has(r.key)) return r.key;
     }
@@ -6492,7 +6498,7 @@ const selectProject = async (client, project) => {
         <div className="main-content">
           {/* \u05d5\u05d9\u05d8\u05dc\u05d9, 21.9: \u05d4\u05d0\u05d9\u05de\u05d5\u05d2'\u05d9 \ud83d\udcca \u05d9\u05e8\u05d3 \u2014 \u05d4\u05d0\u05e0\u05d9\u05de\u05e6\u05d9\u05d4 \u05e9\u05dc Tovno \u05d9\u05d5\u05e9\u05d1\u05ea \u05db\u05d0\u05df \u05d1\u05de\u05e7\u05d5\u05de\u05d5.
               decorative, \u05db\u05d9 \u05d4\u05de\u05e1\u05da \u05d4\u05d6\u05d4 \u05dc\u05d0 \u05d8\u05d5\u05e2\u05df \u05db\u05dc\u05d5\u05dd: \u05d4\u05d5\u05d0 \u05e4\u05e9\u05d5\u05d8 \u05de\u05de\u05ea\u05d9\u05df \u05dc\u05d1\u05d7\u05d9\u05e8\u05ea \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8. */}
-          {view === 'welcome' && (<div className="welcome-center"><TovnoLoader decorative width={300} className="welcome-mark" /><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05de\u05d4\u05ea\u05e4\u05e8\u05d9\u05d8 \u05db\u05d3\u05d9 \u05dc\u05e6\u05e4\u05d5\u05ea \u05d1\u05d3\u05d5\u05d7, \u05d0\u05d5 \u05d4\u05e2\u05dc\u05d4 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd'}</p></div>)}
+          {view === 'welcome' && (<div className="welcome-center"><TovnoLoader decorative width={300} className="welcome-mark" /><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8/\u05d9 \u05d0\u05ea \u05e9\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7 \u05d5\u05dc\u05d0\u05d7\u05e8 \u05de\u05db\u05df \u05d0\u05ea \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d4\u05e8\u05e6\u05d5\u05d9.'}</p></div>)}
 
           {view === 'dashboard' && selectedProject && (<>
                         {isDemoProject && (
