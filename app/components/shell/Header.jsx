@@ -1,8 +1,9 @@
 'use client'
+import { LogOut, Users, Link2, FileSpreadsheet } from 'lucide-react'
 
 // VITAS v2 Header — design-v2-playbook classes (h-brand / h-actions / btn)
-// Mobile: hamburger ☰ (right, RTL) · VITAS logo (center) · kebab ⋮ + logout (left)
-// Desktop: logo + pipe + eyebrow · spacer · export · client-access · logout
+// Mobile: hamburger ☰ (right, RTL) · Tovno logo (center) · kebab ⋮ + logout (left)
+// Desktop: logo · spacer · export · client-access · logout
 //
 // Props:
 //   onMenuOpen       — opens the mobile sidebar drawer
@@ -11,9 +12,11 @@
 //   onLogout         — Logout button handler
 //   loadingIndicator — optional JSX (spinner while fetching)
 
-export default function Header({ onMenuOpen, onExport, onClientAccess, onSessionLogs, onLogout, loadingIndicator = null }) {
+export default function Header({ onMenuOpen, onExport, onClientAccess, onSessionLogs, onLogout, loadingIndicator = null, className = '' }) {
+  // עיצוב מחודש (header-vr): אייקוני lucide במקום אימוג'י, כפתורים בהירים אחידים
+  const vr = className.includes('header-vr')
   return (
-    <header className="header">
+    <header className={`header${className ? ' ' + className : ''}`}>
 
       {/* MOBILE ONLY: hamburger — opens the drawer.
           CSS (.h-hamburger) is display:none on desktop, display:inline-flex on ≤768px */}
@@ -30,11 +33,10 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onSession
         </svg>
       </button>
 
-      {/* Brand: logo · pipe · eyebrow */}
+      {/* Brand: הלוגו בלבד. ה-eyebrow "REPORTS" הוסר (ויטלי, 21.9) — הלוגו של
+          Tovno כבר נושא את "by Vitas", ותוספת טקסט לידו הכפילה את המיתוג. */}
       <div className="h-brand">
-        <img src="/brand/vitas-logo-black.png" alt="VITAS" />
-        <div className="pipe" />
-        <span className="eyebrow">REPORTS</span>
+        <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" />
       </div>
 
       <div className="h-spacer" />
@@ -46,21 +48,21 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onSession
         {/* Export — hidden on mobile, surfaces in drawer */}
         {onExport && (
           <button className="btn btn-export" onClick={onExport} title="ייצוא לאקסל">
-            📤 ייצוא לאקסל
+            {vr ? <FileSpreadsheet size={16} aria-hidden="true" className="h-ico h-ico-excel" /> : '📤'} ייצוא לאקסל
           </button>
         )}
 
         {/* Client Access — hidden on mobile, surfaces in drawer */}
         {onClientAccess && (
           <button className="btn btn-client-access" onClick={onClientAccess} title="ניהול גישת לקוחות">
-            🔗 גישת לקוחות
+            {vr ? <Link2 size={16} aria-hidden="true" className="h-ico" /> : '🔗'} גישת לקוחות
           </button>
         )}
 
         {/* Session Logs */}
         {onSessionLogs && (
           <button className="btn btn-outline" onClick={onSessionLogs} title="לוג כניסות לקוחות">
-            👁 לוג לקוחות
+            {vr ? <Users size={16} aria-hidden="true" className="h-ico" /> : '👁'} לוג לקוחות
           </button>
         )}
 
@@ -80,12 +82,13 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onSession
 
         {/* Logout — visible on both desktop and mobile */}
         {onLogout && (
-          <button className="btn btn-logout danger" onClick={onLogout} aria-label="התנתק">
+          <button className={`btn btn-logout${vr ? '' : ' danger'}`} onClick={onLogout} aria-label="התנתק">
+            {vr ? <LogOut size={16} aria-hidden="true" className="h-ico" /> : (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
               <polyline points="16 17 21 12 16 7"/>
               <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
+            </svg>)}
             <span>התנתק</span>
           </button>
         )}

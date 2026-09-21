@@ -63,9 +63,9 @@ async function sendInviteEmail(toEmail, link, clientName) {
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F7FB;padding:40px 16px">
 <tr><td align="center">
 <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(11,15,30,0.08)">
-<tr><td style="background:#0B0F1E;padding:28px 36px;text-align:right">
-  <span style="color:#fff;font-size:20px;font-weight:800">VITAS</span>
-  <span style="color:#5B5EF4;font-size:20px;font-weight:800"> Reports</span>
+<tr><td style="background:#14243C;padding:28px 36px;text-align:right">
+  <span style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.03em">tovno</span>
+  <span style="color:#7191FF;font-size:14px;font-weight:700"> by Vitas</span>
 </td></tr>
 <tr><td style="padding:36px 36px 28px">
   <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#0B0F1E">הוזמנת לצפות בדוח הפרויקט</h1>
@@ -94,7 +94,7 @@ async function sendInviteEmail(toEmail, link, clientName) {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'VITAS Reports <noreply@vitas.co.il>', to: [toEmail], subject: `גישה לדוח${clientName ? ` — ${clientName}` : ''}`, html }),
+      body: JSON.stringify({ from: 'Tovno by Vitas <noreply@vitas.co.il>', to: [toEmail], subject: `גישה לדוח${clientName ? ` — ${clientName}` : ''}`, html }),
     })
     const data = await res.json()
     if (!res.ok) return { ok: false, error: data.message || JSON.stringify(data) }

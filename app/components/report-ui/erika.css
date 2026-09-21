@@ -1,0 +1,84 @@
+/* app/components/report-ui/erika.css — טאב ה-CRM של אריקה כרמל (BCureLaser, ISMOOTH)
+   בשפה של ש.ברוך. חבילה: 01-Handoffs/VITAS-Erika-CRM-Handoff.
+
+   כל הכללים תחת .vr-erika בלבד, שיושב בתוך .vr-ui. ההוראות בחבילה אוסרות במפורש
+   לשנות את BMBY או את KLOSS כתוצאת לוואי, ואריקה היא הלקוחה היחידה על Zoho.
+
+   הכרטיסים, הטבלאות והמידות מגיעים מהרכיבים המשותפים (MetricCard ב-
+   VitasPresentation.jsx, .data-table ב-vitas-bridge.css). מה שאין שם הוא הערת
+   ההיקף, שברון ההיררכיה ותוויות הרמה — והם מוגדרים כאן. */
+
+/* ── הערת היקף מעל הכרטיסים ─────────────────────────────────────────────────
+   שתי שורות שהמפרט מחייב מילה במילה. בלעדיהן "רכשו" נקרא כמספר סופי, והוא לא:
+   עסקה שתיסגר בשבוע הבא עדיין תשויך ללידים של התקופה הזו. */
+.vr-ui .vr-erika-scope {
+  margin-block-end: 18px;
+  padding-inline-start: 14px;
+  border-inline-start: 3px solid var(--indigo, #6366f1);
+}
+.vr-ui .vr-erika-scope p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text, #142044); }
+.vr-ui .vr-erika-scope p + p { font-size: 13px; color: var(--text-secondary, #66748f); }
+
+/* ── שברון ההיררכיה ─────────────────────────────────────────────────────────
+   כפתור אמיתי ולא תו טקסט: aria-expanded, מקלדת ו-focus גלוי. ה-empty שומר את
+   אותו רוחב בשורות שאין להן ילדים, כדי שהשמות יישארו מיושרים בכל הרמות. */
+.vr-ui .vr-erika-twist,
+.vr-ui .vr-erika-twist-empty {
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 24px; block-size: 24px;
+  margin-inline-end: 7px; vertical-align: middle;
+}
+.vr-ui .vr-erika-twist {
+  border: 1px solid var(--border, #dde2ec); border-radius: 7px;
+  background: var(--surface, #fff); color: var(--text-secondary, #66748f);
+  cursor: pointer; padding: 0;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.vr-ui .vr-erika-twist:hover { background: var(--indigo, #6366f1); border-color: var(--indigo, #6366f1); color: #fff; }
+.vr-ui .vr-erika-twist:focus-visible { outline: 2px solid var(--indigo, #6366f1); outline-offset: 2px; }
+.vr-ui .vr-erika-twist[aria-expanded='true'] { background: var(--indigo, #6366f1); border-color: var(--indigo, #6366f1); color: #fff; }
+
+/* ── תווית רמה ──────────────────────────────────────────────────────────────
+   המפרט מחייב "כיתוב רמה קטן" לצד השברון, והצבע לבדו אינו תחליף לו. ברמת ה-adset
+   התווית משתנה לפי הערוץ: בגוגל השדה הוא UTM_Term, שלרוב הוא מילת חיפוש. */
+.vr-ui .vr-erika-lvl {
+  display: inline-block; margin-inline-end: 8px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  background: var(--surface-2, #f1f4fb); color: var(--text-secondary, #66748f);
+}
+
+/* שם ארוך נשבר לשורה נוספת ולא נחתך — המפרט אוסר לאבד את השם המלא. */
+.vr-ui .vr-erika-name { white-space: normal; text-align: start; overflow-wrap: anywhere; }
+
+/* ── רקעי הרמות ─────────────────────────────────────────────────────────────
+   ההזחה והתווית הן הסימן העיקרי; הרקע רק מחזק אותן. !important נדרש מול פסי
+   הזברה וה-hover של .data-table, שאחרת היו מבטלים את הסימון בדיוק בשורה שמסתכלים
+   עליה. */
+.vr-ui .data-table tbody tr.vr-erika-lvl1,
+.vr-ui .data-table tbody tr.vr-erika-lvl1:hover { background: #f6f8ff !important; }
+.vr-ui .data-table tbody tr.vr-erika-lvl2,
+.vr-ui .data-table tbody tr.vr-erika-lvl2:hover { background: #eef2fe !important; }
+.vr-ui .data-table tbody tr.vr-erika-lvl3,
+.vr-ui .data-table tbody tr.vr-erika-lvl3:hover { background: #e8edfd !important; }
+.vr-ui .data-table tbody tr.vr-erika-lvl0.vr-erika-open,
+.vr-ui .data-table tbody tr.vr-erika-lvl0.vr-erika-open:hover { background: #eef1fd !important; }
+
+/* ── הערת היקף מתחת לטבלת המשפך ─────────────────────────────────────────── */
+.vr-ui .vr-erika-note {
+  margin: 12px 2px 0;
+  padding: 9px 13px;
+  border: 1px solid var(--border, #dde2ec);
+  border-radius: var(--r-sm, 8px);
+  background: var(--surface-2, #f6f8ff);
+  color: var(--text-secondary, #66748f);
+  font-size: 12.5px; line-height: 1.65;
+}
+
+/* במסך צר הטבלה גוללת בתוך .table-wrapper בלבד; העמוד לעולם לא גולל אופקית. */
+@media (max-width: 760px) {
+  .vr-ui .vr-erika-lvl { display: none; }
+  .vr-ui .vr-erika-twist, .vr-ui .vr-erika-twist-empty { inline-size: 22px; block-size: 22px; margin-inline-end: 5px; }
+}
+
+@media (prefers-reduced-motion: reduce) { .vr-ui .vr-erika-twist { transition: none; } }

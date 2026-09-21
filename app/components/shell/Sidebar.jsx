@@ -1,4 +1,5 @@
 'use client'
+import { Building2, Users, ChevronUp } from 'lucide-react'
 
 // VITAS v2 Sidebar — extracted from design_handoff_vitas_hitech_refresh/screen-2-hakol-v2.html
 // Near-black bg (#0B0F1E) with subtle violet glow on active project.
@@ -27,14 +28,18 @@ export default function Sidebar({
   onAddProject,
   lockedProjects = [],
   demoProjects = [],
-  footerText = 'VITAS Reports v3.2',
+  footerText = 'Tovno by Vitas · v3.2',
   isOpen = false,
   onClose,
   onExport,
   onClientAccess,
+  // עיצוב מחודש (ענף redesign): כשמועבר brand={{logo, tagline}} הסיידבר מציג לוגו למעלה,
+  // אייקוני lucide במקום נקודות/אימוג'י, וה-inline styles מפנים את מקומם ל-CSS (.vr-shell).
+  brand = null,
 }) {
+  const vr = !!brand
   return (
-    <aside className={`sidebar${isOpen ? ' mobile-open' : ''}`}>
+    <aside className={`sidebar${isOpen ? ' mobile-open' : ''}${vr ? ' side-vr' : ''}`}>
 
       {/* MOBILE ONLY: close button — CSS hides on desktop, shows in drawer */}
       <button
@@ -49,8 +54,14 @@ export default function Sidebar({
       </button>
 
       <div className="sidebar-inner" style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 60px)' }}>
+        {vr && (
+          <div className="side-brand">
+            <img src={brand.logo} alt="Tovno by Vitas" />
+            {brand.tagline && <span className="side-tagline">{brand.tagline}</span>}
+          </div>
+        )}
         <div className="sidebar-section">
-          <div className="sidebar-title">לקוחות</div>
+          <div className="sidebar-title">{vr && <Users size={15} aria-hidden="true" />}<span>לקוחות</span></div>
 
           {clients.map((client) => {
             const isActive = client.name === activeClient;
@@ -59,7 +70,7 @@ export default function Sidebar({
                 <div
                   className={`client-header ${isActive ? 'active' : ''}`}
                   onClick={() => onSelectClient?.(client)}
-                  style={{
+                  style={vr ? undefined : {
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '10px 14px', color: isActive ? 'white' : 'var(--side-fg)',
                     fontWeight: isActive ? 800 : 600, fontSize: 14,
@@ -67,14 +78,17 @@ export default function Sidebar({
                     cursor: 'pointer',
                   }}
                 >
-                  <span
-                    className="client-dot"
-                    style={{
-                      display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                      background: client.color || 'var(--indigo)',
-                    }}
-                  />
-                  {client.name}
+                  {vr
+                    ? <Building2 size={18} className="side-ico" aria-hidden="true" />
+                    : <span
+                        className="client-dot"
+                        style={{
+                          display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                          background: client.color || 'var(--indigo)',
+                        }}
+                      />}
+                  <span className="side-name">{client.name}</span>
+                  {vr && isActive && (client.projects || []).length > 0 && <ChevronUp size={14} className="side-chev" aria-hidden="true" />}
                 </div>
 
                 {isActive && (client.projects || []).map((project) => {
@@ -86,7 +100,7 @@ export default function Sidebar({
                       className={`project-item ${isCurrent ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
                       onClick={() => !isLocked && onSelectProject?.(client, project)}
                       title={isLocked ? 'פרויקט נעול' : undefined}
-                      style={{
+                      style={vr ? undefined : {
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '8px 14px 8px 24px',
                         marginRight: 14,
@@ -102,9 +116,9 @@ export default function Sidebar({
                     >
                       {isLocked
                         ? <span style={{ fontSize: 12, opacity: 0.7 }}>🔒</span>
-                        : (project.icon || '🏗️')
+                        : vr ? <Building2 size={15} className="side-ico" aria-hidden="true" /> : (project.icon || '🏗️')
                       }
-                      <span dir="ltr">{project.name}</span>
+                      <span dir="ltr" className="side-name">{project.name}</span>
                     </div>
                   );
                 })}

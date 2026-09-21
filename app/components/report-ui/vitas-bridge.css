@@ -1,0 +1,418 @@
+/* vitas-bridge.css — גשר בין העיצוב המחודש (vitas-visual.css, .vr-ui) ל-markup הקיים של הדשבורד.
+
+   הכרטיסים והמשפך עברו לרכיבי report-ui. הטבלאות, כותרות הסקשנים, הטאבים וגלריות המודעות
+   נשארו עם ה-markup והלוגיקה הקיימים (מיון, פתיחת קמפיין→קבוצה→מודעה, ייצוא) — וכאן הם
+   מקבלים את המידות והצבעים מ-DESIGN-SPEC.md. הכל בתוך .vr-ui בלבד, בלי !important,
+   בלי לגעת ב-globals.css. נטען פעם אחת אחרי globals.css ב-app/layout.js. */
+
+/* ── טאבים (DESIGN-SPEC: 44px, 15px, active indigo + underline) ─────────────── */
+/* טאבים כפקד מקוטע (כמו בסקיצה): קופסאות צמודות עם גבול, הפעיל לבן עם טקסט וקו תחתון אינדיגו */
+.vr-ui .client-tabs { display: inline-flex; gap: 0; margin-block-end: 26px; border: 1px solid var(--border, #DDE2EC); border-radius: 10px; overflow: hidden; background: var(--card, #fff); box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.vr-ui .client-tab { min-block-size: 44px; font-size: 15px; font-weight: 600; padding-inline: 22px; color: var(--vr-text, #142044); background: var(--surface, #F5F7FB); border-inline-start: 1px solid var(--border, #DDE2EC); border-radius: 0; }
+.vr-ui .client-tab:first-child { border-inline-start: 0; }
+.vr-ui .client-tab:hover { color: var(--indigo, #5B5EF4); background: #fff; }
+.vr-ui .client-tab.active { color: var(--indigo, #5B5EF4); background: #fff; box-shadow: inset 0 -3px 0 var(--indigo, #5B5EF4); }
+.vr-ui .client-tab.active::after { display: none; }
+/* טאבי המשפך (הכל / Facebook / Google) בתוך כותרת סקשן — קומפקטיים, בלי קו תחתון של כל הרוחב */
+.vr-ui .vr-inline-tabs { margin: 0; }
+.vr-ui .vr-inline-tabs .client-tab { min-block-size: 36px; font-size: 13.5px; padding-inline: 14px; }
+
+/* ── כרטיסי KPI: הגרדיאנטים של המותג (DESIGN-SPEC: "קלוד יכול למפות אחרי בדיקת הקוד") ── */
+/* החבילה הגיעה עם גרדיאנטים כהים משלה; הסקיצה המאושרת משתמשת בגוונים הבהירים של --g-* הקיימים.
+   הניגודיות של טקסט לבן על --g-* נבדקה כבר בכרטיסים הישנים (.kpi). amber נשאר עם טקסט כהה. */
+.vr-ui .vr-tone-indigo  { --vr-fill: var(--g-indigo,  linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)); }
+.vr-ui .vr-tone-emerald { --vr-fill: var(--g-emerald, linear-gradient(135deg, #14B8A6 0%, #0E9F6E 100%)); }
+.vr-ui .vr-tone-violet  { --vr-fill: var(--g-violet,  linear-gradient(135deg, #A78BFA 0%, #7C3AED 100%)); }
+.vr-ui .vr-tone-sky     { --vr-fill: var(--g-sky,     linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)); }
+.vr-ui .vr-tone-terra   { --vr-fill: var(--g-terra,   linear-gradient(135deg, #FB923C 0%, #EA580C 100%)); }
+.vr-ui .vr-tone-amber   { --vr-fill: var(--g-amber,   linear-gradient(135deg, #FBBF24 0%, #D97706 100%)); }
+.vr-ui .vr-tone-rose    { --vr-fill: var(--g-rose,    linear-gradient(135deg, #FB7185 0%, #E11D48 100%)); }
+.vr-ui .vr-metric.vr-tone-indigo  { box-shadow: var(--shadow-indigo,  var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-emerald { box-shadow: var(--shadow-emerald, var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-violet  { box-shadow: var(--shadow-violet,  var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-sky     { box-shadow: var(--shadow-sky,     var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-terra   { box-shadow: var(--shadow-terra,   var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-amber   { box-shadow: var(--shadow-amber,   var(--shadow-sm)); }
+.vr-ui .vr-metric.vr-tone-rose    { box-shadow: var(--shadow-rose,    var(--shadow-sm)); }
+/* המשפך: הפס הצדדי והאייקון נשארים בצבע המלא (--vr-accent), לא בגרדיאנט */
+
+/* ── כרטיסי KPI: תגית שינוי (VITAS: הרחבה) ─────────────────────────────────── */
+.vr-metric-top { flex-wrap: wrap; }
+.vr-metric-badge { margin-inline-start: auto; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #ffffff2e; border: 1px solid #ffffff4d; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* ויטלי (17.9): גם על הכרטיס הכתום הטקסט לבן, כמו בשאר הכרטיסים ובסקיצה */
+.vr-ui .vr-metric.vr-tone-amber { color: #fff; }
+.vr-ui .vr-metric.vr-tone-amber .vr-metric-badge { background: #ffffff2e; border-color: #ffffff4d; }
+.vr-metric-clickable { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.vr-metric-clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-md, 0 10px 24px -10px rgba(11,15,30,0.2)); }
+.vr-metric-note { opacity: .92; }
+.vr-metrics-section { margin-block-end: 8px; }
+
+/* ── סקשנים קיימים (.section / .section-head) ──────────────────────────────── */
+.vr-ui .section { margin-block: 44px 0; }
+.vr-ui .section-head { gap: 12px; margin-block-end: 18px; }
+.vr-ui .section-head h2 { font-size: 23px; font-weight: 750; line-height: 1.35; letter-spacing: 0; color: var(--vr-text); }
+.vr-ui .section-head .sub { font-size: 14px; color: var(--vr-muted); margin-inline-start: 4px; }
+.vr-ui .section-head .ico { inline-size: 36px; block-size: 36px; border-radius: 10px; }
+.vr-ui .section-head .ico svg { inline-size: 18px; block-size: 18px; stroke-width: 1.8; }
+.vr-ui .section-head .head-right { margin-inline-start: auto; }
+
+/* ── טבלאות קיימות (.table-wrapper / .data-table / .card) ──────────────────── */
+.vr-ui .table-wrapper, .vr-ui .card { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); overflow: hidden; }
+.vr-ui .card .card-body { padding: 0; }
+.vr-ui .card .table-wrapper { border: 0; border-radius: 0; box-shadow: none; }
+.vr-ui .table-wrapper { overflow-x: auto; }
+.vr-ui .data-table { font-size: 14px; }
+.vr-ui .data-table thead th { background: #EDF0FC; color: #25315C; font-weight: 650; font-size: 13.5px; padding-block: 14px; padding-inline: 14px; border-block-end: 1px solid var(--border, #DDE2EC); white-space: nowrap; }
+.vr-ui .data-table tbody td { padding-block: 15px; padding-inline: 14px; border-block-end: 1px solid var(--divider, #E5E9F1); font-variant-numeric: tabular-nums; }
+.vr-ui .data-table tbody tr:nth-child(even) { background: #F8FAFF; }
+.vr-ui .data-table tbody tr:hover { background: #F0F3FF; }
+.vr-ui .data-table tbody tr:last-child td { border-block-end: 0; }
+.vr-ui .data-table tbody tr.lvl-2 { background: #F8FAFF; font-size: 13.5px; }
+.vr-ui .data-table tbody tr.lvl-3 { background: #FCFCFE; font-size: 13px; }
+/* כותרות המשנה של הפילוח הדמוגרפי (h3 עם inline style בקוד הקיים) */
+.vr-ui .section h3 { font-family: inherit; }
+
+/* ── גלריות מודעות קיימות (Facebook top ads, Google PMax) ─────────────────── */
+/* DESIGN-SPEC מבקש שתי עמודות; המדיה של פייסבוק היא 4:5 (סרטונים), ובשתי עמודות כרטיס היה
+   מגיע ל-750px גובה. שלוש עמודות בדסקטופ שומרות על התמונה בשלמותה בגודל סביר; ב-<1200 שתיים. */
+.vr-ui .section-top-ads .vr-ad-grid, .vr-ui .section-asset-gallery .vr-ad-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: stretch; }
+.vr-ui .section-top-ads .card, .vr-ui .section-asset-gallery .card { border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); box-shadow: var(--shadow-sm, 0 2px 8px -2px rgba(11,15,30,0.08)); }
+@media (max-width: 1199px) { .vr-ui .section-top-ads .vr-ad-grid, .vr-ui .section-asset-gallery .vr-ad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ═══ המעטפת (.vr-shell על .app-layout, רק במצב העיצוב המחודש) ═════════════════ */
+/* DESIGN-SPEC: Sidebar 224px --side-bg · Header 64px · TitleBar 30px/700, breadcrumb 13px · תוכן padding-inline 32px */
+.vr-shell { grid-template-columns: 224px minmax(0, 1fr); }
+.vr-shell .main-content { padding: 24px 32px 64px; }
+/* header: הלוגו עבר לסיידבר; נשאר סרגל פעולות בהיר */
+/* ה-header יושב מעל .app-layout ולא בתוכו, לכן מקבל class משלו (header-vr) מ-page.js.
+   בסקיצה הסיידבר עולה עד לקצה העליון והכותרת חיה רק מעל התוכן: בדסקטופ הסיידבר הופך fixed
+   בגובה מלא, וה-header והתוכן מפנים לו 224px. במובייל הסיידבר נשאר drawer כמו היום. */
+.header.header-vr { height: 64px; padding-inline: 28px; background: rgba(245,247,251,0.92); border-block-end: 1px solid var(--border, #DDE2EC); }
+/* במעטפת המחודשת הלוגו חי בסיידבר, ולכן ה-header לא מציג אותו שוב.
+   ⚠️ עד 21.9 הוסתרו כאן רק התמונה והקו, וה-eyebrow "REPORTS" נשאר לבדו —
+   מילה מרחפת בלי לוגו לידה. הוא הוסר מה-JSX; הכלל כאן מכסה גם אותו למקרה
+   שמישהו יחזיר אותו. */
+.header.header-vr .h-brand img, .header.header-vr .h-brand .pipe, .header.header-vr .h-brand .eyebrow { display: none; }
+.header.header-vr .h-brand .eyebrow { font-size: 12px; letter-spacing: 0.14em; color: var(--vr-muted, #586581); }
+.header.header-vr .h-actions { gap: 10px; }
+.header.header-vr .h-actions .btn:not(.h-kebab) { display: inline-flex; align-items: center; gap: 8px; min-block-size: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border, #DDE2EC); background: var(--card, #fff); color: var(--vr-text, #142044); font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.header.header-vr .h-actions .btn:hover { border-color: var(--border-strong, #C4CAD6); background: #fff; }
+.header.header-vr .h-ico { color: var(--vr-muted, #586581); }
+.header.header-vr .h-ico-excel { color: #1D6F42; }
+.header.header-vr .btn-logout { color: var(--rose, #F43F5E); }
+.header.header-vr .btn-logout .h-ico { color: inherit; }
+/* רקע העמוד: אפור-כחלחל בהיר, הכרטיסים הלבנים בולטים (כמו בסקיצה) */
+.vr-shell .main-content { background: var(--surface, #F5F7FB); }
+.vr-ui { background: transparent; }
+@media (min-width: 769px) {
+  .vr-shell { grid-template-columns: minmax(0, 1fr); margin-inline-start: 224px; }   /* RTL: inline-start = ימין */
+  .vr-shell .sidebar.side-vr { position: fixed; top: 0; bottom: 0; inset-inline-start: 0; inline-size: 224px; overflow-y: auto; z-index: 60; }
+  .header.header-vr { margin-inline-start: 224px; }
+}
+/* title bar */
+.vr-shell .titlebar { align-items: center; margin-block-end: 24px; }
+.vr-shell .titlebar h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
+.vr-shell .titlebar .crumb { font-size: 13px; }
+
+/* sidebar */
+.vr-shell .sidebar.side-vr { padding: 20px 12px 18px; }
+/* הלוגו הוגדל ואין לצידו טאגליין (ויטלי, 21.9). הוא SVG, ולכן ההגדלה לא
+   פוגעת בחדות. inline-size עם block-size:auto שומר על יחס הממדים — ערכת
+   הלוגו אוסרת מתיחה. */
+.vr-shell .side-brand { display: flex; flex-direction: column; align-items: flex-start; padding: 10px 12px 22px; border-block-end: 1px solid var(--side-divider, rgba(255,255,255,0.06)); margin-block-end: 18px; }
+.vr-shell .side-brand img { inline-size: min(168px, 100%); block-size: auto; display: block; }
+.vr-shell .side-tagline { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--side-fg-mute, #6E7388); }
+.vr-shell .sidebar-title { display: flex; align-items: center; gap: 8px; padding: 0 12px 10px; font-size: 11px; letter-spacing: 0.1em; }
+.vr-shell .client-header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--side-fg, #C9CEDC); font-size: 14px; font-weight: 600; cursor: pointer; }
+.vr-shell .client-header:hover { background: rgba(255,255,255,0.04); color: #fff; }
+.vr-shell .client-header.active { color: #fff; font-weight: 800; }
+.vr-shell .side-ico { flex-shrink: 0; opacity: .85; }
+.vr-shell .side-name { flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vr-shell .side-chev { opacity: .6; }
+.vr-shell .project-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin-inline-start: 22px; margin-block: 2px; border-radius: 8px; color: var(--side-fg, #C9CEDC); font-size: 13px; font-weight: 500; cursor: pointer; border-inline-end: 2px solid transparent; }
+.vr-shell .project-item:hover { background: rgba(255,255,255,0.04); color: #fff; }
+.vr-shell .project-item.active { background: var(--side-active, rgba(99,102,241,0.16)); color: #fff; font-weight: 700; border-inline-end-color: var(--indigo, #5B5EF4); }
+.vr-shell .project-item.locked { opacity: .45; cursor: not-allowed; }
+.vr-shell .add-btn { margin-inline-start: 22px; }
+
+/* budget card (DESIGN-SPEC: משטח לבן עם border, min-height 56, labels גלויים) */
+/* שורה אחת (כמו בסקיצה): בצד ההתחלה תווית + חודש + סכום + שמור, בצד הסיום פס ההתקדמות + "נוצל החודש" */
+.vr-budget { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); padding: 9px 16px; margin-block-end: 20px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; min-block-size: 56px; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.vr-budget-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vr-budget-progress { flex: 1 1 320px; }
+.vr-budget-amount { display: inline-flex; align-items: center; gap: 2px; font-size: 20px; font-weight: 800; color: var(--vr-text, #142044); }
+.vr-budget-amount .vr-budget-currency { font-size: 17px; font-weight: 700; }
+.vr-budget-field.vr-budget-amount input { border: 1px solid transparent; background: transparent; font-size: 20px; font-weight: 800; padding: 4px 6px; inline-size: 7ch; min-block-size: 36px; -moz-appearance: textfield; }
+.vr-budget-field.vr-budget-amount input::-webkit-outer-spin-button, .vr-budget-field.vr-budget-amount input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.vr-budget-field.vr-budget-amount input:hover, .vr-budget-field.vr-budget-amount input:focus { border-color: var(--border, #DDE2EC); background: var(--surface, #F5F7FB); }
+.vr-budget-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: var(--vr-text, #142044); }
+.vr-budget-label svg { color: var(--indigo, #5B5EF4); }
+.vr-budget-field select, .vr-budget-field input { font: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-xs, 6px); background: var(--surface, #F5F7FB); color: var(--vr-text, #142044); min-block-size: 38px; }
+.vr-budget-field input { inline-size: 130px; font-variant-numeric: tabular-nums; }
+.vr-budget-save { min-block-size: 38px; padding-block: 6px; background: var(--indigo, #5B5EF4); color: #fff; border-color: transparent; font-weight: 700; }
+.vr-budget-total { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--vr-text, #142044); }
+.vr-budget-progress { display: flex; align-items: center; gap: 14px; }
+.vr-budget-track { flex: 1 1 auto; block-size: 10px; background: var(--surface, #F5F7FB); border: 1px solid var(--divider, #E5E9F1); border-radius: 999px; overflow: hidden; }
+.vr-budget-fill { block-size: 100%; border-radius: 999px; background: var(--emerald, #10B981); transition: width .3s ease; }
+.vr-budget-progress[data-level="warm"] .vr-budget-fill { background: var(--amber, #F59E0B); }
+.vr-budget-progress[data-level="hot"] .vr-budget-fill, .vr-budget-progress[data-level="over"] .vr-budget-fill { background: var(--rose, #F43F5E); }
+.vr-budget-used { font-size: 13px; color: var(--vr-muted, #586581); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ── טבלת הקמפיינים: שורות היררכיות, תגית פלטפורמה, נקודת סטטוס ──────────── */
+.vr-ui .vr-tree-row.vr-expandable { cursor: pointer; }
+.vr-ui .vr-tree-row.vr-lvl-0 td:first-child { font-weight: 700; }
+.vr-ui .vr-tree-row.vr-lvl-1 { background: #F8FAFF; }
+.vr-ui .vr-tree-row.vr-lvl-1 td:first-child { font-weight: 600; }
+.vr-ui .vr-tree-row.vr-lvl-2 { background: #FCFCFE; font-size: 13.5px; }
+.vr-ui .vr-tree-row td:first-child svg { vertical-align: middle; color: var(--vr-muted, #586581); }
+.vr-platform { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-inline-end: 10px; vertical-align: middle; border: 1px solid var(--border, #DDE2EC); background: var(--surface, #F5F7FB); color: var(--vr-text, #142044); }
+.vr-platform svg { flex-shrink: 0; }
+/* בטבלת הקמפיינים התג יושב בעמודה משלו ולא בתוך תא השם, ולכן אין צורך במרווח שמפריד
+   אותו מהטקסט שלידו (ויטלי, 20.9). */
+.vr-ui .vr-tree-row .vr-platform { margin-inline-end: 0; }
+.vr-platform.meta { color: #1C2B33; }
+.vr-platform.google { color: #3C4043; }
+.vr-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.vr-status i { inline-size: 8px; block-size: 8px; border-radius: 50%; background: #98A0B2; }
+.vr-status.on { color: #0E9F6E; } .vr-status.on i { background: #10B981; }
+/* "מושהה" גם הוא אדום: גוגל ומטא מדווחים סטטוסים שונים לאותו מצב עסקי — קמפיין
+   שאינו רץ — וויטלי ביקש (21.9) שהם ייקראו אותו דבר בשתי הפלטפורמות. ירוק פירושו
+   רץ; כל דבר אחר אדום. */
+.vr-status.paused { color: #C0322F; } .vr-status.paused i { background: #E24B4A; }
+/* "מכובה" — קמפיין שאינו פעיל. אדום ולא אפור, כי אפור נקרא כמו "אין נתון"
+   ולא כמו "כבוי" (ויטלי, 21.9). */
+.vr-status.off { color: #C0322F; } .vr-status.off i { background: #E24B4A; }
+.vr-status.none { color: var(--vr-muted, #586581); }
+
+/* פילוח דמוגרפי: שתי טבלאות זו מתחת לזו, כל אחת בכרטיס לבן עם הכותרת בתוכו (כמו בסקיצה) */
+.vr-ui .vr-demo-grid { display: flex; flex-direction: column; gap: 20px; }
+.vr-ui .vr-demo-block { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); padding: 14px 16px 6px; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.vr-ui .vr-demo-block h3 { font-size: 16px; font-weight: 700; color: var(--vr-text, #142044); margin: 0 0 12px; }
+.vr-ui .vr-demo-block .card { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.vr-ui .section h3 { font-size: 16px; font-weight: 700; color: var(--vr-text, #142044); margin-block-end: 10px; }
+
+/* ── CRM › מקורות הגעה (.vcs-root מהחבילה השנייה) ─────────────────────────────── */
+/* טבלת המקורות נשארה עם ה-markup הקיים (פתיחת מקור → מודעות, לחיצה על מספר → רשימת לידים);
+   כאן: עמודת המקור דביקה בצד ימין, שורת הסיכום כ-tfoot, גלילה אופקית מקומית (SCREEN-SPEC). */
+/* טבלת המקורות — אותו מראה כמו טבלת הקמפיינים ב"הכל" (ויטלי, 17.9); שורת הסיכום מודגשת */
+.vr-ui .vcs-root .table-wrapper { overflow-x: auto; }
+.vr-ui .vcs-root .data-table td:first-child { text-align: start; font-weight: 700; }
+.vr-ui .vcs-root .data-table td:first-child svg { vertical-align: middle; color: var(--vr-muted, #586581); }
+.vr-ui .vcs-root .data-table tbody tr:last-child td { background: #EAF0FF; font-weight: 750; border-block-start: 2px solid var(--border, #DDE2EC); }
+.vr-ui .vcs-root .vcs-metric-scope { margin-block-end: 12px; }
+.vr-ui .vcs-root .vcs-panel { background: var(--card, #fff); }
+.vr-source-mark { display: inline-grid; place-items: center; inline-size: 30px; block-size: 22px; margin-inline-end: 8px; vertical-align: middle; }
+.vr-source-mark svg { display: block; }
+
+/* שורת תתי-הטאבים: הטאבים מימין, כפתור הרענון משמאל (כמו בסקיצה) */
+.vr-ui .vcs-subtabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-block-end: 20px; }
+.vr-ui .vcs-subtabs-row .client-tabs { margin: 0; }
+.vr-ui .vcs-subtabs-row .client-tab { min-block-size: 40px; font-size: 14px; padding-inline: 18px; }
+.vr-ui .vcs-refresh { gap: 8px; min-block-size: 40px; }
+
+/* המשפך לפי הסקיצה */
+.vr-ui .vcs-root .vcs-funnel-toolbar { justify-content: flex-start; gap: 20px; }
+.vr-ui .vcs-root .vcs-adcards { display: flex; gap: 12px; }
+.vr-ui .vcs-root .vcs-adcard { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border: 1px solid var(--border, #DDE2EC); border-radius: 10px; background: var(--card, #fff); min-inline-size: 130px; }
+.vr-ui .vcs-root .vcs-adcard-icon { display: inline-grid; place-items: center; inline-size: 34px; block-size: 34px; border-radius: 8px; background: #EEF1FF; color: var(--indigo, #5B5EF4); }
+.vr-ui .vcs-root .vcs-adcard-label { display: block; font-size: 12px; color: var(--vr-muted, #586581); }
+.vr-ui .vcs-root .vcs-adcard strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.vr-ui .vcs-root .vcs-filter-note { margin-inline-start: auto; }
+.vr-ui .vcs-root .vcs-funnel { display: flex; align-items: flex-start; gap: 0; min-inline-size: 0; grid-template-columns: none; }
+.vr-ui .vcs-root .vcs-stage-column { flex: 1 1 0; min-inline-size: 0; display: flex; flex-direction: column; }
+.vr-ui .vcs-root .vcs-stage-row { display: flex; align-items: center; gap: 0; }
+.vr-ui .vcs-root .vcs-arrow { flex: 0 0 auto; inline-size: 52px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #98A0B2; }
+.vr-ui .vcs-root .vcs-arrow b { font-size: 12.5px; font-weight: 700; color: var(--vr-muted, #586581); font-variant-numeric: tabular-nums; }
+.vr-ui .vcs-root .vcs-stage { flex: 1 1 auto; min-inline-size: 0; padding: 14px 14px 14px 12px; border: 1px solid var(--border, #DDE2EC); border-inline-start: 4px solid var(--vr-accent, var(--indigo, #5B5EF4)); border-radius: 10px; min-block-size: 0; }
+.vr-ui .vcs-root .vcs-stage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vr-ui .vcs-root .vcs-stage-head h3 { font-size: 14px; font-weight: 700; color: var(--vr-text, #142044); }
+.vr-ui .vcs-root .vcs-stage-icon { color: var(--vr-accent, var(--indigo, #5B5EF4)); display: inline-flex; }
+.vr-ui .vcs-root .vcs-stage-value { font-size: 28px; font-weight: 800; margin-block: 6px 0 !important; }
+.vr-ui .vcs-root .vcs-tone-indigo { --vr-accent: var(--indigo, #5B5EF4); } .vr-ui .vcs-root .vcs-tone-emerald { --vr-accent: var(--emerald, #10B981); }
+.vr-ui .vcs-root .vcs-tone-sky { --vr-accent: var(--sky, #0EA5E9); } .vr-ui .vcs-root .vcs-tone-rose { --vr-accent: var(--rose, #F43F5E); }
+.vr-ui .vcs-root .vcs-cancellation { margin-inline-start: 52px; margin-block-start: 22px; }
+.vr-ui .vcs-root .vcs-cancellation::before { block-size: 22px; }
+.vr-ui .vcs-root .vcs-transition-note { margin-block-start: 6px; }
+/* דונאט: מקרא עם ספירה ואחוז */
+.vr-ui .vcs-root .vcs-legend li { padding-block: 14px; }
+.vr-ui .vcs-root .vcs-legend strong em { font-style: normal; color: var(--vr-muted, #586581); font-weight: 600; }
+
+/* ── CRM › זמני תגובה (.vrt-root, חבילה שלישית) — הגרפים הקיימים בתוך פאנלים לבנים ────── */
+.vr-ui .vrt-root .vcs-metric-scope { margin-block-end: 12px; }
+.vr-ui .vrt-root .vr-metric-grid { margin-block-end: 36px; }
+.vr-ui .vrt-root .vrt-group-title { font-size: 23px; font-weight: 750; line-height: 1.35; color: var(--vr-text, #142044); margin: 0 0 16px; }
+.vr-ui .vrt-root .vrt-speed, .vr-ui .vrt-root .vrt-patterns { margin-block-end: 36px; }
+.vr-ui .vrt-root .vrt-speed > .section, .vr-ui .vrt-root .vrt-patterns > .section, .vr-ui .vrt-root .vrt-tables > .section { margin: 0; min-inline-size: 0; background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); padding: 20px 20px 16px; box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+.vr-ui .vrt-root .vrt-speed .section-head, .vr-ui .vrt-root .vrt-patterns .section-head, .vr-ui .vrt-root .vrt-tables .section-head { margin-block-end: 12px; flex-wrap: wrap; }
+.vr-ui .vrt-root .vrt-speed .section-head h2, .vr-ui .vrt-root .vrt-patterns .section-head h2, .vr-ui .vrt-root .vrt-tables .section-head h2 { font-size: 18px; }
+.vr-ui .vrt-root .vrt-speed .section-head .sub, .vr-ui .vrt-root .vrt-patterns .section-head .sub { flex-basis: 100%; margin: 0; }
+.vr-ui .vrt-root .chart-card { border: 0; box-shadow: none; background: transparent; padding: 0; }
+/* העיצוב המקורי של הטבלאות: זו מתחת לזו, ברוחב מלא, כותרת תכלת, תאים ממורכזים עם קווי הפרדה */
+.vr-ui .vrt-root .vrt-patterns .section-head .ico, .vr-ui .vrt-root .vrt-tables .section-head .ico { display: none; }
+.vr-ui .vrt-root .vrt-tables { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.vr-ui .vrt-root .vrt-tables .chart-card { padding: 0 !important; }
+.vr-ui .vrt-root .vrt-tables .data-table { inline-size: 100%; border: 1px solid #D9E2F2; border-radius: 10px; border-collapse: separate; border-spacing: 0; overflow: hidden; }
+.vr-ui .vrt-root .vrt-tables .data-table th { background: #EEF3FB; color: #1E2A4A; font-weight: 800; font-size: 13px; text-align: center; padding: 12px 14px; border-block-end: 1px solid #D9E2F2; border-inline-start: 1px solid #D9E2F2; }
+.vr-ui .vrt-root .vrt-tables .data-table td { text-align: center; padding: 12px 14px; font-size: 14px; font-weight: 600; color: #1E2A4A; border-block-end: 1px solid #E3E9F4; border-inline-start: 1px solid #E3E9F4; background: #fff; }
+.vr-ui .vrt-root .vrt-tables .data-table th:first-child, .vr-ui .vrt-root .vrt-tables .data-table td:first-child { border-inline-start: 0; text-align: start; }
+.vr-ui .vrt-root .vrt-tables .data-table td:first-child { font-weight: 700; }
+.vr-ui .vrt-root .vrt-tables .data-table tr:last-child td { border-block-end: 0; }
+.vr-ui .vrt-root .vrt-tables .data-table td:nth-child(3) { color: #1E2A4A !important; }
+.vr-ui .vrt-root .vrt-tables .data-table td.vrt-source { color: #2563EB; }
+.vr-ui .vrt-root .vrt-tables tbody tr:hover td { background: #F7F9FD; }
+@media (max-width: 1200px) { .vr-ui .vrt-root .vrt-patterns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 850px) { .vr-ui .vrt-root .vrt-tables { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── טקסט כללי בתוך .vr-ui ──────────────────────────────────────────────────── */
+.vr-ui { font-size: 15px; }
+.vr-ui .welcome-center { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); }
+
+@media (max-width: 767px) {
+  .vr-ui .section { margin-block-start: 32px; }
+  .vr-ui .section-head h2 { font-size: 19px; }
+  .vr-ui .data-table thead th, .vr-ui .data-table tbody td { padding-block: 11px; padding-inline: 10px; font-size: 13px; }
+}
+
+/* כותרת סקשן של report-ui: הפעולות (טאבי המשפך) צמודות לכותרת בצד ההתחלה (ימין), לא בקצה השני */
+.vr-ui .vr-section-heading { justify-content: flex-start; gap: 28px; flex-wrap: wrap; }
+
+/* ── CRM › התנגדויות / יישובים / פגישות שבוצעו — אותם רכיבים, בלי חבילה נפרדת ────────── */
+/* ערך טקסטואלי בכרטיס (שם התנגדות / יישוב / מקור) — קטן יותר ממספר, נשבר לשורה שנייה */
+.vr-ui .vr-metric.vr-metric-text .vr-metric-value { font-size: 22px; line-height: 1.35; font-variant-numeric: normal; }
+.vr-ui .vro-root .vro-clickable { cursor: pointer; }
+.vr-ui .vro-root .vro-clickable:hover { background: #F8FAFF; }
+.vr-ui .vro-root .vcs-legend .vcs-legend-label, .vr-ui .vrc-root .vcs-legend .vcs-legend-label { font-weight: 600; color: var(--vr-text, #142044); }
+/* יישובים: גרף עמודות אופקי (10 שורות) לצד הדירוג */
+.vr-ui .vrc-root .vrc-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; align-items: start; }
+.vr-ui .vrc-root .vrc-chart { position: relative; block-size: 420px; min-inline-size: 0; }
+.vr-ui .vrc-root .vrc-rank { display: inline-grid; place-items: center; inline-size: 22px; block-size: 22px; margin-inline-end: 8px; border-radius: 50%; background: #EDF0FC; color: #25315C; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vr-ui .vrc-root .vcs-legend li { padding-block: 12px; }
+/* פגישות: כרטיסים + טבלה רגילה של הגשר, תיאור חופשי עם שבירת שורות */
+.vr-ui .vrm-root .vr-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-block-end: 8px; }
+.vr-ui .vrm-root .vcs-metric-scope { margin-block-end: 12px; }
+.vr-ui .vrm-root .vr-button { gap: 8px; }
+.vr-ui .vrm-root .vrm-table td { vertical-align: top; }
+.vr-ui .vrm-root .vrm-name { font-weight: 700; white-space: nowrap; }
+.vr-ui .vrm-root .vrm-name svg { vertical-align: -2px; margin-inline-end: 6px; color: var(--vr-muted, #586581); }
+.vr-ui .vrm-root .vrm-phone { direction: ltr; text-align: right; white-space: nowrap; }
+.vr-ui .vrm-root .vrm-source, .vr-ui .vrm-root .vrm-date { white-space: nowrap; }
+.vr-ui .vrm-root .vrm-desc { white-space: pre-wrap; line-height: 1.55; max-inline-size: 560px; min-inline-size: 220px; }
+@media (max-width: 1000px) { .vr-ui .vrc-root .vrc-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; } .vr-ui .vrm-root .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 359px) { .vr-ui .vrm-root .vr-metric-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── טאבי Facebook / Google (.vfb-root, חבילה רביעית design/handoff-facebook; Google באותו עיצוב) ──── */
+/* המבנה: כותרת הטאב → "פעילות בתקופה" (כרטיסים) → קוהורט הערוץ (CohortFunnel) → קמפיינים → פילוחים → מודעות */
+.vr-ui .vfb-root { min-inline-size: 0; }
+.vr-ui .vfb-root .vfb-tab-heading { margin-block-end: 22px; }
+.vr-ui .vfb-root .vfb-tab-heading h2 { font-size: 28px; font-weight: 800; line-height: 1.3; }
+.vr-ui .vfb-root .vfb-activity-heading { margin-block-end: 14px; }
+.vr-ui .vfb-root .vfb-activity-heading h2 { font-size: 20px; }
+.vr-ui .vfb-root .vr-metric-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.vr-ui .vfb-root .vr-section { margin-block-start: 40px; }
+/* המשפך: הפאנל של CohortFunnel חי תחת .vcs-root (crm-sources.css); כאן בלי הריפוד התחתון של מסך המקורות */
+.vr-ui .vfb-root .vfb-funnel { padding-block: 0; }
+/* מודעות: אותן מידות כמו בטאב "הכל" (3 עמודות, מדיה 4:5 contain) — ויטלי, 19.9. החבילה ביקשה 2 עמודות; נדחה. */
+.vr-ui .vr-ad-media-box { position: relative; inline-size: 100%; aspect-ratio: 4 / 5; background: #EDF1F8; overflow: hidden; }
+.vr-ui .vr-ad-media-box.vr-ad-media-wide { aspect-ratio: 16 / 9; }
+/* גוגל: גרפי הקמפיינים בפאנלים לבנים כמו שאר הכרטיסים */
+.vr-ui .vfb-root .chart-card { background: var(--card, #fff); border: 1px solid var(--border, #DDE2EC); border-radius: var(--r-md, 12px); box-shadow: var(--shadow-xs, 0 1px 2px rgba(11,15,30,0.06)); }
+@media (max-width: 1100px) { .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 767px) {
+  .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .vr-ui .vfb-root .vfb-tab-heading h2 { font-size: 24px; }
+}
+@media (max-width: 380px) { .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── כרטיס קבוצת נכסים של Google PMax: קיפולים ותמונות ממוזערות ───────────────
+   אחרי שכל הנכסים הוצגו (18 כותרות, 5 תיאורים, 14 תמונות, 6 סרטונים) הכרטיס
+   הגיע לגובה של כמה מסכים. הנכסים נשארו — רק הטקסטים והתמונות העודפות מקופלים
+   מאחורי לחיצה אחת, והסרטונים ירדו לשורת ממוזערות (ויטלי, 21.9). */
+.vr-ag-fold { border-block-start: 1px solid #f1f5f9; padding-block-start: 8px; }
+.vr-ag-fold > summary {
+  cursor: pointer; list-style: none;
+  font-size: 0.74em; font-weight: 700; color: var(--indigo, #4f46e5);
+  padding-block: 2px;
+}
+.vr-ag-fold > summary::-webkit-details-marker { display: none; }
+.vr-ag-fold > summary::before { content: '▸ '; display: inline-block; }
+.vr-ag-fold[open] > summary::before { content: '▾ '; }
+.vr-ag-fold > summary:focus-visible { outline: 2px solid var(--indigo, #4f46e5); outline-offset: 2px; border-radius: 4px; }
+/* גלילה פנימית ולא גובה אינסופי: 22 כותרות נשארות נגישות בלי למתוח את הכרטיס. */
+.vr-ag-list { max-block-size: 190px; overflow-y: auto; margin-block-start: 4px; }
+
+.vr-ag-video { position: relative; display: block; inline-size: 76px; block-size: 44px; border-radius: 6px; overflow: hidden; border: 1px solid #e2e8f0; }
+.vr-ag-video img { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
+.vr-ag-video span {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 15px; background: rgba(15, 23, 42, 0.32);
+}
+.vr-ag-video:hover span { background: rgba(15, 23, 42, 0.12); }
+.vr-ag-video:focus-visible { outline: 2px solid var(--indigo, #4f46e5); outline-offset: 2px; }
+
+/* ── סרגל פעולות אחיד מעל טבלה (פתח/כווץ + ייצוא לאקסל) ─────────────────────
+   עד היום לכל טבלה היה סרגל משלה, או שלא היה בכלל. אותו רכיב, אותן מידות
+   ואותו מיקום בכל הטבלאות (ויטלי, 21.9). */
+.vr-tbl-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-block-end: 12px; }
+.vr-tbl-hint { font-size: 13px; color: var(--vr-muted, #66748f); margin: 0; flex: 1 1 240px; min-inline-size: 0; }
+.vr-tbl-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vr-tbl-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  padding: 7px 12px; border-radius: 8px;
+  border: 1px solid var(--border, #dde2ec);
+  background: var(--surface, #fff); color: var(--vr-text, #142044);
+  cursor: pointer;
+}
+.vr-tbl-btn:hover { border-color: var(--indigo, #5b5ef4); color: var(--indigo, #5b5ef4); }
+.vr-tbl-btn:focus-visible { outline: 2px solid var(--indigo, #5b5ef4); outline-offset: 2px; }
+.vr-tbl-btn svg { flex-shrink: 0; }
+.vr-tbl-btn-export { color: #047857; border-color: #a7f3d0; background: #ecfdf5; }
+.vr-tbl-btn-export:hover { color: #065f46; border-color: #6ee7b7; }
+
+/* ============================================================
+   Tovno Mobile · משפך אנכי
+   (Tovno-Mobile-Handoff · MOBILE-SYSTEM §גרפים ומשפכים)
+
+   "משפך אופקי בדסקטופ הופך לסדרה אנכית, תוך שמירת כל שלב, הסתעפות,
+   אחוז ומכנה." אין כאן נרמול חדש ואין סקאלה מומצאת — אותם שלבים,
+   אותם אחוזים, רק כיוון אחר.
+   ============================================================ */
+@media (max-width: 767px) {
+  /* המעטפת הגוללת מיותרת כשהמשפך אנכי — גלילה אופקית על תוכן שלא
+     חורג היא מלכודת מגע. */
+  .vr-ui .vcs-root .vcs-funnel-scroll { overflow-x: visible; }
+  .vr-ui .vcs-root .vcs-funnel { flex-direction: column; align-items: stretch; gap: 0; }
+  .vr-ui .vcs-root .vcs-stage-column { flex: 0 0 auto; inline-size: 100%; }
+
+  /* השלב מתחת לחץ ולא לצידו. */
+  .vr-ui .vcs-root .vcs-stage-row { flex-direction: column; align-items: stretch; gap: 0; }
+  .vr-ui .vcs-root .vcs-stage { inline-size: 100%; }
+
+  /* החץ מסתובב לכיוון הזרימה החדשה. ArrowLeft (←) בסיבוב ‎-90°‎ מצביע
+     מטה; האחוז נשאר לידו ולא מאבד את המכנה. */
+  .vr-ui .vcs-root .vcs-arrow {
+    flex-direction: row;
+    inline-size: auto;
+    justify-content: flex-start;
+    gap: 8px;
+    padding-inline-start: 18px;
+    padding-block: 8px;
+  }
+  .vr-ui .vcs-root .vcs-arrow svg { transform: rotate(-90deg); }
+
+  /* הסתעפות הביטולים נשארת מוזחת מתחת לשלב שלה, כמו בדסקטופ. */
+  .vr-ui .vcs-root .vcs-cancellation { margin-inline-start: 18px; margin-block-start: 14px; }
+
+  /* כרטיסי נתוני הפרסום מעל המשפך — שניים בשורה במקום שורה אחת שנדחסת. */
+  .vr-ui .vcs-root .vcs-funnel-toolbar { flex-direction: column; align-items: stretch; gap: 12px; }
+  .vr-ui .vcs-root .vcs-adcards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .vr-ui .vcs-root .vcs-segmented { flex-wrap: wrap; }
+
+  /* הערך במשפך קטן מעט — 28px על שורה מלאה נראה צועק בנייד. */
+  .vr-ui .vcs-root .vcs-stage-value { font-size: 24px; }
+
+  /* יעדי מגע: המפרט דורש 44×44 לכל פקד. */
+  .vr-ui .vcs-root .vcs-segmented button,
+  .vr-ui .vcs-root .vcs-source-link,
+  .vr-ui .vcs-root .vcs-sort { min-block-size: 44px; }
+}

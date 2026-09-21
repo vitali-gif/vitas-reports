@@ -138,8 +138,14 @@ export async function POST(request) {
     return Response.json({ error: 'BMBY credentials not configured' }, { status: 500 })
   }
   let projectMap
+  // [SENSITIVE] הוא מה ש-`vercel env pull` כותב במקום הערך של משתנה מסומן כרגיש.
+  // בלי ההבחנה הזו השגיאה שמוצגת למשתמש היא "לא valid JSON", והיא נשמעת כמו תקלה
+  // בפרודקשן בזמן שמדובר בסביבה מקומית שחסר בה ערך. ההודעה אומרת עכשיו מה לעשות.
+  if (String(projectIdsRaw).trim() === '[SENSITIVE]') {
+    return Response.json({ error: 'BMBY_PROJECT_IDS לא נמשך לסביבה המקומית (מסומן כרגיש ב-Vercel). יש להעתיק את הערך ידנית אל .env.local.' }, { status: 500 })
+  }
   try { projectMap = JSON.parse(projectIdsRaw) }
-  catch (e) { return Response.json({ error: 'BMBY_PROJECT_IDS is not valid JSON' }, { status: 500 }) }
+  catch { return Response.json({ error: 'BMBY_PROJECT_IDS is not valid JSON' }, { status: 500 }) }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY   // בלי נפילה חזרה למפתח הציבורי: חסר = 500 מפורש

@@ -22,25 +22,52 @@ function watchErrors(page) {
   return errors
 }
 
-/** ממתין שהמסך יגיע למצב יציב: לא "טוען...", לא "אין גישה", והדשבורד (שורת הטאבים) מוצג. */
+/**
+ * ממתין שהמסך יגיע למצב יציב: הטוען נעלם, אין "אין גישה", והדשבורד (שורת הטאבים) מוצג.
+ *
+ * 21.9 — הטקסט "טוען..." הוחלף בטוען של Tovno (app/components/TovnoLoader.jsx), ולכן
+ * getByText('טוען...') הפך ל-0 תמיד: הבדיקה עברה בלי לחכות לכלום, ושומר הרגרסיה של
+ * 18.9 (deadlock שנתקע על מסך טעינה) מת בשקט. הסלקטור הנכון הוא ה-role="status"
+ * של הטוען עצמו; הגרסה הדקורטיבית במסך "ברוכים הבאים" היא aria-hidden ולא נתפסת כאן.
+ */
+const loaderLocator = (page) => page.getByRole('status', { name: /טוען/ })
+
 async function expectDashboard(page, { timeout = 30_000 } = {}) {
-  await expect(page.getByText('טוען...'), 'הספינר הראשי חייב להיעלם').toHaveCount(0, { timeout })
+  await expect(loaderLocator(page), 'הטוען הראשי חייב להיעלם').toHaveCount(0, { timeout })
   await expect(page.getByText('אין גישה'), 'ללקוח עם הרשאות אסור לראות "אין גישה"').toHaveCount(0)
   await expect(page.locator('.client-tabs').first()).toBeVisible({ timeout })   // first: לחלק מהפרויקטים יש שורת תת-טאבים באותה מחלקה
 }
 
 /**
- * פותח את /client ומחכה למסך הכניסה. אם הדף הסטטי נשאר על "טוען..." (hydration לא קרה — למשל קובץ JS
+ * פותח את /client ומחכה למסך הכניסה. אם הדף הסטטי נשאר על מסך הטעינה (hydration לא קרה — למשל קובץ JS
  * שחזר 502 ברשת איטית), מנסים פעם אחת לטעון מחדש, כמו שמשתמש היה עושה, ומסמנים זאת בדוח.
  * בדיקות הרענון (למטה) נשארות קפדניות: שם אין ניסיון שני.
+ *
+ * 21.9 — שני שינויים במסך שהבדיקה לא הכירה, ושניהם הפילו אותה:
+ *   1. הכותרת היא "ברוכים הבאים" ולא "כניסה לדוח" (המסך החדש לפי design/01).
+ *   2. כשמוגדרים ספקי OAuth (NEXT_PUBLIC_OAUTH_PROVIDERS), טופס הסיסמה מקופל
+ *      מאחורי הקישור "כניסה עם סיסמה", ושדות המייל/הסיסמה אינם גלויים.
+ *      לכן openPasswordForm() — נדרש גם בפרודקשן מרגע שהספקים נדלקים.
  */
+const LOGIN_HEADING = 'ברוכים הבאים'
+
+async function openPasswordForm(page) {
+  const emailInput = page.locator('input[type="email"]')
+  if (await emailInput.isVisible({ timeout: 2_000 }).catch(() => false)) return
+  const toggle = page.getByRole('button', { name: 'כניסה עם סיסמה' })
+  if (await toggle.isVisible({ timeout: 5_000 }).catch(() => false)) await toggle.click()
+  await expect(emailInput).toBeVisible({ timeout: 10_000 })
+}
+
 async function gotoLogin(page) {
   await page.goto('/client')
-  const heading = page.getByRole('heading', { name: 'כניסה לדוח' })
-  if (await heading.isVisible({ timeout: 20_000 }).catch(() => false)) return
-  test.info().annotations.push({ type: 'cold-load-retry', description: 'מסך הכניסה לא הופיע תוך 20 שניות — טעינה מחדש' })
-  await page.reload()
-  await expect(heading).toBeVisible({ timeout: 20_000 })
+  const heading = page.getByRole('heading', { name: LOGIN_HEADING })
+  if (!(await heading.isVisible({ timeout: 20_000 }).catch(() => false))) {
+    test.info().annotations.push({ type: 'cold-load-retry', description: 'מסך הכניסה לא הופיע תוך 20 שניות — טעינה מחדש' })
+    await page.reload()
+    await expect(heading).toBeVisible({ timeout: 20_000 })
+  }
+  await openPasswordForm(page)
 }
 
 async function login(page) {
@@ -197,7 +224,7 @@ test.describe('צד הלקוח (מחובר)', () => {
       await tab.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {})   // שורת טאבים גוללת אופקית
       await tab.click()
       await expect(tab).toHaveClass(/active/)
-      await expect(page.getByText('טוען...')).toHaveCount(0, { timeout: 30_000 })
+      await expect(loaderLocator(page)).toHaveCount(0, { timeout: 30_000 })
       clicked++
     }
     expect(clicked).toBeGreaterThanOrEqual(4)

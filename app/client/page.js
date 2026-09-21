@@ -3,8 +3,16 @@ import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { apiFetch, accessToken } from '../../lib/api-fetch'
 import dynamic from 'next/dynamic'
+import { GoogleMark, MicrosoftMark } from '../components/auth/ProviderMarks'
+import TovnoLoader from '../components/TovnoLoader'
 
 const AdminPage = dynamic(() => import('../admin/page'), { ssr: false })
+
+// אילו ספקי OAuth באמת מוגדרים ב-Supabase Auth. ריק = לא מוצג כלום, וזו ברירת המחדל:
+// כפתור "המשך עם Google" בלי ספק מוגדר נכשל בלחיצה, וזו בדיוק ההבטחה שאסור לתת.
+// הערכים הם שמות הספקים של supabase-js: 'google', 'azure' (זה שמו של Microsoft שם).
+const OAUTH_PROVIDERS = (process.env.NEXT_PUBLIC_OAUTH_PROVIDERS || '')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ClientPage — handles magic-link auth, then renders AdminPage (client view)
@@ -14,7 +22,7 @@ function buildClients(accessList) {
   const map = new Map();
   for (const a of accessList) {
     const cName  = a.projects?.clients?.name  || 'לקוח';
-    const cColor = a.projects?.clients?.color || '#5B5EF4';
+    const cColor = a.projects?.clients?.color || '#315CF5';
     const cId    = a.projects?.client_id;
     if (!map.has(cName)) map.set(cName, { id: cId, name: cName, color: cColor, projects: [] });
     map.get(cName).projects.push({ id: a.project_id, name: a.projects?.name, is_demo: !!a.projects?.is_demo });
@@ -41,6 +49,9 @@ export default function ClientPage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [sessionId, setSessionId] = useState(null)
   const [installPrompt, setInstallPrompt] = useState(null)
+  // טופס הסיסמה מוסתר כברירת מחדל כשיש ספקי OAuth, ונפתח בלחיצה על "כניסה עם סיסמה".
+  const [showPwForm, setShowPwForm] = useState(OAUTH_PROVIDERS.length === 0)
+  const [oauthBusy, setOauthBusy] = useState('')
   const [initialProjectId, setInitialProjectId] = useState(null)
   const sessionStartRef = useRef(Date.now())
   const sessionStart = sessionStartRef.current
@@ -220,6 +231,32 @@ export default function ClientPage() {
     finally { setLinkSending(false) }
   }
 
+  /**
+   * כניסה עם Google / Microsoft.
+   *
+   * אימות זהות אינו הרשאת גישה: אחרי החזרה מהספק, onAuthStateChange מפעיל את
+   * handleSessionReady, שבודק ב-client_access לאילו פרויקטים המייל הזה מורשה. מי שנכנס
+   * בלי שיוך מגיע למסך "אין גישה" ולא לרשימת כל הלקוחות — הדרישה ב-UX-SPEC סעיף 1א.
+   */
+  const signInWithProvider = async (provider) => {
+    setLoginError(''); setOauthBusy(provider)
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin + '/client' },
+      })
+      if (error) {
+        setOauthBusy('')
+        setLoginError('הכניסה דרך הספק אינה זמינה כרגע. אפשר להיכנס עם סיסמה.')
+        setShowPwForm(true)
+      }
+      // בהצלחה הדפדפן עובר לספק; אין מה לאפס כאן.
+    } catch {
+      setOauthBusy('')
+      setLoginError('שגיאת רשת. בדוק את החיבור לאינטרנט ונסה שוב.')
+    }
+  }
+
   const handlePasswordLogin = async () => {
     if (!emailInput.trim() || !passwordInput.trim()) return
     setLoading(true)
@@ -258,8 +295,7 @@ export default function ClientPage() {
   if (loading) return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)'}}>
       <div style={{textAlign:'center'}}>
-        <div style={{width:44,height:44,border:'3px solid var(--indigo,#5B5EF4)',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite',margin:'0 auto 16px'}}/>
-        <p style={{color:'var(--text-3)',fontSize:14}}>טוען...</p>
+        <TovnoLoader hint="טוען את הדוח…" />
         <div id="vitas-stuck" style={{display:'none',marginTop:18}}>
           <p style={{color:'var(--text-3)',fontSize:13,margin:'0 0 10px'}}>הטעינה לוקחת יותר מהרגיל.</p>
           <button type="button" onClick={() => window.location.reload()}
@@ -267,7 +303,6 @@ export default function ClientPage() {
             טען מחדש
           </button>
         </div>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         <script dangerouslySetInnerHTML={{ __html:
           "setTimeout(function(){if(window.__vitasHydrated)return;var e=document.getElementById('vitas-stuck');if(!e)return;e.style.display='block';var b=e.querySelector('button');if(b)b.onclick=function(){location.reload()}},15000);" }} />
       </div>
@@ -282,7 +317,7 @@ export default function ClientPage() {
         <p style={{margin:'0 0 20px',fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>לכתובת המייל הזו אין גישה לאף פרויקט.</p>
         {/* קודם היה כתוב "צור קשר עם VITAS" בלי שום דרך ליצור קשר — מסך ללא מוצא. */}
         <a
-          href="mailto:vitali@vitas.co.il?subject=בקשת%20גישה%20לדוח%20VITAS"
+          href="mailto:vitali@vitas.co.il?subject=בקשת%20גישה%20לדוח%20Tovno"
           style={{display:'block',marginBottom:12,padding:'10px 24px',background:'var(--indigo,#5B5EF4)',color:'#fff',borderRadius:8,fontSize:14,fontWeight:700,textDecoration:'none',fontFamily:'var(--font)'}}
         >
           בקש גישה במייל
@@ -296,7 +331,7 @@ export default function ClientPage() {
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)',fontFamily:'var(--font)'}}>
       <div style={{maxWidth:380,width:'100%',padding:'0 24px'}}>
         <div style={{textAlign:'center',marginBottom:28}}>
-          <img src="/brand/vitas-logo-black.png" alt="VITAS" style={{height:28,marginBottom:24}} />
+          <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" style={{height:30,marginBottom:24}} />
           <h2 style={{margin:'0 0 8px',fontSize:22,fontWeight:800,color:'var(--text)'}}>בחר סיסמה</h2>
           <p style={{margin:0,fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>
             נכנסת בקישור. כדי להיכנס בפעם הבאה עם מייל וסיסמה, בחר סיסמה משלך.
@@ -324,39 +359,68 @@ export default function ClientPage() {
     </div>
   )
 
+  // מסך הכניסה לפי design/01. סדר המסך: ספקים, מפריד, ואז כניסה עם סיסמה — הדרך הקיימת
+  // נשמרת במלואה ואינה מוחלפת, כפי ש-START-HERE-CLAUDE.md דורש ("שימור דרך הכניסה הקיימת").
+  // כפתורי הספקים מופיעים רק כשהספק באמת מוגדר ב-Supabase (NEXT_PUBLIC_OAUTH_PROVIDERS):
+  // כפתור שנראה פעיל ונכשל בלחיצה הוא בדיוק ה-success המדומה שהחבילה אוסרת.
   if (step === 'login') return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)',fontFamily:'var(--font)'}}>
-      <div style={{maxWidth:380,width:'100%',padding:'0 24px'}}>
-        <div style={{textAlign:'center',marginBottom:36}}>
-          <img src="/brand/vitas-logo-black.png" alt="VITAS" style={{height:28,marginBottom:24}} />
-          <h2 style={{margin:'0 0 8px',fontSize:22,fontWeight:800,color:'var(--text)'}}>כניסה לדוח</h2>
-          <p style={{margin:0,fontSize:14,color:'var(--text-3)'}}>הכנס את פרטי הגישה שלך</p>
-        </div>
-        <input
-          type="email" value={emailInput} onChange={e => { setEmailInput(e.target.value); if (loginError) setLoginError('') }}
-          placeholder="your@email.com" dir="ltr"
-          style={{display:'block',width:'100%',padding:'12px 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15,fontFamily:'var(--font)',outline:'none',marginBottom:12,boxSizing:'border-box',background:'var(--card)',color:'var(--text)'}}
-        />
-        <input
-          type="password" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); if (loginError) setLoginError('') }}
-          onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
-          placeholder="סיסמה" dir="ltr"
-          style={{display:'block',width:'100%',padding:'12px 14px',border:'1px solid var(--border)',borderRadius:10,fontSize:15,fontFamily:'var(--font)',outline:'none',marginBottom:12,boxSizing:'border-box',background:'var(--card)',color:'var(--text)'}}
-        />
-        <button onClick={handlePasswordLogin} disabled={loading || !emailInput.trim() || !passwordInput.trim()}
-          style={{display:'block',width:'100%',padding:'13px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:10,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)',opacity:loading||!emailInput.trim()||!passwordInput.trim()?0.6:1}}>
-          {loading ? 'נכנס...' : 'כניסה'}
-        </button>
-        <button onClick={requestLoginLink} disabled={linkSending} type="button"
-          style={{display:'block',width:'100%',marginTop:10,padding:'10px',background:'transparent',color:'var(--indigo,#5B5EF4)',border:'none',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'var(--font)'}}>
-          {linkSending ? 'שולח...' : 'שכחת סיסמה? שלחו לי קישור כניסה'}
-        </button>
-        {loginError && (
-          <p role="alert" style={{marginTop:12,fontSize:13,color:'var(--danger,#B92A46)',textAlign:'center',lineHeight:1.5}}>
-            {loginError}
-          </p>
+    <div className="vsign">
+      <div className="vsign-card">
+        <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" />
+        <h1>ברוכים הבאים</h1>
+        <p>נכנסים לחשבון וממשיכים לפרויקטים שלכם.</p>
+
+        {OAUTH_PROVIDERS.includes('google') && (
+          <button type="button" className="vsign-provider" onClick={() => signInWithProvider('google')} disabled={oauthBusy !== ''}>
+            <span>{oauthBusy === 'google' ? 'מעביר ל-Google…' : 'המשך עם Google'}</span>
+            <GoogleMark />
+          </button>
         )}
-        {toast && <p style={{marginTop:12,fontSize:13,color:'var(--text-3)',textAlign:'center'}}>{toast}</p>}
+        {OAUTH_PROVIDERS.includes('azure') && (
+          <button type="button" className="vsign-provider" onClick={() => signInWithProvider('azure')} disabled={oauthBusy !== ''}>
+            <span>{oauthBusy === 'azure' ? 'מעביר ל-Microsoft…' : 'המשך עם Microsoft'}</span>
+            <MicrosoftMark />
+          </button>
+        )}
+        {OAUTH_PROVIDERS.length > 0 && (
+          showPwForm
+            ? <div className="vsign-or">או</div>
+            : <>
+                <div className="vsign-or">או</div>
+                <button type="button" className="vsign-link" onClick={() => setShowPwForm(true)}>כניסה עם סיסמה</button>
+              </>
+        )}
+
+        {(showPwForm || OAUTH_PROVIDERS.length === 0) && (
+          <div className="vsign-form">
+            <input
+              type="email" value={emailInput} onChange={e => { setEmailInput(e.target.value); if (loginError) setLoginError('') }}
+              placeholder="your@email.com" dir="ltr" autoComplete="email"
+            />
+            <input
+              type="password" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); if (loginError) setLoginError('') }}
+              onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
+              placeholder="סיסמה" dir="ltr" autoComplete="current-password"
+            />
+            <button type="button" className="vsign-submit" onClick={handlePasswordLogin}
+              disabled={loading || !emailInput.trim() || !passwordInput.trim()}>
+              {loading ? 'נכנס...' : 'כניסה'}
+            </button>
+            <button type="button" className="vsign-quiet" onClick={requestLoginLink} disabled={linkSending}>
+              {linkSending ? 'שולח...' : 'שכחת סיסמה? שלחו לי קישור כניסה'}
+            </button>
+          </div>
+        )}
+
+        {loginError && <p role="alert" className="vsign-err">{loginError}</p>}
+        {toast && <p className="vsign-toast">{toast}</p>}
+
+        <p className="vsign-note">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+          </svg>
+          הגישה לפרויקטים נקבעת לפי ההרשאות שלך.
+        </p>
       </div>
     </div>
   )
@@ -430,7 +494,7 @@ export default function ClientPage() {
           <span style={{ fontSize: 14, fontWeight: 600 }}>הוסף לסרגל הבית</span>
           <button
             onClick={() => { installPrompt.prompt(); installPrompt.userChoice.then(() => setInstallPrompt(null)); }}
-            style={{ background: '#5B5EF4', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ background: 'var(--tv-brand, #315CF5)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             התקן
           </button>
           <button onClick={() => setInstallPrompt(null)}
@@ -456,7 +520,7 @@ export default function ClientPage() {
 
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <img src="/brand/vitas-logo-black.png" alt="VITAS" style={{ height: 24, marginBottom: 14 }} />
+              <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" style={{ height: 30, width: 'auto', marginBottom: 14 }} />
               <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: '#0B0F1E', letterSpacing: '-0.02em' }}>
                 ברוכים הבאים לדוח הביצועים 👋
               </h2>
@@ -509,7 +573,7 @@ export default function ClientPage() {
               onClick={dismissOnboarding}
               style={{
                 display: 'block', width: '100%', padding: '13px',
-                background: '#5B5EF4', color: '#fff', border: 'none',
+                background: 'var(--tv-brand, #315CF5)', color: '#fff', border: 'none',
                 borderRadius: 10, fontSize: 15, fontWeight: 700,
                 cursor: 'pointer', fontFamily: 'inherit',
                 boxShadow: '0 6px 20px rgba(91,94,244,0.35)',

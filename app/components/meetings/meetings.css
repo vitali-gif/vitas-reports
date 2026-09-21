@@ -1,150 +1,269 @@
 /* app/components/meetings/meetings.css — טאב "ישיבות שיווק".
    כל הכללים תחת .vmeet-root בלבד, כדי שהעיצוב לא יזלוג לשום טאב אחר.
    properties לוגיים (inline-start/end) ולא left/right — הדשבורד כולו RTL.
-   לפי UX-SPEC: משטחים לבנים, indigo לפעולה ראשית, teal לתקין, amber לפרט שדורש השלמה.
-   אין אדום דקורטיבי ואין ציוני בריאות. */
+
+   לפי UX-SPEC וסקיצות design/01–04: משטחים לבנים על רקע בהיר, מסגרות דקות בכחול-אפור,
+   indigo לפעולה ראשית, teal לסטטוס תקין, amber לפרט שדורש השלמה. כל כותרת סקשן נושאת
+   ריבוע אייקון בהיר. אין אדום דקורטיבי ואין ציוני בריאות.
+   ריווח 20px בין פאנלים, padding 24px, כותרת מסך 28px, גוף 15px. */
 
 .vmeet-root {
   --vmeet-ink: #142044;
-  --vmeet-muted: #586581;
-  --vmeet-border: #dde2ec;
-  --vmeet-indigo: #5b5ef4;
+  --vmeet-muted: #66748f;
+  --vmeet-border: #dde5f4;
+  --vmeet-line: #e8eef8;
+  --vmeet-tint: #eef3fd;
+  --vmeet-indigo: #1d4ed8;
+  --vmeet-indigo-soft: #e8efff;
   --vmeet-teal: #0e9f6e;
   --vmeet-amber: #b45309;
   font-size: 15px;
   color: var(--vmeet-ink);
   min-inline-size: 0;
+  /* גוון רקע עדין למשטח הטאב, כדי שהפאנלים הלבנים יבלטו — כמו בסקיצות. שאר הדשבורד לבן. */
+  background: #f6f8fd;
+  border-radius: 16px;
+  padding: 22px;
 }
+@media (max-width: 760px) { .vmeet-root { padding: 14px; } }
 
-/* ── כותרת המסך ─────────────────────────────────────────────────────────── */
+/* ── כותרת המסך: פירורי לחם, כותרת, תיאור ופעולה ────────────────────────── */
+.vmeet-root .vmeet-crumbs {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; color: var(--vmeet-muted); margin-block-end: 6px;
+}
+.vmeet-root .vmeet-crumbs button {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.vmeet-root .vmeet-crumbs button:hover { color: var(--vmeet-indigo); text-decoration: underline; }
+.vmeet-root .vmeet-crumbs .vmeet-crumb-now { color: var(--vmeet-ink); font-weight: 600; }
+
 .vmeet-root .vmeet-head {
   display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 20px; flex-wrap: wrap; margin-block-end: 24px;
+  gap: 20px; flex-wrap: wrap; margin-block-end: 22px;
 }
-.vmeet-root .vmeet-head h2 { font-size: 28px; font-weight: 800; line-height: 1.3; margin: 0; }
-.vmeet-root .vmeet-head p { margin: 6px 0 0; color: var(--vmeet-muted); font-size: 15px; }
+.vmeet-root .vmeet-head-main { display: flex; align-items: flex-start; gap: 12px; min-inline-size: 0; }
+.vmeet-root .vmeet-head h2 {
+  font-size: 28px; font-weight: 800; line-height: 1.3; margin: 0;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.vmeet-root .vmeet-head p {
+  margin: 6px 0 0; color: var(--vmeet-muted); font-size: 15px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+/* ריבוע האייקון שליד כותרת מסך וליד כותרת סקשן. */
+.vmeet-root .vmeet-ico {
+  inline-size: 34px; block-size: 34px; border-radius: 9px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--vmeet-tint); color: var(--vmeet-indigo);
+}
 
-/* ── פאנל לבן ───────────────────────────────────────────────────────────── */
+/* ── פאנל וכותרת סקשן ───────────────────────────────────────────────────── */
 .vmeet-root .vmeet-panel {
-  background: #fff; border: 1px solid var(--vmeet-border); border-radius: 12px;
-  padding: 24px; margin-block-end: 24px; box-shadow: 0 1px 2px rgba(11, 15, 30, .06);
+  background: #fff; border: 1px solid var(--vmeet-border); border-radius: 14px;
+  padding: 24px; margin-block-end: 20px;
 }
 .vmeet-root .vmeet-section-title {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 18px; font-weight: 700; margin: 0 0 16px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 17px; font-weight: 800; margin: 0 0 18px;
 }
-.vmeet-root .vmeet-section-title svg { color: var(--vmeet-indigo); flex-shrink: 0; }
+.vmeet-root .vmeet-section-title .vmeet-status { margin-inline-start: auto; }
 
-/* ── פס תזכורת ──────────────────────────────────────────────────────────── */
+/* פריסת שתי עמודות: תוכן ראשי + פאנל עזר. מתחת ל-900px נערמים (UX-SPEC). */
+.vmeet-root .vmeet-cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+.vmeet-root .vmeet-cols > * { min-inline-size: 0; }
+@media (max-width: 900px) { .vmeet-root .vmeet-cols { grid-template-columns: 1fr; } }
+
+/* ── באנר המשימות ───────────────────────────────────────────────────────── */
 .vmeet-root .vmeet-banner {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 16px 20px; margin-block-end: 24px;
-  background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; color: var(--vmeet-amber);
+  display: flex; align-items: center; gap: 14px;
+  background: #fdf6e7; border: 1px solid #f0dcb0; border-radius: 12px;
+  padding: 16px 20px; margin-block-end: 20px; color: var(--vmeet-amber);
 }
 .vmeet-root .vmeet-banner svg { flex-shrink: 0; }
 .vmeet-root .vmeet-banner > div { display: flex; flex-direction: column; gap: 2px; }
 .vmeet-root .vmeet-banner strong { font-size: 15px; }
-.vmeet-root .vmeet-banner span { font-size: 13.5px; opacity: .9; }
+.vmeet-root .vmeet-banner span { font-size: 13.5px; color: #8a6420; }
 .vmeet-root .vmeet-banner .vmeet-btn { margin-inline-start: auto; }
 
 /* ── כפתורים ────────────────────────────────────────────────────────────── */
 .vmeet-root .vmeet-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  min-block-size: 40px; padding-inline: 16px; font: inherit; font-size: 14.5px; font-weight: 600;
-  border: 1px solid var(--vmeet-border); border-radius: 10px; background: #fff;
-  color: var(--vmeet-ink); cursor: pointer; text-decoration: none; white-space: nowrap;
+  min-block-size: 40px; padding-inline: 18px; border-radius: 10px;
+  border: 1px solid #c9d6ee; background: #fff; color: var(--vmeet-indigo);
+  font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; text-decoration: none;
+  transition: background .12s, border-color .12s;
 }
-.vmeet-root .vmeet-btn:hover { border-color: #c4cad6; background: #f8faff; }
+.vmeet-root .vmeet-btn:hover { background: #f4f8ff; border-color: #a9bfe6; }
 .vmeet-root .vmeet-btn:disabled { opacity: .55; cursor: not-allowed; }
 .vmeet-root .vmeet-btn-primary { background: var(--vmeet-indigo); border-color: transparent; color: #fff; }
-.vmeet-root .vmeet-btn-primary:hover { background: #4a4de0; border-color: transparent; }
-.vmeet-root .vmeet-btn-sm { min-block-size: 32px; padding-inline: 12px; font-size: 13.5px; }
+.vmeet-root .vmeet-btn-primary:hover { background: #1a44bb; border-color: transparent; }
+.vmeet-root .vmeet-btn-sm { min-block-size: 32px; padding-inline: 12px; font-size: 13.5px; gap: 6px; }
+.vmeet-root .vmeet-btn-quiet { border-color: transparent; color: var(--vmeet-muted); }
+.vmeet-root .vmeet-btn-quiet:hover { color: var(--vmeet-indigo); background: var(--vmeet-tint); }
 .vmeet-root .vmeet-icon-btn {
-  display: inline-grid; place-items: center; inline-size: 32px; block-size: 32px;
-  border: 1px solid var(--vmeet-border); border-radius: 8px; background: #fff;
-  color: var(--vmeet-muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 32px; block-size: 32px; border-radius: 8px;
+  border: 1px solid transparent; background: none; color: var(--vmeet-muted); cursor: pointer;
 }
-.vmeet-root .vmeet-icon-btn:hover { color: #e11d48; border-color: #fbcfe8; }
+.vmeet-root .vmeet-icon-btn:hover { color: #be123c; border-color: #f3cdd8; }
 .vmeet-root .vmeet-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-block-start: 16px; }
 .vmeet-root .vmeet-actions-end { justify-content: flex-end; }
 .vmeet-root :focus-visible { outline: 3px solid var(--vmeet-indigo); outline-offset: 2px; }
 
-/* ── שדות ───────────────────────────────────────────────────────────────── */
-.vmeet-root .vmeet-grid {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-block-end: 20px;
+/* סרגל הפעולות התחתון — פאנל נפרד, הפעולות בקצה ההתחלה (שמאל ב-RTL). */
+.vmeet-root .vmeet-footbar {
+  display: flex; gap: 12px; align-items: center;
+  background: #fff; border: 1px solid var(--vmeet-border); border-radius: 14px;
+  padding: 16px 20px; margin-block-end: 20px;
 }
+.vmeet-root .vmeet-footbar .vmeet-spacer { margin-inline-start: auto; }
+
+/* ── שדות ───────────────────────────────────────────────────────────────── */
+.vmeet-root .vmeet-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-block-end: 20px; }
+@media (max-width: 760px) { .vmeet-root .vmeet-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .vmeet-root .vmeet-span2 { grid-column: span 2; }
+@media (max-width: 760px) { .vmeet-root .vmeet-span2 { grid-column: span 2; } }
 .vmeet-root .vmeet-field { display: flex; flex-direction: column; gap: 6px; margin-block-end: 20px; }
 .vmeet-root .vmeet-grid .vmeet-field { margin-block-end: 0; }
-.vmeet-root .vmeet-label { font-size: 13.5px; font-weight: 700; }
+.vmeet-root .vmeet-label { font-size: 13.5px; font-weight: 700; color: #33415c; }
 .vmeet-root .vmeet-hint { font-size: 12.5px; color: var(--vmeet-muted); line-height: 1.6; }
 .vmeet-root input, .vmeet-root textarea, .vmeet-root select {
-  font: inherit; font-size: 14.5px; padding: 9px 12px; color: var(--vmeet-ink);
-  border: 1px solid var(--vmeet-border); border-radius: 8px; background: #fff;
-  min-block-size: 40px; inline-size: 100%; box-sizing: border-box;
+  font: inherit; font-size: 14.5px; color: var(--vmeet-ink); background: #fff;
+  border: 1px solid #d3ddef; border-radius: 10px; padding: 10px 12px;
+  inline-size: 100%; min-block-size: 42px; box-sizing: border-box;
 }
-.vmeet-root textarea { resize: vertical; line-height: 1.7; }
+.vmeet-root textarea { resize: vertical; line-height: 1.8; }
 .vmeet-root input:focus, .vmeet-root textarea:focus, .vmeet-root select:focus { border-color: var(--vmeet-indigo); }
-.vmeet-root input[readonly] { background: #f5f7fb; color: var(--vmeet-muted); }
-/* שדה שדורש השלמה — amber, לא אדום: זו אינה שגיאה אלא פרט חסר. */
-.vmeet-root .vmeet-incomplete { border-color: #fbbf24; background: #fffbeb; }
+.vmeet-root input[readonly] { background: #f6f8fc; color: var(--vmeet-muted); }
+/* שדה שדורש השלמה — amber, לפי UX-SPEC סעיף 4. */
+.vmeet-root .vmeet-incomplete { border-color: #e9c46a; background: #fdf6e3; color: var(--vmeet-amber); }
 
 /* ── טבלאות ─────────────────────────────────────────────────────────────── */
+.vmeet-root .vmeet-scroll { overflow-x: auto; }
 .vmeet-root .vmeet-table { inline-size: 100%; border-collapse: collapse; font-size: 14px; }
 .vmeet-root .vmeet-table th {
-  text-align: start; font-weight: 700; font-size: 13px; color: #25315c;
-  background: #edf0fc; padding: 12px 14px; border-block-end: 1px solid var(--vmeet-border);
-  white-space: nowrap;
+  text-align: start; font-size: 13px; font-weight: 700; color: #4a5878;
+  background: #f1f5fd; padding: 12px 14px; border-block-end: 1px solid var(--vmeet-line); white-space: nowrap;
 }
-.vmeet-root .vmeet-table th:first-child { border-start-start-radius: 8px; }
-.vmeet-root .vmeet-table th:last-child { border-start-end-radius: 8px; }
-.vmeet-root .vmeet-table td { padding: 12px 14px; border-block-end: 1px solid #e5e9f1; vertical-align: middle; }
+.vmeet-root .vmeet-table th:first-child { border-start-start-radius: 10px; }
+.vmeet-root .vmeet-table th:last-child { border-start-end-radius: 10px; }
+.vmeet-root .vmeet-table td { padding: 12px 14px; border-block-end: 1px solid var(--vmeet-line); vertical-align: middle; }
 .vmeet-root .vmeet-table tbody tr:last-child td { border-block-end: 0; }
 .vmeet-root .vmeet-tasks td { padding: 8px 10px; }
-.vmeet-root .vmeet-tasks input, .vmeet-root .vmeet-tasks select { min-block-size: 36px; padding: 6px 10px; font-size: 13.5px; }
+.vmeet-root .vmeet-tasks input, .vmeet-root .vmeet-tasks select { min-block-size: 38px; padding: 6px 10px; font-size: 13.5px; }
 .vmeet-root .vmeet-empty { text-align: center; color: var(--vmeet-muted); padding-block: 28px; }
 .vmeet-root .vmeet-todo { color: var(--vmeet-amber); font-style: normal; font-weight: 600; }
 
-/* ── תגיות ומצבים ───────────────────────────────────────────────────────── */
+/* ── שבבי מצב ───────────────────────────────────────────────────────────── */
 .vmeet-root .vmeet-chip {
-  display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
-  background: #eef1ff; color: #3e44ad; margin-inline-start: 8px; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  background: #f1f4fa; color: var(--vmeet-muted);
 }
-.vmeet-root .vmeet-chip-ok { background: #e7f8f1; color: var(--vmeet-teal); }
-.vmeet-root .vmeet-chip-warn { background: #fffbeb; color: var(--vmeet-amber); }
-.vmeet-root .vmeet-ok { display: flex; align-items: center; gap: 8px; color: var(--vmeet-teal); font-weight: 600; margin: 0; }
+.vmeet-root .vmeet-chip-ok { background: #e4f6ee; color: var(--vmeet-teal); }
+.vmeet-root .vmeet-chip-warn { background: #fdf3d7; color: var(--vmeet-amber); }
+/* שבב עם נקודה — "נקבעה", "מחובר", "זמין" בסקיצות. */
+.vmeet-root .vmeet-status { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; background: #f1f4fa; color: var(--vmeet-muted); }
+.vmeet-root .vmeet-status::before { content: ''; inline-size: 7px; block-size: 7px; border-radius: 50%; background: currentColor; }
+.vmeet-root .vmeet-status-ok { background: #e4f6ee; color: var(--vmeet-teal); }
+.vmeet-root .vmeet-status-warn { background: #fdf3d7; color: var(--vmeet-amber); }
+
+/* ── הערות ושגיאות ──────────────────────────────────────────────────────── */
 .vmeet-root .vmeet-note {
-  display: flex; align-items: flex-start; gap: 10px; margin-block-start: 16px;
-  padding: 12px 14px; background: #f1f5ff; border: 1px solid var(--vmeet-border);
-  border-radius: 8px; color: #3d4d8e; font-size: 13.5px; line-height: 1.7;
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 13px; color: var(--vmeet-muted); line-height: 1.7;
+  margin-block-start: 14px;
 }
-.vmeet-root .vmeet-note svg { flex-shrink: 0; margin-block-start: 2px; }
+.vmeet-root .vmeet-note svg { flex-shrink: 0; margin-block-start: 3px; color: #8ea3c8; }
+.vmeet-root .vmeet-note-box { background: #f4f7fd; border-radius: 10px; padding: 12px 14px; margin-block-start: 0; }
+.vmeet-root .vmeet-ok { display: flex; align-items: center; gap: 8px; color: var(--vmeet-teal); font-weight: 600; margin: 0; }
 .vmeet-root .vmeet-error {
-  padding: 12px 14px; margin-block-end: 16px; background: #fff1f2; border: 1px solid #fecdd3;
-  border-radius: 8px; color: #9f1239; font-size: 14px; line-height: 1.6;
+  background: #fdf2f4; border: 1px solid #f3cdd8; color: #a1173c;
+  border-radius: 10px; padding: 12px 14px; font-size: 14px; margin-block-end: 16px;
 }
 
-/* ── הישיבה הקרובה ──────────────────────────────────────────────────────── */
-.vmeet-root .vmeet-upcoming-title { font-size: 17px; font-weight: 700; margin-block-end: 14px; }
-.vmeet-root .vmeet-meta { display: flex; flex-wrap: wrap; gap: 28px; margin: 0; }
-.vmeet-root .vmeet-meta div { display: flex; flex-direction: column; gap: 3px; }
-.vmeet-root .vmeet-meta dt { font-size: 12.5px; color: var(--vmeet-muted); }
-.vmeet-root .vmeet-meta dd { margin: 0; font-size: 15px; font-weight: 600; }
+/* ── כרטיס הישיבה הקרובה ורצועת הפרטים ──────────────────────────────────── */
+.vmeet-root .vmeet-card { border: 1px solid var(--vmeet-border); border-radius: 12px; padding: 18px 20px; }
+.vmeet-root .vmeet-card-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-block-end: 16px; }
+.vmeet-root .vmeet-card-title { font-size: 17px; font-weight: 800; }
+.vmeet-root .vmeet-card-head .vmeet-status { margin-inline-start: auto; }
 
+/* רצועת מטא: תאים עם מפריד ביניהם, כמו בסקיצה 02. */
+.vmeet-root .vmeet-strip { display: flex; flex-wrap: wrap; margin: 0; }
+.vmeet-root .vmeet-strip > div {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding-inline: 22px; border-inline-end: 1px solid var(--vmeet-line);
+}
+.vmeet-root .vmeet-strip > div:first-child { padding-inline-start: 0; }
+.vmeet-root .vmeet-strip > div:last-child { border-inline-end: 0; padding-inline-end: 0; }
+.vmeet-root .vmeet-strip svg { color: #8ea3c8; flex-shrink: 0; margin-block-start: 2px; }
+.vmeet-root .vmeet-strip dt { font-size: 12.5px; color: var(--vmeet-muted); margin-block-end: 3px; }
+.vmeet-root .vmeet-strip dd { margin: 0; font-size: 14.5px; font-weight: 700; }
+@media (max-width: 760px) {
+  .vmeet-root .vmeet-strip > div { border-inline-end: 0; padding-inline: 0; flex: 1 1 45%; margin-block-end: 12px; }
+}
+.vmeet-root .vmeet-agenda-line {
+  display: flex; align-items: flex-start; gap: 9px;
+  border-block-start: 1px solid var(--vmeet-line); margin-block-start: 18px; padding-block-start: 16px;
+  font-size: 14px; color: #3d4b69;
+}
+.vmeet-root .vmeet-agenda-line svg { color: #8ea3c8; flex-shrink: 0; margin-block-start: 3px; }
+.vmeet-root .vmeet-agenda-line strong { color: var(--vmeet-ink); font-weight: 700; }
+
+/* ── שתי כרטיסיות החומרים (הקלטה / תמלול) ───────────────────────────────── */
+.vmeet-root .vmeet-materials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-block-end: 20px; }
+@media (max-width: 760px) { .vmeet-root .vmeet-materials { grid-template-columns: 1fr; } }
+.vmeet-root .vmeet-material p { margin: 0; color: var(--vmeet-muted); font-size: 13.5px; line-height: 1.7; }
+.vmeet-root .vmeet-material .vmeet-actions { margin-block-start: 14px; }
+
+/* ── רשימות הסיכום ──────────────────────────────────────────────────────── */
+.vmeet-root .vmeet-numlist {
+  border: 1px solid var(--vmeet-line); border-radius: 10px;
+  padding: 16px 40px 16px 20px; margin: 0; line-height: 2.1; font-size: 14.5px;
+}
+.vmeet-root .vmeet-numlist li::marker { color: var(--vmeet-muted); font-weight: 700; }
+.vmeet-root .vmeet-numlist-empty {
+  border: 1px dashed #cfdaee; border-radius: 10px; padding: 18px 20px;
+  color: var(--vmeet-muted); font-size: 14px; margin: 0;
+}
+
+/* ── עיגולי הנמענים ─────────────────────────────────────────────────────── */
+.vmeet-root .vmeet-people { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vmeet-root .vmeet-avatars { display: flex; }
+.vmeet-root .vmeet-avatars span {
+  inline-size: 34px; block-size: 34px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--vmeet-indigo-soft); color: var(--vmeet-indigo);
+  font-size: 13px; font-weight: 700; border: 2px solid #fff;
+  margin-inline-start: -8px;
+}
+.vmeet-root .vmeet-avatars span:first-child { margin-inline-start: 0; }
+
+/* ── מסך החיבורים ───────────────────────────────────────────────────────── */
+.vmeet-root .vmeet-providers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 760px) { .vmeet-root .vmeet-providers { grid-template-columns: 1fr; } }
+.vmeet-root .vmeet-provider { text-align: center; }
+.vmeet-root .vmeet-provider .vmeet-ico { inline-size: 46px; block-size: 46px; border-radius: 12px; margin-block-end: 12px; }
+.vmeet-root .vmeet-provider h4 { margin: 0 0 8px; font-size: 16px; font-weight: 800; }
+.vmeet-root .vmeet-provider p { margin: 0 0 16px; font-size: 13.5px; color: var(--vmeet-muted); line-height: 1.7; }
+.vmeet-root .vmeet-provider .vmeet-btn { inline-size: 100%; }
+.vmeet-root .vmeet-provider .vmeet-status { margin-block-start: 12px; }
+
+/* ── פאנל העזר ──────────────────────────────────────────────────────────── */
+.vmeet-root .vmeet-aside-rows { display: flex; flex-direction: column; }
+.vmeet-root .vmeet-aside-rows > div {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding-block: 14px; border-block-end: 1px solid var(--vmeet-line);
+}
+.vmeet-root .vmeet-aside-rows > div:last-child { border-block-end: 0; padding-block-end: 0; }
+.vmeet-root .vmeet-aside-rows > div:first-child { padding-block-start: 0; }
+.vmeet-root .vmeet-aside-rows svg { color: #8ea3c8; flex-shrink: 0; margin-block-start: 2px; }
+.vmeet-root .vmeet-aside-rows dt { font-size: 12.5px; color: var(--vmeet-muted); margin-block-end: 3px; }
+.vmeet-root .vmeet-aside-rows dd { margin: 0; font-size: 14.5px; font-weight: 700; }
+.vmeet-root .vmeet-tip { background: #f4f7fd; border-color: transparent; }
+.vmeet-root .vmeet-tip p { margin: 0; font-size: 13.5px; color: #3d4b69; line-height: 1.8; }
+
+/* ── ספינר ──────────────────────────────────────────────────────────────── */
 @keyframes vmeet-spin { to { transform: rotate(360deg); } }
 .vmeet-root .vmeet-spin { animation: vmeet-spin .8s linear infinite; }
-
-@media (max-width: 900px) {
-  .vmeet-root .vmeet-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .vmeet-root .vmeet-span2 { grid-column: span 2; }
-  .vmeet-root .vmeet-panel { padding: 18px; }
-  .vmeet-root .vmeet-head h2 { font-size: 24px; }
-  /* גלילה מקומית לטבלה, לא לעמוד — ובמובייל אסור להסתיר משימות או חסרים. */
-  .vmeet-root .vmeet-panel:has(.vmeet-table) { overflow-x: auto; }
-  .vmeet-root .vmeet-table { min-inline-size: 640px; }
-}
-@media (max-width: 560px) {
-  .vmeet-root .vmeet-grid { grid-template-columns: minmax(0, 1fr); }
-  .vmeet-root .vmeet-span2 { grid-column: span 1; }
-  .vmeet-root .vmeet-banner .vmeet-btn { margin-inline-start: 0; }
-}

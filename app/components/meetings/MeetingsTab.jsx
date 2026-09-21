@@ -10,21 +10,76 @@
  * כולל: רשימת ישיבות, יצירת טיוטה, העלאת תמלול, סיכום ידני, אישור, משימות ושליחה במייל.
  * לא כולל: יומנים, Meet/Teams/Zoom, וסיכום AI. אלה שלבים 2–5, ואין כאן שום כפתור שמתחזה
  * להם — לפי ACCEPTANCE.md, יכולת שלא נבדקה אינה מוצגת כפעילה.
+ *
+ * ═══ על היחס לסקיצות ═══
+ * הפריסה והשפה העיצובית לפי design/01–04 ו-UX-SPEC.md. איפה שהסקיצה מציגה יכולת שאין —
+ * "מחובר ל-Microsoft 365", "הקלטה זמינה", "מקור בתמלול" — מוצג המצב האמיתי במקום, כי
+ * START-HERE-CLAUDE.md אוסר success מדומה. כל מקום כזה מסומן בהערה.
+ *
+ * ארבעת המסכים מיוצאים בשמם (ולא רק ברירת המחדל) כדי שאפשר יהיה לרנדר כל אחד מהם עם
+ * נתוני דמה ולצלם תצוגה מקדימה בלי להתחבר — זו דרישת "הצג תצוגה מקדימה לפני פרסום".
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../../../lib/api-fetch';
 import {
-  CalendarDays, Plus, ArrowRight, Upload, FileText, CheckCircle2, AlertCircle,
-  Trash2, Send, Loader2, ClipboardList, Users, Clock,
+  CalendarDays, CalendarClock, Plus, ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle,
+  Trash2, Send, Loader2, ClipboardList, Users, Clock, Video, Info, Pencil, Link2,
+  Settings2, ListChecks, CheckSquare, Mail, PlayCircle, RefreshCw,
 } from 'lucide-react';
 
-const fmtDate = (iso, tz = 'Asia/Jerusalem') => {
+const fmtDateTime = (iso, tz = 'Asia/Jerusalem') => {
   if (!iso) return '—';
   try {
     return new Intl.DateTimeFormat('he-IL', { timeZone: tz, dateStyle: 'short', timeStyle: 'short' }).format(new Date(iso));
   } catch { return '—'; }
 };
+const fmtDate = (iso, tz = 'Asia/Jerusalem') => {
+  if (!iso) return '—';
+  try { return new Intl.DateTimeFormat('he-IL', { timeZone: tz, dateStyle: 'short' }).format(new Date(iso)); }
+  catch { return '—'; }
+};
+const fmtTimeRange = (start, end, tz = 'Asia/Jerusalem') => {
+  if (!start) return '—';
+  try {
+    const f = new Intl.DateTimeFormat('he-IL', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+    return end ? `${f.format(new Date(start))} – ${f.format(new Date(end))}` : f.format(new Date(start));
+  } catch { return '—'; }
+};
 const todayIL = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
+/** ראשי תיבות לעיגול הנמען. כתובת אימייל — האות הראשונה של החלק שלפני ה-@. */
+const initialsOf = (s) => {
+  const t = String(s || '').split('@')[0].replace(/[._-]+/g, ' ').trim();
+  return t ? t.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() : '?';
+};
+
+/** פירורי לחם. הפריט האחרון אינו לחיץ. */
+function Crumbs({ items }) {
+  return (
+    <nav className="vmeet-crumbs" aria-label="מיקום">
+      {items.map((it, i) => (
+        <span key={i}>
+          {i > 0 && <span aria-hidden="true">/ </span>}
+          {it.onClick ? <button type="button" onClick={it.onClick}>{it.label}</button>
+            : <span className="vmeet-crumb-now">{it.label}</span>}
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+function SectionTitle({ icon: Icon, children, extra }) {
+  return (
+    <h3 className="vmeet-section-title">
+      <span className="vmeet-ico"><Icon size={18} aria-hidden="true" /></span>
+      {children}
+      {extra}
+    </h3>
+  );
+}
+
+function Note({ children }) {
+  return <p className="vmeet-note"><Info size={15} aria-hidden="true" />{children}</p>;
+}
 
 /** שדה טקסט־רב־שורות שכל שורה בו היא פריט. פשוט יותר מעורך רשימות, וקל להדביק לתוכו. */
 function ListEditor({ label, hint, value, onChange, rows = 4 }) {
@@ -38,11 +93,66 @@ function ListEditor({ label, hint, value, onChange, rows = 4 }) {
 }
 const linesToItems = (s) => String(s || '').split('\n').map(t => t.trim()).filter(Boolean).map(text => ({ text }));
 const itemsToLines = (arr) => (arr || []).map(i => i?.text || '').join('\n');
+/** תצוגת קריאה של פריטי סיכום — רשימה ממוספרת, כמו בסקיצה 04. */
+function NumList({ items, empty }) {
+  const list = (items || []).map(i => i?.text).filter(Boolean);
+  if (!list.length) return <p className="vmeet-numlist-empty">{empty}</p>;
+  return <ol className="vmeet-numlist">{list.map((t, i) => <li key={i}>{t}</li>)}</ol>;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
-// מסך 1 — רשימת הישיבות
+// מסך 0 — חיבורים (סקיצה 01, החלק "היומן שלי")
 // ═══════════════════════════════════════════════════════════════════════════
-function MeetingsList({ data, onOpen, onNew, canEdit }) {
+// כל הספקים מוצגים כלא מחוברים והכפתורים מושבתים. זה המצב האמיתי: אין credentials
+// ואין adapters (שלב 2 ב-START-HERE-CLAUDE.md). הסקיצה מציגה "חבר יומן" פעיל, אבל
+// כפתור שלא יעשה דבר הוא בדיוק ה-success המדומה שהחבילה אוסרת.
+export function ConnectionsScreen({ onBack }) {
+  const providers = [
+    { name: 'Google Calendar', icon: CalendarDays, text: 'חיבור היומן יאפשר ליצור אירוע, לשלוח הזמנות ולצרף קישור Google Meet.' },
+    { name: 'Microsoft 365', icon: CalendarDays, text: 'חיבור היומן יאפשר ליצור אירוע, לשלוח הזמנות ולצרף קישור Microsoft Teams.' },
+  ];
+  return (
+    <div className="vmeet-root">
+      <Crumbs items={[{ label: 'ישיבות שיווק', onClick: onBack }, { label: 'חיבורים' }]} />
+      <div className="vmeet-head">
+        <div className="vmeet-head-main">
+          <span className="vmeet-ico"><Settings2 size={18} aria-hidden="true" /></span>
+          <div>
+            <h2>היומן שלי</h2>
+            <p>חיבור יומן נדרש למנהל ישיבה בלבד. הכניסה לדשבורד אינה מחברת את היומן.</p>
+          </div>
+        </div>
+        <button type="button" className="vmeet-btn" onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />חזרה לרשימה</button>
+      </div>
+
+      <div className="vmeet-panel">
+        <div className="vmeet-providers">
+          {providers.map(p => (
+            <div key={p.name} className="vmeet-card vmeet-provider">
+              <span className="vmeet-ico"><p.icon size={22} aria-hidden="true" /></span>
+              <h4>{p.name}</h4>
+              <p>{p.text}</p>
+              <button type="button" className="vmeet-btn" disabled>חבר יומן</button>
+              <div><span className="vmeet-status">לא מחובר</span></div>
+            </div>
+          ))}
+        </div>
+        <Note>חיבור היומנים עדיין לא מומש — אין הרשאות ספק מוגדרות במערכת, ולכן הכפתורים מושבתים. בינתיים אפשר ליצור ישיבה ולהדביק בה קישור לפגישה שנוצרה ביומן שלך.</Note>
+      </div>
+
+      <div className="vmeet-panel">
+        <SectionTitle icon={Video}>שירות הפגישה</SectionTitle>
+        <p className="vmeet-hint">Google Meet · Microsoft Teams · Zoom</p>
+        <Note>יצירת פגישה אוטומטית תלויה בחיבור היומן ובהרשאות החשבון. חיבור Zoom נדרש רק ליצירת פגישות Zoom חדשות.</Note>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// מסך 1 — רשימת הישיבות (סקיצה 02)
+// ═══════════════════════════════════════════════════════════════════════════
+export function MeetingsList({ data, onOpen, onNew, onConnections, canEdit }) {
   const { meetings = [], dueForReview = [], openTasks = [] } = data || {};
   const [showTasks, setShowTasks] = useState(false);
   const upcoming = meetings.find(m => m.start_at && new Date(m.start_at) >= new Date() && m.status !== 'cancelled');
@@ -51,11 +161,17 @@ function MeetingsList({ data, onOpen, onNew, canEdit }) {
   return (
     <div className="vmeet-root">
       <div className="vmeet-head">
-        <div>
-          <h2>ישיבות שיווק ומכירות</h2>
-          <p>כל ההחלטות, המשימות והמעקב במקום אחד</p>
+        <div className="vmeet-head-main">
+          <span className="vmeet-ico"><CalendarDays size={18} aria-hidden="true" /></span>
+          <div>
+            <h2>ישיבות שיווק ומכירות</h2>
+            <p>כל ההחלטות, המשימות והמעקב במקום אחד</p>
+          </div>
         </div>
-        {canEdit && <button type="button" className="vmeet-btn vmeet-btn-primary" onClick={onNew}><Plus size={18} aria-hidden="true" />ישיבה חדשה</button>}
+        <div className="vmeet-actions">
+          <button type="button" className="vmeet-btn" onClick={onConnections}><Settings2 size={16} aria-hidden="true" />חיבורים</button>
+          {canEdit && <button type="button" className="vmeet-btn vmeet-btn-primary" onClick={onNew}><Plus size={18} aria-hidden="true" />ישיבה חדשה</button>}
+        </div>
       </div>
 
       {(dueForReview.length > 0 || openTasks.length > 0) && (
@@ -75,77 +191,106 @@ function MeetingsList({ data, onOpen, onNew, canEdit }) {
 
       {showTasks && (
         <div className="vmeet-panel">
-          <table className="vmeet-table">
-            <thead><tr><th>משימה</th><th>אחראי</th><th>עד תאריך</th><th>מועד בדיקה</th><th>סטטוס</th></tr></thead>
-            <tbody>
-              {openTasks.map(t => (
-                <tr key={t.id}>
-                  <td>{t.title}</td>
-                  <td>{t.assignee_email || t.assignee_label || <em className="vmeet-todo">להשלמה</em>}</td>
-                  <td>{t.due_at || <em className="vmeet-todo">להשלמה</em>}</td>
-                  <td>{t.review_at || '—'}</td>
-                  <td>{t.status === 'needs_details' ? <em className="vmeet-todo">דורשת השלמה</em> : t.status}</td>
-                </tr>
-              ))}
-              {!openTasks.length && <tr><td colSpan={5} className="vmeet-empty">אין משימות פתוחות</td></tr>}
-            </tbody>
-          </table>
+          <SectionTitle icon={ListChecks}>משימות פתוחות</SectionTitle>
+          <div className="vmeet-scroll">
+            <table className="vmeet-table">
+              <thead><tr><th>משימה</th><th>אחראי</th><th>עד תאריך</th><th>מועד בדיקה</th><th>סטטוס</th></tr></thead>
+              <tbody>
+                {openTasks.map(t => (
+                  <tr key={t.id}>
+                    <td>{t.title}</td>
+                    <td>{t.assignee_email || t.assignee_label || <em className="vmeet-todo">להשלמה</em>}</td>
+                    <td>{t.due_at || <em className="vmeet-todo">להשלמה</em>}</td>
+                    <td>{t.review_at || '—'}</td>
+                    <td>{t.status === 'needs_details' ? <em className="vmeet-todo">דורשת השלמה</em> : t.status}</td>
+                  </tr>
+                ))}
+                {!openTasks.length && <tr><td colSpan={5} className="vmeet-empty">אין משימות פתוחות</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {upcoming && (
         <section className="vmeet-panel">
-          <h3 className="vmeet-section-title"><CalendarDays size={18} aria-hidden="true" />הישיבה הקרובה</h3>
-          <div className="vmeet-upcoming">
-            <div className="vmeet-upcoming-title">{upcoming.title}</div>
-            <dl className="vmeet-meta">
-              <div><dt>מועד</dt><dd>{fmtDate(upcoming.start_at, upcoming.timezone)}</dd></div>
-              <div><dt>מארגן</dt><dd>{upcoming.organizer_email}</dd></div>
-              <div><dt>משימות פתוחות</dt><dd>{upcoming.openTasks}</dd></div>
+          <SectionTitle icon={CalendarClock}>הישיבה הקרובה</SectionTitle>
+          <div className="vmeet-card">
+            <div className="vmeet-card-head">
+              <span className="vmeet-card-title">{upcoming.title}</span>
+              <span className="vmeet-status vmeet-status-ok">נקבעה</span>
+            </div>
+            <dl className="vmeet-strip">
+              <div><CalendarDays size={17} aria-hidden="true" /><div>
+                <dt>תאריך</dt><dd>{fmtDate(upcoming.start_at, upcoming.timezone)}</dd></div></div>
+              <div><Clock size={17} aria-hidden="true" /><div>
+                <dt>שעה</dt><dd>{fmtTimeRange(upcoming.start_at, upcoming.end_at, upcoming.timezone)}</dd></div></div>
+              {/* "מקור" בסקיצה הוא שירות הפגישה. בלי חיבור יומן יש רק קישור שהודבק ידנית. */}
+              <div><Video size={17} aria-hidden="true" /><div>
+                <dt>שירות פגישה</dt><dd>{upcoming.join_url ? 'קישור קיים' : <em className="vmeet-todo">לא הוגדר</em>}</dd></div></div>
+              {/* invited אינו attended — UX-SPEC סעיף 2. */}
+              <div><Users size={17} aria-hidden="true" /><div>
+                <dt>מוזמנים</dt><dd>{upcoming.inviteeCount ?? 0} מוזמנים</dd></div></div>
+              <div><ListChecks size={17} aria-hidden="true" /><div>
+                <dt>משימות פתוחות</dt><dd>{upcoming.openTasks}</dd></div></div>
             </dl>
+            {upcoming.agenda && (
+              <div className="vmeet-agenda-line">
+                <FileText size={16} aria-hidden="true" />
+                <span><strong>נושאים מרכזיים: </strong>{upcoming.agenda.split('\n').map(s => s.trim()).filter(Boolean).join(' · ')}</span>
+              </div>
+            )}
             <div className="vmeet-actions">
+              {/* join URL בלבד, לעולם לא host/start URL — UX-SPEC סעיף 2. */}
+              {upcoming.join_url && (
+                <a className="vmeet-btn vmeet-btn-primary" href={upcoming.join_url} target="_blank" rel="noopener noreferrer">
+                  <Video size={16} aria-hidden="true" />הצטרפות לפגישה
+                </a>
+              )}
               <button type="button" className="vmeet-btn" onClick={() => onOpen(upcoming.id)}><FileText size={16} aria-hidden="true" />פרטי הישיבה</button>
-              {upcoming.join_url && <a className="vmeet-btn" href={upcoming.join_url} target="_blank" rel="noopener noreferrer">הצטרפות לפגישה</a>}
             </div>
           </div>
         </section>
       )}
 
       <section className="vmeet-panel">
-        <h3 className="vmeet-section-title"><Clock size={18} aria-hidden="true" />ישיבות קודמות</h3>
-        <table className="vmeet-table">
-          <thead><tr><th>תאריך</th><th>ישיבה</th><th>סטטוס סיכום</th><th>משימות פתוחות</th><th>פעולה</th></tr></thead>
-          <tbody>
-            {past.map(m => (
-              <tr key={m.id}>
-                <td>{m.start_at ? fmtDate(m.start_at, m.timezone) : <em className="vmeet-todo">ללא מועד</em>}</td>
-                <td>{m.title}</td>
-                <td>
-                  {m.summaryStatus === 'approved' ? <span className="vmeet-chip vmeet-chip-ok">אושר</span>
-                    : m.summaryStatus === 'draft' ? <span className="vmeet-chip vmeet-chip-warn">טיוטה לאישור</span>
-                    : <span className="vmeet-chip">אין סיכום</span>}
-                </td>
-                <td>{m.openTasks}</td>
-                <td><button type="button" className="vmeet-btn vmeet-btn-sm" onClick={() => onOpen(m.id)}>פתיחת סיכום</button></td>
-              </tr>
-            ))}
-            {!past.length && <tr><td colSpan={5} className="vmeet-empty">עוד לא נוצרו ישיבות</td></tr>}
-          </tbody>
-        </table>
+        <SectionTitle icon={Clock}>ישיבות קודמות</SectionTitle>
+        <div className="vmeet-scroll">
+          <table className="vmeet-table">
+            <thead><tr><th>תאריך</th><th>ישיבה</th><th>סטטוס סיכום</th><th>משימות פתוחות</th><th>פעולה</th></tr></thead>
+            <tbody>
+              {past.map(m => (
+                <tr key={m.id}>
+                  <td>{m.start_at ? fmtDate(m.start_at, m.timezone) : <em className="vmeet-todo">ללא מועד</em>}</td>
+                  <td>{m.title}</td>
+                  <td>
+                    {m.summaryStatus === 'approved' ? <span className="vmeet-chip vmeet-chip-ok">אושר</span>
+                      : m.summaryStatus === 'draft' ? <span className="vmeet-chip vmeet-chip-warn">טיוטה לאישור</span>
+                      : <span className="vmeet-chip">אין סיכום</span>}
+                  </td>
+                  <td>{m.openTasks}</td>
+                  <td><button type="button" className="vmeet-btn vmeet-btn-sm" onClick={() => onOpen(m.id)}><FileText size={14} aria-hidden="true" />פתיחת סיכום</button></td>
+                </tr>
+              ))}
+              {!past.length && <tr><td colSpan={5} className="vmeet-empty">עוד לא נוצרו ישיבות</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// מסך 2 — ישיבה חדשה
+// מסך 2 — ישיבה חדשה (סקיצה 03)
 // ═══════════════════════════════════════════════════════════════════════════
-function MeetingForm({ projectId, onCancel, onCreated }) {
+export function MeetingForm({ projectId, projectLabel, onCancel, onCreated }) {
   const [f, setF] = useState({ title: '', date: todayIL(), start: '10:00', end: '11:00', agenda: '', joinUrl: '' });
   const [invitees, setInvitees] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const set = (k) => (e) => setF(p => ({ ...p, [k]: e.target.value }));
+  const inviteeCount = invitees.split('\n').map(s => s.trim()).filter(Boolean).length;
 
   const save = async () => {
     setErr('');
@@ -173,58 +318,94 @@ function MeetingForm({ projectId, onCancel, onCreated }) {
 
   return (
     <div className="vmeet-root">
+      <Crumbs items={[{ label: 'ישיבות שיווק', onClick: onCancel }, { label: 'ישיבה חדשה' }]} />
       <div className="vmeet-head">
-        <div><h2>ישיבה חדשה</h2><p>שמירת טיוטה אינה שולחת הזמנות ואינה יוצרת אירוע ביומן</p></div>
-        <button type="button" className="vmeet-btn" onClick={onCancel}><ArrowRight size={16} aria-hidden="true" />חזרה לרשימה</button>
+        <div className="vmeet-head-main">
+          <span className="vmeet-ico"><CalendarDays size={18} aria-hidden="true" /></span>
+          <div>
+            <h2>ישיבה חדשה</h2>
+            <p>שמירת טיוטה אינה שולחת הזמנות ואינה יוצרת אירוע ביומן</p>
+          </div>
+        </div>
+        <button type="button" className="vmeet-btn" onClick={onCancel}><ArrowLeft size={16} aria-hidden="true" />חזרה לרשימה</button>
       </div>
 
-      <div className="vmeet-panel">
-        <div className="vmeet-grid">
-          <label className="vmeet-field vmeet-span2"><span className="vmeet-label">כותרת הישיבה</span>
-            <input type="text" value={f.title} onChange={set('title')} dir="rtl" placeholder="ישיבת שיווק חודשית" /></label>
-          <label className="vmeet-field"><span className="vmeet-label">תאריך</span>
-            <input type="date" value={f.date} onChange={set('date')} /></label>
-          <label className="vmeet-field"><span className="vmeet-label">שעת התחלה</span>
-            <input type="time" value={f.start} onChange={set('start')} /></label>
-          <label className="vmeet-field"><span className="vmeet-label">שעת סיום</span>
-            <input type="time" value={f.end} onChange={set('end')} /></label>
-          <label className="vmeet-field"><span className="vmeet-label">אזור זמן</span>
-            <input type="text" value="שעון ישראל" readOnly /></label>
+      <div className="vmeet-cols">
+        <div>
+          <div className="vmeet-panel">
+            <SectionTitle icon={FileText}>פרטי הישיבה</SectionTitle>
+            <div className="vmeet-grid">
+              <label className="vmeet-field vmeet-span2"><span className="vmeet-label">פרויקט</span>
+                <input type="text" value={projectLabel || '—'} readOnly /></label>
+              <label className="vmeet-field vmeet-span2"><span className="vmeet-label">כותרת הישיבה</span>
+                <input type="text" value={f.title} onChange={set('title')} dir="rtl" placeholder="ישיבת שיווק חודשית" /></label>
+              <label className="vmeet-field"><span className="vmeet-label">תאריך</span>
+                <input type="date" value={f.date} onChange={set('date')} /></label>
+              <label className="vmeet-field"><span className="vmeet-label">שעת התחלה</span>
+                <input type="time" value={f.start} onChange={set('start')} /></label>
+              <label className="vmeet-field"><span className="vmeet-label">שעת סיום</span>
+                <input type="time" value={f.end} onChange={set('end')} /></label>
+              <label className="vmeet-field"><span className="vmeet-label">אזור זמן</span>
+                <input type="text" value="שעון ישראל" readOnly /></label>
+            </div>
+
+            <ListEditor label="מוזמנים" rows={4} value={invitees} onChange={setInvitees}
+              hint="שורה לכל מוזמן. כתובת אימייל תישלח אליה סיכום; תפקיד בלי כתובת יסומן להשלמה ולא יישלח לאיש." />
+            <ListEditor label="סדר יום" rows={4} value={f.agenda} onChange={(v) => setF(p => ({ ...p, agenda: v }))}
+              hint="שורה לכל נושא" />
+            <label className="vmeet-field"><span className="vmeet-label">קישור לפגישה (אופציונלי)</span>
+              <input type="url" value={f.joinUrl} onChange={set('joinUrl')} dir="ltr" placeholder="https://" /></label>
+            <Note>הסקיצה מציגה בחירת יומן ושירות פגישה (Teams / Meet / Zoom). החיבורים האלה עדיין לא מומשו, ולכן אין כאן בחירה שלא תעשה דבר — אפשר להדביק קישור לפגישה שנוצרה ביומן שלך.</Note>
+          </div>
+
+          <div className="vmeet-panel">
+            <SectionTitle icon={PlayCircle} extra={<span className="vmeet-status">לא נתמך בשלב זה</span>}>הקלטה ותמלול</SectionTitle>
+            <p className="vmeet-hint">יצירת הזמנה אינה מפעילה הקלטה. איסוף אוטומטי של הקלטה ותמלול מהספק אינו זמין — אפשר לצרף קובץ תמלול למסך הישיבה גם אחרי הפגישה.</p>
+          </div>
         </div>
 
-        <ListEditor label="מוזמנים" rows={4} value={invitees} onChange={setInvitees}
-          hint="שורה לכל מוזמן. כתובת אימייל תישלח אליה סיכום; תפקיד בלי כתובת יסומן להשלמה ולא יישלח לאיש." />
-        <ListEditor label="סדר יום" rows={4} value={f.agenda} onChange={(v) => setF(p => ({ ...p, agenda: v }))} />
-        <label className="vmeet-field"><span className="vmeet-label">קישור לפגישה (אופציונלי)</span>
-          <input type="url" value={f.joinUrl} onChange={set('joinUrl')} dir="ltr" placeholder="https://" /></label>
+        <aside>
+          <div className="vmeet-panel">
+            <SectionTitle icon={Info}>מידע נוסף</SectionTitle>
+            <dl className="vmeet-aside-rows">
+              <div><CalendarClock size={17} aria-hidden="true" /><div>
+                <dt>סוג ישיבה</dt><dd>ישיבת שיווק</dd></div></div>
+              <div><Users size={17} aria-hidden="true" /><div>
+                <dt>מוזמנים</dt><dd>{inviteeCount} מוזמנים</dd></div></div>
+              <div><Clock size={17} aria-hidden="true" /><div>
+                <dt>מועד</dt><dd>{f.date ? `${f.date} · ${f.start}–${f.end}` : '—'}</dd></div></div>
+            </dl>
+          </div>
+          <div className="vmeet-panel vmeet-tip">
+            <SectionTitle icon={Info}>טיפ</SectionTitle>
+            <p>לפני השליחה כדאי לעבור על רשימת המוזמנים: שורה בלי כתובת אימייל תסומן להשלמה ולא תקבל את הסיכום.</p>
+          </div>
+        </aside>
+      </div>
 
-        <div className="vmeet-note">
-          <AlertCircle size={16} aria-hidden="true" />
-          חיבור יומן ויצירת פגישה אוטומטית עדיין אינם זמינים. אפשר להדביק כאן קישור לפגישה שנוצרה ביומן שלך.
-        </div>
-
-        {err && <div className="vmeet-error" role="alert">{err}</div>}
-        <div className="vmeet-actions vmeet-actions-end">
-          <button type="button" className="vmeet-btn" onClick={onCancel}>ביטול</button>
-          <button type="button" className="vmeet-btn vmeet-btn-primary" onClick={save} disabled={busy}>
-            {busy ? <Loader2 size={16} className="vmeet-spin" aria-hidden="true" /> : null}שמירת טיוטה
-          </button>
-        </div>
+      {err && <div className="vmeet-error" role="alert">{err}</div>}
+      <div className="vmeet-footbar">
+        <button type="button" className="vmeet-btn vmeet-btn-primary" onClick={save} disabled={busy}>
+          {busy ? <Loader2 size={16} className="vmeet-spin" aria-hidden="true" /> : null}שמירת טיוטה
+        </button>
+        <button type="button" className="vmeet-btn" onClick={onCancel}>ביטול</button>
       </div>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// מסך 3 — סיכום, משימות ואישור
+// מסך 3 — סיכום, משימות ואישור (סקיצה 04)
 // ═══════════════════════════════════════════════════════════════════════════
-function MeetingDetail({ meetingId, onBack, canEdit, reload }) {
+export function MeetingDetail({ meetingId, onBack, canEdit, reload }) {
   const [d, setD] = useState(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
+  const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ keyPoints: '', decisions: '', openQuestions: '' });
   const [tasks, setTasks] = useState([]);
   const [recipients, setRecipients] = useState('');
+  const [editRecipients, setEditRecipients] = useState(false);
   const fileRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -277,7 +458,7 @@ function MeetingDetail({ meetingId, onBack, canEdit, reload }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
-      setD(j); setTasks((j.tasks || []).map(t => ({ ...t })));
+      setD(j); setTasks((j.tasks || []).map(t => ({ ...t }))); setEditing(false);
     } catch (e) { setErr(e.message || String(e)); }
     finally { setBusy(''); }
   };
@@ -327,118 +508,201 @@ function MeetingDetail({ meetingId, onBack, canEdit, reload }) {
   const s = d.currentSummary;
   const approved = s?.status === 'approved';
   const transcript = (d.artifacts || []).find(a => a.kind === 'transcript');
+  const recording = (d.artifacts || []).find(a => a.kind === 'recording');
   const incomplete = tasks.filter(t => !t.assignee_email || !t.due_at).length;
+  const recipientList = recipients.split('\n').map(x => x.trim()).filter(Boolean);
 
   return (
     <div className="vmeet-root">
+      <Crumbs items={[{ label: 'ישיבות שיווק', onClick: onBack }, { label: m.title }]} />
       <div className="vmeet-head">
-        <div>
-          <h2>סיכום ישיבת השיווק</h2>
-          <p>{m.title} · {m.start_at ? fmtDate(m.start_at, m.timezone) : 'ללא מועד'}
-            {approved ? <span className="vmeet-chip vmeet-chip-ok">אושר</span> : s ? <span className="vmeet-chip vmeet-chip-warn">טיוטה לאישור</span> : null}</p>
+        <div className="vmeet-head-main">
+          <span className="vmeet-ico"><ClipboardList size={18} aria-hidden="true" /></span>
+          <div>
+            <h2>סיכום ישיבת השיווק</h2>
+            <p>
+              <Users size={15} aria-hidden="true" />
+              {m.start_at ? fmtDateTime(m.start_at, m.timezone) : 'ללא מועד'}
+              {` · ${(d.invitees || []).length} מוזמנים`}
+              {approved ? <span className="vmeet-chip vmeet-chip-ok">אושר</span>
+                : s ? <span className="vmeet-chip vmeet-chip-warn">טיוטה לאישור</span> : null}
+            </p>
+          </div>
         </div>
-        <button type="button" className="vmeet-btn" onClick={onBack}><ArrowRight size={16} aria-hidden="true" />חזרה לרשימה</button>
+        <button type="button" className="vmeet-btn" onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />חזרה לרשימה</button>
       </div>
 
       {err && <div className="vmeet-error" role="alert">{err}</div>}
 
+      {/* שתי כרטיסיות החומרים. המצב אמיתי ולא לפי השעה — UX-SPEC סעיף 4. */}
+      <div className="vmeet-materials">
+        <section className="vmeet-panel vmeet-material">
+          <SectionTitle icon={PlayCircle} extra={
+            recording ? <span className="vmeet-status vmeet-status-ok">חומר זמין</span>
+              : <span className="vmeet-status">אין חומר</span>
+          }>הקלטת הפגישה</SectionTitle>
+          {recording?.external_url ? (
+            <>
+              <p>הקלטת וידאו של הישיבה.</p>
+              <div className="vmeet-actions">
+                <a className="vmeet-btn" href={recording.external_url} target="_blank" rel="noopener noreferrer">
+                  <PlayCircle size={16} aria-hidden="true" />צפייה בהקלטה
+                </a>
+              </div>
+            </>
+          ) : (
+            <p>איסוף הקלטה מהספק אינו זמין בשלב הזה. אפשר לסכם ישיבה גם בלי הקלטה, מתוך תמלול.</p>
+          )}
+        </section>
+
+        <section className="vmeet-panel vmeet-material">
+          <SectionTitle icon={FileText} extra={
+            transcript ? <span className="vmeet-status vmeet-status-ok">חומר זמין</span>
+              : <span className="vmeet-status vmeet-status-warn">העלאה ידנית</span>
+          }>תמלול</SectionTitle>
+          {transcript ? (
+            <p className="vmeet-ok"><CheckCircle2 size={16} aria-hidden="true" />
+              {transcript.filename || 'תמלול'} · {transcript.segment_count} מקטעים</p>
+          ) : (
+            <p>אין עדיין תמלול. איסוף אוטומטי מהספקים אינו זמין בשלב הזה — אפשר לצרף קובץ TXT, VTT או SRT.</p>
+          )}
+          {canEdit && (
+            <div className="vmeet-actions">
+              <input ref={fileRef} type="file" accept=".txt,.vtt,.srt,text/plain" onChange={e => upload(e.target.files?.[0])} hidden id="vmeet-file" />
+              <label htmlFor="vmeet-file" className="vmeet-btn">
+                {busy === 'upload' ? <Loader2 size={16} className="vmeet-spin" aria-hidden="true" /> : <Upload size={16} aria-hidden="true" />}
+                {transcript ? 'החלפת התמלול' : 'צירוף תמלול'}
+              </label>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* הסיכום: תצוגת קריאה ממוספרת כמו בסקיצה, ומעבר לעריכה בלחיצה. */}
       <section className="vmeet-panel">
-        <h3 className="vmeet-section-title"><FileText size={18} aria-hidden="true" />תמלול הישיבה</h3>
-        {transcript ? (
-          <p className="vmeet-ok"><CheckCircle2 size={16} aria-hidden="true" />
-            {transcript.filename || 'תמלול'} · {transcript.segment_count} מקטעים</p>
-        ) : (
-          <p className="vmeet-hint">אין עדיין תמלול. איסוף אוטומטי מהספקים אינו זמין בשלב הזה — אפשר לצרף קובץ TXT, VTT או SRT.</p>
-        )}
-        {canEdit && (
-          <div className="vmeet-actions">
-            <input ref={fileRef} type="file" accept=".txt,.vtt,.srt,text/plain" onChange={e => upload(e.target.files?.[0])} hidden id="vmeet-file" />
-            <label htmlFor="vmeet-file" className="vmeet-btn">
-              {busy === 'upload' ? <Loader2 size={16} className="vmeet-spin" aria-hidden="true" /> : <Upload size={16} aria-hidden="true" />}
-              {transcript ? 'החלפת התמלול' : 'צירוף תמלול'}
-            </label>
-          </div>
-        )}
+        <SectionTitle icon={FileText} extra={canEdit && (
+          <button type="button" className="vmeet-btn vmeet-btn-sm vmeet-btn-quiet" onClick={() => setEditing(v => !v)}>
+            <Pencil size={14} aria-hidden="true" />{editing ? 'סיום עריכה' : 'עריכת הסיכום'}
+          </button>
+        )}>הנקודות החשובות</SectionTitle>
+        {editing
+          ? <ListEditor label="הנקודות החשובות" value={form.keyPoints} onChange={v => setForm(p => ({ ...p, keyPoints: v }))} hint="שורה לכל נקודה" />
+          : <NumList items={s?.key_points} empty="עוד לא נכתבו נקודות. לחץ על ״עריכת הסיכום״ כדי להוסיף." />}
+        {approved && <Note>הגרסה הזאת אושרה. עריכה תיצור גרסה חדשה ולא תדרוס את המאושרת.</Note>}
       </section>
 
       <section className="vmeet-panel">
-        <h3 className="vmeet-section-title"><ClipboardList size={18} aria-hidden="true" />הסיכום</h3>
-        {approved && <p className="vmeet-hint">הגרסה הזאת אושרה. עריכה תיצור גרסה חדשה ולא תדרוס את המאושרת.</p>}
-        <ListEditor label="הנקודות החשובות" value={form.keyPoints} onChange={v => setForm(p => ({ ...p, keyPoints: v }))} hint="שורה לכל נקודה" />
-        <ListEditor label="החלטות שהתקבלו" value={form.decisions} onChange={v => setForm(p => ({ ...p, decisions: v }))} hint="רק החלטות מפורשות, לא כל הצעה שעלתה" />
-        <ListEditor label="שאלות פתוחות" value={form.openQuestions} onChange={v => setForm(p => ({ ...p, openQuestions: v }))} hint="מחלוקות ופרטים שלא הוכרעו" />
+        <SectionTitle icon={CheckSquare}>החלטות שהתקבלו</SectionTitle>
+        {editing
+          ? <ListEditor label="החלטות שהתקבלו" value={form.decisions} onChange={v => setForm(p => ({ ...p, decisions: v }))} hint="רק החלטות מפורשות, לא כל הצעה שעלתה" />
+          : <NumList items={s?.decisions} empty="לא תועדו החלטות." />}
       </section>
 
+      {/* שאלות פתוחות מוצגות כשיש תוכן — התיקון שה-UX-SPEC דורש לסקיצה. */}
+      {(editing || (s?.open_questions || []).length > 0) && (
+        <section className="vmeet-panel">
+          <SectionTitle icon={AlertCircle}>שאלות פתוחות</SectionTitle>
+          {editing
+            ? <ListEditor label="שאלות פתוחות" value={form.openQuestions} onChange={v => setForm(p => ({ ...p, openQuestions: v }))} hint="מחלוקות ופרטים שלא הוכרעו" />
+            : <NumList items={s?.open_questions} empty="אין שאלות פתוחות." />}
+        </section>
+      )}
+
       <section className="vmeet-panel">
-        <h3 className="vmeet-section-title"><Users size={18} aria-hidden="true" />משימות</h3>
-        <table className="vmeet-table vmeet-tasks">
-          <thead><tr><th>משימה</th><th>אחראי (אימייל)</th><th>עד תאריך</th><th>מועד בדיקה</th><th>סטטוס</th><th /></tr></thead>
-          <tbody>
-            {tasks.map((t, i) => {
-              const live = t.id && t.status !== 'proposed';
-              return (
-                <tr key={t.id || `new-${i}`}>
-                  <td><input type="text" value={t.title || ''} onChange={e => patchTask(i, 'title', e.target.value)} dir="rtl" disabled={!canEdit} /></td>
-                  <td><input type="email" value={t.assignee_email || ''} onChange={e => patchTask(i, 'assignee_email', e.target.value)} dir="ltr"
-                    className={!t.assignee_email ? 'vmeet-incomplete' : ''} placeholder="להשלמה" disabled={!canEdit} /></td>
-                  <td><input type="date" value={t.due_at || ''} onChange={e => patchTask(i, 'due_at', e.target.value)}
-                    className={!t.due_at ? 'vmeet-incomplete' : ''} disabled={!canEdit} /></td>
-                  <td><input type="date" value={t.review_at || ''} onChange={e => patchTask(i, 'review_at', e.target.value)} disabled={!canEdit} /></td>
-                  <td>
-                    {live ? (
-                      <select value={t.status} onChange={e => patchTask(i, 'status', e.target.value)} disabled={!canEdit}>
-                        <option value="open">לביצוע</option>
-                        <option value="in_progress">בתהליך</option>
-                        <option value="done">בוצע</option>
-                        <option value="blocked">תקוע</option>
-                        <option value="needs_details">דורשת השלמה</option>
-                        <option value="cancelled">בוטלה</option>
-                      </select>
-                    ) : <span className="vmeet-chip">מוצעת</span>}
-                  </td>
-                  <td>
-                    {canEdit && (live
-                      ? <button type="button" className="vmeet-btn vmeet-btn-sm" onClick={() => saveLiveTask(t)} disabled={busy === 'task'}>שמירה</button>
-                      : <button type="button" className="vmeet-icon-btn" onClick={() => removeTask(i)} aria-label="הסרת משימה"><Trash2 size={15} /></button>)}
-                  </td>
-                </tr>
-              );
-            })}
-            {!tasks.length && <tr><td colSpan={6} className="vmeet-empty">אין משימות</td></tr>}
-          </tbody>
-        </table>
-        {canEdit && <button type="button" className="vmeet-btn vmeet-btn-sm" onClick={addTask}><Plus size={15} aria-hidden="true" />הוספת משימה</button>}
+        <SectionTitle icon={ListChecks}>משימות לביצוע</SectionTitle>
+        <div className="vmeet-scroll">
+          <table className="vmeet-table vmeet-tasks">
+            <thead><tr><th>משימה</th><th>אחראי</th><th>עד תאריך</th><th>מועד בדיקה</th><th>סטטוס</th><th>מקור</th><th /></tr></thead>
+            <tbody>
+              {tasks.map((t, i) => {
+                const live = t.id && t.status !== 'proposed';
+                const fromTranscript = Array.isArray(t.source_segment_ids) && t.source_segment_ids.length > 0;
+                return (
+                  <tr key={t.id || `new-${i}`}>
+                    <td><input type="text" value={t.title || ''} onChange={e => patchTask(i, 'title', e.target.value)} dir="rtl" disabled={!canEdit} /></td>
+                    <td><input type="email" value={t.assignee_email || ''} onChange={e => patchTask(i, 'assignee_email', e.target.value)} dir="ltr"
+                      className={!t.assignee_email ? 'vmeet-incomplete' : ''} placeholder="להשלמה" disabled={!canEdit} /></td>
+                    <td><input type="date" value={t.due_at || ''} onChange={e => patchTask(i, 'due_at', e.target.value)}
+                      className={!t.due_at ? 'vmeet-incomplete' : ''} disabled={!canEdit} /></td>
+                    {/* "לבדיקה הבאה" הוא תאריך מעקב ולא סטטוס ביצוע — UX-SPEC סעיף 4. */}
+                    <td><input type="date" value={t.review_at || ''} onChange={e => patchTask(i, 'review_at', e.target.value)} disabled={!canEdit} /></td>
+                    <td>
+                      {live ? (
+                        <select value={t.status} onChange={e => patchTask(i, 'status', e.target.value)} disabled={!canEdit}>
+                          <option value="open">לביצוע</option>
+                          <option value="in_progress">בתהליך</option>
+                          <option value="done">בוצע</option>
+                          <option value="blocked">תקוע</option>
+                          <option value="needs_details">דורשת השלמה</option>
+                          <option value="cancelled">בוטלה</option>
+                        </select>
+                      ) : <span className="vmeet-chip">מוצעת</span>}
+                    </td>
+                    {/* מילוי ידני מסומן כהשלמת מנהל ולא כציטוט מהשיחה — UX-SPEC סעיף 4. */}
+                    <td>{fromTranscript
+                      ? <span className="vmeet-chip"><Link2 size={13} aria-hidden="true" />מקור בתמלול</span>
+                      : <span className="vmeet-hint">נוסף ידנית</span>}</td>
+                    <td>
+                      {canEdit && (live
+                        ? <button type="button" className="vmeet-btn vmeet-btn-sm" onClick={() => saveLiveTask(t)} disabled={busy === 'task'}>שמירה</button>
+                        : <button type="button" className="vmeet-icon-btn" onClick={() => removeTask(i)} aria-label="הסרת משימה"><Trash2 size={15} /></button>)}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!tasks.length && <tr><td colSpan={7} className="vmeet-empty">אין משימות</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {canEdit && <div className="vmeet-actions"><button type="button" className="vmeet-btn vmeet-btn-sm" onClick={addTask}><Plus size={15} aria-hidden="true" />הוספת משימה</button></div>}
         {incomplete > 0 && (
-          <p className="vmeet-note"><AlertCircle size={16} aria-hidden="true" />
-            {incomplete} משימות בלי אחראי או בלי תאריך יעד. אפשר לאשר את הסיכום, אבל הן יסומנו כדורשות השלמה ולא יישלחו לאיש.</p>
+          <Note>{incomplete} משימות בלי אחראי או בלי תאריך יעד. אפשר לאשר את הסיכום, אבל הן יסומנו כדורשות השלמה ולא יישלחו לאיש.</Note>
         )}
       </section>
 
       {canEdit && (
         <section className="vmeet-panel">
-          <h3 className="vmeet-section-title"><Send size={18} aria-hidden="true" />נמעני הסיכום</h3>
-          <ListEditor label="נמענים" rows={3} value={recipients} onChange={setRecipients}
-            hint="שורה לכל כתובת. נשלחים הסיכום והמשימות בלבד; הקלטה ותמלול אינם מצורפים." />
-          {(d.shares || []).length > 0 && (
-            <p className="vmeet-hint">שליחה אחרונה: {d.shares[0].delivery_status === 'sent' ? 'נשלח' : 'נכשל'} · {d.shares[0].recipient_email}</p>
+          <SectionTitle icon={Mail}>נמעני הסיכום</SectionTitle>
+          {editRecipients ? (
+            <ListEditor label="נמענים" rows={3} value={recipients} onChange={setRecipients}
+              hint="שורה לכל כתובת. נשלחים הסיכום והמשימות בלבד; הקלטה ותמלול אינם מצורפים." />
+          ) : (
+            <div className="vmeet-people">
+              <span className="vmeet-avatars">
+                {recipientList.slice(0, 6).map((r, i) => <span key={i} title={r}>{initialsOf(r)}</span>)}
+              </span>
+              <span>{recipientList.length} נמענים</span>
+              <button type="button" className="vmeet-btn vmeet-btn-sm vmeet-btn-quiet" onClick={() => setEditRecipients(true)}>
+                <Pencil size={14} aria-hidden="true" />עריכת נמענים
+              </button>
+            </div>
           )}
-          <div className="vmeet-actions vmeet-actions-end">
-            <button type="button" className="vmeet-btn" onClick={saveDraft} disabled={!!busy}>
-              {busy === 'draft' ? <Loader2 size={16} className="vmeet-spin" aria-hidden="true" /> : null}שמירת טיוטה
-            </button>
-            <button type="button" className="vmeet-btn vmeet-btn-primary" onClick={approve} disabled={!!busy || !s}>
-              {busy === 'approve' ? <Loader2 size={16} className="vmeet-spin" aria-hidden="true" /> : null}
-              {approved ? 'שליחה חוזרת' : 'אישור ושליחת הסיכום'}
-            </button>
-          </div>
+          {(d.shares || []).length > 0 && (
+            <Note>שליחה אחרונה: {d.shares[0].delivery_status === 'sent' ? 'נשלח' : 'נכשל'} · {d.shares[0].recipient_email}</Note>
+          )}
+          {!editRecipients && <Note>נשלחים הסיכום והמשימות בלבד. הקלטה ותמלול דורשים בחירה וגישה נפרדת.</Note>}
         </section>
+      )}
+
+      {canEdit && (
+        <div className="vmeet-footbar">
+          {/* שתי פעולות מתועדות: אישור גרסה ואז שליחה. כשל בשליחה אינו מבטל אישור. */}
+          <button type="button" className="vmeet-btn vmeet-btn-primary" onClick={approve} disabled={!!busy || !s}>
+            {busy === 'approve' ? <Loader2 size={16} className="vmeet-spin" aria-hidden="true" />
+              : approved ? <RefreshCw size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
+            {approved ? 'שליחה חוזרת' : 'אישור ושליחת הסיכום'}
+          </button>
+          <button type="button" className="vmeet-btn" onClick={saveDraft} disabled={!!busy}>
+            {busy === 'draft' ? <Loader2 size={16} className="vmeet-spin" aria-hidden="true" /> : null}שמירת טיוטה
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-export default function MeetingsTab({ projectId, isClientView = false }) {
+export default function MeetingsTab({ projectId, projectName, isClientView = false }) {
   const [view, setView] = useState({ name: 'list' });
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
@@ -461,12 +725,16 @@ export default function MeetingsTab({ projectId, isClientView = false }) {
   if (err && !data) return <div className="vmeet-root"><div className="vmeet-panel"><div className="vmeet-error">{err}</div></div></div>;
   if (!data) return <div className="vmeet-root"><div className="vmeet-panel">טוען…</div></div>;
 
+  if (view.name === 'connections') {
+    return <ConnectionsScreen onBack={() => setView({ name: 'list' })} />;
+  }
   if (view.name === 'new') {
-    return <MeetingForm projectId={projectId} onCancel={() => setView({ name: 'list' })}
+    return <MeetingForm projectId={projectId} projectLabel={projectName} onCancel={() => setView({ name: 'list' })}
       onCreated={(id) => { load(); setView({ name: 'detail', id }); }} />;
   }
   if (view.name === 'detail') {
     return <MeetingDetail meetingId={view.id} canEdit={canEdit} reload={load} onBack={() => { load(); setView({ name: 'list' }); }} />;
   }
-  return <MeetingsList data={data} canEdit={canEdit} onNew={() => setView({ name: 'new' })} onOpen={(id) => setView({ name: 'detail', id })} />;
+  return <MeetingsList data={data} canEdit={canEdit} onNew={() => setView({ name: 'new' })}
+    onConnections={() => setView({ name: 'connections' })} onOpen={(id) => setView({ name: 'detail', id })} />;
 }

@@ -1,0 +1,22 @@
+/* Load after globals.css and vitas-visual.css. Scoped to this view only. */
+.vrt-root { min-inline-size:0; }
+.vrt-root .vr-metric-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+.vrt-root .vr-section { margin-block-end:32px; }
+.vrt-root .vrt-explanation { display:flex; align-items:flex-start; gap:10px; padding:16px; border:1px solid var(--border,#dce3fa); border-radius:var(--r-sm,8px); background:#f1f5ff; color:#3d4d8e; line-height:1.7; }
+.vrt-root .vrt-explanation svg { flex-shrink:0; margin-block-start:4px; }
+.vrt-root .vrt-speed { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+.vrt-root .vrt-patterns { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; }
+.vrt-root .vrt-speed>.vr-section,.vrt-root .vrt-patterns>.vr-section { min-inline-size:0; margin:0; }
+.vrt-root .vrt-speed h2,.vrt-root .vrt-patterns h2 { font-size:18px; }
+.vrt-root .vrt-panel { background:var(--card,#fff); border:1px solid var(--border,#dce3fa); border-radius:var(--r-md,12px); padding:24px; box-shadow:var(--shadow-xs,0 2px 8px #20306008); }
+.vrt-root .vrt-canvas { position:relative; block-size:270px; min-inline-size:0; }
+.vrt-root .vrt-unit { color:#57658a; font-size:13px; margin-block:0 12px; }
+.vrt-root .vrt-chart-data { margin-block-start:16px; font-size:13px; }
+.vrt-root .vrt-chart-data summary { cursor:pointer; color:var(--indigo,#5B5EF4); padding-block:8px; }
+.vrt-root .vr-table th,.vrt-root .vr-table td { padding-block:16px; }
+.vrt-root .vr-table { min-inline-size:650px; }
+.vrt-root .vrt-chart-data .vr-table { min-inline-size:320px; }
+.vrt-root :focus-visible { outline:3px solid var(--indigo,#5B5EF4); outline-offset:3px; }
+@media(max-width:1200px) { .vrt-root .vrt-patterns { grid-template-columns:repeat(2,minmax(0,1fr)); } .vrt-root .vrt-patterns>.vr-section:last-child { grid-column:1 / -1; } }
+@media(max-width:850px) { .vrt-root .vr-metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .vrt-root .vrt-speed,.vrt-root .vrt-patterns { grid-template-columns:1fr; } .vrt-root .vrt-panel { padding:18px; } }
+@media(max-width:380px) { .vrt-root .vr-metric-grid { grid-template-columns:1fr; } }

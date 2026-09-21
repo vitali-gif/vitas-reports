@@ -1,0 +1,116 @@
+/* Import once AFTER globals.css. Opt-in scope only. No :root overrides.
+   Existing VITAS tokens are reused. Fallbacks are only for missing tokens. */
+.vr-ui {
+  --vr-text: #142044;
+  --vr-muted: #586581;
+  --vr-focus: var(--indigo, #5b5ef4);
+  color: var(--vr-text);
+  background: var(--bg, #f6f8ff);
+  font-family: Heebo, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: start;
+  min-inline-size: 0;
+}
+.vr-ui *, .vr-ui *::before, .vr-ui *::after { box-sizing: border-box; }
+.vr-ui h2, .vr-ui h3, .vr-ui p, .vr-ui dl { margin: 0; }
+.vr-ui button, .vr-ui a { font: inherit; }
+.vr-ui button { cursor: pointer; }
+.vr-ui :focus-visible { outline: 3px solid var(--vr-focus); outline-offset: 4px; }
+.vr-content { padding-block: 28px 56px; padding-inline: 32px; min-inline-size: 0; }
+.vr-section { margin-block-start: 44px; min-inline-size: 0; }
+.vr-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-block-end: 18px; }
+.vr-section-heading h2 { font-size: 23px; font-weight: 750; line-height: 1.35; }
+.vr-section-heading p, .vr-caption { color: var(--vr-muted); font-size: 14px; line-height: 1.65; }
+.vr-metrics-section > .vr-caption { margin-block-end: 14px; }
+.vr-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.vr-tone-indigo { --vr-accent: var(--indigo, #5b5ef4); --vr-fill: linear-gradient(135deg, #5863c9, #343aa1); }
+.vr-tone-emerald { --vr-accent: var(--emerald, #10b981); --vr-fill: linear-gradient(135deg, #168976, #066c60); }
+.vr-tone-violet { --vr-accent: var(--violet, #8b5cf6); --vr-fill: linear-gradient(135deg, #8b52c3, #6836a2); }
+.vr-tone-sky { --vr-accent: var(--sky, #0ea5e9); --vr-fill: linear-gradient(135deg, #227fbc, #1563a2); }
+.vr-tone-terra { --vr-accent: var(--terra, #e77943); --vr-fill: linear-gradient(135deg, #b75723, #944016); }
+.vr-tone-amber { --vr-accent: var(--amber, #f59e0b); --vr-fill: linear-gradient(135deg, #ffcf71, #f6b343); }
+.vr-tone-rose { --vr-accent: var(--rose, #f43f5e); --vr-fill: linear-gradient(135deg, #bc4766, #99344f); }
+.vr-metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
+.vr-metric { background: var(--vr-fill); color: #fff; padding: 22px 20px; min-block-size: 168px; border-radius: var(--r-md, 12px); box-shadow: var(--shadow-sm, 0 3px 10px #17214a12); position: relative; min-inline-size: 0; }
+.vr-metric.vr-tone-amber { color: #3b2a0b; }
+.vr-metric-top { display: flex; gap: 10px; align-items: center; }
+.vr-metric-top h3 { font-size: 16px; font-weight: 650; line-height: 1.4; }
+.vr-metric-icon { display: inline-flex; padding: 8px; border: 1px solid #ffffff55; background: #ffffff19; border-radius: 8px; flex-shrink: 0; }
+.vr-metric-value { font-size: clamp(27px, 2.2vw, 38px); font-weight: 750; line-height: 1.25; margin-block-start: 14px !important; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vr-metric-note { font-size: 13px; margin-block-start: 6px !important; }
+/* שורת ההשוואה — מה היה בתקופה המקבילה. עמומה יותר מהערך עצמו, כי היא
+   הקשר ולא המדד. יורשת את צבע הכרטיס הצבעוני ולכן opacity ולא צבע קבוע. */
+.vr-metric-compare { font-size: 12px; opacity: 0.78; margin-block-start: 4px !important; font-variant-numeric: tabular-nums; }
+.vr-metric-trend { block-size: 30px; margin-block-start: 14px; overflow: hidden; }
+.vr-metric-trend svg { display: block; inline-size: 100%; block-size: 100%; }
+.vr-help { margin-block-start: 10px; font-size: 13px; }
+.vr-help summary { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.vr-help p { margin-block-start: 8px; }
+.vr-funnel-panel > .vr-caption { margin-block-end: 12px; }
+/* grid ולא flex: הענפים (ביטולים וכד') יורדים לשורה שנייה מתחת לשלב שממנו הם
+   מסתעפים, ולשם כך צריך שכל שלב ראשי יתפוס עמודה קבועה. --vr-funnel-cols מגיע
+   מהרכיב ושווה למספר השלבים הראשיים. */
+.vr-funnel { display: grid; grid-template-columns: repeat(var(--vr-funnel-cols, 6), minmax(145px, 1fr)); align-items: start; list-style: none; padding: 0; margin: 0; gap: 14px; overflow-x: auto; padding-block-end: 8px; }
+.vr-funnel-step { background: var(--card, #fff); border: 1px solid var(--border, #dce3f1); border-inline-start: 3px solid var(--vr-accent); border-radius: var(--r-sm, 8px); padding: 18px; min-inline-size: 0; }
+/* ענף: רקע אדום עדין, שהוא הסימן שהמשתמש כבר מכיר מהעיצוב הקודם. */
+.vr-funnel-leak { background: #fdf2f3; border-color: #f6cdcd; border-inline-start-color: var(--rose, #e24b4a); padding-block: 14px; }
+.vr-funnel-leak .vr-funnel-label h3 { color: var(--rose, #e24b4a); }
+.vr-funnel-leak .vr-funnel-value { font-size: 23px; color: var(--rose, #e24b4a); }
+.vr-funnel-label { display: flex; gap: 8px; align-items: center; }
+.vr-funnel-label svg { color: var(--vr-accent); flex-shrink: 0; }
+.vr-funnel-label h3 { font-size: 15px; font-weight: 650; }
+.vr-funnel-value { font-size: 28px; font-weight: 750; margin-block: 10px 6px !important; font-variant-numeric: tabular-nums; }
+.vr-table-wrap { overflow-x: auto; background: var(--surface, #fff); border: 1px solid var(--border, #dce3f1); border-radius: var(--r-sm, 8px); box-shadow: var(--shadow-xs, 0 2px 6px #16204806); }
+.vr-table { inline-size: 100%; border-collapse: collapse; font-size: 14px; text-align: start; }
+.vr-table th { background: #edf0fc; color: #25315c; font-weight: 650; white-space: nowrap; }
+.vr-table th, .vr-table td { padding-block: 15px; padding-inline: 14px; text-align: start; border-block-end: 1px solid var(--border, #dce3f1); }
+.vr-table tbody tr:nth-child(even) { background: #f8faff; }
+.vr-table tbody tr:hover { background: #f0f3ff; }
+.vr-table tbody tr:last-child td { border-block-end: 0; }
+.vr-table .vr-numeric { white-space: nowrap; font-variant-numeric: tabular-nums; text-align: end; }
+.vr-row-name { display: inline-flex; align-items: center; gap: 6px; min-inline-size: 180px; }
+.vr-level-1 { padding-inline-start: 20px; }
+.vr-level-2 { padding-inline-start: 40px; }
+.vr-table-child { font-size: 13px; }
+.vr-table .vr-table-empty { text-align: center; padding-block: 32px; color: var(--vr-muted); }
+.vr-icon-button, .vr-sort { color: inherit; background: transparent; border: 0; padding: 5px; display: inline-flex; align-items: center; gap: 5px; }
+.vr-icon-button { min-inline-size: 32px; min-block-size: 32px; justify-content: center; border-radius: 6px; }
+.vr-button { display: inline-flex; align-items: center; justify-content: center; padding-block: 8px; padding-inline: 14px; border: 1px solid var(--border, #dce3f1); border-radius: var(--r-xs, 6px); background: var(--surface, #fff); color: #3e44ad; text-decoration: none; min-block-size: 40px; }
+.vr-button:disabled { opacity: .55; cursor: not-allowed; }
+.vr-ad-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.vr-ad { background: var(--card, #fff); border: 1px solid var(--border, #dce3f1); border-radius: var(--r-md, 12px); overflow: hidden; min-inline-size: 0; }
+.vr-ad-media { background: #edf1f8; display: grid; place-items: center; overflow: hidden; }
+.vr-ad-media-square { aspect-ratio: 1; }
+.vr-ad-media-wide { aspect-ratio: 16 / 9; }
+.vr-ad-media img { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
+.vr-ad-media-native img { block-size: auto; }
+.vr-ad-missing { display: flex; gap: 12px; align-items: center; padding: 24px; color: var(--vr-muted); min-block-size: 180px; }
+.vr-ad-body { padding: 20px; }
+.vr-ad-body h3 { font-size: 18px; margin-block-end: 14px; }
+.vr-ad-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-block-end: 16px !important; }
+.vr-ad-metrics dt { font-size: 13px; color: var(--vr-muted); }
+.vr-ad-metrics dd { margin: 4px 0 0; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vr-state { padding: 48px 24px; background: var(--surface, #fff); border: 1px solid var(--border, #dce3f1); border-radius: var(--r-md, 12px); text-align: center; }
+.vr-state .vr-button { margin-block-start: 18px; }
+.vr-sr-only { position: absolute; inline-size: 1px; block-size: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (max-width: 1199px) {
+  .vr-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .vr-content { padding-inline: 24px; }
+}
+@media (max-width: 767px) {
+  /* במסך צר המשפך נערם לעמודה אחת; הענף מאבד את המיקום מתחת לשלב שלו, ולכן ההזחה
+     והחץ ↳ הם מה שמסמן אותו. */
+  .vr-funnel { grid-template-columns: minmax(0, 1fr); }
+  .vr-funnel-step { grid-column: 1 !important; grid-row: auto !important; }
+  .vr-funnel-leak { margin-inline-start: 18px; }
+  .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .vr-content { padding-inline: 16px; }
+  .vr-metric { padding: 18px 14px; }
+  .vr-metric-top { flex-wrap: wrap; }
+  .vr-section { margin-block-start: 32px; }
+  .vr-section-heading { align-items: start; flex-direction: column; }
+  .vr-ad-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 359px) { .vr-metric-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .vr-ui *, .vr-ui *::before, .vr-ui *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

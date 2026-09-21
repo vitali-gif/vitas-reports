@@ -3,6 +3,7 @@
  * Runs at 07:00 + 14:00 Israel time. BMBY handled separately by /api/cron/prefetch-crm.
  */
 import { sendAlert } from '../../../../lib/alert'
+import { logJob } from '../../../../lib/job-log'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -123,9 +124,9 @@ export async function GET(request) {
         <h2>⚠️ קרון מודעות (Meta/Google) — ${failed.length} משימות נכשלו</h2>
         <p>${fmt}</p>
         <ul>${failList}</ul>
-        <p style="color:#888;font-size:12px">VITAS Reports · ניטור אוטומטי</p>
+        <p style="color:#888;font-size:12px">Tovno by Vitas · ניטור אוטומטי</p>
       </div>`
-    try { await sendAlert({ subject: `⚠️ VITAS Ads cron: ${failed.length} משימות נכשלו`, html }) } catch {}
+    try { await sendAlert({ subject: `⚠️ Tovno Ads cron: ${failed.length} משימות נכשלו`, html }) } catch {}
   }
   // === Monthly budget threshold alerts (ש.ברוך projects with a budget set) ===
   try {
@@ -159,17 +160,30 @@ export async function GET(request) {
       if (crossings.length) {
         const rows = crossings.map(c => `<li><b>${c.project}</b> — ${c.pct}% \u05de\u05d4\u05ea\u05e7\u05e6\u05d9\u05d1 (\u20aa${Math.round(c.spend).toLocaleString('he-IL')} / \u20aa${Number(c.budget).toLocaleString('he-IL')}) \u00b7 \u05e1\u05e4\u05d9\u05dd: ${c.newly.join('%, ')}%</li>`).join('')
         const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right"><h2>\ud83d\udcb0 \u05d4\u05ea\u05e8\u05d0\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1 \u05d7\u05d5\u05d3\u05e9\u05d9 (${ym})</h2><ul>${rows}</ul><p style="color:#888;font-size:12px">VITAS Reports</p></div>`
-        await sendAlert({ subject: `\ud83d\udcb0 VITAS \u05ea\u05e7\u05e6\u05d9\u05d1: ` + crossings.map(c => `${c.project} ${c.pct}%`).join(', '), html })
+        await sendAlert({ subject: `\ud83d\udcb0 Tovno \u05ea\u05e7\u05e6\u05d9\u05d1: ` + crossings.map(c => `${c.project} ${c.pct}%`).join(', '), html })
       }
     }
   } catch {}
 
   // heartbeat for the health watchdog (explicit timestamp -> updates every run)
+  //
+  // ⚠️ למה גם job_log וגם heartbeat (21.9): ה-heartbeat נכתב רק בסוף הריצה, ולכן
+  // ריצה שנפלה באמצע לא משאירה שום עקבה — השומר רואה "לא רץ" ואי אפשר לדעת אם
+  // היא לא התחילה, קרסה, או נחסמה ב-429 של גוגל. עד 20.9 הפער הזה היה מכוסה
+  // במקרה, כי הבלוק היומי שרץ כאן רשם `prefetch-ads:daily-block` ל-job_log בכל
+  // ריצה. הבלוק הוסר (הוא שכפל את prefetch-daily), ואיתו נעלמה גם ההיסטוריה.
+  // עכשיו הרישום מפורש: כל ריצה נרשמת, גם כושלת, עם מספר הכשלים והשגיאה הראשונה.
   try {
     const _su = process.env.NEXT_PUBLIC_SUPABASE_URL
     const _sk = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (_su && _sk) {
       const _hb = createClient(_su, _sk, { auth: { persistSession: false } })
+      await logJob(_hb, 'prefetch-ads', failed.length === 0, Date.now() - startedAt, {
+        totalJobs: jobs.length,
+        completed: results.length,
+        failed: failed.length,
+        firstError: failed.length ? String(failed[0]?.error || failed[0]?.label || '').slice(0, 200) : null,
+      })
       await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-ads', last_run: new Date().toISOString() }, { onConflict: 'job' })
     }
   } catch {}

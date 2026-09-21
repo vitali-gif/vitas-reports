@@ -31,9 +31,9 @@ async function sendMagicLinkEmail(toEmail, magicLink) {
       <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(11,15,30,0.08)">
 
         <!-- Header -->
-        <tr><td style="background:#0B0F1E;padding:28px 36px;text-align:right">
-          <span style="color:#fff;font-size:20px;font-weight:800;letter-spacing:-0.03em">VITAS</span>
-          <span style="color:#5B5EF4;font-size:20px;font-weight:800"> Reports</span>
+        <tr><td style="background:#14243C;padding:28px 36px;text-align:right">
+          <span style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.03em">tovno</span>
+          <span style="color:#7191FF;font-size:14px;font-weight:700"> by Vitas</span>
         </td></tr>
 
         <!-- Body -->
@@ -79,9 +79,9 @@ async function sendMagicLinkEmail(toEmail, magicLink) {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: 'VITAS Reports <noreply@vitas.co.il>',
+        from: 'Tovno by Vitas <noreply@vitas.co.il>',
         to: [toEmail],
-        subject: 'קישור כניסה לדוח — VITAS Reports',
+        subject: 'קישור כניסה לדוח — Tovno by Vitas',
         html,
       }),
     })

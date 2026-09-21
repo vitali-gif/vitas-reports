@@ -25,7 +25,8 @@ export async function GET(request) {
 
   const [meetingsRes, tasksRes] = await Promise.all([
     sb.from('marketing_meetings')
-      .select('id, title, start_at, end_at, timezone, status, organizer_email, join_url, created_at')
+      // agenda נשלח כדי שכרטיס "הישיבה הקרובה" יציג את הנושאים המרכזיים (סקיצה 02).
+      .select('id, title, start_at, end_at, timezone, status, organizer_email, join_url, agenda, created_at')
       .eq('project_id', projectId)
       .order('start_at', { ascending: false, nullsFirst: false })
       .limit(100),
@@ -51,6 +52,13 @@ export async function GET(request) {
       .select('meeting_id, version, status').in('meeting_id', ids).order('version', { ascending: false })
     for (const s of (sums || [])) if (!summaryByMeeting[s.meeting_id]) summaryByMeeting[s.meeting_id] = s
   }
+  // ספירת מוזמנים לכרטיס הישיבה הקרובה. "מוזמנים" ולא "משתתפים": אין לנו נוכחות אמיתית,
+  // וה-UX-SPEC אוסר להציג invited כאילו היה attended.
+  const inviteeByMeeting = {}
+  if (ids.length) {
+    const { data: invs } = await sb.from('meeting_invitees').select('meeting_id').in('meeting_id', ids)
+    for (const i of (invs || [])) inviteeByMeeting[i.meeting_id] = (inviteeByMeeting[i.meeting_id] || 0) + 1
+  }
   const openByMeeting = {}
   for (const t of openTasks) openByMeeting[t.meeting_id] = (openByMeeting[t.meeting_id] || 0) + 1
 
@@ -61,6 +69,7 @@ export async function GET(request) {
       summaryStatus: summaryByMeeting[m.id]?.status || null,
       summaryVersion: summaryByMeeting[m.id]?.version || null,
       openTasks: openByMeeting[m.id] || 0,
+      inviteeCount: inviteeByMeeting[m.id] || 0,
     })),
     openTasks,
     // "הגיע מועד הבדיקה" — לא תזכורת שנשלחה, אלא מה שצריך לעלות בישיבה הבאה.

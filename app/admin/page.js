@@ -4,13 +4,38 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { apiFetch } from '../../lib/api-fetch'
-import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, getRecommendationsWindowMonths } from '../../lib/helpers'
+import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, comparisonPeriodKey, comparisonPeriodLabel, COLORS, sourceColor, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
 import { CRM_SCHEMA_VERSION, GOOGLE_SCHEMA_VERSION } from '../../lib/crm/schema-version'
 import { buildRecommendations, groupByRole, ROLE_META, ROLE_ORDER, compareImpact } from '../../lib/recommendations'
 import Chart from 'chart.js/auto'
+
+// גודל גופן מינימלי בגרפים במובייל. המפרט (Tovno-Mobile-Handoff, §גרפים):
+// "תוויות 12px ומעלה". Chart.js מצייר על canvas ולא רואה media queries,
+// ולכן הרף נקבע כאן ומוחל כברירת מחדל גלובלית בכל בניית גרף.
+// ⚠️ קונפיגורציות שמגדירות font.size מפורשות (ticks של כמה גרפים, 10–11px)
+// עדיין גוברות על ברירת המחדל — נשאר מעבר ייעודי.
+const isNarrowViewport = () =>
+  typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+
+const applyChartFontFloor = () => {
+  if (typeof window === 'undefined') return
+  Chart.defaults.font.size = isNarrowViewport() ? 12 : 11
+}
+
+/**
+ * cfs — "chart font size". מעלה רצפה של 12px במסך צר ומשאיר את גודל
+ * הדסקטופ כפי שהוא.
+ *
+ * למה לא פשוט 12 בכל מקום: הדסקטופ מציג גרפים צפופים עם הרבה תוויות,
+ * ו-12px שם היה חותך או מדלל אותן. הדרישה ל-12px היא של המובייל בלבד
+ * ("תוויות 12px ומעלה", MOBILE-SYSTEM §גרפים), ולכן זו רצפה ולא ערך קבוע.
+ * נקרא בזמן בניית הגרף, וה-createChart נבנה מחדש בכל רינדור — כלומר
+ * מעבר בין רוחבים מקבל את הגודל הנכון.
+ */
+const cfs = (n) => (isNarrowViewport() ? Math.max(n, 12) : n)
 import Header from '../components/shell/Header'
 
 // BMBY note/remark fields arrive with HTML numeric entities (e.g. &#1493; = ו). Decode for display.
@@ -24,7 +49,38 @@ const decodeHtmlEntities = (str) => {
 import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
+import BackToTop from '../components/BackToTop'
+import TovnoLoader from '../components/TovnoLoader'
+import ViewPicker from '../components/shell/ViewPicker'
+import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
+import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
+import { CohortFunnel } from '../components/report-ui/CrmSources'
+import SourceDistribution from '../components/report-ui/SourceDistribution'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download } from 'lucide-react'
+// צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
+const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
+
+// טאב "המלצות חכמות" מוסתר בכל הלקוחות עד שהתוכן שלו ישופר (ויטלי, 21.9).
+// להחזרה: להפוך ל-true. הרינדור עצמו נשאר בקוד ולא נמחק.
+const RECOMMENDATIONS_TAB_ON = false
+
+// תצוגות ה-CRM לבורר המובייל. הסדר והתוויות זהים לשורת תתי־הטאבים בדסקטופ —
+// הבורר מחליף את אופן הבחירה, לא את מה שאפשר לבחור.
+const BMBY_CRM_VIEWS = [
+  { key: 'sources',    label: 'מקורות הגעה',    icon: <Users size={18} /> },
+  { key: 'response',   label: 'זמני תגובה',     icon: <Clock size={18} /> },
+  { key: 'objections', label: 'התנגדויות',      icon: <MessageSquareWarning size={18} /> },
+  { key: 'reports',    label: 'יישובים',        icon: <MapPin size={18} /> },
+  { key: 'meetings',   label: 'פגישות שבוצעו',  icon: <CalendarCheck size={18} /> },
+]
+const KLOSS_CRM_VIEWS = [
+  { key: 'network',   label: 'מסך רשת',              icon: <Building2 size={18} /> },
+  { key: 'branches',  label: 'סניפים',               icon: <MapPin size={18} /> },
+  { key: 'people',    label: 'אנשי מכירות ומוצרים',  icon: <Users size={18} /> },
+  { key: 'timing',    label: 'זמנים',                icon: <Clock size={18} /> },
+  { key: 'breakdown', label: 'מקורות וסטטוסים',      icon: <ListChecks size={18} /> },
+]
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -122,6 +178,34 @@ const downloadCsv = (rows, filename) => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
+/**
+ * ייצוא טבלה לאקסל (ויטלי, 21.9).
+ *
+ * xlsx אמיתי ולא CSV: העמודות בעברית, והמספרים נשארים מספרים במקום להפוך
+ * למחרוזות כשאקסל מפרש קובץ CSV בלוקאל אחר. הספרייה נטענת דינמית — היא כבדה,
+ * ורוב הכניסות לדשבורד לא מייצאות כלום.
+ *
+ * rows הוא מערך של אובייקטים; מפתחות האובייקט הראשון הם העמודות, בסדר שנקבע
+ * בקוד הקורא. נפילה חזרה ל-CSV אם הטעינה נכשלת, כדי שהכפתור לא יהיה כפתור דמה.
+ */
+const downloadXlsx = async (rows, filename, sheetName = 'נתונים') => {
+  if (!rows || !rows.length) return;
+  const safe = String(filename).replace(/[\\/:*?"<>|]/g, '-');
+  try {
+    const XLSX = await import('xlsx');
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // רוחב עמודה לפי התוכן הארוך ביותר, עד 48 תווים — אחרת כל העמודות ברוחב
+    // ברירת המחדל ושמות קמפיינים נחתכים.
+    const cols = Object.keys(rows[0]);
+    ws['!cols'] = cols.map(c => ({ wch: Math.min(48, Math.max(10, ...rows.map(r => String(r[c] ?? '').length), c.length + 2)) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
+    XLSX.writeFile(wb, safe + '.xlsx');
+  } catch {
+    downloadCsv(rows, filename);
+  }
+};
+
 export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null }) {
   // שמות הדמו מגיעים מה-DB (הפרויקט/הלקוח שסומנו is_demo) ולא מקודדים בקוד,
   // אחרת הכותרת והסיידבר מציגים שני שמות שונים.
@@ -141,7 +225,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [customSince, setCustomSince] = useState('')
   const [customUntil, setCustomUntil] = useState('')
   const [compareEnabled, setCompareEnabled] = useState(false)
-  const [activePreset, setActivePreset] = useState('lastMonth')
+  // ויטלי, 21.9: נפתח על החודש הנוכחי ולא על חודש שעבר. אם עוד אין שורה
+  // לחודש הנוכחי (תחילת חודש, לפני שהקרון כתב), pickDefaultMonth נופל
+  // אחורה לחודש שעבר — ראה שם.
+  const [activePreset, setActivePreset] = useState('currentMonth')
   const [refreshing, setRefreshing] = useState(false)
   const [refreshingCrm, setRefreshingCrm] = useState(false)
   const [periodLoading, setPeriodLoading] = useState(false)  // spinner while switching date range / loading reports
@@ -181,6 +268,23 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [ruleError, setRuleError] = useState(null)
   const [creatingRule, setCreatingRule] = useState(false)
   const chartsRef = useRef([])
+  // המקרא של גרף התפלגות התקציב (Google). נבנה יחד עם הגרף ומוצג ב-JSX לצד
+  // הדונאט, במקום המקרא האופקי של Chart.js שנמתח על פני חצי מסך.
+  const [campLegend, setCampLegend] = useState([])
+  const [campHidden, setCampHidden] = useState(() => new Set())
+  // ⚠️ בניית הגרפים רצה בתוך setTimeout שנקבע בכל רינדור של renderDashboard.
+  // setState שם, בלי שמירה, היה מפעיל רינדור → timeout חדש → setState → לולאה
+  // אינסופית. הרף מחזיק את המקרא האחרון שנכתב, וכותבים רק כשהוא באמת השתנה.
+  const campLegendRef = useRef('')
+  const _applyCampLegend = (next) => {
+    const key = JSON.stringify(next)
+    if (campLegendRef.current === key) return
+    campLegendRef.current = key
+    setCampLegend(next)
+    // תקופה חדשה = פלחים חדשים. בלי האיפוס, קמפיין שהוסתר היה נשאר מסומן כמוסתר
+    // במקרא בזמן שהפלח שלו מצויר — כלומר המקרא משקר על מצב הגרף.
+    setCampHidden(new Set())
+  }
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
   const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was SUCCESSFULLY lazy-loaded
   const monthDataInFlight = useRef(new Set())  // month-keys with a heavy-data fetch currently in flight (dedupe)
@@ -243,6 +347,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
+      // הסברי המדדים במסך רשת של KLOSS הם <details> של MetricCard — נגישים למקלדת,
+      // אבל הדפדפן לא סוגר אותם ב-Escape. המפרט דורש שכן, אז סוגרים כאן.
+      const openHelp = typeof document !== 'undefined' ? document.querySelector('.vr-kloss details[open]') : null;
+      if (openHelp) { openHelp.removeAttribute('open'); return; }
       if (sfInfo) return setSfInfo(null);
       if (sfNoteModal) return setSfNoteModal(null);
       if (noteModal) return setNoteModal(null);
@@ -422,6 +530,57 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // ישיבות שיווק (שלב 1, docs/meetings-plan.md). כבוי כברירת מחדל: הטאב מופיע רק כש-
   // NEXT_PUBLIC_MEETINGS_ENABLED='1'. זו דרך הכיבוי שה-ACCEPTANCE דורש לפיילוט.
   const meetingsOn = process.env.NEXT_PUBLIC_MEETINGS_ENABLED === '1' && !isDemoProject && !!selectedProject?.id
+
+  // ── עיצוב מחודש (ענף redesign, design/handoff-v1): פיילוט נדל"ן, טאב "הכל" בלבד ──
+  // opt-in מפורש: לא KLOSS (salesforce), לא BCure (zoho), לא פרויקט הדגמה. כשהדגל דלוק,
+  // תוכן הדשבורד עטוף ב-.vr-ui, כרטיסי ה-KPI והמשפך מוצגים ברכיבי report-ui, ושאר
+  // הסקשנים מקבלים את המידות מ-vitas-bridge.css. הלוגיקה, החישובים וההרשאות לא משתנים.
+  const _vrCrmType = reports.find(r => r.month === selectedMonth && r.source === 'crm')?.summary?.crmType || null
+  // vrShell — המעטפת (סיידבר, header, כותרת, תקציב) בעיצוב החדש בכל הטאבים של פרויקט נדל"ן, כדי שהמסך לא
+  // יקפוץ בין שני עיצובים במעבר טאב. vrMode — תוכן הטאב "הכל" בלבד (הפיילוט).
+  const _vrOwnCrm = ['zoho', 'salesforce'].includes(_vrCrmType)
+  // vrChrome — המעטפת עצמה: header, סיידבר, כותרת, פס התקציב ושורת הטאבים הראשית,
+  // וכן העטיפה ב-.vr-ui. דלוקה לכל לקוח ובכל טאב (ויטלי, 21.9). קודם היא הייתה קשורה
+  // ל-vrShell, שכבוי ל-KLOSS ולאריקה, ולכן אצלם שורת הטאבים התחלפה בין העיצוב החדש
+  // לישן לפי הטאב הפעיל — חדש ב"הכל"/Facebook/Google, ישן ב-CRM וב"ישיבות שיווק".
+  // ⚠️ בלי תלות ב-view (ויטלי, 21.9): המעטפת היא מסגרת העמוד, לא תוכן הדוח.
+  // כשהתנאי כלל view === 'dashboard', מסך "ברוכים הבאים" נפל למעטפת הישנה —
+  // הלוגו הופיע כהה על רקע לבן מעל הסיידבר, ואז קפץ פנימה אל הסיידבר בלבן
+  // ברגע שנבחר פרויקט. אותו לוגו בשני מקומות ובשני צבעים באותו מסך.
+  const vrChrome = !isDemoProject
+  // vrShell — נשאר כפי שהיה: הוא מגדיר את מסכי ה-CRM המעוצבים של BMBY בלבד
+  // (vrCrm/vrResp/vrObj/vrCity/vrMeet למטה), שאינם קיימים ל-Zoho ול-Salesforce.
+  const vrShell = vrChrome && !_vrOwnCrm
+  // טאבי המדיה ("הכל", Facebook, Google) זהים בין כל הלקוחות — אותם כרטיסים, אותה טבלת
+  // קמפיינים, אותם פילוחים וגלריות. לכן הם מקבלים את העיצוב המחודש גם ב-KLOSS וב-אריקה
+  // (ויטלי, 20.9), בעוד שטאב ה-CRM נשאר לפי מבנה ה-CRM של כל לקוח.
+  const vrAdsShell = view === 'dashboard' && !isDemoProject && ['all', 'facebook', 'google'].includes(dashTab)
+  const vrMode = vrAdsShell && dashTab === 'all'
+  // vrCrm — המסך השני של הפיילוט: CRM › מקורות הגעה (design/handoff-crm-sources)
+  const vrCrm = vrShell && dashTab === 'crm' && crmSubTab === 'sources'
+  // vrResp — המסך השלישי: CRM › זמני תגובה (design/handoff-response-times)
+  const vrResp = vrShell && dashTab === 'crm' && crmSubTab === 'response'
+  // vrObj / vrCity / vrMeet — שלושת תת-הטאבים הנותרים של CRM (התנגדויות, יישובים, פגישות שבוצעו) באותה שפה
+  // עיצובית של המסכים הקודמים, בלי חבילה נפרדת: MetricCard, ReportSection, פאנל לבן ודונאט+מקרא של .vcs-root.
+  const vrObj = vrShell && dashTab === 'crm' && crmSubTab === 'objections'
+  const vrCity = vrShell && dashTab === 'crm' && crmSubTab === 'reports'
+  const vrMeet = vrShell && dashTab === 'crm' && crmSubTab === 'meetings'
+  // vrFb / vrG — טאבי Facebook ו-Google (design/handoff-facebook; Google באותו עיצוב לפי ויטלי, 19.9).
+  // vrAds — כל טאב מדיה בעיצוב המחודש ("הכל", Facebook, Google): אותם כרטיסים, טבלת קמפיינים, פילוחים וגלריות.
+  const vrFb = vrAdsShell && dashTab === 'facebook'
+  const vrG = vrAdsShell && dashTab === 'google'
+  const vrAds = vrMode || vrFb || vrG
+  // המשפך ("משפך לידים") בטאב "הכל" קיים לכל שלושת ה-CRM: renderFunnelBar בונה את
+  // התחנות לפי summary.crmType — namedLeads ב-BMBY, funnelCohort ב-Salesforce,
+  // funnel.byChannel ב-Zoho. שלבי המדיה (חשיפות, קליקים) זהים לכולם.
+  const vrFunnelMode = vrMode
+  // ⚠️ הפרדה שחייבת להישאר: המשפך בטאבי Facebook/Google מסונן לערוץ. ל-Salesforce
+  // (KLOSS) אין פילוח ערוץ ב-CRM — הלידים מסווגים לפי מקור הגעה ולא לפי פלטפורמת
+  // מדיה — ולכן משפך "של פייסבוק" שם היה מציג חשיפות של פייסבוק מול כל הלידים.
+  const vrFunnel = vrAds && _vrCrmType !== 'salesforce'
+  // vrZohoCrm — טאב ה-CRM של אריקה כרמל (BCureLaser ו-ISMOOTH), חבילת VITAS-Erika-CRM-Handoff.
+  // אותה שפה של ש.ברוך: 11 כרטיסים ברכיב המשותף ושתי טבלאות נפתחות. אין תתי-טאבים.
+  const vrZohoCrm = view === 'dashboard' && !isDemoProject && dashTab === 'crm' && _vrCrmType === 'zoho'
 
   // Compute since/until (or full month) from a preset key
   const presetToPayload = (preset) => {
@@ -690,7 +849,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const refreshAll = async () => {
     // Re-fetch the current period
     if (!selectedMonth) {
-      const r = presetToPayload('lastMonth');
+      // אותה ברירת מחדל כמו בפתיחת פרויקט — החודש הנוכחי.
+      const r = presetToPayload('currentMonth');
       if (r) await triggerFetch(r.payload);
       return;
     }
@@ -703,7 +863,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const onComparisonToggle = async (enabled) => {
     setCompareEnabled(enabled);
     if (!enabled || !selectedMonth) return;
-    const prev = getPrevMonth(selectedMonth);
+    const prev = comparisonPeriodKey(selectedMonth);
     if (!prev) return;
     // If prev-period isn't loaded yet, fetch it
     if (!reports.some(r => r.month === prev)) {
@@ -723,12 +883,14 @@ const loadClients = async () => {
   // 🔴 19.9.2026 (נמצא בבדיקת ה-E2E הראשונה): עד עכשיו נבחרה השורה הראשונה מ-by-project, שממוין לפי
   // month יורד. הקרון כותב מראש גם את הרבעון הבא ("2026-10-01_2026-12-31", נוצר ב-6.6), והמפתח הזה
   // גדול מכל מפתח יומי של ספטמבר — ולכן כל לקוח נחת על תקופה עתידית וראה אפסים בכל הכרטיסים, בזמן
-  // שהתגית הציגה "חודש שעבר" (activePreset). סדר עדיפות: מה שכבר נבחר → ברירת המחדל (חודש שעבר) →
-  // החודש הנוכחי → התקופה המאוחרת ביותר שכבר התחילה → הראשונה.
+  // שהתגית הציגה "חודש שעבר" (activePreset). סדר עדיפות: מה שכבר נבחר → ברירת המחדל →
+  // החודש הנוכחי → חודש שעבר → התקופה המאוחרת ביותר שכבר התחילה → הראשונה.
+  // ויטלי, 21.9: החודש הנוכחי לפני חודש שעבר. חודש שעבר נשאר ברשת הביטחון —
+  // ב-1 בחודש, לפני שהקרון כתב את השורה הראשונה, אין עדיין מה להציג.
   const pickDefaultMonth = (rows, prev) => {
     const keys = new Set(rows.map(r => r.month));
     if (prev && keys.has(prev)) return prev;
-    for (const p of [activePreset, 'lastMonth', 'currentMonth']) {
+    for (const p of [activePreset, 'currentMonth', 'lastMonth']) {
       const r = p && p !== 'custom' ? presetToPayload(p) : null;
       if (r && keys.has(r.key)) return r.key;
     }
@@ -810,11 +972,24 @@ const loadClients = async () => {
     // Otherwise the first render and every project switch waited on ~3 months of heavy raw
     // data that isn't displayed — making tables/breakdowns appear late and switching slow.
     if (dashTab === 'recommendations') { try { getRecommendationsWindowMonths(60).forEach(m => needed.add(m)); } catch {} }
-    if (compareEnabled && selectedMonth) { const pm = getPrevMonth(selectedMonth); if (pm) needed.add(pm); }
+    if (compareEnabled && selectedMonth) { const pm = comparisonPeriodKey(selectedMonth); if (pm) needed.add(pm); }
     const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && !monthDataInFlight.current.has(m) && reports.some(r => r.month === m && r.data == null));
     if (!toLoad.length) return;
     loadMonthsData(selectedProject.id, toLoad);   // marks monthDataLoaded only on SUCCESS (inside)
   }, [selectedProject, selectedMonth, compareEnabled, reports, dashTab]);
+
+  // תקופת ההשוואה של חודש שרץ היא טווח תאריכים (1 עד היום, בחודש שעבר),
+  // ולטווח אין שורה שמורה — הקרון כותב חודשים. בלי המשיכה הזאת המתג היה
+  // נדלק ולא קורה כלום, כי אין מול מה להשוות.
+  useEffect(() => {
+    if (!compareEnabled || !selectedProject || !selectedMonth) return;
+    const key = comparisonPeriodKey(selectedMonth);
+    if (!key || !key.includes('_')) return;               // חודש מלא — כבר קיים
+    if (reports.some(r => r.month === key)) return;       // כבר נטען
+    if (monthDataInFlight.current.has(key)) return;
+    monthDataInFlight.current.add(key);
+    loadRangeRows(selectedProject.id, key).finally(() => monthDataInFlight.current.delete(key));
+  }, [compareEnabled, selectedProject, selectedMonth, reports]);
 
   const loadProjectTasks = async (projectId) => {
     const { data } = await supabase.from('vitas_tasks').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
@@ -1214,9 +1389,94 @@ const selectProject = async (client, project) => {
     }
   };
 
-  const createChart = (id, type, labels, datasets, scalesConfig, onSliceClick) => {
+  // תוויות ערך מעל עמודות — העיצוב החדש של "יום מבוקש לפגישה" ו"שעות ללא מענה"
+  const vrBarLabelsPlugin = {
+    id: 'vrBarLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = '700 12px Heebo, Arial, sans-serif';
+      ctx.fillStyle = '#374151';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      chart.data.datasets.forEach((ds, di) => {
+        if (ds.type && ds.type !== 'bar') return;
+        const meta = chart.getDatasetMeta(di);
+        if (meta.hidden) return;
+        meta.data.forEach((bar, i) => {
+          const v = ds.data[i];
+          if (v == null || v === 0) return;
+          ctx.fillText(String(v), bar.x, bar.y - 4);
+        });
+      });
+      ctx.restore();
+    },
+  };
+
+  /**
+   * קיצור דטרמיניסטי של תוויות לציר X (חבילת Ads-Sections).
+   *
+   * המפרט אוסר לשנות את שם הקמפיין בנתונים, אבל שמות באורך 40 תווים על ציר של
+   * ארבעה קמפיינים הם קיר טקסט. כאן חותכים לתצוגה בלבד, והשם המלא חוזר ב-tooltip.
+   *
+   * "דטרמיניסטי" פירושו גם "מבחין": שני קמפיינים שמתחילים אותו דבר
+   * ("P-max | Ongoing | General" ו-"P-max | Ongoing | New Client") היו מתקצרים
+   * לאותה מחרוזת, ואז אי אפשר לדעת איזו עמודה שייכת למי. לכן כשיש התנגשות,
+   * הקיצור מתארך עד שהוא ייחודי.
+   */
+  const shortenLabels = (names, max = 34) => {
+    // Chart.js מצייר תווית שהיא מערך כמה שורות. לכן לא חותכים עם "…" אלא שוברים
+    // לשתי שורות — ככה שם כמו "P-max | Ongoing | New Client" נקרא במלואו, במקום
+    // להיחתך ל-"P-max | Ongoing…" שנראה זהה ל"P-max | Ongoing | General".
+    const wrap = (n) => {
+      const t = String(n || '').trim().replace(/\s*\|\s*/g, ' | ');
+      if (t.length <= Math.ceil(max / 2)) return [t];
+      const words = t.split(' ');
+      const lines = ['', ''];
+      let i = 0;
+      for (const w of words) {
+        if (i === 0 && (lines[0] + ' ' + w).trim().length > Math.ceil(max / 2) && lines[0]) i = 1;
+        lines[i] = (lines[i] ? lines[i] + ' ' : '') + w;
+      }
+      // שורה שנייה ארוכה מדי נחתכת, אבל רק היא — ההתחלה תמיד נשארת שלמה,
+      // וההתחלה היא מה שמבדיל בין קמפיינים דומים.
+      if (lines[1].length > max) lines[1] = lines[1].slice(0, max - 1).trimEnd() + '\u2026';
+      return lines[1] ? [lines[0], lines[1]] : [lines[0]];
+    };
+    return names.map(wrap);
+  };
+
+  /**
+   * סרגל פעולות אחיד מעל טבלה: פתח/כווץ הכל + ייצוא לאקסל (ויטלי, 21.9).
+   *
+   * onToggleAll ו-allOpen אופציונליים — טבלה שאין בה היררכיה מקבלת רק ייצוא,
+   * ולא כפתור פתיחה שלא עושה דבר. הייצוא תמיד מוציא את העץ המלא בכל הרמות,
+   * ולא רק את מה שפתוח על המסך, אחרת שני משתמשים מקבלים קבצים שונים מאותה
+   * תקופה לפי מה שבמקרה היה פתוח אצלם.
+   */
+  const tableToolbar = ({ hint, allOpen, onToggleAll, onExport, exportLabel = 'ייצוא לאקסל' }) => (
+    <div className="vr-tbl-bar">
+      {hint ? <p className="vr-tbl-hint">{hint}</p> : <span />}
+      <div className="vr-tbl-actions">
+        {onToggleAll && (
+          <button type="button" className="vr-tbl-btn" onClick={onToggleAll} aria-pressed={!!allOpen}>
+            {allOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
+            {allOpen ? 'כווץ הכל' : 'פתח הכל'}
+          </button>
+        )}
+        {onExport && (
+          <button type="button" className="vr-tbl-btn vr-tbl-btn-export" onClick={onExport}>
+            <Download size={14} aria-hidden="true" />{exportLabel}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  const createChart = (id, type, labels, datasets, scalesConfig, onSliceClick, extra) => {
     const canvas = document.getElementById(id);
     if (!canvas) return;
+    applyChartFontFloor();
     const isDoughnut = type === 'doughnut' || type === 'pie';
     const enhancedDatasets = datasets.map(ds => isDoughnut
       ? { borderColor: '#FFFFFF', borderWidth: 3, hoverOffset: 8, ...ds }
@@ -1251,8 +1511,8 @@ const selectProject = async (client, project) => {
       if (indexAxis) config.options.indexAxis = indexAxis;
       config.options.scales = scalesConfig ? _scaleAxes : {
         y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
-             ticks: { font: { size: 11 }, color: '#6B7280' } },
-        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#6B7280' } }
+             ticks: { font: { size: cfs(11) }, color: '#6B7280' } },
+        x: { grid: { display: false }, ticks: { font: { size: cfs(11) }, color: '#6B7280' } }
       };
     }
     // אופציונלי: לחיצה על פלח מחזירה את התווית שלו (משמש בגרף ההתנגדויות)
@@ -1261,6 +1521,13 @@ const selectProject = async (client, project) => {
         if (els && els.length) { const lbl = labels[els[0].index]; if (lbl != null) onSliceClick(lbl); }
       };
       config.options.onHover = (evt, els) => { if (evt?.native?.target) evt.native.target.style.cursor = els && els.length ? 'pointer' : 'default'; };
+    }
+    // extra: { plugins: [...], options: { plugins: { legend, tooltip }, ... } } — מיזוג לכל מפתח כדי לשמור על העיצוב הבסיסי
+    if (extra && Array.isArray(extra.plugins)) config.plugins.push(...extra.plugins);
+    if (extra && extra.options) {
+      const { plugins: _xp, ..._rest } = extra.options;
+      Object.assign(config.options, _rest);
+      if (_xp) for (const [k, v] of Object.entries(_xp)) config.options.plugins[k] = { ...(config.options.plugins[k] || {}), ...v };
     }
     const chart = new Chart(canvas, config);
     chartsRef.current.push(chart);
@@ -1309,6 +1576,9 @@ const selectProject = async (client, project) => {
 
     pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
+      // העיצוב המחודש: המקרא של Chart.js מוסתר (הדירוג/המקרא מוצגים לצד הגרף), והדונאטים בפלטת .vcs-color-N
+      const _noLegend = vrCity ? { options: { plugins: { legend: { display: false } } } } : undefined;
+      const _pal = (n) => vrCity ? Array.from({ length: n }, (_, i) => VCS_PALETTE[i % VCS_PALETTE.length]) : COLORS.slice(0, n);
       if (cityNames.length > 0) {
         createChart('crmRepCityChart', 'bar', cityNames, [{
           label: metricLabel, data: cityCounts,
@@ -1317,22 +1587,82 @@ const selectProject = async (client, project) => {
         }], {
           y: { beginAtZero: true, position: 'right' },
           indexAxis: 'y',
-        });
+        }, undefined, _noLegend);
       }
       if (isHiPark && lsEntries.length > 0) {
         createChart('crmLivingStatusChart', 'doughnut', lsEntries.map(e => e[0]), [{
-          data: lsEntries.map(e => e[1]), backgroundColor: COLORS.slice(0, lsEntries.length),
-        }]);
+          data: lsEntries.map(e => e[1]), backgroundColor: _pal(lsEntries.length),
+        }], undefined, undefined, _noLegend);
       }
       if (isHiPark && ptEntries.length > 0) {
         createChart('crmPropertyTypeChart', 'doughnut', ptEntries.map(e => e[0]), [{
-          data: ptEntries.map(e => e[1]), backgroundColor: COLORS.slice(0, ptEntries.length),
-        }]);
+          data: ptEntries.map(e => e[1]), backgroundColor: _pal(ptEntries.length),
+        }], undefined, undefined, _noLegend);
       }
     }, 200));
 
     if (cityEntries.length === 0) {
       return <div className="welcome-center"><div className="icon">🏘️</div><h3>אין נתוני יישובים לתקופה זו</h3></div>;
+    }
+
+    if (vrCity) {
+      // העיצוב המחודש: כרטיסים מהאגרגציה הקיימת (repData.cities) — בלי חישובים חדשים.
+      const _cityAll = Object.entries(repData.cities).filter(([n]) => n && n !== 'לא צוין');
+      const _sumLeads = _cityAll.reduce((s, [, c]) => s + (c.leads || 0), 0);
+      const _noCity = repData.cities['לא צוין'] ? (repData.cities['לא צוין'].leads || 0) : 0;
+      const [topCity, topCityData] = cityEntries[0];
+      const _rankList = (entries, unit, dotColor) => (
+        <ul className="vcs-legend" aria-label={'דירוג לפי ' + unit}>
+          {entries.map(([name, v], i) => (
+            <li key={name}>
+              <span className={`vcs-dot${dotColor ? '' : ' vcs-color-' + (i % 7)}`} style={dotColor ? { background: dotColor(i) } : undefined} aria-hidden="true" />
+              <span className="vcs-legend-label"><span className="vrc-rank" aria-hidden="true">{i + 1}</span>{name}</span>
+              <strong><bdi>{formatNum(v)}</bdi> <em>{unit}</em></strong>
+            </li>
+          ))}
+        </ul>
+      );
+      const _dist = (id, entries, unit) => {
+        const _t = entries.reduce((s, [, c]) => s + c, 0);
+        return (
+          <div className="vcs-panel">
+            <div className="vcs-distribution">
+              <div className="vcs-chart-wrap"><canvas id={id}></canvas><div className="vcs-chart-center" aria-hidden="true"><strong>{formatNum(_t)}</strong><span>{unit}</span></div></div>
+              {_rankList(entries, unit)}
+            </div>
+          </div>
+        );
+      };
+      return (
+        <div className="vcs-root vrc-root">
+          <p className="vr-caption vcs-metric-scope">לפי יישוב המגורים כפי שנרשם ב-CRM · לידים ללא יישוב לא נכללים בדירוג</p>
+          <div className="vr-metric-grid">
+            <MetricCard label="יישובים" value={formatNum(_cityAll.length)} tone="indigo" icon={MapPin} description="יישובים שונים שנרשמו בתקופה" />
+            <MetricCard label="יישוב מוביל" value={topCity} tone="amber" icon={Trophy} className="vr-metric-text" description={formatNum(topCityData[metricKey] || 0) + ' ' + metricLabel} />
+            <MetricCard label="לידים עם יישוב" value={formatNum(_sumLeads)} tone="emerald" icon={Users} description="לידים שנרשם להם יישוב מגורים" />
+            <MetricCard label="ללא יישוב" value={formatNum(_noCity)} tone="sky" icon={Building2} description="לידים שלא נרשם להם יישוב" />
+          </div>
+          <ReportSection title="Top 10 יישובים" description={'לפי ' + metricLabel}
+            actions={<div className="client-tabs vr-inline-tabs" role="group" aria-label="בחירת מדד">
+              {[['leads', 'לידים'], ['meetings', 'פגישות'], ['contracts', 'חוזים']].map(([k, l]) => (
+                <button key={k} type="button" className={`client-tab ${cityMetric === k ? 'active' : ''}`} aria-pressed={cityMetric === k} onClick={() => setCityMetric(k)}>{l}</button>
+              ))}
+            </div>}>
+            <div className="vcs-panel">
+              <div className="vrc-grid">
+                <div className="vrc-chart"><canvas id="crmRepCityChart"></canvas></div>
+                {_rankList(cityEntries.map(([n, c]) => [n, c[metricKey] || 0]), metricLabel, (i) => COLORS[i] || 'var(--accent)')}
+              </div>
+            </div>
+          </ReportSection>
+          {isHiPark && lsEntries.length > 0 && (
+            <ReportSection title="מצב דיור" description="לפי לידים · כפי שנרשם בטופס הליד">{_dist('crmLivingStatusChart', lsEntries, 'לידים')}</ReportSection>
+          )}
+          {isHiPark && ptEntries.length > 0 && (
+            <ReportSection title="סוג נכס" description="באיזו דירה מתעניינים · ליד שסימן כמה סוגים נספר בכל אחד">{_dist('crmPropertyTypeChart', ptEntries, 'לידים')}</ReportSection>
+          )}
+        </div>
+      );
     }
 
     return (
@@ -1422,7 +1752,7 @@ const selectProject = async (client, project) => {
       )}
       </>
     );
-  }, [selectedMonth, reports, cityMetric, setCityMetric, selectedProject]);
+  }, [vrCity, selectedMonth, reports, cityMetric, setCityMetric, selectedProject]);
 
   // ==================== CRM RESPONSE TIME SUB-TAB ====================
   const renderCrmResponseDashboard = useCallback(() => {
@@ -1446,9 +1776,19 @@ const selectProject = async (client, project) => {
     const contactHourMerged = Array.from({ length: 24 }, () => 0);       // first-contact by hour
     const contactMeetingMerged = Array.from({ length: 24 }, () => 0);    // of those, matured to a scheduled meeting
     const noAnswerHourMerged = Array.from({ length: 24 }, () => 0);      // 'אין מענה' by contact-attempt hour
+    // חציון נלקח מהסיכום רק כשיש דוח CRM אחד לטווח (חציונים של כמה דוחות אינם ניתנים למיזוג).
+    // "טרם התקיימה שיחה" (noResponseByUser/BySource) — מסכם רק אם כל הדוחות כוללים את השדה (סכמה v34+).
+    let _rtReports = 0, _pendingComplete = true, _bizMedianOverall = null;
+    const pendingByUser = {}, pendingBySource = {};
     for (const r of crmRows) {
       const rt = r.summary && r.summary.responseTimeStats;
       if (!rt) continue;
+      _rtReports++;
+      if (rt.business && rt.business.medianMinutes != null) _bizMedianOverall = rt.business.medianMinutes;
+      if (rt.noResponseByUser && rt.noResponseBySource) {
+        for (const [k, n] of Object.entries(rt.noResponseByUser)) pendingByUser[k] = (pendingByUser[k] || 0) + n;
+        for (const [k, n] of Object.entries(rt.noResponseBySource)) pendingBySource[k] = (pendingBySource[k] || 0) + n;
+      } else _pendingComplete = false;
       totalLids += rt.totalLids || 0;
       respondedCount += rt.respondedCount || 0;
       noResponseCount += rt.noResponseCount || 0;
@@ -1494,12 +1834,14 @@ const selectProject = async (client, project) => {
         byUserMerged[k].count += v.count;
         byUserMerged[k].sumMinutes += v.avgMinutes * v.count;
         if (bUser[k]) byUserMerged[k].sumBusinessMinutes += bUser[k].avgMinutes * bUser[k].count;
+        if (bUser[k] && bUser[k].medianMinutes != null) byUserMerged[k].bizMedian = bUser[k].medianMinutes;
       }
       for (const [k, v] of Object.entries(rt.bySource || {})) {
         if (!bySourceMerged[k]) bySourceMerged[k] = { count: 0, sumMinutes: 0, sumBusinessMinutes: 0 };
         bySourceMerged[k].count += v.count;
         bySourceMerged[k].sumMinutes += v.avgMinutes * v.count;
         if (bSource[k]) bySourceMerged[k].sumBusinessMinutes += bSource[k].avgMinutes * bSource[k].count;
+        if (bSource[k] && bSource[k].medianMinutes != null) bySourceMerged[k].bizMedian = bSource[k].medianMinutes;
       }
     }
 
@@ -1534,11 +1876,11 @@ const selectProject = async (client, project) => {
           pointBackgroundColor: '#F59E0B', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
           fill: false, yAxisID: 'y1', order: 1 },
       ], {
-        x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } },
+        x: { grid: { display: false }, ticks: { font: { size: cfs(10), weight: '600' } } },
         y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
-             title: { display: true, text: 'מספר לידים', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+             title: { display: true, text: 'מספר לידים', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
         y1: { beginAtZero: true, position: 'left', max: 100,
-              title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+              title: { display: true, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' },
               ticks: { callback: v => v + '%' }, grid: { drawOnChartArea: false } },
       });
     }, 200));
@@ -1567,9 +1909,9 @@ const selectProject = async (client, project) => {
         ], {
           x: { grid: { display: false } },
           y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
-               title: { display: true, text: 'כמות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: 'כמות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
           y1: { beginAtZero: true, position: 'left', max: 100,
-                title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                title: { display: true, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' },
                 ticks: { callback: v => v + '%' }, grid: { drawOnChartArea: false } },
         });
       }, 300));
@@ -1583,14 +1925,21 @@ const selectProject = async (client, project) => {
         const labels = mdowOrder.map(k => (meetingDowMerged[k] && meetingDowMerged[k].name) || k);
         const counts = mdowOrder.map(k => (meetingDowMerged[k] && meetingDowMerged[k].count) || 0);
         const _max = Math.max(...counts);
-        createChart('meetingDowChart', 'bar', labels, [
+        if (vrResp) {
+          createChart('meetingDowChart', 'bar', ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'], [
+            { label: 'פגישות שתואמו', type: 'bar', data: counts, backgroundColor: '#2EC4B6', borderRadius: 6, maxBarThickness: 40 },
+          ], {
+            x: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' }, color: '#374151' } },
+            y: { beginAtZero: true, grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' }, grace: '15%' },
+          }, undefined, { plugins: [vrBarLabelsPlugin], options: { plugins: { legend: { display: false } } } });
+        } else createChart('meetingDowChart', 'bar', labels, [
           { label: 'פגישות שתואמו (לפי יום הפגישה)', type: 'bar', data: counts,
             backgroundColor: counts.map(c => c === _max && _max > 0 ? '#7C3AED' : '#C4B5FD'),
             borderRadius: 4, maxBarThickness: 46 },
         ], {
           x: { grid: { display: false } },
           y: { beginAtZero: true, grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
-               title: { display: true, text: 'מספר פגישות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: 'מספר פגישות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
         });
       }, 300));
     }
@@ -1608,17 +1957,33 @@ const selectProject = async (client, project) => {
     if (hourHasData) {
       pendingChartsRef.current.push(setTimeout(() => {
         const hLabels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
-        createChart('apptHourChart', 'bar', hLabels, [
+        if (vrResp) {
+          const _idx = Array.from({ length: 24 }, (_, h) => h).filter(h => leadHourMerged[h] > 0 || hourMerged[h] > 0 || contactHourMerged[h] > 0);
+          const _from = _idx.length ? Math.min(..._idx) : 8, _to = _idx.length ? Math.max(..._idx) : 20;
+          const _hours = Array.from({ length: _to - _from + 1 }, (_, i) => _from + i);
+          const _line = (color) => ({ borderColor: color, backgroundColor: color, borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 6,
+            pointBackgroundColor: color, pointBorderColor: '#FFFFFF', pointBorderWidth: 1.5, tension: 0, fill: false });
+          createChart('apptHourChart', 'line', _hours.map(h => h + ':00'), [
+            { label: 'לידים', data: _hours.map(h => leadHourMerged[h]), ..._line('#3B82F6') },
+            { label: 'תיאומי פגישות', data: _hours.map(h => hourMerged[h]), ..._line('#8B5CF6') },
+          ], {
+            x: { grid: { display: false }, ticks: { font: { size: cfs(11), weight: '600' }, color: '#374151', maxRotation: 0 } },
+            y: { beginAtZero: true, grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' } },
+          }, undefined, { options: { plugins: {
+            legend: { position: 'top', align: 'center', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 18, font: { weight: '600', size: 12 }, color: '#374151' } },
+            tooltip: { callbacks: { afterBody: (items) => { const h = _hours[items[0].dataIndex]; const c = contactHourMerged[h]; return c > 0 ? ['יצירת קשר: ' + c, '% המרה לפגישה: ' + contactRate[h] + '%'] : []; } } },
+          } } });
+        } else createChart('apptHourChart', 'bar', hLabels, [
           { label: 'לידים', type: 'bar', data: leadHourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 3 },
           { label: 'יצירת קשר', type: 'bar', data: contactHourMerged.slice(), backgroundColor: '#F59E0B', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 2 },
           { label: 'פגישות שתואמו', type: 'bar', data: hourMerged.slice(), backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
           { label: '% המרה לפגישה', type: 'line', data: contactRate, borderColor: '#EF4444', backgroundColor: '#EF4444', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, spanGaps: true, yAxisID: 'y1', order: 0 },
         ], {
-          x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' }, maxRotation: 0, autoSkip: false } },
+          x: { grid: { display: false }, ticks: { font: { size: cfs(9), weight: '600' }, maxRotation: 0, autoSkip: isNarrowViewport() } },
           y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
-               title: { display: true, text: 'כמות', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: 'כמות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
           y1: { beginAtZero: true, suggestedMax: 100, position: 'left', grid: { display: false }, ticks: { precision: 0, callback: (v) => v + '%' },
-               title: { display: true, text: '% המרה', font: { size: 10.5, weight: '700' }, color: '#EF4444' } },
+               title: { display: true, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#EF4444' } },
         });
       }, 350));
     }
@@ -1629,14 +1994,24 @@ const selectProject = async (client, project) => {
       pendingChartsRef.current.push(setTimeout(() => {
         const hLabels2 = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
         const _mx = Math.max(...noAnswerHourMerged);
-        createChart('noAnswerHourChart', 'bar', hLabels2, [
+        if (vrResp) {
+          const _idx2 = Array.from({ length: 24 }, (_, h) => h).filter(h => noAnswerHourMerged[h] > 0);
+          const _f2 = Math.min(..._idx2), _t2 = Math.max(..._idx2);
+          const _hrs2 = Array.from({ length: _t2 - _f2 + 1 }, (_, i) => _f2 + i);
+          createChart('noAnswerHourChart', 'bar', _hrs2.map(h => h + ':00'), [
+            { label: 'ניסיונות חיוג שלא נענו', type: 'bar', data: _hrs2.map(h => noAnswerHourMerged[h]), backgroundColor: '#F6AD3C', borderRadius: 6, maxBarThickness: 34 },
+          ], {
+            x: { grid: { display: false }, ticks: { font: { size: cfs(11), weight: '600' }, color: '#374151', maxRotation: 0 } },
+            y: { beginAtZero: true, grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' }, grace: '15%' },
+          }, undefined, { plugins: [vrBarLabelsPlugin], options: { plugins: { legend: { display: false } } } });
+        } else createChart('noAnswerHourChart', 'bar', hLabels2, [
           { label: 'לידים "אין מענה" (לפי שעת ניסיון יצירת קשר)', type: 'bar', data: noAnswerHourMerged.slice(),
             backgroundColor: noAnswerHourMerged.map(c => c === _mx && _mx > 0 ? '#DC2626' : '#FCA5A5'),
             borderRadius: 4, maxBarThickness: 26 },
         ], {
-          x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' }, maxRotation: 0, autoSkip: false } },
+          x: { grid: { display: false }, ticks: { font: { size: cfs(9), weight: '600' }, maxRotation: 0, autoSkip: isNarrowViewport() } },
           y: { beginAtZero: true, grid: { color: '#F2F4F8' }, ticks: { precision: 0 },
-               title: { display: true, text: 'מספר לידים', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: 'מספר לידים', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
         });
       }, 380));
     }
@@ -1653,18 +2028,43 @@ const selectProject = async (client, project) => {
 
     const userList = Object.entries(byUserMerged)
       .filter(([, v]) => v.count > 0)
-      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count) }))
+      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count),
+        bizMedian: _rtReports === 1 && v.bizMedian != null ? v.bizMedian : null, pending: _pendingComplete ? (pendingByUser[name] || 0) : null }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
+    if (vrResp && _pendingComplete) {
+      for (const [name, n] of Object.entries(pendingByUser)) {
+        if (!byUserMerged[name] && n > 0) userList.push({ name, count: 0, avg: null, bizAvg: null, bizMedian: null, pending: n });
+      }
+    }
 
     const sourceList = Object.entries(bySourceMerged)
       .filter(([, v]) => v.count >= 3)
-      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count) }))
+      .map(([name, v]) => ({ name, count: v.count, avg: Math.round(v.sumMinutes / v.count), bizAvg: Math.round((v.sumBusinessMinutes || 0) / v.count),
+        bizMedian: _rtReports === 1 && v.bizMedian != null ? v.bizMedian : null, pending: _pendingComplete ? (pendingBySource[name] || 0) : null }))
       .sort((a, b) => b.bizAvg - a.bizAvg)
       .slice(0, 10);
 
+    // עיצוב מחודש: ההסבר העסקי + 4 כרטיסי report-ui עם אותן הגדרות (ה-InfoTip הקיים → "הסבר המדד").
+    // חציון אינו זמין: הדוחות שומרים סיכומים (ממוצעים ודליים), לא זמן תגובה לכל ליד — לכן נשמרו המדדים הקיימים.
+    const _vrRespTips = ['כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות.', 'לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב.'];
     return (
-      <>
+      <div className={vrResp ? 'vrt-root' : undefined}>
+        {vrResp ? (<>
+          <p className="vrt-explanation"><Info size={18} aria-hidden="true" />זמן המענה נמדד מכניסת הליד ל-BMBY ועד הפעולה הראשונה של איש מכירות אנושי, בשעות העסקים בלבד. לידים שטרם קיבלו מענה מוצגים בנפרד ואינם נכללים בממוצע.</p>
+          <p className="vr-caption vcs-metric-scope">{formatNum(totalLids)} לידים שנכנסו בתקופה · {formatNum(respondedCount)} מהם עם מענה אנושי</p>
+          <div className="vr-metric-grid">
+            <MetricCard label={'סה"כ לידים'} value={formatNum(totalLids)} tone="indigo" icon={Users} details={_vrRespTips[0]}
+              onClick={_crmRespLeads?.allLeads?.length > 0 ? () => setNamedLeadsModal({title: 'סה"כ לידים', names: _crmRespLeads.allLeads}) : undefined} />
+            <MetricCard label="קיבלו מענה" value={formatNum(respondedCount)} tone="emerald" icon={CheckCircle2} details={_vrRespTips[1]}
+              description={totalLids > 0 ? Math.round(respondedCount / totalLids * 100) + '% מהלידים' : undefined} />
+            <MetricCard label="זמן מענה ממוצע" value={fmt(overallBusinessMin)} tone="sky" icon={Clock} details={_vrRespTips[2]}
+              description={respondedCount > 0 ? (_rtReports === 1 && _bizMedianOverall != null ? 'חציון ' + fmt(_bizMedianOverall) + ' · ' : '') + 'שעות עסקים · מתוך ' + formatNum(respondedCount) + ' לידים עם מענה' : undefined} />
+            <MetricCard label="בלי מענה" value={formatNum(noResponseCount)} tone="amber" icon={PhoneOff} details={_vrRespTips[3]}
+              description={totalLids > 0 ? 'מתוך ' + formatNum(totalLids) + ' לידים' : undefined}
+              onClick={_crmRespLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים בלי מענה', names: _crmRespLeads.noResponse}) : undefined} />
+          </div>
+        </>) : (
                 <div className="kpi-tier primary" style={{marginBottom:'36px'}}>
           <div className="kpi-c indigo" style={_crmRespLeads?.allLeads?.length > 0 ? {cursor:'pointer'} : undefined} onClick={_crmRespLeads?.allLeads?.length > 0 ? () => setNamedLeadsModal({title: 'סה"כ לידים', names: _crmRespLeads.allLeads}) : undefined}>
             <div className="ic-wrap">
@@ -1694,8 +2094,10 @@ const selectProject = async (client, project) => {
             <div className="lbl">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div>
             <div className="val">{noResponseCount}</div>
           </div>
-        </div>
+        </div>)}
 
+        {vrResp && <h2 className="vrt-group-title">מהירות המענה</h2>}
+        <div className={vrResp ? 'vrt-speed' : undefined}>
         <div className="section">
           <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>התפלגות זמני תגובה</h2><span className="sub">חלוקת לידים ל-7 דליי זמן</span></div>
           <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="responseBucketsChart"></canvas></div></div>
@@ -1707,40 +2109,46 @@ const selectProject = async (client, project) => {
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="dowChart"></canvas></div></div>
           </div>
         )}
+        </div>
 
+        {vrResp && <h2 className="vrt-group-title">דפוסי פגישות ומענה</h2>}
+        <div className={vrResp ? 'vrt-patterns' : undefined}>
         {meetingDowHasData && (
           <div className="section">
-            <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>יום מבוקש לפגישה</h2><span className="sub">באיזה יום בשבוע לקוחות רוצים להגיע לפגישה (לפי תאריך הפגישה שנקבע, ללא מבוטלות)</span></div>
+            <div className="section-head"><div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>יום מבוקש לפגישה</h2><span className="sub">{vrResp ? 'מתוך תיאומי פגישות' : 'באיזה יום בשבוע לקוחות רוצים להגיע לפגישה (לפי תאריך הפגישה שנקבע, ללא מבוטלות)'}</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="meetingDowChart"></canvas></div></div>
           </div>
         )}
 
         {hourHasData && (
           <div className="section">
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2><span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, מתי אנשי המכירות יצרו קשר, וכמה פגישות תואמו. הקו האדום = פגישות שנקבעו באותה שעה חלקי יצירות הקשר באותה שעה (אחוז המרה)</span></div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2>{!vrResp && <span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, מתי אנשי המכירות יצרו קשר, וכמה פגישות תואמו. הקו האדום = פגישות שנקבעו באותה שעה חלקי יצירות הקשר באותה שעה (אחוז המרה)</span>}</div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="apptHourChart"></canvas></div></div>
           </div>
         )}
 
         {noAnswerTotal > 0 && (
           <div className="section">
-            <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><h2>שעות אין מענה</h2><span className="sub">באילו שעות נרשמו הכי הרבה לידים עם התנגדות "אין מענה" (Bad Contact / Invalid Phone), לפי שעת ניסיון יצירת הקשר</span></div>
+            <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><h2>{vrResp ? 'שעות ללא מענה' : 'שעות אין מענה'}</h2><span className="sub">{vrResp ? 'ניסיונות חיוג שלא נענו' : 'באילו שעות נרשמו הכי הרבה לידים עם התנגדות "אין מענה" (Bad Contact / Invalid Phone), לפי שעת ניסיון יצירת הקשר'}</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="noAnswerHourChart"></canvas></div></div>
           </div>
         )}
+        </div>
 
-        <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
+        <div className={vrResp ? 'vrt-tables' : 'chart-grid'} style={vrResp ? undefined : {gridTemplateColumns: '1fr 1fr'}}>
           <div className="section">
             <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><h2>זמן מענה לפי איש מכירות</h2></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
-                <thead><tr><th>איש מכירות</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
+                <thead><tr><th>איש מכירות</th><th>{vrResp ? 'לידים עם שיחה' : 'לידים'}</th><th>{vrResp ? 'זמן ממוצע' : 'זמן מענה ממוצע'}</th>{vrResp && <th>זמן חציוני</th>}{vrResp && <th>טרם התקיימה שיחה</th>}</tr></thead>
                 <tbody>
                   {userList.map(u => (
                     <tr key={u.name}>
                       <td style={{fontWeight:600}}>{u.name}</td>
                       <td>{u.count}</td>
-                      <td style={{fontWeight:600,color:'var(--accent)'}}>{fmt(u.bizAvg)}</td>
+                      <td style={{fontWeight:600,color:'var(--accent)'}}>{u.count > 0 ? fmt(u.bizAvg) : '—'}</td>
+                      {vrResp && <td>{u.count === 0 ? '—' : u.bizMedian != null ? fmt(u.bizMedian) : 'אין נתון'}</td>}
+                      {vrResp && <td>{u.pending != null ? u.pending : 'אין נתון'}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -1748,16 +2156,17 @@ const selectProject = async (client, project) => {
             </div>
           </div>
           <div className="section">
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="20" x2="2" y2="14"/><line x1="7" y1="20" x2="7" y2="8"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="17" y1="20" x2="17" y2="10"/><line x1="22" y1="20" x2="22" y2="2"/></svg></div><h2>הכי איטיים - לפי מקור</h2></div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="20" x2="2" y2="14"/><line x1="7" y1="20" x2="7" y2="8"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="17" y1="20" x2="17" y2="10"/><line x1="22" y1="20" x2="22" y2="2"/></svg></div><h2>{vrResp ? 'מקורות עם זמן המענה הארוך ביותר' : 'הכי איטיים - לפי מקור'}</h2></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
-                <thead><tr><th>מקור</th><th>לידים</th><th>זמן מענה ממוצע</th></tr></thead>
+                <thead><tr><th>מקור</th><th>{vrResp ? 'לידים עם שיחה' : 'לידים'}</th><th>זמן מענה ממוצע</th>{vrResp && <th>טרם התקיימה שיחה</th>}</tr></thead>
                 <tbody>
                   {sourceList.map(s => (
                     <tr key={s.name}>
-                      <td style={{fontWeight:600,fontSize:13}}>{s.name}</td>
+                      <td className={vrResp ? 'vrt-source' : undefined} style={{fontWeight:600,fontSize:13}}>{s.name}</td>
                       <td>{s.count}</td>
                       <td style={{fontWeight:600,color:'var(--accent)'}}>{fmt(s.bizAvg)}</td>
+                      {vrResp && <td>{s.pending != null ? s.pending : 'אין נתון'}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -1765,9 +2174,9 @@ const selectProject = async (client, project) => {
             </div>
           </div>
         </div>
-      </>
+      </div>
     );
-  }, [selectedMonth, reports]);
+  }, [vrResp, selectedMonth, reports]);
 
     // ==================== CRM OBJECTIONS SUB-TAB ====================
   const renderCrmObjectionsDashboard = useCallback(() => {
@@ -1806,6 +2215,10 @@ const selectProject = async (client, project) => {
 
     const objEntries = Object.entries(objCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
     const total = objEntries.reduce((s, [, c]) => s + c, 0);
+    // העיצוב המחודש: האחוזים והמרכז מחושבים מכלל ההתנגדויות (לא רק 10 הראשונות), כדי שכרטיס
+    // "סה"כ התנגדויות" ומרכז הדונאט יראו את אותו מספר.
+    const totalAll = Object.values(objCounts).reduce((s, c) => s + c, 0);
+    const objTypes = Object.keys(objCounts).length;
 
     if (objEntries.length === 0) {
       return <div className="welcome-center"><div className="icon">🚫</div><h3>אין נתוני התנגדויות לתקופה זו</h3></div>;
@@ -1818,9 +2231,43 @@ const selectProject = async (client, project) => {
       destroyCharts();
       createChart('crmObjChart', 'doughnut', topNames, [{
         data: topCounts,
-        backgroundColor: COLORS.slice(0, topNames.length),
-      }], undefined, _openObj);
+        backgroundColor: vrObj ? topNames.map((_, i) => VCS_PALETTE[i % VCS_PALETTE.length]) : COLORS.slice(0, topNames.length),
+      }], undefined, _openObj, vrObj ? { options: { plugins: { legend: { display: false } } } } : undefined);
     }, 200));
+
+    if (vrObj) {
+      const [topName, topCount] = objEntries[0];
+      const _pctOf = (c) => totalAll > 0 ? Math.round(c / totalAll * 100) : 0;
+      const _canOpen = (name) => (_leadsByObj[name] || []).length > 0;
+      return (
+        <div className="vcs-root vro-root">
+          <p className="vr-caption vcs-metric-scope">התנגדויות שנרשמו ללידים בתקופה · ליד עם כמה התנגדויות נספר בכל אחת מהן</p>
+          <div className="vr-metric-grid">
+            <MetricCard label="לידים עם התנגדות" value={formatNum(rowsWithObjection)} tone="rose" icon={Ban} description="לידים שנרשמה להם לפחות התנגדות אחת" />
+            <MetricCard label={'סה"כ התנגדויות'} value={formatNum(totalAll)} tone="indigo" icon={ClipboardList} description="כל ההתנגדויות שנרשמו בתקופה" />
+            <MetricCard label="סוגי התנגדויות" value={formatNum(objTypes)} tone="sky" icon={ListChecks} description="סוגים שונים אחרי איחוד ניסוחים" />
+            <MetricCard label="ההתנגדות המובילה" value={topName} tone="amber" icon={MessageSquareWarning} className="vr-metric-text" description={formatNum(topCount) + ' לידים · ' + _pctOf(topCount) + '%'} onClick={_canOpen(topName) ? () => _openObj(topName) : undefined} />
+          </div>
+          <ReportSection title="התפלגות ההתנגדויות" description="10 ההתנגדויות הנפוצות · לחיצה על התנגדות פותחת את רשימת הלידים">
+            <div className="vcs-panel">
+              <div className="vcs-distribution">
+                <div className="vcs-chart-wrap"><canvas id="crmObjChart"></canvas><div className="vcs-chart-center" aria-hidden="true"><strong>{formatNum(totalAll)}</strong><span>התנגדויות</span></div></div>
+                <ul className="vcs-legend" aria-label="התנגדויות לפי סוג">
+                  {objEntries.map(([name, count], i) => {
+                    const clickable = _canOpen(name);
+                    return (
+                      <li key={name} className={clickable ? 'vro-clickable' : undefined} onClick={clickable ? () => _openObj(name) : undefined} title={clickable ? 'לחיצה לרשימת הלידים' : undefined}>
+                        <span className={`vcs-dot vcs-color-${i % 7}`} aria-hidden="true" /><span className="vcs-legend-label">{name}</span><strong><bdi>{formatNum(count)}</bdi> <em>({_pctOf(count)}%)</em></strong>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          </ReportSection>
+        </div>
+      );
+    }
 
     return (
       <div className="section">
@@ -1860,7 +2307,7 @@ const selectProject = async (client, project) => {
         </ul>
       </div>
     );
-  }, [selectedMonth, reports]);
+  }, [vrObj, selectedMonth, reports]);
 
   // היסטוריית ההערות של ליד — נמשכת חי מ-BMBY בלחיצה, לא נשמרת בדוח.
   // הסיבה: הסנכרון הלילי מושך משימות רק בטווח התקופה שמסונכרנת, אז ליד שנכנס במרץ
@@ -1921,6 +2368,45 @@ const selectProject = async (client, project) => {
       XLSX.writeFile(wb, 'פגישות-שבוצעו_' + (selectedMonth || '') + '.xlsx');
     };
 
+    if (vrMeet) {
+      // העיצוב המחודש: כרטיסים מהרשימה הקיימת בלבד (ספירות), הטבלה והייצוא ללא שינוי.
+      const _uniqLeads = new Set(meetings.map(m => m.cid ? 'c:' + m.cid : m.phone ? 'p:' + m.phone : 'n:' + (m.name || ''))).size;
+      const _bySrc = {};
+      meetings.forEach(m => { const s = m.source || 'ללא מקור'; _bySrc[s] = (_bySrc[s] || 0) + 1; });
+      const _topSrc = Object.entries(_bySrc).sort((a, b) => b[1] - a[1])[0];
+      const _withDesc = meetings.filter(m => (m.description || '').toString().trim()).length;
+      return (
+        <div className="vrm-root">
+          <p className="vr-caption vcs-metric-scope">פגישות שסומנו ב-CRM כבוצעו בתקופה · לחיצה על שורה פותחת את היסטוריית ההערות של הליד</p>
+          <div className="vr-metric-grid">
+            <MetricCard label="פגישות שבוצעו" value={formatNum(meetings.length)} tone="emerald" icon={CalendarCheck} description="פגישות שסומנו כבוצעו בתקופה" />
+            <MetricCard label="לידים שנפגשו" value={formatNum(_uniqLeads)} tone="indigo" icon={Users} description="לידים ייחודיים מאחורי הפגישות" />
+            <MetricCard label="מקור מוביל" value={_topSrc ? _topSrc[0] : 'אין נתון'} tone="sky" icon={Tag} className="vr-metric-text" description={_topSrc ? formatNum(_topSrc[1]) + ' פגישות · ' + formatNum(Object.keys(_bySrc).length) + ' מקורות' : undefined} />
+            <MetricCard label="עם סיכום פגישה" value={formatNum(_withDesc)} tone="violet" icon={NotebookPen} description="פגישות שנרשם להן תיאור ב-CRM" />
+          </div>
+          <ReportSection title="רשימת הפגישות" description={formatNum(meetings.length) + ' פגישות · מהחדשה לישנה'}
+            actions={<button type="button" className="vr-button" onClick={exportMeetings} title="ייצוא הטבלה כפי שהיא לקובץ אקסל"><Download size={16} aria-hidden="true" />ייצוא לאקסל</button>}>
+            <div className="table-wrapper">
+              <table className="data-table vrm-table">
+                <thead><tr><th>{'שם מלא'}</th><th>{'טלפון'}</th><th>{'מקור הגעה'}</th><th>{'תאריך פגישה'}</th><th>{'תיאור'}</th></tr></thead>
+                <tbody>
+                  {meetings.map((m, i) => (
+                    <tr key={i} onClick={m.cid ? () => openLeadNotes(m) : undefined} title={m.cid ? 'לחץ לכל היסטוריית ההערות של הליד' : ''} style={m.cid ? {cursor:'pointer'} : undefined}>
+                      <td className="vrm-name">{m.cid ? <NotebookPen size={14} aria-hidden="true" /> : null}{m.name || '—'}</td>
+                      <td className="vrm-phone">{m.phone || '—'}</td>
+                      <td className="vrm-source"><SourceMark name={m.source || ''} />{m.source || '—'}</td>
+                      <td className="vrm-date">{fmtDate(m.date)}</td>
+                      <td className="vrm-desc">{m.description || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </ReportSection>
+        </div>
+      );
+    }
+
     return (
       <div className="section">
         <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h2>{'פגישות שבוצעו'}</h2><span className="sub">{meetings.length + ' פגישות בתקופה'}</span>
@@ -1947,7 +2433,7 @@ const selectProject = async (client, project) => {
         </div>
       </div>
     );
-  }, [selectedMonth, reports, openLeadNotes]);
+  }, [vrMeet, selectedMonth, reports, openLeadNotes]);
 
     const renderCrmAdsDashboard = useCallback(() => {
       if (!selectedMonth || reports.length === 0) return null;
@@ -2130,7 +2616,8 @@ const selectProject = async (client, project) => {
     // הישנה — שם כל שלב קיבל גוון אחר, מה שרומז על זהויות שונות במקום על רצף אחד.
     // המספרים נשארים בצבע טקסט; הצבע יושב על הפס בלבד. הביטולים הם צבע מצב (ורוד)
     // ומסומנים גם בחץ ↳ וגם בטקסט, כדי שהם לא ייקראו כשלב ברצף.
-    const renderFunnelBar = useCallback(() => {
+    // channelOverride — טאב Facebook/Google: המשפך מסונן לערוץ הטאב בלי בורר (הבורר נשאר ב"הכל" וב-CRM).
+    const renderFunnelBar = useCallback((vr = false, channelOverride = null) => {
       const MIN_N = 30;
       const RAMP = ['#ddd6fe', '#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95'];
       const LEAK = '#e11d48';
@@ -2140,46 +2627,155 @@ const selectProject = async (client, project) => {
       const fbR = _rows.filter(r => r.source === 'facebook');
       const gR = _rows.filter(r => r.source && r.source.startsWith('google'));
 
-      const _nlRoot = crmR[0]?.summary?.namedLeads || null;
-      const _nl = _nlRoot ? (_nlRoot.all ? _nlRoot : { all: _nlRoot }) : null;
-      const g = _nl ? (funnelChannel === 'facebook' ? _nl.facebook : funnelChannel === 'google' ? _nl.google : _nl.all) : null;
-      const L = (a) => (Array.isArray(a) ? a.length : null);
+      // ── תחנות המשפך לפי מבנה ה-CRM ──────────────────────────────────────────
+      // שלבי המדיה (חשיפות, קליקים) זהים לכל הלקוחות. מהלידים והלאה לכל CRM יש
+      // שרשרת משלו: BMBY מחזיק namedLeads (רשימות שמיות לכל שלב), Salesforce מחזיק
+      // funnelCohort, ו-Zoho מחזיק funnel.byChannel.
+      //
+      // אין כאן אף אחוז חדש: כל מכנה נלקח מהמכנים שכבר מוצגים היום במסכים של אותו
+      // לקוח (ב-KLOSS — שדות rate* של funnelCohort ושורות "מה קרה ללידים של החודש";
+      // באריקה — "אחוז המרה לעסקה" שהוא רכישות חלקי לידים). חיבור עיוור של שתי
+      // שורות סמוכות אסור לפי MASTER-INSTRUCTIONS.
+      const _crmType = crmR.find(r => r.summary && r.summary.crmType)?.summary?.crmType || 'bmby';
+      // Salesforce (KLOSS) מסווג לידים לפי מקור הגעה ולא לפי פלטפורמת מדיה — אין לו
+      // פילוח facebook/google, ולכן אין בורר ערוץ (ואין משפך בטאבי Facebook/Google).
+      const _noChannelSplit = _crmType === 'salesforce';
+      const channel = _noChannelSplit ? 'all' : (channelOverride || funnelChannel);
 
-      const mediaRows = funnelChannel === 'facebook' ? fbR : funnelChannel === 'google' ? gR : [...fbR, ...gR];
-      let hasMedia = false, impr = 0, clk = 0;
+      const mediaRows = channel === 'facebook' ? fbR : channel === 'google' ? gR : [...fbR, ...gR];
+      let hasMedia = false, impr = 0, clk = 0, mediaSpend = 0;
       for (const r of mediaRows) {
         const sm = r.summary || {};
         if (sm.impressions != null || sm.clicks != null) hasMedia = true;
         impr += Number(sm.impressions) || 0;
         clk += Number(sm.clicks) || 0;
+        mediaSpend += Number(sm.spend) || 0;
       }
-      const chF = fbR.length > 0, chG = gR.length > 0;
+      // CPM מוצג מתחת ל"חשיפות" (ויטלי, 21.9). זו עלות אלף חשיפות בתקופה — אותה
+      // הוצאה ואותן חשיפות שמוצגות בכרטיסים, בלי חישוב חדש.
+      const _cpm = (hasMedia && impr > 0) ? (mediaSpend / impr) * 1000 : null;
+      const _cpmLabel = _cpm != null ? ('CPM ' + formatCurrency(_cpm)) : '';
+      let chF = fbR.length > 0, chG = gR.length > 0;
 
-      const leads = g ? L(g.allLeads) : null;
-      const noResp = g ? L(g.noResponse) : null;
-      const V = {
-        impr: hasMedia ? impr : null,
-        click: hasMedia ? clk : null,
-        lead: leads,
-        cont: (leads != null && noResp != null) ? leads - noResp : null,
-        sched: g ? L(g.meetingsScheduled) : null,
-        held: g ? L(g.meetingsCompleted) : null,
-        canc: g ? L(g.meetingsCancelled) : null,
-        reg: g ? L(g.registrations) : null,
-        deal: g ? L(g.contracts) : null,
-      };
-
-      const STAGES = [
-        { key: 'impr',  label: 'חשיפות',          of: null,    ofLabel: 'ראש המשפך' },
-        { key: 'click', label: 'קליקים על קישור', of: 'impr',  ofLabel: 'מהחשיפות' },
-        { key: 'lead',  label: 'לידים',            of: 'click', ofLabel: 'מהקליקים' },
-        { key: 'cont',  label: 'נוצר קשר',         of: 'lead',  ofLabel: 'מהלידים' },
-        { key: 'sched', label: 'פגישה נקבעה',      of: 'cont',  ofLabel: 'מנוצר קשר' },
-        { key: 'held',  label: 'פגישות שהגיעו',    of: 'sched', ofLabel: 'מהפגישות שנקבעו' },
-        { key: 'canc',  label: 'פגישות שהתבטלו',   of: 'sched', ofLabel: 'מהפגישות שנקבעו', leak: true },
-        { key: 'reg',   label: 'הרשמות',           of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
-        { key: 'deal',  label: 'חוזים',            of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
+      // שתי תחנות הפתיחה משותפות לכל ה-CRM.
+      const AD_STAGES = [
+        { key: 'impr',  label: 'חשיפות',          of: null,   ofLabel: _cpmLabel || 'ראש המשפך' },
+        { key: 'click', label: 'קליקים על קישור', of: 'impr', ofLabel: 'מהחשיפות' },
       ];
+      const AD_V = { impr: hasMedia ? impr : null, click: hasMedia ? clk : null };
+      const MEDIA_NOTE = 'חשיפות וקליקים הם נתוני פרסום בתקופה, לא אנשים ייחודיים.';
+
+      let V, STAGES, scopeNote, flowDesc, cohortCfg;
+      if (_crmType === 'salesforce') {
+        // KLOSS: קוהורט הלידים של התקופה. אותן שורות ואותם מכנים כמו "מה קרה ללידים
+        // של החודש" במסך הרשת, ובתוספת שתי תחנות המדיה שמעליהן.
+        const _fc = (crmR.find(r => r.summary && r.summary.funnelCohort)?.summary || {}).funnelCohort || null;
+        const N = (x) => (_fc && x != null ? x : null);
+        V = {
+          ...AD_V,
+          lead:    N(_fc && _fc.leads),
+          sfSched: N(_fc && _fc.meetings),
+          sfNoShow:N(_fc && _fc.noShow),
+          sfArr:   N(_fc && _fc.arrived),
+          sfOpp:   N(_fc && _fc.opportunities),
+          sfQuote: N(_fc && _fc.quotes),
+          sfPaid:  N(_fc && _fc.paid),
+          sfLost:  N(_fc && _fc.lost),
+        };
+        STAGES = [
+          ...AD_STAGES,
+          { key: 'lead',     label: 'לידים',             of: 'click',   ofLabel: 'מהקליקים' },
+          { key: 'sfSched',  label: 'תיאמו פגישה',       of: 'lead',    ofLabel: 'מהלידים' },
+          { key: 'sfNoShow', label: 'לא הגיעו לפגישה',   of: 'sfSched', ofLabel: 'מהפגישות שנקבעו', leak: true },
+          { key: 'sfArr',    label: 'הגיעו לפגישה',      of: 'sfSched', ofLabel: 'מהפגישות שנקבעו' },
+          { key: 'sfOpp',    label: 'עברו להזדמנות',     of: 'sfArr',   ofLabel: 'מהפגישות שהגיעו' },
+          { key: 'sfQuote',  label: 'קיבלו הצעת מחיר',   of: 'sfOpp',   ofLabel: 'מההזדמנויות' },
+          { key: 'sfPaid',   label: 'שילמו מקדמה',       of: 'sfQuote', ofLabel: 'ממי שקיבלו הצעת מחיר' },
+          { key: 'sfLost',   label: 'לא רכשו',           of: 'sfOpp',   ofLabel: 'מההזדמנויות', leak: true },
+        ];
+        flowDesc = 'מחשיפה ועד תשלום מקדמה';
+        scopeNote = 'הלידים שנוצרו בתקופה ומה קרה להם — התוצאות עשויות להתעדכן בהמשך. ' + MEDIA_NOTE
+          + ' "לא הגיעו לפגישה" נמדד מהפגישות שנקבעו ו"לא רכשו" מההזדמנויות — שניהם ענפים ולא תחנות ברצף.';
+        cohortCfg = null; // אין פילוח ערוץ, ולכן אין תצוגת קוהורט בטאבי Facebook/Google
+      } else if (_crmType === 'zoho') {
+        // אריקה כרמל: לידים ← הזדמנויות ← רכישות, עם ענף ביטולים. שמות התחנות זהים
+        // לכרטיסי ה-KPI של הטאב. "עברו להזדמנות" ו"רכשו" נמדדים שניהם מהלידים, כי זה
+        // המכנה של "אחוז המרה לעסקה" הקיים; אין כאן מעבר הזדמנות←רכישה שלא הוצג עד היום.
+        const _zf = (crmR.find(r => r.summary && r.summary.funnel)?.summary || {}).funnel || null;
+        const _byCh = (_zf && _zf.byChannel) || [];
+        const _hasCh = (c) => _byCh.some(x => x.channel === c);
+        chF = chF && _hasCh('facebook');
+        chG = chG && _hasCh('google');
+        const _sc = channel === 'all' ? _zf : (_byCh.find(c => c.channel === channel) || null);
+        // אין שורת ערוץ ב-CRM → אין משפך לערוץ הזה. עדיף לא להציג אותו מאשר להציג
+        // חשיפות וקליקים של פייסבוק מעל שרשרת CRM שכולה "אין נתון".
+        if (channel !== 'all' && !_sc) return null;
+        const N = (x) => (_sc && x != null ? x : null);
+        V = {
+          ...AD_V,
+          lead:   N(_sc && _sc.leads),
+          zOpp:   N(_sc && _sc.opportunities),
+          zBuy:   N(_sc && _sc.purchased),
+          zCanc:  N(_sc && _sc.cancellations),
+        };
+        STAGES = [
+          ...AD_STAGES,
+          { key: 'lead',  label: 'לידים',          of: 'click', ofLabel: 'מהקליקים' },
+          { key: 'zOpp',  label: 'עברו להזדמנות',  of: 'lead',  ofLabel: 'מהלידים' },
+          { key: 'zBuy',  label: 'רכשו',           of: 'lead',  ofLabel: 'מהלידים' },
+          { key: 'zCanc', label: 'ביטולים',        of: 'zBuy',  ofLabel: 'מהרכישות', leak: true },
+        ];
+        flowDesc = 'מחשיפה ועד רכישה';
+        scopeNote = 'לידים שנכנסו בתקופה. ' + MEDIA_NOTE
+          + ' "עברו להזדמנות" ו"רכשו" נמדדים שניהם מהלידים; "ביטולים" נמדד מהרכישות.';
+        cohortCfg = {
+          // ויטלי (21.9): למשפך של אריקה יש פחות תחנות מזה של ש.ברוך, ולכן שתי תחנות
+          // המדיה בכרטיסים הקטנים שמעל נראו מנותקות. כאן הן נכנסות לאותה שורה עם שאר
+          // התחנות, ו"ביטולים" נשאר ענף מתחת ל"רכשו".
+          inlineMedia: true,
+          stageKeys: ['impr', 'click', 'lead', 'zOpp', 'zBuy'],
+          leak: { key: 'zCanc', parentStageId: 'zBuy', denomNoun: 'רכישות' },
+          transitionNote: 'אחוזי המעבר מוצגים מהשלב הקודם, למעט "רכשו" שנמדד מהלידים; הביטולים נמדדים מהרכישות.',
+        };
+      } else {
+        const _nlRoot = crmR[0]?.summary?.namedLeads || null;
+        const _nl = _nlRoot ? (_nlRoot.all ? _nlRoot : { all: _nlRoot }) : null;
+        const g = _nl ? (channel === 'facebook' ? _nl.facebook : channel === 'google' ? _nl.google : _nl.all) : null;
+        const L = (a) => (Array.isArray(a) ? a.length : null);
+        const leads = g ? L(g.allLeads) : null;
+        const noResp = g ? L(g.noResponse) : null;
+        V = {
+          ...AD_V,
+          lead: leads,
+          cont: (leads != null && noResp != null) ? leads - noResp : null,
+          sched: g ? L(g.meetingsScheduled) : null,
+          held: g ? L(g.meetingsCompleted) : null,
+          canc: g ? L(g.meetingsCancelled) : null,
+          reg: g ? L(g.registrations) : null,
+          deal: g ? L(g.contracts) : null,
+        };
+        STAGES = [
+          ...AD_STAGES,
+          { key: 'lead',  label: 'לידים',            of: 'click', ofLabel: 'מהקליקים' },
+          { key: 'cont',  label: 'נוצר קשר',         of: 'lead',  ofLabel: 'מהלידים' },
+          // ויטלי (21.9): שתי התחנות האלה נמדדות מסך הלידים ולא מהתחנה שלפניהן. "פגישה
+          // נקבעה מתוך נוצר קשר" הוא יחס פנימי של צוות המכירות; מה שמעניין הוא כמה
+          // מכלל הלידים הגיעו לפגישה בפועל.
+          { key: 'sched', label: 'פגישה נקבעה',      of: 'lead',  ofLabel: 'מהלידים' },
+          { key: 'held',  label: 'פגישות שהגיעו',    of: 'lead',  ofLabel: 'מהלידים' },
+          { key: 'canc',  label: 'פגישות שהתבטלו',   of: 'sched', ofLabel: 'מהפגישות שנקבעו', leak: true },
+          { key: 'reg',   label: 'הרשמות',           of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
+          { key: 'deal',  label: 'חוזים',            of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
+        ];
+        flowDesc = 'מחשיפה ועד חוזה';
+        scopeNote = 'לידים שנכנסו בתקופה. ' + MEDIA_NOTE
+          + ' "פגישות שהתבטלו" נמדד מהפגישות שנקבעו, כמו "הגיעו".';
+        cohortCfg = {
+          stageKeys: ['lead', 'cont', 'sched', 'held', 'reg', 'deal'],
+          leak: { key: 'canc', parentStageId: 'sched', denomNoun: 'פגישות שנקבעו' },
+          transitionNote: null, // ברירת המחדל של CohortFunnel
+        };
+      }
       if (STAGES.every(st => V[st.key] == null)) return null;
 
       // "0.035%" חסר משמעות בדיוק כמו אחוז בלי n. מתחת לחצי אחוז עוברים ל"1 מכל N".
@@ -2204,15 +2800,83 @@ const selectProject = async (client, project) => {
       const anyWeak = rows.some(r => r.value != null && r.weak);
       const missing = rows.filter(r => r.value == null);
 
+      if (vr === 'cohort') {
+        // מקורות הגעה (עיצוב מחודש): פס נתוני פרסום (חשיפות, קליקים) + שלבי הקבוצה + ענף ביטולים —
+        // אותם ערכים/מכנים/אחוזים כמו הסרגל הישן, ברכיב CohortFunnel של החבילה.
+        if (!cohortCfg) return null;
+        const byKey = Object.fromEntries(rows.map(r => [r.key, r]));
+        const denomLabel = (r) => r.denom != null ? `מתוך ${formatNum(r.denom)} ${r.ofLabel.replace(/^מ/, '')}` : r.ofLabel;
+        const STAGE_ICON = { lead: Users, cont: Phone, sched: CalendarCheck, held: UserCheck, reg: FileText, deal: FileSignature, zOpp: Handshake, zBuy: CheckCircle2, impr: Eye, click: MousePointerClick };
+        const STAGE_TONE = { lead: 'indigo', cont: 'emerald', sched: 'sky', held: 'indigo', reg: 'emerald', deal: 'rose', zOpp: 'sky', zBuy: 'emerald', impr: 'violet', click: 'violet' };
+        const stage = (k) => { const r = byKey[k]; return { id: k, label: r.label, icon: STAGE_ICON[k], tone: STAGE_TONE[k], value: r.value == null ? null : formatNum(r.value),
+          rate: (r.value != null && r.of && r.pct != null) ? fmtPct(r.pct) : null, denominatorLabel: r.of ? denomLabel(r) : (r.ofLabel === 'ראש המשפך' ? '' : (r.ofLabel || '')), smallSample: !!(r.value != null && r.weak) }; };
+        const canc = cohortCfg.leak ? byKey[cohortCfg.leak.key] : null;
+        const model = {
+          advertising: cohortCfg.inlineMedia ? [] : ['impr', 'click'].map(k => ({ id: k, label: byKey[k].label, value: byKey[k].value == null ? null : formatNum(byKey[k].value) })),
+          stages: cohortCfg.stageKeys.map(stage),
+          cancellation: canc ? { parentStageId: cohortCfg.leak.parentStageId, value: canc.value == null ? null : formatNum(canc.value), denominatorLabel: canc.denom != null ? `מתוך ${formatNum(canc.denom)} ${cohortCfg.leak.denomNoun}` : '' } : null,
+          transitionNote: cohortCfg.transitionNote,
+          scopeNote: 'חשיפות וקליקים: נתוני הפרסום בתקופה. מלידים והלאה: התקדמות הלידים שנכנסו בתקופה.' + (missing.length > 0 ? ' "אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + '.' : ''),
+        };
+        if (channelOverride) {
+          // טאב Facebook/Google (design/handoff-facebook): הקוהורט של הערוץ בלבד, בלי בורר פלטפורמה.
+          const _chName = channel === 'facebook' ? 'Facebook' : 'Google';
+          return (
+            <ReportSection title="מה קרה ללידים שנכנסו בתקופה" description={'לידים שנכנסו מ-' + _chName + ' בתקופה, לפי שיוך המקור ב-CRM · חשיפות וקליקים: נתוני הפרסום המצטברים של ' + _chName + ' בתקופה, בנפרד מהקוהורט'}>
+              <div className="vcs-root vfb-funnel"><CohortFunnel model={model} platforms={[]} selectedPlatform={channel} /></div>
+            </ReportSection>
+          );
+        }
+        const platforms = [{ id: 'all', label: 'הכל' }, chF ? { id: 'facebook', label: 'Facebook' } : null, chG ? { id: 'google', label: 'Google' } : null].filter(Boolean);
+        return (
+          <ReportSection title="משפך לידים" description={flowDesc + " · כל אחוז נמדד מהמכנה הרשום לידו"}>
+            <CohortFunnel model={model} platforms={platforms} selectedPlatform={funnelChannel} onPlatformChange={setFunnelChannel} />
+          </ReportSection>
+        );
+      }
+      if (vr) {
+        // עיצוב מחודש: אותן תחנות, אותם מכנים ואותם אחוזים — ברכיב Funnel של report-ui.
+        const VR_TONE = { impr: 'indigo', click: 'indigo', lead: 'emerald', cont: 'emerald', sched: 'sky', held: 'terra', canc: 'rose', reg: 'emerald', deal: 'rose',
+          sfSched: 'sky', sfNoShow: 'rose', sfArr: 'terra', sfOpp: 'emerald', sfQuote: 'sky', sfPaid: 'emerald', sfLost: 'rose',
+          zOpp: 'sky', zBuy: 'emerald', zCanc: 'rose' };
+        const VR_ICON = { impr: Eye, click: MousePointerClick, lead: Users, cont: Handshake, sched: CalendarCheck, held: CheckCircle2, canc: XCircle, reg: ClipboardList, deal: FileSignature,
+          sfSched: CalendarCheck, sfNoShow: XCircle, sfArr: UserCheck, sfOpp: Handshake, sfQuote: FileText, sfPaid: CheckCircle2, sfLost: Ban,
+          zOpp: Handshake, zBuy: CheckCircle2, zCanc: XCircle };
+        const items = rows.map(r => ({
+          // leak — ענף ולא שלב ברצף. הרכיב מוריד אותו לשורה שנייה על רקע אדום,
+          // מתחת לשלב שממנו הוא מסתעף (ויטלי, 21.9).
+          id: r.key, label: r.label, tone: VR_TONE[r.key], icon: VR_ICON[r.key], leak: !!r.leak,
+          value: r.value == null ? null : formatNum(r.value),
+          rate: (r.value != null && r.of) ? ((r.weak && r.pct != null ? '~' : '') + fmtPct(r.pct)) : null,
+          denominatorLabel: r.of ? (r.ofLabel + (r.denom != null ? ' (' + formatNum(r.denom) + ')' : '')) : (r.ofLabel === 'ראש המשפך' ? '' : (r.ofLabel || '')),
+        }));
+        const notes = [scopeNote];
+        if (anyWeak) notes.push('~ אחוז על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו.');
+        if (missing.length > 0) notes.push('"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — אין מקור נתונים לשלב הזה בטווח הנבחר.');
+        if (!_noChannelSplit && funnelChannel === 'all' && chF && chG) notes.push('תצוגת "הכל" מערבבת טופס מיידי ודף נחיתה; להשוואה אמיתית בחר ערוץ בודד.');
+        const actions = (!_noChannelSplit && (chF || chG)) ? (
+          <div className="client-tabs vr-inline-tabs" role="tablist" aria-label="ערוץ המשפך">
+            <button type="button" className={`client-tab ${funnelChannel === 'all' ? 'active' : ''}`} onClick={() => setFunnelChannel('all')}>הכל</button>
+            {chF && <button type="button" className={`client-tab ${funnelChannel === 'facebook' ? 'active' : ''}`} onClick={() => setFunnelChannel('facebook')}>Facebook</button>}
+            {chG && <button type="button" className={`client-tab ${funnelChannel === 'google' ? 'active' : ''}`} onClick={() => setFunnelChannel('google')}>Google</button>}
+          </div>
+        ) : null;
+        return (
+          <ReportSection title="משפך לידים" description={flowDesc + " · כל אחוז נמדד מהמכנה הרשום מתחתיו"} actions={actions}>
+            <Funnel items={items} description={notes.join(' ')} />
+          </ReportSection>
+        );
+      }
+
       return (
         <div className="section">
           <div className="section-head">
             <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
             <h2>משפך לידים</h2>
-            <span className="sub">מחשיפה ועד חוזה · כל אחוז נמדד מהמכנה הרשום מתחתיו</span>
+            <span className="sub">{flowDesc + ' · כל אחוז נמדד מהמכנה הרשום מתחתיו'}</span>
           </div>
 
-          {(chF || chG) && (
+          {!_noChannelSplit && (chF || chG) && (
             <div className="client-tabs" style={{ marginBottom: 14 }}>
               <button type="button" className={`client-tab ${funnelChannel === 'all' ? 'active' : ''}`} onClick={() => setFunnelChannel('all')}>הכל</button>
               {chF && <button type="button" className={`client-tab ${funnelChannel === 'facebook' ? 'active' : ''}`} onClick={() => setFunnelChannel('facebook')}>Facebook</button>}
@@ -2220,7 +2884,7 @@ const selectProject = async (client, project) => {
             </div>
           )}
 
-          {funnelChannel === 'all' && chF && chG && (
+          {!_noChannelSplit && funnelChannel === 'all' && chF && chG && (
             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '9px 12px', marginBottom: 14, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
               <b>{'תצוגת "הכל" מערבבת סוגי משפך.'}</b>{' טופס מיידי ודף נחיתה אינם ברי-השוואה, והלידים כוללים גם מקורות ללא מדיה. להשוואה אמיתית בחר ערוץ בודד.'}
             </div>
@@ -2272,7 +2936,9 @@ const selectProject = async (client, project) => {
           </div>
 
           <div style={{ marginTop: 4, fontSize: 11.5, color: '#64748b', lineHeight: 1.75 }}>
-            <div><span style={{ color: LEAK, fontWeight: 700 }}>▼ פגישות שהתבטלו</span>{' הוא ענף ולא שלב: הוא נמדד מהפגישות שנקבעו, כמו "הגיעו", ולא ממנו.'}</div>
+            {rows.filter(r => r.leak).map(r => (
+              <div key={r.key}><span style={{ color: LEAK, fontWeight: 700 }}>{'▼ ' + r.label}</span>{' הוא ענף ולא שלב: הוא נמדד ' + r.ofLabel + ', ולא מהשלב שלפניו.'}</div>
+            ))}
             {anyWeak && <div><b style={{ color: '#b45309' }}>~</b>{' אחוז שחושב על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו, ולא להתייחס אליו כעובדה.'}</div>}
             {missing.length > 0 && <div>{'"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — חסר מקור נתונים לשלב הזה בטווח הנבחר.'}</div>}
           </div>
@@ -2376,7 +3042,7 @@ const selectProject = async (client, project) => {
 
     let prevCrmData = null;
     if (compareEnabled) {
-      const prevMonth = getPrevMonth(selectedMonth);
+      const prevMonth = comparisonPeriodKey(selectedMonth);
       const prevCrmReports = reports.filter(r => r.month === prevMonth && r.source === 'crm');
       if (prevCrmReports.length > 0) {
         // נקרא רק דרך .totals ולא משתנה, ולכן אין צורך בעותק.
@@ -2412,6 +3078,17 @@ const selectProject = async (client, project) => {
       const crmV2Color = { green:'emerald', orange:'terra', pink:'rose', purple:'violet', cyan:'sky', red:'amber', '':'indigo' };
       const v2cls = crmV2Color[color] || 'indigo';
       const _hasNames = namesArr && namesArr.length > 0;
+      if (vrCrm) {
+        // עיצוב מחודש (מקורות הגעה): אותם ערכים, אותה תגית שינוי, אותו הסבר ואותה לחיצה — בכרטיס report-ui
+        const VR_ICON = { 'סה"כ לידים': Users, 'רלוונטיים': CheckCircle2, 'פגישות תואמו': CalendarCheck, 'פגישות בוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'הרשמות': ClipboardList, 'חוזים': FileSignature };
+        const badge = !ch ? null : ch.newVal ? '↑ חדש'
+          : ((ch.pct > 0 ? '↑ ' : ch.pct < 0 ? '↓ ' : '− ') + (ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '-') + Math.abs(ch.pct).toFixed(0) + '%'));
+        return (
+          <MetricCard key={label} label={label} value={value} tone={v2cls} icon={VR_ICON[sl]} description={subNote || undefined}
+            details={tip || undefined} badge={badge}
+            onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} />
+        );
+      }
       return (
         <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} — הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
           <div className="kpi-top">
@@ -2450,11 +3127,13 @@ const selectProject = async (client, project) => {
 
     pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
-      if (sourceNames.length > 0) {
+      if (!vrCrm && sourceNames.length > 0) {
         createChart('crmPieChart', 'doughnut', sourceNames, [{
           label: srcMobileMetric === 'meetings' ? 'פגישות' : 'לידים',
           data: sourceNames.map(n => srcMobileMetric === 'meetings' ? (crmData.sources[n].meetingsScheduled || 0) : crmData.sources[n].totalLeads),
-          backgroundColor: COLORS.slice(0, sourceNames.length)
+          // צבע קבוע לפי שם המקור (סעיף 8 במפרט Tovno): מקור שנעלם בתקופה אחרת
+          // לא מזיז את הצבעים של השאר. מקור לא מוכר נופל חזרה לפלטה לפי אינדקס.
+          backgroundColor: sourceNames.map((n, i) => sourceColor(n) || COLORS[i % COLORS.length])
         }]);
       }
     }, 200));
@@ -2533,41 +3212,81 @@ const selectProject = async (client, project) => {
         </>
       );
     }
+    // עיצוב מחודש: 8 כרטיסים בדיוק (4×2); תקציב/עלויות/שווי מקופלים כתיאור בכרטיסים הרלוונטיים
+    const _vrCost = (n) => (vrCrm && _platformSpend > 0 && n > 0) ? formatCurrency(_platformSpend / n) : null;
+    const _vrLeadsNote = vrCrm && _platformSpend > 0 ? ['תקציב ' + formatCurrency(_platformSpend), _vrCost(ct.totalLeads) ? 'עלות לליד ' + _vrCost(ct.totalLeads) : null].filter(Boolean).join(' · ') : undefined;
+    const _vrHeldNote = _vrCost(ct.meetingsCompleted) ? 'עלות לפגישה ' + _vrCost(ct.meetingsCompleted) : undefined;
+    const _vrRegNote = vrCrm && (ct.registrationValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(ct.registrationValue) : undefined;
+    const _vrDealNote = vrCrm ? [(ct.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(ct.contractValue) : null, _vrCost(ct.contracts) ? 'עלות לחוזה ' + _vrCost(ct.contracts) : null].filter(Boolean).join(' · ') || undefined : undefined;
+    // התפלגות לידים לפי מקור לגרף החדש — מערך יציב (memoAgg) כדי שהגרף לא ייבנה מחדש בכל רינדור
+    const _distItems = memoAgg(`crmDist|${selectedMonth}`, () => sourceEntries.map(([name, d]) => ({ id: name, label: name, value: Number.isFinite(d.totalLeads) ? d.totalLeads : null })));
     return (
-      <>
-        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
+      <div className={vrCrm ? 'vcs-root' : undefined}>
+        {!vrCrm && <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
           <button onClick={refreshFromBmby} disabled={refreshingCrm} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',cursor:refreshingCrm ? 'wait' : 'pointer',opacity: refreshingCrm ? 0.6 : 1}}>
             {refreshingCrm ? '⏳' : '🔄'} {refreshingCrm ? 'מושך...' : 'רענן CRM'}
             {!refreshingCrm && crmSchemaVersion > 0 && <span style={{fontSize:10,color:'var(--text-muted)',marginRight:2}}>v{crmSchemaVersion}</span>}
           </button>
-        </div>
-        <div className="kpi-grid">
-          {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads)}
+        </div>}
+        {vrCrm && <p className="vr-caption vcs-metric-scope">פעילות בתקופה · כולל פעילות מלידים שנכנסו לפני התקופה</p>}
+        <div className={vrCrm ? 'vr-metric-grid' : 'kpi-grid'}>
+          {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads, _vrLeadsNote)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, 'תואמו = כל הפגישות שנקבעו החודש.\nנספר לפי תאריך התיאום (מתי נקבעה הפגישה), בכל סטטוס: עתידיות + שבוצעו + שבוטלו.\nהשורה למטה: כמה מלידים שנכנסו החודש (חדשים) וכמה מלידים מחודשים קודמים.', _crmLeads?.meetingsScheduled, (ct.meetingsScheduledSplit && (ct.meetingsScheduledSplit.fromNewLeads+ct.meetingsScheduledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsScheduledSplit.fromNewLeads+' · קודמים '+ct.meetingsScheduledSplit.fromOldLeads) : null))}
-          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה — רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, (ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null))}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה — רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, [(ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null), _vrHeldNote].filter(Boolean).join(' · ') || undefined)}
           {crmKpi('פגישות עתידיות', formatNum(ct.meetingsUpcoming||0), 'cyan', ct.meetingsUpcoming||0, cp?.meetingsUpcoming, false, 'עתידיות = פגישות שנקבעו וטרם התקיימו.\nמועד הפגישה עתידי (אחרי היום) והיא עדיין פתוחה. כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsUpcoming, (ct.meetingsUpcomingSplit && (ct.meetingsUpcomingSplit.fromNewLeads+ct.meetingsUpcomingSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsUpcomingSplit.fromNewLeads+' · קודמים '+ct.meetingsUpcomingSplit.fromOldLeads) : null))}
           {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled||0), 'red', ct.meetingsCancelled||0, cp?.meetingsCancelled, false, 'בוטלו = פגישות שנקבעו החודש ובוטלו.\nנספר לפי תאריך התיאום, כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsCancelled, (ct.meetingsCancelledSplit && (ct.meetingsCancelledSplit.fromNewLeads+ct.meetingsCancelledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCancelledSplit.fromNewLeads+' · קודמים '+ct.meetingsCancelledSplit.fromOldLeads) : null))}
-          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations)}
-          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts)}
-          {_platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
-          {ct.totalLeads > 0 && _platformSpend > 0 ? crmKpi('עלות לליד', formatCurrency(_platformSpend / ct.totalLeads), 'purple', _platformSpend / ct.totalLeads, null, true) : null}
-          {ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
-          {ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
-          {(ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrencyCompact(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
-          {(ct.registrationValue || 0) > 0 ? crmKpi('שווי הרשמות', formatCurrencyCompact(ct.registrationValue), 'green', ct.registrationValue, cp?.registrationValue || null) : null}
+          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations, _vrRegNote)}
+          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts, _vrDealNote)}
+          {!vrCrm && _platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
+          {!vrCrm && ct.totalLeads > 0 && _platformSpend > 0 ? crmKpi('עלות לליד', formatCurrency(_platformSpend / ct.totalLeads), 'purple', _platformSpend / ct.totalLeads, null, true) : null}
+          {!vrCrm && ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
+          {!vrCrm && ct.contracts > 0 && _platformSpend > 0 ? crmKpi('עלות לחוזה', formatCurrency(_platformSpend / ct.contracts), 'red', _platformSpend / ct.contracts, null, true) : null}
+          {!vrCrm && (ct.contractValue || 0) > 0 ? crmKpi('שווי חוזים', formatCurrencyCompact(ct.contractValue), 'green', ct.contractValue, cp?.contractValue || null) : null}
+          {!vrCrm && (ct.registrationValue || 0) > 0 ? crmKpi('שווי הרשמות', formatCurrencyCompact(ct.registrationValue), 'green', ct.registrationValue, cp?.registrationValue || null) : null}
         </div>
 
 
-        {renderFunnelBar()}
+        {renderFunnelBar(vrCrm ? 'cohort' : false)}
 
         {/* CRM Table by Source */}
         <div className="section">
           <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>נתונים לפי מקור הגעה</h2><span className="sub"> <InfoTip text="פירוט לידים, רלוונטיים, פגישות וחוזים לפי מקור" /></span></div>
+          {(() => {
+            const _parents = sourceEntries.filter(([, d]) => Array.isArray(d.children) && d.children.length).map(([n]) => n);
+            const _allOpen = _parents.length > 0 && _parents.every(n => expandedCrmSources.has(n));
+            const _row = (level, src, d) => ({
+              'רמה': level, 'מקור': src,
+              'סה"כ לידים': d.totalLeads || 0, 'רלוונטיים': d.relevantLeads || 0, 'לא רלוונטיים': d.irrelevantLeads || 0,
+              'תואמו': d.meetingsScheduled || 0,
+              '% תיאום': (d.totalLeads > 0 ? Math.round(d.meetingsScheduled / d.totalLeads * 1000) / 10 : 0),
+              'בוצעו': d.meetingsCompleted || 0,
+              '% ביצוע': (d.totalLeads > 0 ? Math.round(d.meetingsCompleted / d.totalLeads * 1000) / 10 : 0),
+              'בוטלו': d.meetingsCancelled || 0,
+              'הרשמות': d.registrations || 0, 'שווי הרשמות': Math.round(d.registrationValue || 0),
+              'חוזים': d.contracts || 0, 'שווי חוזים': Math.round(d.contractValue || 0),
+            });
+            return tableToolbar({
+              hint: 'לחצו על מקור כדי לראות את הקמפיינים שמתחתיו',
+              allOpen: _allOpen,
+              onToggleAll: _parents.length ? () => setExpandedCrmSources(_allOpen ? new Set() : new Set(_parents)) : undefined,
+              onExport: () => {
+                const out = [];
+                sourceEntries.forEach(([n, d]) => {
+                  out.push(_row('מקור', n, d));
+                  (Array.isArray(d.children) ? d.children : []).forEach(ch => out.push(_row('קמפיין', ch.name, ch)));
+                });
+                downloadXlsx(out, 'נתונים-לפי-מקור-הגעה_' + (selectedMonth || ''), 'מקורות הגעה');
+              },
+            });
+          })()}
           <div className="table-wrapper">
             <table className="data-table">
               <thead><tr>
                 <th>{'\u05de\u05e7\u05d5\u05e8'}</th>
+                {/* אייקון המקור בעמודה משלו (ויטלי, 21.9) — קודם הוא ישב בתוך תא השם
+                    ודחף את הטקסט, ובשורות הבן הוא לא הופיע כלל. */}
+                <th>{'\u05e1\u05d5\u05d2'}</th>
                 <th>{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</th>
                 <th>{'\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</th>
                 <th>{'\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</th>
@@ -2591,11 +3310,12 @@ const selectProject = async (client, project) => {
                   const toggle = () => setExpandedCrmSources(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; });
                   return (<Fragment key={name}>
                     <tr style={hasChildren ? {cursor:'pointer'} : undefined} onClick={hasChildren ? toggle : undefined}>
-                      <td style={{fontWeight:600,whiteSpace:'nowrap'}}>
-                        {hasChildren && <span style={{display:'inline-block',width:'18px',color:'var(--accent)',userSelect:'none'}}>{isOpen ? '▼' : '◀'}</span>}
-                        {name}
-                        {hasChildren && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginRight:'6px'}}>({children.length})</span>}
+                      <td dir="rtl" style={{fontWeight:600,whiteSpace:'nowrap',textAlign:'start'}}>
+                        {hasChildren && <span style={{display:'inline-block',width:'18px',color:'var(--accent)',userSelect:'none'}}>{vrCrm ? (isOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />) : (isOpen ? '▼' : '◀')}</span>}
+                        <bdi>{name}</bdi>
+                        {hasChildren && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginInlineStart:'6px'}}>({children.length})</span>}
                       </td>
+                      <td><SourceMark name={name} /></td>
                       <td style={(d.leads && d.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(d.leads && d.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: name, leads: d.leads}); } : undefined}>{formatNum(d.totalLeads)}</td>
                       <td>{formatNum(d.relevantLeads)}</td>
                       <td>{formatNum(d.irrelevantLeads)}</td>
@@ -2614,7 +3334,10 @@ const selectProject = async (client, project) => {
                       const cComp  = ch.totalLeads > 0 ? (ch.meetingsCompleted / ch.totalLeads * 100).toFixed(1) : '0.0';
                       return (
                         <tr key={`${name}::${ch.name}`} style={{background:'var(--bg-secondary)',fontSize:'0.92em'}}>
-                          <td style={{paddingRight:'42px',color:'#475569',unicodeBidi:'plaintext'}}>{ch.name}</td>
+                          {/* dir=rtl על התא + bdi סביב השם: קודם התא כולו היה unicodeBidi:'plaintext',
+                              ולכן שם קמפיין שמתחיל באנגלית הפך את כל השורה לשמאל-ימין. */}
+                          <td dir="rtl" style={{paddingInlineStart:'42px',color:'#475569',textAlign:'start',whiteSpace:'normal'}}><bdi>{ch.name}</bdi></td>
+                          <td><SourceMark name={name} /></td>
                           <td style={(ch.leads && ch.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(ch.leads && ch.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: ch.name, leads: ch.leads}); } : undefined}>{formatNum(ch.totalLeads)}</td>
                           <td>{formatNum(ch.relevantLeads)}</td>
                           <td>{formatNum(ch.irrelevantLeads)}</td>
@@ -2633,6 +3356,7 @@ const selectProject = async (client, project) => {
                 })}
                 <tr style={{fontWeight:700,background:'var(--bg-secondary)'}}>
                   <td>{'\u05e1\u05d4"\u05db'}</td>
+                  <td />
                   <td>{formatNum(ct.totalLeads)}</td>
                   <td>{formatNum(ct.relevantLeads)}</td>
                   <td>{formatNum(ct.irrelevantLeads)}</td>
@@ -2649,8 +3373,7 @@ const selectProject = async (client, project) => {
               </tbody>
             </table>
           </div>
-          <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div>
-          {/* MOBILE: leads/meetings toggle (mobile only via CSS) */}
+                    {/* MOBILE: leads/meetings toggle (mobile only via CSS) */}
           <div className="src-metric-toggle">
             {[['leads','לידים'],['meetings','פגישות']].map(([k,l]) => (
               <button key={k} className={srcMobileMetric === k ? 'active' : ''} onClick={() => setSrcMobileMetric(k)}>{l}</button>
@@ -2673,16 +3396,21 @@ const selectProject = async (client, project) => {
           </ul>
         </div>
 
-        {/* CRM Charts */}
+        {/* CRM Charts — במצב העיצוב המחודש: דונאט + רשימת ערכים (SourceDistribution), מופע Chart.js משלו */}
+        {vrCrm ? (
+          <ReportSection title="התפלגות לידים לפי מקור" description={formatNum(ct.totalLeads) + ' לידים בתקופה · לפי מקור ההגעה כפי שנרשם ב-CRM'}>
+            <div className="vcs-panel"><SourceDistribution items={_distItems} /></div>
+          </ReportSection>
+        ) : (
         <div className="section">
           <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>גרפים</h2></div>
           <div className="chart-grid" style={{gridTemplateColumns: '1fr'}}>
             <div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05dc\u05d9\u05d3\u05d9\u05dd'}</h4><div className="chart-container"><canvas id="crmPieChart"></canvas></div></div>
           </div>
-        </div>
-      </>
+        </div>)}
+      </div>
     );
-  }, [selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric, renderFunnelBar]);
+  }, [vrCrm, selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric, renderFunnelBar]);
 
   const renderDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
@@ -2814,7 +3542,7 @@ const selectProject = async (client, project) => {
 
     let prevData = null;
     if (compareEnabled) {
-      const prevMonth = getPrevMonth(selectedMonth);
+      const prevMonth = comparisonPeriodKey(selectedMonth);
       const prevReports = reports.filter(r => r.month === prevMonth);
       const displayPrev = dashTab === 'all'
         ? prevReports.filter(r => r.source !== 'crm')
@@ -2834,7 +3562,7 @@ const selectProject = async (client, project) => {
     let prevCrmTotals = null;
     let prevCrmTotalLeads = 0;
     if (compareEnabled) {
-      const prevMonth2 = getPrevMonth(selectedMonth);
+      const prevMonth2 = comparisonPeriodKey(selectedMonth);
       const prevCrmReps = reports.filter(r => r.month === prevMonth2 && r.source === 'crm');
       if (prevCrmReps.length > 0) {
         let allPrevCrm = [];
@@ -2855,7 +3583,11 @@ const selectProject = async (client, project) => {
       }
     }
 
-    const allMonths = [...new Set(reports.map(r => r.month))].sort();
+    // ⚠️ רק מפתחות של חודש מלא ("2026-09"). `reports` מחזיק גם דוחות של טווחי
+    // תאריכים מותאמים, שהמפתח שלהם הוא "2026-09-01_2026-09-15" — והם נכנסו לכאן
+    // ומוינו לקסיקוגרפית בין החודשים. התוצאה: גרף המגמה הקטן שבכרטיסים ערבב חודשים
+    // שלמים עם חלונות חלקיים, ונקודה שנראתה כמו "חודש חלש" הייתה בעצם טווח של יומיים.
+    const allMonths = [...new Set(reports.map(r => r.month))].filter(m => /^\d{4}-\d{2}$/.test(m || '')).sort();
     // Built from per-report `summary` (not heavy `data`) so sparklines work under lazy-loading.
     const trendData = allMonths.map(m => {
       let leads = 0, spend = 0;
@@ -2897,9 +3629,37 @@ const selectProject = async (client, project) => {
       const v2cls = v2Color[color] || 'indigo';
       // sparkline: extract this metric's values from trendData
       const metricKey = label === 'לידים' ? 'leads' : label === 'תקציב' ? 'spend' : label === 'עלות לליד' ? 'cpl' : label === 'פגישות שתואמו' ? 'meetingsScheduled' : label === 'פגישות שבוצעו' ? 'meetingsCompleted' : label === 'הרשמות' ? 'registrations' : label === 'חוזים' ? 'contracts' : null;
+      // הגרף הקטן שבכרטיס אינו קישוט: הוא הערך של אותו מדד בכל אחד מהחודשים המלאים
+      // שנטענו לפרויקט, לפי הסדר. מוצג רק למדדים שיש להם סדרה אמיתית (שבעה כרגע);
+      // לשאר הכרטיסים אין גרף, ולכן היעדרו הוא מידע ולא חוסר עקביות.
       const sparkVals = metricKey && trendData.length >= 2 ? trendData.map(d => d[metricKey] || 0) : null;
+      const sparkTitle = sparkVals ? (label + ' לאורך ' + trendData.length + ' חודשים: ' + trendData.map(d => d.month).join(', ')) : undefined;
       const trendPct = ch ? (ch.pct > 0 ? '+' : '') + Math.abs(ch.pct).toFixed(0) + '%' : null;
       const _hasNames = namesArr && namesArr.length > 0;
+      // גם טאב ה-CRM של אריקה מקבל את הכרטיס המשותף — אותם ערכים, אותה תגית שינוי.
+      if (vrAds || vrZohoCrm) {
+        // עיצוב מחודש: אותם ערכים, אותה תגית שינוי, אותה לחיצה לרשימת לידים — בכרטיס report-ui.
+        const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'לידים שלא טופלו': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature,
+          // מדדים שקיימים רק אצל אריקה (Zoho) ו-KLOSS (Salesforce). בלעדיהם הכרטיסים שלהם
+          // היו מקבלים את העיצוב אבל בלי אייקון, בזמן שהשאר כן.
+          'תקציב שנוצל': Wallet, 'עלות ממוצעת לקליק': MousePointerClick, 'עברו להזדמנות': Handshake, 'הזדמנויות': Handshake,
+          'רכשו': CheckCircle2, 'אחוז המרה': Trophy, 'אחוז המרה לעסקה': Trophy, 'שווי מכירות': Trophy, 'שווי עסקאות': Trophy,
+          'ביטולים': XCircle, 'ערך ממוצע לעסקה': Tag, 'עלות מכירת מכשיר': Wallet, 'ROAS לא כולל מע"מ': Trophy,
+          'פגישות שנקבעו': CalendarCheck, 'הצעות מחיר': FileText, 'הזמנות (שולמה מקדמה)': FileSignature,
+          'הובלה והרכבה': ClipboardList, 'עלות להזמנה': Wallet, 'זמן תגובה חציוני': Clock };
+        const badge = !ch ? null : ch.newVal ? '↑ חדש'
+          : ((ch.pct > 0 ? '↑ ' : ch.pct < 0 ? '↓ ' : '− ') + (ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '-') + Math.abs(ch.pct).toFixed(0) + '%'));
+        // ויטלי, 21.9: "רק האחוזים... זה לא אומר לי כלום". האחוז לבדו באמת לא —
+        // חסרים הערך שממנו השתנה והתקופה שמולה משווים. שניהם כאן.
+        const badgeTitle = (!ch || ch.newVal || prev == null) ? null
+          : 'מול ' + (isCost ? formatCurrency(prev) : formatNum(Math.round(prev))) + ' ב-' + comparisonPeriodLabel(selectedMonth);
+        return (
+          <MetricCard key={label} label={label === 'תקציב' ? 'תקציב שנוצל' : label} value={value} tone={v2cls} icon={VR_ICON[label]}
+            description={subNote || undefined} badge={badge} badgeTitle={badgeTitle}
+            trend={sparkVals ? <span title={sparkTitle}><Sparkline values={sparkVals} /></span> : null}
+            onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} />
+        );
+      }
       return (
         <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} — הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
           <div className="kpi-top">
@@ -2928,7 +3688,7 @@ const selectProject = async (client, project) => {
           <div className="kpi-label">{label}</div>
           <div className="kpi-value">{value}</div>
           {subNote ? <div style={{fontSize:'0.74em',color:'rgba(255,255,255,0.92)',marginTop:2,fontWeight:700,whiteSpace:'nowrap'}}>{subNote}</div> : null}
-          {sparkVals ? <Sparkline values={sparkVals} /> : <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>}
+          {sparkVals ? <span title={sparkTitle}><Sparkline values={sparkVals} /></span> : <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>}
         </div>
       );
     };
@@ -3002,18 +3762,65 @@ const selectProject = async (client, project) => {
       const extremes = {};
       cols.forEach(c => { if (c.key === 'name' || c.key === 'spend') return; const vals = entries.map(([n,d]) => c.get(d,n)).filter(v => typeof v === 'number' && v > 0); if (vals.length < 2) return; extremes[c.key] = {min: Math.min(...vals), max: Math.max(...vals)}; });
       const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {color:'#059669',fontWeight:800} : {color:'#dc2626',fontWeight:800}; if (val === e.min) return col.higher ? {color:'#dc2626',fontWeight:800} : {color:'#059669',fontWeight:800}; return {}; };
-      return (<><div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:source==='google'?'var(--rose-50)':'var(--sky-50)',color:source==='google'?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{source==='google'?'G':'F'}</span> : null}{name}{source ? <span className={`platform-tag${source==='google'?' google':''}`} style={{marginRight:'8px'}}>{source==='google'?'GOOGLE':'FACEBOOK'}</span> : null}</td><td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{formatNum(Math.round(d.leads))} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>
-          <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div></>);
+      // ייצוא לאקסל לכל טבלה שנבנית כאן — קמפיינים, קבוצות מודעות ומודעות בכל
+      // טאבי המדיה (ויטלי, 21.9). אין כאן היררכיה, ולכן אין כפתור פתח/כווץ.
+      const _exportRows = () => downloadXlsx(entries.map(([name, d]) => {
+        const _cpl = d.leads > 0 ? d.spend / d.leads : 0;
+        const _cpc = d.clicks > 0 ? d.spend / d.clicks : 0;
+        const _ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0;
+        const _cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0;
+        const r = { [labelName]: name };
+        if (source) r['פלטפורמה'] = source === 'google' ? 'Google' : 'Meta';
+        return { ...r,
+          'קליקים': d.clicks || 0, 'חשיפות': d.impressions || 0,
+          'עלות לקליק': Math.round(_cpc * 100) / 100, 'CTR': Math.round(_ctr * 100) / 100,
+          'CPM': Math.round(_cpm * 100) / 100, 'לידים': Math.round(d.leads || 0),
+          'עלות לליד': Math.round(_cpl * 100) / 100, 'תקציב שנוצל': Math.round(d.spend || 0),
+        };
+      }), labelName + '_' + (selectedMonth || ''), labelName);
+      return (<>{tableToolbar({ onExport: entries.length ? _exportRows : undefined })}<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map((c,ci)=>(<Fragment key={c.key}><th style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>{ci===0 && source ? <th style={{whiteSpace:'nowrap'}}>{'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4'}</th> : null}</Fragment>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}>{/* שם הקמפיין בתא RTL עם bdi, והפלטפורמה בעמודה משלה (ויטלי, 21.9) */}<td dir="rtl" style={{fontWeight: 600, textAlign:'start', whiteSpace:'normal'}}><bdi>{name}</bdi></td>{source ? <td style={{whiteSpace:'nowrap'}}>{vrAds ? <span className={`vr-platform ${source==='google'?'google':'meta'}`}>{source==='google' ? <GoogleMark size={14} /> : <MetaMark size={16} />}{source==='google'?'Google':'Meta'}</span> : <span className={`platform-tag${source==='google'?' google':''}`}>{source==='google'?'GOOGLE':'FACEBOOK'}</span>}</td> : null}<td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{formatNum(Math.round(d.leads))} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>
+          </>);
     };
 
 
     pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
       // monthly trend charts removed
-      const campNames2 = Object.keys(data.campaigns);
+      // ⚠️ הגרפים הציגו כל קמפיין שקיים בנתונים, כולל עשרות קמפיינים משנים קודמות
+      // שנשארו עם חשיפה בודדת ובלי שקל הוצאה (ויטלי, 21.9). המקרא התארך על פני חצי
+      // מסך והציר היה שורה אחת של אפסים. עכשיו הגרפים מסננים בדיוק כמו הטבלה שמתחת:
+      // רק קמפיין שהוציא כסף בתקופה, ממוין מהגדול לקטן. הטבלה מסננת רחב יותר (גם
+      // חשיפות או קליקים בלבד) כי שם שורה נוספת לא שוברת את התצוגה.
+      // ⚠️ הגרפים והמקרא שייכים לסקשן "קמפיינים", שמרונדר רק בטאב Google (isPmax).
+      // בטאבים אחרים ה-canvas לא קיים ו-createChart פשוט חוזר — אבל המקרא כן נכתב,
+      // ובטאב "הכל" data.campaigns מכיל גם קמפייני פייסבוק. התוצאה שוויטלי ראה
+      // (21.9): מעבר ל-Google הציג מקרא עם קמפיינים של פייסבוק, שנשאר מהטאב הקודם.
+      // הבדיקה היא על קיום ה-canvas בפועל ולא על isPmax, כי ה-timeout הזה רץ אחרי
+      // הרינדור והמצב יכול להשתנות בין השניים.
+      const _hasCampCanvas = typeof document !== 'undefined' && !!document.getElementById('campSpend');
+      const campNames2 = !_hasCampCanvas ? [] : Object.keys(data.campaigns)
+        .filter(n => (data.campaigns[n].spend || 0) > 0)
+        .sort((a, b) => (data.campaigns[b].spend || 0) - (data.campaigns[a].spend || 0));
       if (campNames2.length > 0) {
-        createChart('campSpend', 'doughnut', campNames2, [{ data: campNames2.map(n => data.campaigns[n].spend), backgroundColor: COLORS.slice(0, campNames2.length) }]);
-        createChart('campLeads', 'bar', campNames2, [
+        // חבילת VITAS-KLOSS-Ads-Sections-Handoff:
+        // • המקרא המובנה של Chart.js כבוי; במקומו מקרא אנכי ב-JSX לצד הדונאט.
+        //   הוא נגיש למקלדת ומחזיק את השם המלא, מה שהמקרא האופקי לא יכול היה.
+        // • תוויות ציר X מקוצרות בקיצור דטרמיניסטי (setCampLabels), והשם המלא
+        //   חוזר ב-tooltip — אסור לשנות את שם הקמפיין בנתונים עצמם.
+        const _campColors = campNames2.map((_, i) => COLORS[i % COLORS.length]);
+        const _campSpendTot = campNames2.reduce((a, n) => a + (data.campaigns[n].spend || 0), 0);
+        _applyCampLegend(campNames2.map((n, i) => ({
+          name: n, color: _campColors[i],
+          pct: _campSpendTot > 0 ? Math.round((data.campaigns[n].spend || 0) / _campSpendTot * 1000) / 10 : 0,
+        })));
+        createChart('campSpend', 'doughnut', campNames2, [{ data: campNames2.map(n => data.campaigns[n].spend), backgroundColor: _campColors }], null, null, {
+          options: { plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => ' ' + ctx.label + ': ' + formatCurrency(ctx.parsed || 0) } },
+          } },
+        });
+        const _shortCamp = shortenLabels(campNames2);
+        createChart('campLeads', 'bar', _shortCamp, [
           { label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: campNames2.map(n => data.campaigns[n].leads),
             backgroundColor: '#10B981', maxBarThickness: 80, yAxisID: 'y', order: 2 },
           { label: 'CPL', data: campNames2.map(n => data.campaigns[n].leads > 0 ? data.campaigns[n].spend / data.campaigns[n].leads : 0),
@@ -3023,13 +3830,26 @@ const selectProject = async (client, project) => {
             pointBackgroundColor: '#F43F5E', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
             yAxisID: 'y1', order: 1 }
         ], {
-          x: { grid: { display: false }, ticks: { font: { size: 10.5, weight: '700' } } },
+          x: { grid: { display: false }, ticks: { font: { size: cfs(10.5), weight: '700' }, autoSkip: false, maxRotation: 0, minRotation: 0 } },
           y: { position: 'right', beginAtZero: true, grid: { color: '#F2F4F8' },
-               title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
+               title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
           y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false },
-                title: { display: true, text: '\u20aa CPL', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                title: { display: true, text: '\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3 \u20aa', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' },
                 ticks: { callback: v => '\u20aa' + Math.round(v) } }
+        }, null, {
+          options: { plugins: {
+            legend: { labels: { usePointStyle: true } },
+            tooltip: { callbacks: {
+              // הכותרת היא השם המלא, לא הקיצור שעל הציר.
+              title: (items) => campNames2[items[0]?.dataIndex] ?? '',
+              label: (ctx) => ctx.dataset.label === 'CPL'
+                ? ' \u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3: ' + formatCurrency(ctx.parsed.y || 0)
+                : ' \u05dc\u05d9\u05d3\u05d9\u05dd: ' + formatNum(Math.round(ctx.parsed.y || 0)),
+            } },
+          } },
         });
+      } else {
+        _applyCampLegend([]);
       }
       // gender doughnut charts removed (replaced by table)
       const an = Object.keys(data.ages).filter(a => a !== 'unknown').sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999));
@@ -3044,10 +3864,10 @@ const selectProject = async (client, project) => {
             yAxisID: 'y1', order: 1 }],
           { x: { grid: { display: false } },
             y: { position: 'right', beginAtZero: true, grid: { color: '#F2F4F8' },
-                 title: { display: true, text: '\u05d4\u05d5\u05e6\u05d0\u05d4 (\u20aa)', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                 title: { display: true, text: '\u05d4\u05d5\u05e6\u05d0\u05d4 (\u20aa)', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' },
                  ticks: { callback: v => '\u20aa' + v.toLocaleString() } },
             y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false },
-                  title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: 10.5, weight: '700' }, color: '#5E6478' } } });
+                  title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } } });
         const ageCPLdata = an.map(a => data.ages[a].leads > 0 ? data.ages[a].spend / data.ages[a].leads : 0);
         const ageCPLcolors = ageCPLdata.map(v => v < 80 ? '#10b981' : v < 120 ? '#3b82f6' : v < 150 ? '#8b5cf6' : '#ef4444');
         const ageCPLbg = ageCPLdata.map(v => v < 80 ? 'rgba(16,185,129,0.15)' : v < 120 ? 'rgba(59,130,246,0.15)' : v < 150 ? 'rgba(139,92,246,0.15)' : 'rgba(239,68,68,0.15)');
@@ -3114,11 +3934,13 @@ const selectProject = async (client, project) => {
             {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
             {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
             {meetingsOn && <button className={`client-tab ${dashTab === 'meetings' ? 'active' : ''}`} onClick={() => setDashTab('meetings')}>ישיבות שיווק</button>}
-            {hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
+            {/* "המלצות חכמות" מוסתר לכל הלקוחות עד שנשפר אותו (ויטלי, 21.9). הקוד של
+                הטאב נשאר במקומו — רק הכניסה אליו חסומה, כדי שהחזרה תהיה שינוי של שורה. */}
+            {RECOMMENDATIONS_TAB_ON && hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
         </div>
 
         {dashTab === 'meetings' ? (
-          <MeetingsTab projectId={selectedProject?.id} isClientView={isClientView} />
+          <MeetingsTab projectId={selectedProject?.id} projectName={selectedProject?.name} isClientView={isClientView} />
         ) : dashTab === 'recommendations' ? (() => {
           // 60-day rolling window - recommendations are ALWAYS based on the last 60 days,
           // independent of selectedMonth (which only affects the KPI/chart tabs).
@@ -3705,16 +4527,14 @@ const selectProject = async (client, project) => {
             const _cpl = _leads > 0 ? _spend / _leads : 0
             const _clicks = ((fbTotals && fbTotals.clicks) || 0) + ((gTotals && gTotals.clicks) || 0)
 
-            const CARD = (label, value, color, info, cur, sub) => (
-              <div key={label} style={{position:'relative'}}>
-                {kpi(label, value, color, cur === undefined ? null : cur, null)}
-                {sub ? (<span style={{position:'absolute',bottom:9,insetInlineStart:13,fontSize:11,fontWeight:600,color:'rgba(255,255,255,.9)',letterSpacing:'.2px'}}>{sub}</span>) : null}
-                <span role="button" aria-label="הסבר" onClick={() => setSfInfo(sfInfo === label ? null : label)}
-                  style={{position:'absolute',insetInlineStart:10,top:10,zIndex:5,cursor:'pointer',width:17,height:17,borderRadius:'50%',background:'rgba(255,255,255,.28)',color:'#fff',fontSize:11,lineHeight:'17px',textAlign:'center',fontWeight:700,userSelect:'none'}}>!</span>
-                {sfInfo === label && (
-                  <div onClick={() => setSfInfo(null)} style={{position:'absolute',zIndex:60,top:'100%',insetInlineEnd:0,marginTop:6,width:265,background:'#0f172a',color:'#fff',fontSize:12,lineHeight:1.7,padding:'10px 12px',borderRadius:8,boxShadow:'0 8px 24px rgba(0,0,0,.22)',cursor:'pointer',textAlign:'right'}}>{info}</div>
-                )}
-              </div>
+            // כרטיס מדד במסך רשת. עבר מ-kpi() + בועה מצוירת ביד ל-MetricCard המשותף
+            // (חבילת KLOSS-Network). מה שהרווחנו: ההסבר הוא <details> אמיתי — נפתח
+            // ברווח/Enter, יש לו focus נראה ו-aria-expanded מובנה, וקורא מסך מקריא אותו.
+            // ה-Escape מטופל ב-effect נפרד, כי <details> לא נסגר בו מעצמו.
+            // sub נשאר: ההוראות אומרות במפורש ששורות המשנה הקיימות נשמרות.
+            const CARD = (label, value, tone, icon, info, sub) => (
+              <MetricCard key={label} label={label} value={value} tone={tone} icon={icon}
+                description={sub || undefined} details={info} />
             )
 
             const _arrived2 = _f.arrived !== undefined ? _f.arrived : Math.max(0, _meet - _noShow)
@@ -3723,89 +4543,108 @@ const selectProject = async (client, project) => {
             const _costCustomer = _paid > 0 ? _spend / _paid : 0
             const _quotesAmount = (_bs['קיבל הצעת מחיר'] || {}).amount || 0
             const _dealAmount = (_bs['הזמנה - שולמה מקדמה'] || {}).amount || 0
+            // 16 קארדים, ארבע שורות על ארבע עמודות. הסדר מחייב ומגיע מטבלת ה-DESIGN-SPEC,
+            // לא מהסקיצה — בסקיצה סדר חלק מהקארדים בשורות 2 ו-4 שונה, והמפרט גובר.
+            // הצבע קבוע לכל מדד ואינו משתנה לפי טוב/רע.
             const netCards = (
-              <div className="section">
-                <div className="section-head">{ICO('violet', "M3 3v18h18M7 16l4-6 4 3 5-8")}<h2>מסך רשת</h2><span className="sub">קבוצת הלידים שנוצרו החודש · מה קרה להם עד כה · לחיצה על ! להסבר</span></div>
-                <div className="kpi-grid">
-                  {CARD('תקציב שנוצל', formatCurrency(_spend), '', 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.', _spend)}
-                  {CARD('סה"כ לידים', formatNum(_leads), 'green', 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו. אחוז ההמרה מקליקים יוצג אוטומטית כשיחוברו חשבונות הפרסום.', _leads, _clicks > 0 ? pctOf(_leads, _clicks) + ' מהקליקים' : null)}
-                  {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'purple', 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.', _cpl)}
-                  {CARD('טרם טופלו / חדשים', formatNum(_untreated), 'amber', 'לידים שסטטוסם עדיין "חדש" (New) ולא נגעו בהם.', _untreated)}
-                  {CARD('פגישות שנקבעו', formatNum(_meet), 'sky', 'סכום שלושת סטטוסי הפגישה: "תואמה פגישה בסניף" (טרם התקיימה) + "הומר" (הגיע) + "לא הגיעו לפגישה". נספר לפי סטטוס ולא לפי תאריך הפגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא. השורה התחתונה: אחוז מסך הלידים.', _meet, pctOf(_meet, _leads) + ' מהלידים')}
-                  {CARD('פגישות עתידיות', formatNum(_sched), 'amber', 'לידים בסטטוס "תואמה פגישה בסניף" — הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.', _sched)}
-                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'cyan', 'לידים בסטטוס "הומר" (Qualified) — הגיעו לפגישה בפועל. אחוז מהפגישות שנקבעו: ' + pctOf(_arrived2, _meet) + '. השורה התחתונה: אחוז מסך הלידים.', _arrived2, pctOf(_arrived2, _leads) + ' מהלידים')}
-                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'red', 'לידים בסטטוס "לא הגיעו לפגישה" — פגישות שנקבעו ולא התקיימו. השורה התחתונה: שיעור הביטול מתוך הפגישות שנקבעו.', _noShow, pctOf(_noShow, _meet) + ' מהפגישות')}
-                  {CARD('עברו להזדמנות', formatNum(_opps), 'cyan', 'מתוך הלידים שנוצרו החודש — כמה נפתחה להם הזדמנות (הגיעו לפגישה ונפתח תיק). לא כולל הזדמנויות מלידים של חודשים קודמים. השורה התחתונה: אחוז מסך הלידים.', _opps, pctOf(_opps, _leads) + ' מהלידים')}
-                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'orange', 'מתוך הלידים של החודש — כמה קיבלו הצעת מחיר (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps) + '. השורה התחתונה: אחוז מסך הלידים.', _quotes, pctOf(_quotes, _leads) + ' מהלידים')}
-                  {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), 'orange', 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של הזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — פוטנציאל שטרם נסגר. לשם השוואה, בשדה Amount הסטנדרטי של Salesforce הסכום הוא ' + formatCurrencyCompact(_quotesAmount) + ' (כולל הובלה ותוספות).', _quotesVal)}
-                  {CARD('שילמו מקדמה', formatNum(_paid), 'pink', 'מתוך הלידים של החודש — כמה כבר שילמו מקדמה (רכשו). לא כולל עסקאות שנסגרו החודש מלידים קודמים. השורה התחתונה: אחוז מסך הלידים.', _paid, pctOf(_paid, _leads) + ' מהלידים')}
-                  {CARD('עלות פגישה שהגיעה', _spend > 0 ? formatCurrency(_costArrived) : '—', 'amber', 'תקציב שנוצל חלקי מספר הלידים שהגיעו לפגישה בפועל (סטטוס "הומר"). מוצג רק כשיש נתוני מדיה.', _costArrived)}
-                  {CARD('עלות לקוח', _spend > 0 ? formatCurrency(_costCustomer) : '—', 'red', 'תקציב שנוצל חלקי מספר ההזמנות ששולמה בהן מקדמה — כמה עולה לנו לקוח משלם. מוצג רק כשיש נתוני מדיה.', _costCustomer)}
-                  {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), 'pink', 'סכום "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. ההובלה וההרכבה בנפרד. בשדה Amount הסטנדרטי: ' + formatCurrencyCompact(_dealAmount) + '.', _dealVal)}
-                  {CARD('החליטו לא לרכוש', formatNum(_lost), '', 'מתוך הלידים של החודש — כמה מההזדמנויות נסגרו ללא רכישה. אחוז מההזדמנויות: ' + pctOf(_lost, _opps), _lost)}
+              <ReportSection title="מסך רשת" description="תמונת מצב ללידים שנוצרו בתקופה שנבחרה.">
+                <div className="vr-metric-grid">
+                  {CARD('תקציב שנוצל', formatCurrency(_spend), 'indigo', Wallet, 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.')}
+                  {CARD('סה"כ לידים', formatNum(_leads), 'emerald', Users, 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו. אחוז ההמרה מקליקים יוצג אוטומטית כשיחוברו חשבונות הפרסום.', _clicks > 0 ? pctOf(_leads, _clicks) + ' מהקליקים' : null)}
+                  {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'violet', Tag, 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.')}
+                  {CARD('טרם טופלו / חדשים', formatNum(_untreated), 'indigo', ClipboardList, 'לידים שסטטוסם עדיין "חדש" (New) ולא נגעו בהם.')}
+                  {CARD('פגישות שנקבעו', formatNum(_meet), 'violet', CalendarCheck, 'סכום שלושת סטטוסי הפגישה: "תואמה פגישה בסניף" (טרם התקיימה) + "הומר" (הגיע) + "לא הגיעו לפגישה". נספר לפי סטטוס ולא לפי תאריך הפגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא. השורה התחתונה: אחוז מסך הלידים.', pctOf(_meet, _leads) + ' מהלידים')}
+                  {CARD('פגישות עתידיות', formatNum(_sched), 'indigo', CalendarClock, 'לידים בסטטוס "תואמה פגישה בסניף" — הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.')}
+                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'sky', UserCheck, 'לידים בסטטוס "הומר" (Qualified) — הגיעו לפגישה בפועל. אחוז מהפגישות שנקבעו: ' + pctOf(_arrived2, _meet) + '. השורה התחתונה: אחוז מסך הלידים.', pctOf(_arrived2, _leads) + ' מהלידים')}
+                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'terra', UserX, 'לידים בסטטוס "לא הגיעו לפגישה" — פגישות שנקבעו ולא התקיימו. השורה התחתונה: שיעור הביטול מתוך הפגישות שנקבעו.', pctOf(_noShow, _meet) + ' מהפגישות')}
+                  {CARD('עברו להזדמנות', formatNum(_opps), 'emerald', Handshake, 'מתוך הלידים שנוצרו החודש — כמה נפתחה להם הזדמנות (הגיעו לפגישה ונפתח תיק). לא כולל הזדמנויות מלידים של חודשים קודמים. השורה התחתונה: אחוז מסך הלידים.', pctOf(_opps, _leads) + ' מהלידים')}
+                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'sky', FileText, 'מתוך הלידים של החודש — כמה קיבלו הצעת מחיר (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps) + '. השורה התחתונה: אחוז מסך הלידים.', pctOf(_quotes, _leads) + ' מהלידים')}
+                  {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), 'terra', Tag, 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של הזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — פוטנציאל שטרם נסגר. לשם השוואה, בשדה Amount הסטנדרטי של Salesforce הסכום הוא ' + formatCurrencyCompact(_quotesAmount) + ' (כולל הובלה ותוספות).')}
+                  {CARD('שילמו מקדמה', formatNum(_paid), 'amber', CheckCircle2, 'מתוך הלידים של החודש — כמה כבר שילמו מקדמה (רכשו). לא כולל עסקאות שנסגרו החודש מלידים קודמים. השורה התחתונה: אחוז מסך הלידים.', pctOf(_paid, _leads) + ' מהלידים')}
+                  {CARD('עלות פגישה שהגיעה', _spend > 0 ? formatCurrency(_costArrived) : '—', 'indigo', Users, 'תקציב שנוצל חלקי מספר הלידים שהגיעו לפגישה בפועל (סטטוס "הומר"). מוצג רק כשיש נתוני מדיה.')}
+                  {CARD('עלות לקוח', _spend > 0 ? formatCurrency(_costCustomer) : '—', 'amber', Wallet, 'תקציב שנוצל חלקי מספר ההזמנות ששולמה בהן מקדמה — כמה עולה לנו לקוח משלם. מוצג רק כשיש נתוני מדיה.')}
+                  {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), 'rose', Trophy, 'סכום "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. ההובלה וההרכבה בנפרד. בשדה Amount הסטנדרטי: ' + formatCurrencyCompact(_dealAmount) + '.')}
+                  {CARD('החליטו לא לרכוש', formatNum(_lost), 'violet', Ban, 'מתוך הלידים של החודש — כמה מההזדמנויות נסגרו ללא רכישה. אחוז מההזדמנויות: ' + pctOf(_lost, _opps))}
                 </div>
-              </div>
+              </ReportSection>
             )
 
             const _fc = _s.funnelCohort || {}
             const _fp = _s.funnelPeriod || {}
-            const funnelBars = (title, subtitle, ico, steps, showStepPct) => {
+            /**
+             * שורות הברים של שני הדוחות (חבילת KLOSS-Network).
+             *
+             * מה שהמפרט דורש ושונה ממה שהיה כאן:
+             *  • המספר יושב בעמודה קבועה לפני המסילה ולא בתוך הבר, כדי שלא ייחתך כשהבר קצר.
+             *  • האחוזים גלויים בטקסט. בסקיצה הם הוסתרו מאחורי "בפירוט השלב" — המפרט אומר
+             *    במפורש שזה אינו מימוש מאושר.
+             *  • כל אחוז נושא את המכנה שלו בכתב ("מהלידים" / "מהפגישות"), כי שני הדוחות
+             *    משתמשים בבסיסים שונים.
+             *  • אותו שלב מקבל את אותו צבע בשני הדוחות, והמידע קיים גם בלי הבחנת צבע.
+             *
+             * רוחב הבר הוא היחיד שנשאר inline — הוא נתון מחושב, לא בחירת עיצוב.
+             */
+            const funnelBars = (title, tagText, tagTone, description, steps, showStepPct) => {
               const mainSteps = steps.filter(x => !x.aux)
               const mx = Math.max(1, mainSteps[0] ? mainSteps[0].v : 1)
               const leadsTot = mainSteps[0] ? mainSteps[0].v : 0
+              const heading = (<>{title}<span className={`vr-kloss-tag vr-kloss-tag-${tagTone}`}>{tagText}</span></>)
               return (
-                <div className="section">
-                  <div className="section-head">{ICO(ico, "M3 4h18l-7 8v6l-4 2v-8z")}<h2>{title}</h2><span className="sub">{subtitle}</span></div>
-                  <div style={{padding:'14px 4px'}}>
+                <ReportSection title={heading} description={description}>
+                  <ol className="vr-kloss-bars">
                     {steps.map((st, i) => {
-                      const w = Math.max(4, Math.round(st.v / mx * 100))
+                      const w = Math.max(2, Math.round(st.v / mx * 100))
                       const prevMain = (() => { for (let j = i - 1; j >= 0; j--) { if (!steps[j].aux) return steps[j].v } return null })()
                       const dropPct = (showStepPct && prevMain !== null && !st.aux) ? pctOf(st.v, prevMain) : null
                       return (
-                        <div key={st.label} style={{display:'flex',alignItems:'center',gap:12,marginBottom:9,opacity: st.aux ? 0.92 : 1}}>
-                          <div style={{width:150,fontSize:13,fontWeight:600,textAlign:'left',flexShrink:0,color: st.aux ? '#ef4444' : '#334155'}}>{st.aux ? '↳ ' : ''}{st.label}</div>
-                          <div style={{flex:1,position:'relative',height:st.aux?26:34,background:'#f1f5f9',borderRadius:8,overflow:'hidden'}}>
-                            <div style={{position:'absolute',insetInlineStart:0,top:0,height:'100%',width:w+'%',background:st.color,borderRadius:8,transition:'width .5s ease',display:'flex',alignItems:'center',paddingInline:12,minWidth:50,gap:8}}>
-                              <span style={{color:'#fff',fontWeight:700,fontSize:st.aux?12:14}}>{formatNum(st.v)}</span>
-                              {st.note ? <span style={{color:'rgba(255,255,255,.92)',fontWeight:600,fontSize:11}}>· {st.note}</span> : null}
-                            </div>
-                          </div>
-                          <div style={{width:120,fontSize:12,flexShrink:0,textAlign:'right'}}>
-                            {st.aux ? <span style={{color:'#f87171'}}>{pctOf(st.v, st.of || leadsTot)} {st.ofLabel || 'מהלידים'}</span>
-                              : i === 0 ? <span style={{color:'#94a3b8'}}>100%</span>
-                              : (<><span style={{color:'#7c6cf5',fontWeight:600}}>{pctOf(st.v, leadsTot)}</span><span style={{color:'#94a3b8'}}> מהלידים</span>{dropPct ? <span style={{color:'#cbd5e1'}}> · {dropPct} מהקודם</span> : null}</>)}
-                          </div>
-                        </div>
+                        <li key={st.label} className={`vr-kloss-bar${st.aux ? ' vr-kloss-bar-aux' : ''}`}>
+                          <span className="vr-kloss-bar-label">{st.aux ? '↳ ' : ''}{st.label}</span>
+                          <span className="vr-kloss-bar-value"><bdi>{formatNum(st.v)}</bdi></span>
+                          <span className="vr-kloss-bar-rail">
+                            <span className={`vr-kloss-bar-fill vr-kloss-fill-${st.fill}`} style={{ inlineSize: w + '%' }} />
+                          </span>
+                          <span className="vr-kloss-bar-note">
+                            {st.aux
+                              ? <><bdi>{pctOf(st.v, st.of || leadsTot)}</bdi> {st.ofLabel || 'מהלידים'}</>
+                              : i === 0
+                                ? <><bdi>100%</bdi> מהלידים</>
+                                : (<><strong><bdi>{pctOf(st.v, leadsTot)}</bdi></strong> מהלידים{dropPct ? <> · <bdi>{dropPct}</bdi> מהשלב הקודם</> : null}</>)}
+                            {st.note ? <> · <span className="vr-kloss-bar-amount"><bdi>{st.note}</bdi></span></> : null}
+                          </span>
+                        </li>
                       )
                     })}
-                  </div>
-                </div>
+                  </ol>
+                </ReportSection>
               )
             }
+            // הניסוחים בשתי המסגרות מגיעים מילה במילה מה-DESIGN-SPEC.
             const cohortFunnel = funnelBars(
-              'מה קרה ללידים של החודש', 'קבוצת הלידים שנוצרו החודש — כל שלב מתוך אותם לידים · האחוז הוא מהשלב הקודם',
-              'emerald',
+              'מה קרה ללידים של החודש', 'לידים של התקופה', 'cohort',
+              'מעקב אחר הלידים שנוצרו בתקופה — התוצאות עשויות להתעדכן בהמשך.',
               [
-                { label: 'לידים', v: _fc.leads || 0, color: '#10b981' },
-                { label: 'תיאמו פגישה', v: _fc.meetings || 0, color: '#3b82f6' },
-                { label: 'לא הגיעו לפגישה', v: _fc.noShow || 0, color: '#ef4444', aux: true, of: _fc.meetings || 0, ofLabel: 'מהפגישות' },
-                { label: 'הגיעו לפגישה', v: _fc.arrived || 0, color: '#14b8a6' },
-                { label: 'עברו להזדמנות', v: _fc.opportunities || 0, color: '#06b6d4' },
-                { label: 'קיבלו הצעת מחיר', v: _fc.quotes || 0, color: '#f97316', note: formatCurrencyCompact(_fc.quotesValue || 0) },
-                { label: 'שילמו מקדמה', v: _fc.paid || 0, color: '#a855f7', note: formatCurrencyCompact(_fc.paidValue || 0) },
-                { label: 'לא רכשו', v: _fc.lost || 0, color: '#94a3b8', aux: true, of: _fc.opportunities || 0, ofLabel: 'מההזדמנויות' },
+                { label: 'לידים', v: _fc.leads || 0, fill: 'leads' },
+                { label: 'תיאמו פגישה', v: _fc.meetings || 0, fill: 'meetings' },
+                { label: 'לא הגיעו לפגישה', v: _fc.noShow || 0, fill: 'noshow', aux: true, of: _fc.meetings || 0, ofLabel: 'מהפגישות' },
+                { label: 'הגיעו לפגישה', v: _fc.arrived || 0, fill: 'arrived' },
+                { label: 'עברו להזדמנות', v: _fc.opportunities || 0, fill: 'opps' },
+                { label: 'קיבלו הצעת מחיר', v: _fc.quotes || 0, fill: 'quotes', note: formatCurrencyCompact(_fc.quotesValue || 0) },
+                { label: 'שילמו מקדמה', v: _fc.paid || 0, fill: 'paid', note: formatCurrencyCompact(_fc.paidValue || 0) },
+                { label: 'לא רכשו', v: _fc.lost || 0, fill: 'lost', aux: true, of: _fc.opportunities || 0, ofLabel: 'מההזדמנויות' },
               ], true)
+            // showStepPct=false בכוונה: זהו דוח פעילות ולא מסלול מעבר של אותם אנשים,
+            // ולכן אסור לייצר ממנו שיעור המרה מחלוקת שתי שורות סמוכות (DESIGN-SPEC).
             const periodFunnel = funnelBars(
-              'דוח ביצועים — פעילות החודש', 'כל מה שנוצר/התקיים החודש, כולל לידים מחודשים קודמים',
-              'violet',
+              'דוח ביצועים — פעילות החודש', 'פעילות בתקופה', 'period',
+              'כולל פעילות על לידים שנוצרו בחודשים קודמים.',
               [
-                { label: 'לידים שנוצרו', v: _fp.leads || 0, color: '#10b981' },
-                { label: 'הזדמנויות שנפתחו', v: _fp.opportunities || 0, color: '#06b6d4' },
-                { label: 'פגישות שהתקיימו', v: _fp.meetings || 0, color: '#3b82f6' },
-                { label: 'לא הגיעו לפגישה', v: _fp.noShow || 0, color: '#ef4444', aux: true, of: _fp.meetings || 0, ofLabel: 'מהפגישות' },
-                { label: 'קיבלו הצעת מחיר', v: _fp.quotes || 0, color: '#f97316', note: formatCurrencyCompact(_fp.quotesValue || 0) },
-                { label: 'שילמו מקדמה', v: _fp.paid || 0, color: '#a855f7', note: formatCurrencyCompact(_fp.paidValue || _fp.dealValue || 0) },
-                { label: 'לא רכשו', v: _fp.lost || 0, color: '#94a3b8', aux: true, of: _fp.opportunities || 0, ofLabel: 'מההזדמנויות' },
+                { label: 'לידים שנוצרו', v: _fp.leads || 0, fill: 'leads' },
+                { label: 'הזדמנויות שנפתחו', v: _fp.opportunities || 0, fill: 'opps' },
+                { label: 'פגישות שהתקיימו', v: _fp.meetings || 0, fill: 'meetings' },
+                { label: 'לא הגיעו לפגישה', v: _fp.noShow || 0, fill: 'noshow', aux: true, of: _fp.meetings || 0, ofLabel: 'מהפגישות' },
+                { label: 'קיבלו הצעת מחיר', v: _fp.quotes || 0, fill: 'quotes', note: formatCurrencyCompact(_fp.quotesValue || 0) },
+                { label: 'שילמו מקדמה', v: _fp.paid || 0, fill: 'paid', note: formatCurrencyCompact(_fp.paidValue || _fp.dealValue || 0) },
+                { label: 'לא רכשו', v: _fp.lost || 0, fill: 'lost', aux: true, of: _fp.opportunities || 0, ofLabel: 'מההזדמנויות' },
               ], false)
 
             const maxH = Math.max(1, ...Object.values(_hours))
@@ -3831,8 +4670,52 @@ const selectProject = async (client, project) => {
             const _lensBtn = (v, label) => (<button type="button" onClick={(e)=>{e.preventDefault();e.stopPropagation();setSfBranchLens(v);}} style={{fontSize:12,fontWeight:600,padding:'4px 12px',borderRadius:6,cursor:'pointer',border:'1px solid '+(_bLens===v?'#7c6cf5':'var(--border)'),background:_bLens===v?'#7c6cf5':'transparent',color:_bLens===v?'#fff':'var(--text-secondary)'}}>{label}</button>)
             const branchesSec = (
               <div className="section">
-                <div className="section-head">{ICO('emerald', "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z")}<h2>ביצועים לפי סניף</h2><span className="sub">{_bLens==='cohort'?'מה קרה ללידים של החודש':'פעילות החודש (כולל לידים קודמים)'}</span></div>
-                <div style={{display:'flex',gap:8,padding:'0 2px 12px'}}>{_lensBtn('cohort','לידים של החודש')}{_lensBtn('period','פעילות החודש')}</div>
+                {/* תג סוג התקופה, אותו רכיב ואותם צבעים של מסך הרשת — כדי ששני המסכים
+                    יאמרו "לידים של התקופה" ו"פעילות בתקופה" באותה שפה. */}
+                <div className="section-head">{ICO('emerald', "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z")}<h2>ביצועים לפי סניף<span className={`vr-kloss-tag vr-kloss-tag-${_bLens==='cohort'?'cohort':'period'}`}>{_bLens==='cohort'?'לידים של התקופה':'פעילות בתקופה'}</span></h2><span className="sub">{_bLens==='cohort'?'מה קרה ללידים של החודש':'פעילות החודש (כולל לידים קודמים)'}</span></div>
+                <div style={{display:'flex',gap:8,padding:'0 2px 4px'}}>{_lensBtn('cohort','לידים של החודש')}{_lensBtn('period','פעילות החודש')}</div>
+                {/* המפרט דורש להגיד במפורש על מה הבורר חל — הוא אינו משפיע על מקטעי
+                    ההתנגדויות שמתחת, ובלי המשפט הזה זו הנחה סבירה וגם שגויה. */}
+                <div className="sub" style={{padding:'0 2px 12px',fontSize:12.5}}>הבחירה חלה על הטבלה והשוואת הסניפים</div>
+                {(() => {
+                  const _names = _bd.map(b => b.branch);
+                  const _allOpen = _names.length > 0 && _names.every(n => expandedFunnelCh.has(n));
+                  return tableToolbar({
+                    hint: 'לחצו על סניף כדי לראות אנשי מכירות ומוצרים',
+                    allOpen: _allOpen,
+                    onToggleAll: () => setExpandedFunnelCh(_allOpen ? new Set() : new Set(_names)),
+                    onExport: () => {
+                      const out = [];
+                      _bd.forEach(b => {
+                        const isC = _bLens === 'cohort';
+                        out.push({
+                          'רמה': 'סניף', 'סניף': b.branch, 'שם': '',
+                          'לידים': b.leads || 0, 'פגישות': b.meetings || 0,
+                          'הזדמנויות': (isC ? b.cohortOpps : b.opportunities) || 0,
+                          'הצעות': (isC ? b.cohortQuotesTotal : b.quotesTotal) || 0,
+                          'רכשו': (isC ? b.cohortPaid : b.paid) || 0,
+                          'שווי': Math.round((isC ? b.cohortValue : b.value) || 0),
+                          'המרה %': (isC ? b.cohortConvLeadToPaid : b.convLeadToPaid) || 0,
+                          'מוביל': (isC ? b.cohortTopSalesman : b.topSalesman) || '',
+                        });
+                        ((isC ? b.cohortSalesmen : b.salesmen) || []).forEach(a => out.push({
+                          'רמה': 'איש מכירות', 'סניף': b.branch, 'שם': a.name,
+                          'לידים': '', 'פגישות': '',
+                          'הזדמנויות': a.opportunities || 0, 'הצעות': a.quotesTotal || 0,
+                          'רכשו': a.orders || 0, 'שווי': Math.round(a.value || 0),
+                          'המרה %': a.convToDeal || 0, 'מוביל': '',
+                        }));
+                        ((isC ? b.cohortProducts : b.products) || []).forEach(pr => out.push({
+                          'רמה': 'מוצר', 'סניף': b.branch, 'שם': pr.name,
+                          'לידים': '', 'פגישות': '', 'הזדמנויות': '', 'הצעות': '',
+                          'רכשו': pr.units || 0, 'שווי': Math.round(pr.value || 0),
+                          'המרה %': '', 'מוביל': '',
+                        }));
+                      });
+                      downloadXlsx(out, 'ביצועים-לפי-סניף_' + (_bLens === 'cohort' ? 'לידים-של-החודש' : 'פעילות-החודש') + '_' + (selectedMonth || ''), 'סניפים');
+                    },
+                  });
+                })()}
                 <div className="table-wrapper">
                   <table className="data-table">
                     <thead><tr><th>סניף</th><th>לידים</th><th>פגישות</th><th>הזדמנויות</th><th>הצעות</th><th>רכשו</th><th>שווי</th><th>המרה</th><th>מוביל</th></tr></thead>
@@ -3847,8 +4730,18 @@ const selectProject = async (client, project) => {
                       const _sm = _bLens==='cohort' ? (b.cohortSalesmen||[]) : (b.salesmen||[])
                       const _pr = _bLens==='cohort' ? (b.cohortProducts||[]) : (b.products||[])
                       return (<Fragment key={b.branch}>
-                        <tr onClick={() => toggleBranch(b.branch)} style={{cursor:'pointer'}}>
-                          <td style={{fontWeight:600}}>{open ? '▾ ' : '▸ '}{b.branch}</td>
+                        {/* כפתור אמיתי ולא רק שורה שנלחצת: aria-expanded אומר למקריא המסך
+                            אם הפירוט פתוח, ו-Enter/Space עובדים בלי עכבר. stopPropagation
+                            הכרחי — בלעדיו הלחיצה מגיעה גם לשורה, והשורה מתקפלת מיד בחזרה. */}
+                        <tr onClick={() => toggleBranch(b.branch)} style={{cursor:'pointer'}} className={open ? 'vr-kloss-row-open' : undefined}>
+                          <td style={{fontWeight:600}}>
+                            <button type="button" className="vr-kloss-expand" aria-expanded={open}
+                              aria-label={(open ? 'סגירת פירוט הסניף ' : 'פתיחת פירוט הסניף ') + b.branch}
+                              onClick={(e) => { e.stopPropagation(); toggleBranch(b.branch); }}>
+                              {open ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />}
+                            </button>
+                            <bdi>{b.branch}</bdi>
+                          </td>
                           <td>{formatNum(b.leads)}</td>
                           <td>{formatNum(b.meetings)}</td>
                           <td>{formatNum(oOpps)}</td>
@@ -3858,9 +4751,9 @@ const selectProject = async (client, project) => {
                           <td style={{color:'var(--violet)',fontWeight:600}}>{oConv}%</td>
                           <td className="sub">{oTop || '—'}</td>
                         </tr>
-                        {open && (<tr><td colSpan={9} style={{background:'#f8fafc',padding:'14px 18px'}}>
+                        {open && (<tr className="vr-kloss-row-open"><td colSpan={9} style={{background:'#f8fafc',padding:'18px 20px'}}>
                           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:20,width:'100%'}}>
-                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px',overflowX:'auto'}}>
+                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'16px 18px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אנשי מכירות</div>
                               {_sm.length === 0 ? <div className="sub">—</div> : (
                                 <table className="data-table" style={{width:'100%'}}>
@@ -3878,7 +4771,7 @@ const selectProject = async (client, project) => {
                                 </table>
                               )}
                             </div>
-                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'12px 14px',overflowX:'auto'}}>
+                            <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'16px 18px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>מוצרים מובילים</div>
                               {_pr.length === 0 ? <div className="sub">—</div> : (
                                 <table className="data-table" style={{width:'100%'}}>
@@ -3921,34 +4814,41 @@ const selectProject = async (client, project) => {
                   {_bcSeries.map(sr => (<span key={sr.key}><span style={{display:'inline-block',width:10,height:10,background:sr.color,borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>{sr.label}</span>))}
                   <span style={{marginInlineStart:'auto',color:'#94a3b8'}}>האחוז מימין = מעבר מהשלב הקודם</span>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:12}}>
+                {/* בלי המשפט הזה הכרטיסים נראים כמו השוואת נפחים על סקאלה משותפת, והם לא:
+                    בר "לידים" מלא בכל סניף, גם בסניף עם עשרה לידים וגם בסניף עם מאתיים. */}
+                <p className="vr-caption" style={{margin:'0 2px 14px',fontSize:12.5,color:'#66748f'}}>
+                  אורך הבר בכל כרטיס מנורמל ללידים של אותו סניף — כלומר הכרטיסים משווים שיעורי מעבר, לא נפחים. להשוואת נפחים יש את הטבלה שלמעלה.
+                </p>
+                {/* הכרטיסים היו בנויים כולם מ-inline styles, ולכן עטיפה ב-.vr-ui לא שינתה
+                    אותם — מה שוויטלי ראה (21.9) כ"הסקשן הזה לא עוצב". עכשיו הם מחלקות
+                    תחומות ל-.vr-kloss-branches, עם המידות והצללים של השפה המשותפת.
+                    הערכים, הסקאלה ואחוזי המעבר לא השתנו. */}
+                <div className="vr-bcmp-grid">
                   {_bcRows.map(b => {
                     const v = _bcVal(b)
                     const _vals = [b.leads || 0, b.meetings || 0, v.opp, v.paid]
                     const _base = Math.max(1, b.leads || 0)
-                    const _convColor = v.conv >= 30 ? '#0f6e56' : v.conv >= 15 ? '#854f0b' : '#a32d2d'
-                    const _convBg = v.conv >= 30 ? '#e1f5ee' : v.conv >= 15 ? '#faeeda' : '#fcebeb'
                     return (
-                      <div key={b.branch} style={{background:'var(--surface-2, #fff)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px'}}>
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-                          <span style={{fontSize:15,fontWeight:600,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.branch}</span>
-                          <span style={{fontSize:12,fontWeight:600,color:_convColor,background:_convBg,padding:'3px 10px',borderRadius:20,whiteSpace:'nowrap',flexShrink:0}}>{v.conv}% המרה</span>
+                      <div key={b.branch} className="vr-bcmp-card">
+                        <div className="vr-bcmp-head">
+                          <span className="vr-bcmp-name"><bdi>{b.branch}</bdi></span>
+                          <span className="vr-bcmp-conv"><bdi>{v.conv}%</bdi> המרה</span>
                         </div>
-                        {_bcSeries.map((sr, i) => {
-                          const val = _vals[i]
-                          const w = Math.max(4, Math.round(val / _base * 100))
-                          const step = i > 0 ? Math.round(val / Math.max(1, _vals[i-1]) * 100) : null
-                          return (
-                            <div key={sr.key} style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
-                              <span style={{fontSize:11,color:'#64748b',width:60,flexShrink:0,textAlign:'start'}}>{sr.label}</span>
-                              <div style={{flex:1,background:'#f1f5f9',borderRadius:5,height:20,overflow:'hidden'}}>
-                                <div style={{width:w+'%',height:'100%',background:sr.color,borderRadius:5}}></div>
-                              </div>
-                              <span style={{fontSize:13,fontWeight:600,color:'#0f172a',width:40,textAlign:'start',flexShrink:0}}>{formatNum(val)}</span>
-                              <span style={{fontSize:10,color:'#94a3b8',width:38,textAlign:'start',flexShrink:0}}>{step !== null ? step+'%' : ''}</span>
-                            </div>
-                          )
-                        })}
+                        <ol className="vr-bcmp-rows">
+                          {_bcSeries.map((sr, i) => {
+                            const val = _vals[i]
+                            const w = Math.max(4, Math.round(val / _base * 100))
+                            const step = i > 0 ? Math.round(val / Math.max(1, _vals[i-1]) * 100) : null
+                            return (
+                              <li key={sr.key} className="vr-bcmp-row">
+                                <span className="vr-bcmp-label">{sr.label}</span>
+                                <span className="vr-bcmp-rail"><span className="vr-bcmp-fill" style={{inlineSize:w+'%',background:sr.color}} /></span>
+                                <span className="vr-bcmp-val"><bdi>{formatNum(val)}</bdi></span>
+                                <span className="vr-bcmp-step">{step !== null ? <bdi>{step+'%'}</bdi> : ''}</span>
+                              </li>
+                            )
+                          })}
+                        </ol>
                       </div>
                     )
                   })}
@@ -3967,14 +4867,29 @@ const selectProject = async (client, project) => {
                 <div className="section">
                   <div className="section-head">{ICO(ico[0], ico[1])}<h2>{title}</h2><span className="sub">{subtitle}</span></div>
                   {opts.takeaway && peakI >= 0 ? <div style={{padding:'0 2px 6px',fontSize:13}}><b style={{color}}>{opts.takeaway}: {items[peakI].label}{opts.suffix && items[peakI].value != null ? ' (' + items[peakI].value + opts.suffix + ')' : ''}</b></div> : null}
+                  {/* מקרא הנפח הנמוך. הכלל עצמו כבר היה בקוד (minSample), אבל הוא השפיע רק
+                      על בחירת השיא ולא נאמר למסך — כלומר עמודת 100% שמבוססת על שלושה
+                      לידים נראתה זהה לעמודה שמבוססת על מאתיים. עכשיו היא מעומעמת ומוסברת. */}
+                  {opts.samples ? (
+                    <div className="sub" style={{padding:'0 2px 8px',fontSize:12,display:'flex',alignItems:'center',gap:6}}>
+                      <span aria-hidden="true" style={{display:'inline-block',width:10,height:10,borderRadius:3,background:color,opacity:0.3}} />
+                      {'פחות מ־' + (opts.minSample || 0) + ' לידים — נתון בנפח נמוך'}
+                    </div>
+                  ) : null}
                   <div style={{display:'flex',alignItems:'flex-end',gap:opts.tight?3:8,padding:'6px 2px',minHeight:130,overflowX:'auto'}}>
-                    {items.map((it, i) => (
-                      <div key={i} style={{flex:'1 0 auto',minWidth:opts.tight?16:26,textAlign:'center'}}>
+                    {items.map((it, i) => {
+                      const _low = !!opts.samples && !_elig(i)
+                      // tooltip לכל עמודה: בגרף של 24 שעות התוויות דלילות, ובלי זה אי אפשר
+                      // לדעת לאיזו שעה שייכת עמודה. כשיש samples — גם בסיס הספירה.
+                      const _tip = it.label + ': ' + (it.value == null ? 'אין נתון' : formatNum(it.value) + (opts.suffix || ''))
+                        + (opts.samples ? ' · ' + formatNum(opts.samples[i] || 0) + ' לידים' : '')
+                      return (
+                      <div key={i} title={_tip} style={{flex:'1 0 auto',minWidth:opts.tight?16:26,textAlign:'center'}}>
                         <div style={{fontSize:10,marginBottom:3,color:'#334155',fontWeight:i===peakI?700:400}}>{it.value==null?'':formatNum(it.value)}{it.value!=null&&opts.suffix?opts.suffix:''}</div>
-                        <div style={{height:Math.round((it.value||0)/max*104)+3,background:(opts.colors?opts.colors[i]:color),borderRadius:'3px 3px 0 0',opacity:(opts.highlightMax&&i!==peakI)?0.45:1}}></div>
+                        <div style={{height:Math.round((it.value||0)/max*104)+3,background:(opts.colors?opts.colors[i]:color),borderRadius:'3px 3px 0 0',opacity:_low?0.3:((opts.highlightMax&&i!==peakI)?0.45:1)}}></div>
                         <div className="sub" style={{fontSize:10,marginTop:4,fontWeight:i===peakI?700:400}}>{it.label}</div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
               )
@@ -3984,8 +4899,8 @@ const selectProject = async (client, project) => {
             const _respColors = ['#10b981','#22c55e','#84cc16','#eab308','#f59e0b','#ef4444']
             const timingSec = (!_timing.data) ? (<div className="section"><div className="sub" style={{padding:'10px 4px'}}>אין נתונים — לחצו "רענן CRM" למשיכת נתוני הזמנים.</div></div>) : (<>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'2px 4px 14px'}}>
-                <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>זמנים לפי:</span>
-                <select value={_tb} onChange={(e)=>setSfTimeBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
+                <label htmlFor="sf-time-branch" style={{fontSize:13,fontWeight:600,color:'#334155'}}>זמנים לפי:</label>
+                <select id="sf-time-branch" value={_tb} onChange={(e)=>setSfTimeBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
                   {_timeBranches.map(b => (<option key={b} value={b}>{b==='הכל'?'כל הרשת':b}</option>))}
                 </select>
               </div>
@@ -4035,8 +4950,6 @@ const selectProject = async (client, project) => {
                 const _rz = _td.resp || [], _rm = _td.respMeet || []
                 const _cd = _tRespLabels.map((lb, i) => { const L = _rz[i]||0, M = _rm[i]||0; return { lb, L, M, pc: L>0?Math.round(M/L*100):0 } })
                 const _MINS = 10
-                const _eligible = _cd.filter(c => c.L >= _MINS)
-                const _best = _eligible.length ? Math.max(..._eligible.map(c => c.pc)) : -1
                 const _col = (pc) => pc>=30 ? {c:'#0f9d58',bg:'#e1f5ee'} : pc>=20 ? {c:'#b45309',bg:'#fef3c7'} : {c:'#dc2626',bg:'#fee2e2'}
                 return (
                   <div className="section">
@@ -4046,7 +4959,10 @@ const selectProject = async (client, project) => {
                         <div key={c.lb} style={{background:'var(--surface-2, #fff)',border: best ? '2px solid '+cc.c : '1px solid var(--border)',borderRadius:14,padding:'14px 16px',opacity: small ? 0.7 : 1}}>
                           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                             <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>{c.lb}</span>
-                            {best ? null : (small ? <span style={{fontSize:10,fontWeight:600,color:'#94a3b8',background:'#f1f5f9',padding:'2px 8px',borderRadius:20}}>מדגם קטן</span> : null)}
+                            {/* תג "מדגם קטן" מוצג תמיד כשהמדגם קטן, גם בכרטיס המודגש. קודם הוא
+                                הוסתר בכרטיס הראשון, ולכן "תוך שעה" עם שלושה לידים הראה 100%
+                                בהדגשה ובלי שום סייג. המפרט אוסר זאת במפורש. */}
+                            {small ? <span style={{fontSize:10,fontWeight:600,color:'#94a3b8',background:'#f1f5f9',padding:'2px 8px',borderRadius:20}}>{'מדגם קטן · פחות מ־' + _MINS + ' לידים'}</span> : null}
                           </div>
                           <div style={{display:'flex',alignItems:'baseline',gap:6}}>
                             <span style={{fontSize:30,fontWeight:700,color:cc.c,lineHeight:1}}>{c.pc}%</span>
@@ -4140,22 +5056,36 @@ const selectProject = async (client, project) => {
               </div>
             )
 
+            // אנשי מכירות ומוצרים (חבילת VITAS-KLOSS-Sales-Products-Handoff).
+            // שתי טבלאות בלבד — בלי KPI, גרפים, מיון או דירוג שלא קיימים היום. מה שהשתנה
+            // כאן הוא רק חזותי ונגישותי: scope על כותרות העמודות, bidi isolation סביב שמות
+            // וסכומים, וערך מלא ב-title כשהסכום מקוצר (המפרט מחייב גישה לערך המלא).
+            const _fullMoney = (v) => formatCurrency(Math.round(v || 0))
+            const _money = (v) => <bdi title={_fullMoney(v)}>{formatCurrencyCompact(v || 0)}</bdi>
             const peopleSec = (<>
               <div className="section">
                 <div className="section-head">{ICO('violet', "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2")}<h2>ביצועי אנשי מכירות</h2><span className="sub">כלל הרשת</span></div>
+                {tableToolbar({ onExport: () => downloadXlsx(_salesmen.map(a => ({
+                  'איש מכירות': a.name, 'הזדמנויות': a.opportunities || 0, 'הצעות מחיר': a.quotesTotal || 0,
+                  'שווי הצעות': Math.round(a.quotesValueTotal || 0), 'מכירות': a.orders || 0,
+                  'שווי מכירות': Math.round(a.value || 0), 'ממוצע לעסקה': Math.round(a.avgDeal || 0),
+                  '% המרה': a.convToDeal || 0,
+                })), 'ביצועי-אנשי-מכירות_' + (selectedMonth || ''), 'אנשי מכירות') })}
                 <div className="table-wrapper">
                   <table className="data-table">
-                    <thead><tr><th>איש מכירות</th><th>הזדמנויות</th><th>הצעות מחיר</th><th>שווי הצעות</th><th>מכירות</th><th>שווי מכירות</th><th>ממוצע לעסקה</th><th>% המרה</th></tr></thead>
-                    <tbody>{_salesmen.map(a => (
+                    <thead><tr><th scope="col">איש מכירות</th><th scope="col">הזדמנויות</th><th scope="col">הצעות מחיר</th><th scope="col">שווי הצעות</th><th scope="col">מכירות</th><th scope="col">שווי מכירות</th><th scope="col">ממוצע לעסקה</th><th scope="col">% המרה</th></tr></thead>
+                    <tbody>{_salesmen.length === 0 ? (
+                      <tr><td colSpan={8} className="sub" style={{padding:'14px 4px'}}>אין נתוני אנשי מכירות לתקופה שנבחרה</td></tr>
+                    ) : _salesmen.map(a => (
                       <tr key={a.name}>
-                        <td style={{fontWeight:600}}>{a.name}</td>
+                        <th scope="row" style={{fontWeight:600,whiteSpace:'normal',textAlign:'start'}}><bdi>{a.name}</bdi></th>
                         <td>{formatNum(a.opportunities || 0)}</td>
                         <td>{formatNum(a.quotesTotal || 0)}</td>
-                        <td>{formatCurrencyCompact(a.quotesValueTotal || 0)}</td>
+                        <td>{_money(a.quotesValueTotal)}</td>
                         <td style={{fontWeight:600}}>{formatNum(a.orders || 0)}</td>
-                        <td>{formatCurrencyCompact(a.value || 0)}</td>
-                        <td>{formatCurrency(a.avgDeal || 0)}</td>
-                        <td style={{color:'var(--violet)',fontWeight:600}}>{(a.convToDeal || 0) + '%'}</td>
+                        <td>{_money(a.value)}</td>
+                        <td><bdi>{formatCurrency(a.avgDeal || 0)}</bdi></td>
+                        <td style={{color:'var(--violet)',fontWeight:600}}><bdi>{(a.convToDeal || 0) + '%'}</bdi></td>
                       </tr>
                     ))}</tbody>
                   </table>
@@ -4163,11 +5093,17 @@ const selectProject = async (client, project) => {
               </div>
               <div className="section">
                 <div className="section-head">{ICO('emerald', "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z")}<h2>המוצרים הנמכרים ביותר</h2><span className="sub">כלל הרשת</span></div>
+                {tableToolbar({ onExport: () => downloadXlsx(_products.map(pr => ({
+                  'מוצר': pr.name, 'כמות': pr.units || 0, 'שווי': Math.round(pr.value || 0),
+                })), 'מוצרים-נמכרים_' + (selectedMonth || ''), 'מוצרים') })}
                 <div className="table-wrapper">
                   <table className="data-table">
-                    <thead><tr><th>מוצר</th><th>כמות</th><th>שווי</th></tr></thead>
-                    <tbody>{_products.map(pr => (
-                      <tr key={pr.name}><td style={{fontWeight:600}}>{pr.name}</td><td>{formatNum(pr.units)}</td><td>{formatCurrencyCompact(pr.value)}</td></tr>
+                    <thead><tr><th scope="col">מוצר</th><th scope="col">כמות</th><th scope="col">שווי</th></tr></thead>
+                    <tbody>{_products.length === 0 ? (
+                      <tr><td colSpan={3} className="sub" style={{padding:'14px 4px'}}>אין נתוני מוצרים לתקופה שנבחרה</td></tr>
+                    ) : /* שם מוצר ארוך נשבר לשורות ולא נחתך — המפרט אוסר לצמצם פונט או לחתוך טקסט. */
+                      _products.map(pr => (
+                      <tr key={pr.name}><th scope="row" style={{fontWeight:600,whiteSpace:'normal',textAlign:'start',maxWidth:420}}><bdi>{pr.name}</bdi></th><td>{formatNum(pr.units)}</td><td>{_money(pr.value)}</td></tr>
                     ))}</tbody>
                   </table>
                 </div>
@@ -4207,13 +5143,13 @@ const selectProject = async (client, project) => {
             const _objScope = _ob === 'all' ? 'כלל הרשת' : ('סניף: ' + _ob)
             const objectionsSec = (<>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'2px 4px 12px'}}>
-                <span style={{fontSize:13,fontWeight:600,color:'#334155'}}>התנגדויות לפי:</span>
-                <select value={_ob} onChange={(e)=>setSfObjBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
+                <label htmlFor="sf-obj-branch" style={{fontSize:13,fontWeight:600,color:'#334155'}}>התנגדויות לפי:</label>
+                <select id="sf-obj-branch" value={_ob} onChange={(e)=>setSfObjBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
                   <option value="all">כל הרשת</option>
                   {_objBranchList.map(b => (<option key={b} value={b}>{b}</option>))}
                 </select>
                 <span className="sub" style={{fontSize:12,color:'#94a3b8'}}>לידים ─(אי המרה)─▶ הזדמנויות ─(נסגר ללא הצלחה)─▶ רכשו</span>
-                <span style={{marginInlineStart:'auto',fontSize:11,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:6,padding:'3px 9px',whiteSpace:'nowrap'}}>מבוסס פעילות החודש · לא מושפע מהעדשה למעלה</span>
+                <span style={{marginInlineStart:'auto',fontSize:11,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:6,padding:'3px 9px',whiteSpace:'nowrap'}}>מבוסס פעילות החודש · לא מושפע מהבחירה למעלה</span>
               </div>
               {_objBlock('נשירת ליד — סיבת אי המרה', 'לידים שלא הומרו החודש · ' + _objScope, ['amber', "M18 6 6 18M6 6l12 12"], _unqR, _unqT, _otherUnqualF, 'lead', '#eda100')}
               {_objBlock('נשירת הזדמנות — נסגר ללא הצלחה', 'הזדמנויות שנסגרו ללא הצלחה החודש · ' + _objScope, ['rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"], _lossR, _lossT, _otherLossF, 'opp', '#e24b4a')}
@@ -4225,17 +5161,22 @@ const selectProject = async (client, project) => {
                   {refreshingCrm ? '\u23f3' : '\ud83d\udd04'} {refreshingCrm ? 'מושך...' : 'רענן CRM'}
                 </button>
               </div>
-              <div className="client-tabs" style={{marginBottom:15}}>
+              {/* מובייל: בורר אחד במקום שורת תתי־הטאבים (Tovno-Mobile-Handoff). */}
+              <ViewPicker title="תצוגות CRM" value={sfTab} onChange={setSfTab} options={KLOSS_CRM_VIEWS} />
+              <div className="client-tabs vpick-replaced" style={{marginBottom:15}}>
                 <button type="button" className={`client-tab ${sfTab === 'network' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('network'); }}>מסך רשת</button>
                 <button type="button" className={`client-tab ${sfTab === 'branches' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('branches'); }}>סניפים</button>
                 <button type="button" className={`client-tab ${sfTab === 'people' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('people'); }}>אנשי מכירות ומוצרים</button>
                 <button type="button" className={`client-tab ${sfTab === 'timing' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('timing'); }}>זמנים</button>
                 <button type="button" className={`client-tab ${sfTab === 'breakdown' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('breakdown'); }}>מקורות וסטטוסים</button>
               </div>
-              {sfTab === 'network' ? (<>{netCards}{cohortFunnel}{periodFunnel}</>)
-                : sfTab === 'branches' ? (<>{branchesSec}{branchesChart}{objectionsSec}</>)
-                : sfTab === 'people' ? peopleSec
-                : sfTab === 'timing' ? timingSec
+              {/* כל תת-טאב עוטף ב-VitasPresentation בנפרד: הרכיבים והמידות המשותפים פעילים
+                  רק בתוך .vr-ui, ו-.vr-kloss-* מתחם את התוספות של כל מסך. "מקורות וסטטוסים"
+                  נשאר בעיצוב הישן בכוונה — אין לו חבילת מפרט, וויטלי ביקש להשאירו כך. */}
+              {sfTab === 'network' ? (<VitasPresentation className="vr-kloss">{netCards}{cohortFunnel}{periodFunnel}</VitasPresentation>)
+                : sfTab === 'branches' ? (<VitasPresentation className="vr-kloss vr-kloss-branches">{branchesSec}{branchesChart}{objectionsSec}</VitasPresentation>)
+                : sfTab === 'people' ? (<VitasPresentation className="vr-kloss vr-kloss-people">{peopleSec}</VitasPresentation>)
+                : sfTab === 'timing' ? (<VitasPresentation className="vr-kloss vr-kloss-timing">{timingSec}</VitasPresentation>)
                 : (<>
                     {sourcesSec}
                     {simple('סטטוסי לידים', ent(_s.byStatus).map(([k, v]) => [({ 'New': 'חדש', 'Working': 'נוצר קשר ראשוני', 'Nurturing': 'תואמה פגישה', 'Qualified': 'הומר', 'Unqualified': 'לא הומר' })[k] || k, v]), 'סטטוס', 'לידים', 'amber')}
@@ -4275,8 +5216,9 @@ const selectProject = async (client, project) => {
     const _spCamp = (ch,camp) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return _fbQnSpend; return _fbCampSpend[_normName(camp)]||0 }
     const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), t=_nn(adset); if(!t||t.indexOf('ללא')>=0) return null; const exact=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset)===t); if(exact.length) return {spend:exact.reduce((a,x)=>a+x.spend,0)}; const m=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset).includes(t)); return m.length===1 ? {spend:m[0].spend} : null }
     const _spAd = (ch,camp,adset,label) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), a=_nn(adset); const L=_nn(label); if(!L) return null; const inA=x=>(!a||a.indexOf('ללא')>=0||_nn(x.adset).includes(a)); let m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L && inA(x)); if(m.length) return {spend:m.reduce((z,x)=>z+x.spend,0)}; m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L); if(m.length===1) return {spend:m[0].spend}; const tok=(_nn(label).match(/ad\d+/)||[])[0]; if(tok){ const m2=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName).indexOf(tok)===0 && inA(x)); if(m2.length===1) return {spend:m2[0].spend}; } return null }
-    const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
-    const _roasCell = (rev, res, fs) => { const sp=res==null?null:(typeof res==='object'?res.spend:res); if(sp==null||sp<=0) return <td style={{fontSize:fs,color:'#cbd5e1'}}>—</td>; const r=(rev||0)/sp; return <td style={{fontSize:fs,whiteSpace:'nowrap',fontWeight:600,color:r>=1?'var(--emerald)':'var(--rose)'}}>{r.toFixed(2)}x</td> }
+    const _naT = 'לא זמין — נתוני הוצאה ו-ROAS קיימים ל-Facebook בלבד'
+    const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">—</span></td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
+    const _roasCell = (rev, res, fs) => { const sp=res==null?null:(typeof res==='object'?res.spend:res); if(sp==null||sp<=0) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">—</span></td>; const r=(rev||0)/sp; return <td style={{fontSize:fs,whiteSpace:'nowrap',fontWeight:600,color:r>=1?'var(--emerald)':'var(--rose)'}}>{r.toFixed(2)}x</td> }
             const _agents = _zs.agentPerformance || []
             const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
 
@@ -4328,7 +5270,7 @@ const selectProject = async (client, project) => {
                 })
               })
               add('סה"כ', '', '', '', '', _fn, _fbTotalSpend)
-              downloadCsv(rows, 'משפך-לפי-ערוץ_' + (selectedMonth || ''))
+              downloadXlsx(rows, 'משפך-לפי-ערוץ_' + (selectedMonth || ''), 'משפך לפי ערוץ')
             }
 
             const _agentPaths = _agents.filter(a => (a.bySource || []).length).map(a => a.agent)
@@ -4345,7 +5287,7 @@ const selectProject = async (client, project) => {
                 add('נציג', ag.agent, '', ag)
                 ;(ag.bySource || []).forEach(sr => add('מקור', ag.agent, sr.source, sr))
               })
-              downloadCsv(rows, 'ביצועי-אנשי-מכירות_' + (selectedMonth || ''))
+              downloadXlsx(rows, 'ביצועי-אנשי-מכירות_' + (selectedMonth || ''), 'אנשי מכירות')
             }
             const _tblBar  = { display:'flex', flexWrap:'wrap', gap:10, alignItems:'center', marginBottom:10 }
             const _tblHint = { fontSize:'0.85em', color:'#64748b', flex:'1 1 220px', textAlign:'right' }
@@ -4366,24 +5308,51 @@ const selectProject = async (client, project) => {
               </div>
             )
 
-            return (<>
-
-
-                <div className="kpi-grid">
+            // ── שברון נגיש (חבילת אריקה) ──────────────────────────────────────────
+            // עד היום הפתיחה הייתה שורה שנלחצת עם תו "◀" — בלי מקלדת, בלי focus,
+            // ובלי דרך למקריא מסך לדעת אם הפירוט פתוח. stopPropagation הכרחי כי
+            // הכפתור יושב בתוך שורה שגם היא נלחצת.
+            const _twist = (has, open, rowLabel, onToggle) => has ? (
+              <button type="button" className="vr-erika-twist" aria-expanded={open}
+                aria-label={(open ? 'סגירת פירוט ' : 'פתיחת פירוט ') + rowLabel}
+                onClick={(e) => { e.stopPropagation(); onToggle(); }}>
+                {open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
+              </button>
+            ) : <span className="vr-erika-twist-empty" aria-hidden="true" />
+            // תווית רמה. ברמת ה-adset הנתון מגיע מ-UTM_Term, ובגוגל זו לרוב מילת חיפוש
+            // ולא קבוצת מודעות — המפרט אוסר לקרוא לה "קבוצת מודעות" באופן גורף.
+            const _isG = (ch) => /google|גוגל/i.test(ch || '')
+            const _lvlTag = (txt) => <span className="vr-erika-lvl">{txt}</span>
+            // "(ללא קמפיין)" הוא ערך טכני מהנתונים; המפרט מחייב תווית מפורשת שלא
+            // תיקרא כשם קמפיין אמיתי. השורה עצמה נשארת — אין למחוק אותה.
+            // תקציב כולל לשורת הסיכום. fbTotals/gTotals הם אותם סכומים שמזינים את
+            // כרטיס ה-ROAS למעלה, ולכן שתי התצוגות נשענות על אותו מכנה.
+            const _gTotalSpend = (gTotals && gTotals.spend) || 0
+            const _totalAdSpend = ((fbTotals && fbTotals.spend) || 0) + _gTotalSpend
+            const _NOCAMP = '(ללא קמפיין)'
+            const _campLabel = (nm) => nm === _NOCAMP ? 'ללא שיוך לקמפיין' : nm
+            // המעטפת המשותפת: הרכיבים והמידות של ש.ברוך פעילים רק בתוך .vr-ui,
+            // ו-.vr-erika מתחם את התוספות של המסך הזה לשני פרויקטי אריקה בלבד.
+            return (<VitasPresentation className="vr-erika">
+                {/* היקף הנתונים. בלי המשפט הזה "רכשו" נקרא כמספר סופי, והוא לא:
+                    עסקה שתיסגר בשבוע הבא עדיין תשויך ללידים של התקופה הזו. */}
+                <div className="vr-erika-scope">
+                  <p>תוצאות הלידים שנוצרו בתקופה שנבחרה</p>
+                  <p>רכישות וביטולים עשויים להתעדכן גם לאחר סיום התקופה.</p>
+                </div>
+                <div className={vrZohoCrm ? 'vr-metric-grid' : 'kpi-grid'}>
                   {zohoKpiCards({ leads:_fn.leads, opportunities:_fn.opportunities, purchased:_fn.purchased, cancellations:_fn.cancellations, netRevenue:_fn.netRevenue, conversionRate:_fn.conversionRate }, ((fbTotals && fbTotals.spend) || 0) + ((gTotals && gTotals.spend) || 0), null)}
                 </div>
                 <div className="section">
-                  <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2></div>
-                  <div style={_tblBar}>
-                    <div style={_tblHint}>💡 לחץ על ערוץ ← קמפיין ← adset ← מודעה כדי לצלול פנימה · תקציב FB: קמפיין מדויק, adset/מודעה משוער (~)</div>
-                    <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                      <button onClick={toggleFunnelAll} style={_btnOpen}>{_funnelAllOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
-                      <button onClick={exportFunnelCsv} style={_btnCsv}>{'⬇ ייצוא ל-CSV'}</button>
-                    </div>
-                  </div>
+                  <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2><span className="sub">לחצו על שורה לפירוט</span></div>
+                  {/* אותו סרגל פעולות של כל שאר הטבלאות במערכת (ויטלי, 21.9). */}
+                  {tableToolbar({
+                    hint: '💡 לחץ על ערוץ ← קמפיין ← קבוצת מודעות / מילת חיפוש ← מודעה כדי לצלול פנימה · הוצאה ו-ROAS קיימים ל-Facebook בלבד: קמפיין מדויק, רמות עמוקות יותר משוערות (~)',
+                    allOpen: _funnelAllOpen, onToggleAll: toggleFunnelAll, onExport: exportFunnelCsv,
+                  })}
                   <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th><th>תקציב FB</th><th>ROAS</th></tr></thead>
+                      <thead><tr><th scope="col">ערוץ</th><th scope="col">סוג</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">רכשו</th><th scope="col">אחוז המרה</th><th scope="col">שווי נטו</th><th scope="col" title="בשורות: Facebook בלבד. בשורת הסיכום: Facebook + Google">תקציב</th><th scope="col" title="בשורות: מול תקציב Facebook. בשורת הסיכום: מול התקציב הכולל">ROAS</th></tr></thead>
                       <tbody>
                         {(() => {
                           const out = [];
@@ -4391,8 +5360,9 @@ const selectProject = async (client, project) => {
                             const camps = c.campaigns || [];
                             const chOpen = expandedFunnelCh.has(c.channel);
                             out.push(
-                              <tr key={c.channel} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
-                                <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{camps.length ? (chOpen ? '▼' : '◀') : ''}</span>{c.channel}</td>
+                              <tr key={c.channel} className={'vr-erika-lvl0' + (chOpen ? ' vr-erika-open' : '')} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
+                                <td style={{fontWeight:600}}>{_twist(camps.length > 0, chOpen, 'הערוץ ' + c.channel, () => toggleFunnelCh(c.channel))}{_lvlTag('ערוץ')}<bdi>{c.channel}</bdi></td>
+                                <td><SourceMark name={c.channel} /></td>
                                 <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>{_fbCell(_isFb(c.channel) ? _fbTotalSpend : null)}{_roasCell(c.netRevenue, _isFb(c.channel) ? _fbTotalSpend : null)}
                               </tr>
                             );
@@ -4402,8 +5372,9 @@ const selectProject = async (client, project) => {
                               const adSets = cm.adSets || [];
                               const cmOpen = expandedFunnelCamp.has(campKey);
                               out.push(
-                                <tr key={campKey} style={{background:'rgba(59,130,246,0.05)', cursor: adSets.length ? 'pointer' : 'default'}} onClick={adSets.length ? () => toggleFunnelCamp(campKey) : undefined}>
-                                  <td style={{paddingRight:24,fontSize:'0.9em',textAlign:'right',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{adSets.length ? (cmOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{cm.campaign}</span></td>
+                                <tr key={campKey} className={'vr-erika-lvl1' + (cmOpen ? ' vr-erika-open' : '')} style={{cursor: adSets.length ? 'pointer' : 'default'}} onClick={adSets.length ? () => toggleFunnelCamp(campKey) : undefined}>
+                                  <td className="vr-erika-name" style={{paddingInlineStart:26,fontSize:'0.9em'}}>{_twist(adSets.length > 0, cmOpen, 'הקמפיין ' + _campLabel(cm.campaign), () => toggleFunnelCamp(campKey))}{_lvlTag('קמפיין')}<bdi>{_campLabel(cm.campaign)}</bdi></td>
+                                  <td><SourceMark name={c.channel} size={14} /></td>
                                   <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>{_fbCell(_spCamp(c.channel, cm.campaign), '0.9em')}{_roasCell(cm.netRevenue, _spCamp(c.channel, cm.campaign), '0.9em')}
                                 </tr>
                               );
@@ -4413,16 +5384,18 @@ const selectProject = async (client, project) => {
                                 const ads = as.ads || [];
                                 const asOpen = expandedFunnelAst.has(astKey);
                                 out.push(
-                                  <tr key={astKey} style={{background:'rgba(59,130,246,0.09)', cursor: ads.length ? 'pointer' : 'default'}} onClick={ads.length ? () => toggleFunnelAst(astKey) : undefined}>
-                                    <td style={{paddingRight:44,fontSize:'0.85em',textAlign:'right',color:'#475569',whiteSpace:'nowrap'}}><span style={{display:'inline-block',width:14,color:'#94a3b8',marginLeft:4}}>{ads.length ? (asOpen ? '▼' : '◀') : ''}</span><span style={{unicodeBidi:'plaintext'}}>{as.adset}</span></td>
+                                  <tr key={astKey} className={'vr-erika-lvl2' + (asOpen ? ' vr-erika-open' : '')} style={{cursor: ads.length ? 'pointer' : 'default'}} onClick={ads.length ? () => toggleFunnelAst(astKey) : undefined}>
+                                    <td className="vr-erika-name" style={{paddingInlineStart:46,fontSize:'0.85em',color:'#475569'}}>{_twist(ads.length > 0, asOpen, as.adset, () => toggleFunnelAst(astKey))}{_lvlTag(_isG(c.channel) ? 'מילת חיפוש (UTM Term)' : 'קבוצת מודעות')}<bdi>{as.adset}</bdi></td>
+                                    <td><SourceMark name={c.channel} size={14} /></td>
                                     <td style={{fontSize:'0.85em'}}>{formatNum(as.leads)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.opportunities)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.purchased)}</td><td style={{fontSize:'0.85em',color:'var(--violet)'}}>{(as.conversionRate||0)+'%'}</td><td style={{fontSize:'0.85em'}}>{formatCurrency(as.netRevenue||0)}</td>{_fbCell(_spAdset(c.channel, cm.campaign, as.adset), '0.85em')}{_roasCell(as.netRevenue, _spAdset(c.channel, cm.campaign, as.adset), '0.85em')}
                                   </tr>
                                 );
                                 if (!asOpen) return;
                                 ads.forEach(ad => {
                                   out.push(
-                                    <tr key={astKey+'|'+ad.ad} style={{background:'rgba(59,130,246,0.13)'}}>
-                                      <td style={{paddingRight:62,fontSize:'0.8em',unicodeBidi:'plaintext',textAlign:'right',color:'#64748b'}}>{_resolveAd(c.channel, ad.ad)}</td>
+                                    <tr key={astKey+'|'+ad.ad} className="vr-erika-lvl3">
+                                      <td className="vr-erika-name" style={{paddingInlineStart:66,fontSize:'0.8em',color:'#64748b'}}><span className="vr-erika-twist-empty" aria-hidden="true" />{_lvlTag('מודעה')}<bdi>{_resolveAd(c.channel, ad.ad)}</bdi></td>
+                                      <td><SourceMark name={c.channel} size={14} /></td>
                                       <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>{_fbCell(_spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}{_roasCell(ad.netRevenue, _spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}
                                     </tr>
                                   );
@@ -4436,41 +5409,52 @@ const selectProject = async (client, project) => {
                       <tfoot>
                         <tr style={{fontWeight:700, borderTop:'2px solid rgba(99,102,241,0.35)', background:'rgba(99,102,241,0.06)'}}>
                           <td style={{fontWeight:700}}>סה"כ</td>
+                          <td />
                           <td style={{fontWeight:700}}>{formatNum(_fn.leads||0)}</td>
                           <td style={{fontWeight:700}}>{formatNum(_fn.opportunities||0)}</td>
                           <td style={{fontWeight:700}}>{formatNum(_fn.purchased||0)}</td>
                           <td style={{fontWeight:700,color:'var(--violet)'}}>{(_fn.conversionRate||0)+'%'}</td>
-                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}}>{formatCurrency(_fbTotalSpend)}</td><td style={{fontWeight:700}}>{_fbTotalSpend>0 ? ((_fn.netRevenue||0)/_fbTotalSpend).toFixed(2)+'x' : '—'}</td>
+                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}} title={'Facebook ' + formatCurrency(_fbTotalSpend) + ' + Google ' + formatCurrency(_gTotalSpend)}>{formatCurrency(_totalAdSpend)}</td><td style={{fontWeight:700}} title="הכנסות מכל הערוצים חלקי התקציב הכולל (Facebook + Google)">{_totalAdSpend>0 ? ((_fn.netRevenue||0)/_totalAdSpend).toFixed(2)+'x' : '—'}</td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
+                  {/* שורת הסיכום מחלקת את ההכנסות בתקציב הכולל (ויטלי, 21.9). עד כה היא
+                      חילקה בתקציב Facebook בלבד ולכן יצאה מנופחת — זה הפער ש-DATA-NOTES
+                      של חבילת אריקה מסמן בסעיף 5.
+                      נשאר הבדל אחד מול הכרטיס למעלה, והוא מכוון: הכרטיס נקרא "ROAS לא
+                      כולל מע"מ" ומחלק את ההכנסות ב-1.18 לפני החלוקה בתקציב, והטבלה מציגה
+                      את ההכנסות כפי שהן. לכן הכרטיס תמיד נמוך בכ-15%. */}
+                  {_totalAdSpend > 0 && ((_fn.netRevenue || 0) > 0) ? (
+                    <p className="vr-erika-note">
+                      שורת הסיכום מחלקת את ההכנסות בתקציב הכולל (Facebook + Google). השורות שמעליה מציגות תקציב ו-ROAS של Facebook בלבד, כי אלה הנתונים שניתן לשייך לקמפיין. הכרטיס שבראש העמוד נמוך בכ-15% כי הוא מחושב ללא מע״מ.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="section">
-                  <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>ביצועי אנשי מכירות</h2></div>
-                  <div style={_tblBar}>
-                    <div style={_tblHint}>💡 לחץ על נציג כדי לראות פילוח לפי מקור ליד</div>
-                    <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                      <button onClick={toggleAgentsAll} style={_btnOpen}>{_agentsAllOpen ? '⊟ כווץ הכל' : '⊞ פתח הכל'}</button>
-                      <button onClick={exportAgentsCsv} style={_btnCsv}>{'⬇ ייצוא ל-CSV'}</button>
-                    </div>
-                  </div>
+                  <div className="section-head"><div className="ico emerald"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>ביצועי אנשי מכירות</h2><span className="sub">פירוט לפי נציג ומקור ליד</span></div>
+                  {tableToolbar({
+                    hint: '💡 לחץ על נציג כדי לראות פילוח לפי מקור ליד',
+                    allOpen: _agentsAllOpen, onToggleAll: toggleAgentsAll, onExport: exportAgentsCsv,
+                  })}
                   <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th>נציג</th><th>לידים</th><th>הזדמנויות</th><th>מכירות</th><th>שווי מכירות</th><th>אחוז המרה</th></tr></thead>
+                      <thead><tr><th scope="col">נציג</th><th scope="col">מקור</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">מכירות</th><th scope="col">שווי מכירות</th><th scope="col">אחוז המרה</th></tr></thead>
                       <tbody>
                         {_agents.map(ag => {
                           const srcs = ag.bySource || [];
                           const isOpen = expandedAgents.has(ag.agent);
                           const rows = [
-                            <tr key={ag.agent} style={{fontWeight:600, cursor: srcs.length ? 'pointer' : 'default'}} onClick={srcs.length ? () => toggleAgent(ag.agent) : undefined}>
-                              <td style={{fontWeight:600}}><span style={{display:'inline-block',width:16,color:'#64748b',marginLeft:4}}>{srcs.length ? (isOpen ? '\u25bc' : '\u25c0') : ''}</span>{ag.agent}</td>
+                            <tr key={ag.agent} className={'vr-erika-lvl0' + (isOpen ? ' vr-erika-open' : '')} style={{fontWeight:600, cursor: srcs.length ? 'pointer' : 'default'}} onClick={srcs.length ? () => toggleAgent(ag.agent) : undefined}>
+                              <td style={{fontWeight:600}}>{_twist(srcs.length > 0, isOpen, 'הנציג ' + ag.agent, () => toggleAgent(ag.agent))}<bdi>{ag.agent}</bdi></td>
+                              <td />
                               <td>{formatNum(ag.leads)}</td><td>{formatNum(ag.opportunities)}</td><td>{formatNum(ag.purchased)}</td><td>{formatCurrency(ag.netRevenue||0)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(ag.conversionRate||0)+'%'}</td>
                             </tr>
                           ];
                           if (isOpen) srcs.forEach(sr => rows.push(
-                            <tr key={ag.agent+'|'+sr.source} style={{background:'rgba(16,185,129,0.05)'}}>
-                              <td style={{paddingRight:30,fontSize:'0.9em'}}>{sr.source}</td>
+                            <tr key={ag.agent+'|'+sr.source} className="vr-erika-lvl1">
+                              <td className="vr-erika-name" style={{paddingInlineStart:26,fontSize:'0.9em'}}><span className="vr-erika-twist-empty" aria-hidden="true" />{_lvlTag('מקור ליד')}<bdi>{sr.source}</bdi></td>
+                              <td><SourceMark name={sr.source} size={14} /></td>
                               <td style={{fontSize:'0.9em'}}>{formatNum(sr.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(sr.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(sr.purchased)}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(sr.netRevenue||0)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(sr.conversionRate||0)+'%'}</td>
                             </tr>
                           ));
@@ -4480,17 +5464,31 @@ const selectProject = async (client, project) => {
                     </table>
                   </div>
                 </div>
-            </>)
+            </VitasPresentation>)
           }
 
           // BMBY CRM (existing behavior — unchanged)
           return (<>
-            <div className="client-tabs" style={{marginBottom: 15}}>
-              <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>📂 מקורות הגעה</button>
-              <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>⏱️ זמני תגובה</button>
-              <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>🚫 התנגדויות</button>
-              <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>🏘️ יישובים</button>
-              <button className={`client-tab ${crmSubTab === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>📅 פגישות שבוצעו</button>
+            {/* מובייל: בורר אחד במקום שורת תתי־הטאבים (Tovno-Mobile-Handoff). */}
+            <ViewPicker
+              title="תצוגות CRM"
+              value={crmSubTab}
+              onChange={setCrmSubTab}
+              options={BMBY_CRM_VIEWS}
+            />
+            <div className={vrShell ? 'vcs-subtabs-row' : undefined}>
+            <div className="client-tabs vpick-replaced" style={vrShell ? undefined : {marginBottom: 15}}>
+              <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>{vrShell ? '' : '📂 '}מקורות הגעה</button>
+              <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>{vrShell ? '' : '⏱️ '}זמני תגובה</button>
+              <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>{vrShell ? '' : '🚫 '}התנגדויות</button>
+              <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>{vrShell ? '' : '🏘️ '}יישובים</button>
+              <button className={`client-tab ${crmSubTab === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>{vrShell ? '' : '📅 '}פגישות שבוצעו</button>
+            </div>
+            {vrShell && (
+              <button type="button" className="vr-button vcs-refresh" onClick={refreshFromBmby} disabled={refreshingCrm} title="משיכה חיה מ-BMBY לתקופה שנבחרה">
+                <RefreshCw size={16} aria-hidden="true" />{refreshingCrm ? 'מרענן נתונים…' : 'רענון נתונים'}
+              </button>
+            )}
             </div>
             {crmSubTab === 'sources' ? (<>{renderCrmDashboard()}{renderCrmAdsDashboard()}</>) : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : crmSubTab === 'meetings' ? renderCrmMeetingsDashboard() : renderCrmReportDashboard()}
           </>)
@@ -4500,8 +5498,21 @@ const selectProject = async (client, project) => {
             <h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05d8\u05d5\u05d5\u05d7 \u05d4\u05ea\u05d0\u05e8\u05d9\u05db\u05d9\u05dd \u05e9\u05e0\u05d1\u05d7\u05e8'}</h3>
             <p style={{color:'#64748b',marginTop:'8px'}}>{'\u05d1\u05d7\u05e8 \u05d8\u05d5\u05d5\u05d7 \u05d0\u05d7\u05e8 \u05d0\u05d5 \u05d4\u05e8\u05e5 \u05e1\u05e0\u05db\u05e8\u05d5\u05df'}</p>
           </div>
-        ) : (<>
-        <div className="kpi-grid">
+        ) : (<div className={(vrFb || vrG) ? 'vfb-root' : undefined}>
+        {(vrFb || vrG) && (
+          <div className="vr-section-heading vfb-tab-heading"><div>
+            <h2>{vrFb ? 'Facebook' : 'Google'}</h2>
+            <p>{vrFb ? 'ביצועי הפרסום ב-Meta והתקדמות הלידים המשויכים ל-Facebook ב-CRM' : 'ביצועי הפרסום ב-Google Ads והתקדמות הלידים המשויכים ל-Google ב-CRM'}</p>
+          </div></div>
+        )}
+        {vrMode && <p className="vr-caption vr-metrics-section">פעילות בתקופה · כולל פעילות מלידים שנכנסו לפני התקופה</p>}
+        {(vrFb || vrG) && (
+          <div className="vr-section-heading vfb-activity-heading"><div>
+            <h2>פעילות בתקופה</h2>
+            <p>{'כולל פעילות בתקופה מלידים שנכנסו קודם · תקציב, לידים וקליקים לפי ' + (vrFb ? 'Meta' : 'Google Ads') + '; פגישות, הרשמות וחוזים לפי שיוך המקור ב-CRM'}</p>
+          </div></div>
+        )}
+        <div className={vrAds ? 'vr-metric-grid' : 'kpi-grid'}>
           {crmReports[0]?.summary?.crmType === 'zoho' ? (() => {
             const _zr = (crmReports.find(r => r.summary && r.summary.funnel) || {}).summary || {};
             const _zf = _zr.funnel || {};
@@ -4535,13 +5546,18 @@ const selectProject = async (client, project) => {
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות עתידיות', formatNum(_cs.meetingsUpcoming || 0), 'cyan', _cs.meetingsUpcoming || 0, prevCrmTotals?.meetingsUpcoming, false, _tabCrmLeads?.meetingsUpcoming) : null}
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות שבוטלו', formatNum(_cs.meetingsCancelled || 0), 'red', _cs.meetingsCancelled || 0, prevCrmTotals?.meetingsCancelled, false, _tabCrmLeads?.meetingsCancelled) : null}
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('לידים שלא טופלו', formatNum(_cs.leadsToHandle || 0), 'amber', _cs.leadsToHandle || 0, null, false, null) : null}
-          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations) : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
-          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts) : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
-          {activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations,
+            (vrAds && activeT.spend > 0 && (crmTotals?.registrationValue || 0) > 0) ? ('שווי ' + formatCurrencyCompact(crmTotals.registrationValue)) : undefined) : null}
+          {!vrAds && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
+          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts,
+            (vrAds && activeT.spend > 0) ? [ (crmTotals?.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(crmTotals.contractValue) : null, (crmTotals?.contracts || 0) > 0 ? 'עלות לחוזה ' + formatCurrency(activeT.spend / crmTotals.contracts) : null ].filter(Boolean).join(' · ') || undefined : undefined) : null}
+          {!vrAds && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
+          {!vrAds && activeT.spend > 0 && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
           </>)}
         </div>
+
+        {/* Facebook/Google (עיצוב מחודש): קוהורט הערוץ מיד אחרי הכרטיסים, כמו בסקיצה; פילוחי סוכנות/תת-פרויקט אחריו */}
+        {vrFunnel && vrFb ? renderFunnelBar('cohort', 'facebook') : vrFunnel && vrG ? renderFunnelBar('cohort', 'google') : null}
 
         {(() => {
           const _ab = dashTab === 'facebook' ? (fbReports[0]?.summary?.byAgency)
@@ -4552,23 +5568,44 @@ const selectProject = async (client, project) => {
           return (
             <div className="section">
               <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><h2>פילוח לפי משרד פרסום</h2><span className="sub">{dashTab === 'facebook' ? 'Facebook' : 'Google'}</span></div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:12}}>
-                {_rows.map(([ag, o]) => { const pc = _tot > 0 ? Math.round((o.spend || 0) / _tot * 100) : 0; return (
-                  <div key={ag} style={{background:'var(--surface-2, #fff)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                      <span style={{fontSize:15,fontWeight:600,color:'#0f172a'}}>{ag}</span>
-                      <span style={{fontSize:11,fontWeight:600,color:'#0369a1',background:'#e0f2fe',padding:'2px 8px',borderRadius:20}}>{pc}% מהתקציב</span>
-                    </div>
-                    <div style={{fontSize:24,fontWeight:700,color:'#0f172a',lineHeight:1.1}}>{formatCurrency(o.spend || 0)}</div>
-                    <div style={{fontSize:11,color:'#94a3b8',marginBottom:12}}>הוצאה</div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 10px',fontSize:13}}>
-                      <div><span style={{color:'#64748b'}}>לידים </span><b style={{color:'#0f172a'}}>{formatNum(Math.round(o.leads || 0))}</b></div>
-                      <div><span style={{color:'#64748b'}}>עלות לליד </span><b style={{color:'#7c3aed'}}>{formatCurrency(o.cpl || 0)}</b></div>
-                      <div><span style={{color:'#64748b'}}>קליקים </span><b style={{color:'#0f172a'}}>{formatNum(o.clicks || 0)}</b></div>
-                      <div><span style={{color:'#64748b'}}>CTR </span><b style={{color:'#0f172a'}}>{(o.ctr || 0).toFixed(2)}%</b></div>
-                    </div>
-                  </div>
-                )})}
+              {/* חבילת VITAS-KLOSS-Ads-Sections-Handoff. אותם נתונים ואותו מכנה: האחוז
+                  הוא חלק המשרד מסך ההוצאה של הפלטפורמה בתקופה — לא ניצול יעד חודשי.
+                  אין דירוג "משרד מנצח" ואין לוגואים מומצאים; אייקון ניטרלי בלבד. */}
+              <div className="vr-agency-grid">
+                {_rows.map(([ag, o]) => {
+                  const pc = _tot > 0 ? Math.round((o.spend || 0) / _tot * 100) : 0;
+                  const cells = [
+                    { k: 'leads', label: 'לידים',      value: formatNum(Math.round(o.leads || 0)), Icon: Users },
+                    { k: 'cpl',   label: 'עלות לליד',  value: formatCurrency(o.cpl || 0),          Icon: Tag },
+                    { k: 'clicks',label: 'קליקים',     value: formatNum(o.clicks || 0),            Icon: MousePointerClick },
+                    { k: 'ctr',   label: 'CTR',        value: (o.ctr || 0).toFixed(2) + '%',       Icon: Eye },
+                  ];
+                  return (
+                    <section key={ag} className="vr-agency-card">
+                      <header className="vr-agency-head">
+                        <span className="vr-agency-name"><Building2 size={16} aria-hidden="true" /><bdi>{ag}</bdi></span>
+                        <span className="vr-agency-share" title={'חלק המשרד מסך ההוצאה של ' + (dashTab === 'facebook' ? 'Facebook' : 'Google') + ' בתקופה'}><bdi>{pc}%</bdi> מהתקציב</span>
+                      </header>
+                      <p className="vr-agency-label">תקציב שנוצל</p>
+                      <p className="vr-agency-value"><bdi>{formatCurrency(o.spend || 0)}</bdi></p>
+                      {/* הפס מתאר בדיוק את אותו אחוז שבתג — אותו מספר, לא חלוקה חדשה. */}
+                      <span className="vr-agency-rail" role="img" aria-label={pc + '% מהתקציב'}>
+                        <span className="vr-agency-fill" style={{ inlineSize: pc + '%' }} />
+                      </span>
+                      <dl className="vr-agency-cells">
+                        {cells.map(({ k, label, value, Icon }) => (
+                          <div key={k} className={'vr-agency-cell vr-agency-' + k}>
+                            <span className="vr-agency-ico"><Icon size={14} aria-hidden="true" /></span>
+                            <div>
+                              <dt>{label}</dt>
+                              <dd><bdi>{value}</bdi></dd>
+                            </div>
+                          </div>
+                        ))}
+                      </dl>
+                    </section>
+                  );
+                })}
               </div>
             </div>
           )
@@ -4579,7 +5616,7 @@ const selectProject = async (client, project) => {
             מדיה-בלבד לא היה רואה אותו כלל, למרות שחצי מהמשפך שלו כן קיים.
             כאן הוא מוצג בטאב "הכל": שלבי המדיה עם נתונים, ושלבי ה-CRM כ"אין נתון".
             ברגע שה-CRM יחובר, טאב ה-CRM ייווצר והסרגל יעבור לשם מעצמו. */}
-        {dashTab === 'all' && !hasCrm ? renderFunnelBar() : null}
+        {dashTab === 'all' && (!hasCrm || vrFunnelMode) ? renderFunnelBar(vrFunnelMode) : null}
 
         {/* פילוח פנימי לפי פרויקט — לקוח בחשבון מודעות אחד שמזהה את הבניין ברמת המודעה.
             הסכום למעלה נשאר סך החשבון; כאן רואים ממה הוא מורכב. כל שקל בדלי אחד בלבד,
@@ -4652,8 +5689,10 @@ const selectProject = async (client, project) => {
           )
         })()}
 
-        {/* FUNNEL */}
-        <div className="section">
+        {/* FUNNEL — במצב העיצוב המחודש המשפך היחיד הוא "משפך לידים" (renderFunnelBar) למעלה; זה מוצג רק במצב הישן.
+            התנאי הוא vrAds ולא vrFunnel: ב-KLOSS אין משפך בטאבי Facebook/Google (אין פילוח ערוץ ב-Salesforce),
+            אבל הטאב כן בעיצוב המחודש — ולכן "משפך שיווקי" הישן חזר להופיע שם לצד "משפך לידים" (ויטלי, 20.9). */}
+        {!vrAds && <div className="section">
           <div className="section-head">
             <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
             <h2>משפך שיווקי</h2>
@@ -4779,7 +5818,7 @@ const selectProject = async (client, project) => {
             </div>
             );
           })()}
-        </div>
+        </div>}
 
         {detailPending && (
           <div className="section" style={{display:'flex',alignItems:'center',gap:12,padding:'18px 20px'}}>
@@ -4790,7 +5829,43 @@ const selectProject = async (client, project) => {
         )}
 
                 {/* Non-FB tabs: keep existing campaigns charts + flat table */}
-        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid"><div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns', 'google')}</div>)}
+        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid">
+          {/* חבילת Ads-Sections: הדונאט מימין והמקרא האנכי משמאלו, באותו כרטיס.
+              המקרא הוא כפתורים אמיתיים — לחיצה מסתירה פלח, בדיוק כמו המקרא המובנה
+              של Chart.js שהוחלף, ועכשיו זה עובד גם במקלדת. */}
+          <div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4>
+            <div className="vr-camp-chart">
+              {/* כיתוב במרכז הדונאט, כמו בעיצוב. שכבה מעל ה-canvas ולא תוסף של
+                  Chart.js — הוא לא צריך להיות חלק מהציור, והוא נשאר קריא לכל גודל. */}
+              <div className="chart-container vr-camp-donut">
+                <canvas id="campSpend" role="img" aria-label={'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05d4\u05ea\u05e7\u05e6\u05d9\u05d1 \u05d1\u05d9\u05df ' + campLegend.length + ' \u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd. \u05d4\u05e4\u05d9\u05e8\u05d5\u05d8 \u05d4\u05de\u05dc\u05d0 \u05d1\u05de\u05e7\u05e8\u05d0 \u05e9\u05dc\u05d9\u05d3 \u05d5\u05d1\u05d8\u05d1\u05dc\u05d4 \u05e9\u05de\u05ea\u05d7\u05ea.'}></canvas>
+                <span className="vr-camp-center" aria-hidden="true">תקציב<br />פרסום</span>
+              </div>
+              <ul className="vr-camp-legend">
+                {campLegend.map((it, i) => {
+                  const hidden = campHidden.has(it.name);
+                  return (
+                    <li key={it.name}>
+                      <button type="button" aria-pressed={!hidden} title={it.name}
+                        onClick={() => {
+                          // Chart.js שומר את מצב ההסתרה על ה-meta של הפלח, ולכן
+                          // הלחיצה נוגעת ישירות במופע הגרף ולא מרנדרת אותו מחדש.
+                          const chart = chartsRef.current.find(c => c?.canvas?.id === 'campSpend');
+                          if (chart) { chart.toggleDataVisibility(i); chart.update(); }
+                          setCampHidden(prev => { const n = new Set(prev); if (n.has(it.name)) n.delete(it.name); else n.add(it.name); return n; });
+                        }}>
+                        <span className="vr-camp-dot" style={{background: it.color}} aria-hidden="true" />
+                        <span className="vr-camp-name">{it.name}</span>
+                        <span className="vr-camp-pct"><bdi>{it.pct}%</bdi></span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+          <div className="chart-card"><h4>{'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</h4><div className="chart-container"><canvas id="campLeads" role="img" aria-label={'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3 \u05dc\u05e4\u05d9 \u05e7\u05de\u05e4\u05d9\u05d9\u05df. \u05d4\u05e2\u05e8\u05db\u05d9\u05dd \u05d4\u05de\u05dc\u05d0\u05d9\u05dd \u05d1\u05d8\u05d1\u05dc\u05d4 \u05e9\u05de\u05ea\u05d7\u05ea.'}></canvas></div></div>
+        </div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns', 'google')}</div>)}
 
         {/* Nested expandable table - Campaign → Ad Set → Ad - for FB, All, Google Search */}
         {(isFb || dashTab === 'all' || dashTab === 'google_search') && campNames.length > 0 && (() => {
@@ -4842,8 +5917,12 @@ const selectProject = async (client, project) => {
           const campaignNames = Object.keys(tree).filter(n => _hasActivity(tree[n])).sort((a,b) => treeCmp(a, b, n => tree[n]));
           const toggleCampaign = (c) => setExpandedCampaigns(prev => { const next = new Set(prev); if (next.has(c)) next.delete(c); else next.add(c); return next; });
           const toggleAdSet = (k) => setExpandedAdSets(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
+          // עמודת "פלטפורמה" נפרדת (ויטלי, 20.9): הלוגו ישב בתוך תא השם, ומכיוון ששמות
+          // הקמפיינים מעורבים עברית/אנגלית הוא נדד ימינה או שמאלה לפי השם — עמודה משלו
+          // מיישרת אותו בכל השורות. sort=false כי אין מה למיין לפיו ברמות 1 ו-2.
           const cols = [
             { key:'name', label:'\u05e7\u05de\u05e4\u05d9\u05d9\u05df / \u05e7\u05d1\u05d5\u05e6\u05d4 / \u05de\u05d5\u05d3\u05e2\u05d4' },
+            { key:'platform', label:'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4', noSort: true },
             { key:'status', label:'\u05e1\u05d8\u05d0\u05d8\u05d5\u05e1' },
             { key:'clicks', label:'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd' },
             { key:'impressions', label:'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea' },
@@ -4865,16 +5944,24 @@ const selectProject = async (client, project) => {
             const fontW = level === 0 ? 700 : level === 1 ? 600 : 400;
             const fontSize = level === 2 ? '0.9em' : '1em';
             return (
-              <tr key={key} style={{background: rowBg, cursor: hasChildren ? 'pointer' : 'default', borderRight: level === 1 ? '3px solid rgba(59,130,246,0.3)' : level === 2 ? '3px solid rgba(16,185,129,0.3)' : 'none'}} onClick={hasChildren ? onToggle : undefined}>
-                <td style={{fontWeight: fontW, fontSize, paddingRight: `${8 + indent}px`, unicodeBidi: 'plaintext', textAlign: 'right'}}>
-                  <span style={{display:'inline-block', width:'18px', color:'#64748b', marginLeft:'4px'}}>
-                    {hasChildren ? (isExpanded ? '\u25bc' : '\u25c0') : ''}
+              <tr key={key} className={vrAds ? `vr-tree-row vr-lvl-${level}${hasChildren ? ' vr-expandable' : ''}` : undefined} style={vrAds ? undefined : {background: rowBg, cursor: hasChildren ? 'pointer' : 'default', borderRight: level === 1 ? '3px solid rgba(59,130,246,0.3)' : level === 2 ? '3px solid rgba(16,185,129,0.3)' : 'none'}} onClick={hasChildren ? onToggle : undefined}>
+                {/* dir=rtl על התא + bdi סביב השם: החץ יושב תמיד בקצה הימני, והשם עצמו
+                    עדיין מוצג בכיוון שלו (אנגלית LTR, עברית RTL). קודם התא כולו היה
+                    unicodeBidi:'plaintext', ולכן שורה ששמה מתחיל באנגלית התהפכה כולה. */}
+                <td dir="rtl" style={{fontWeight: fontW, fontSize, paddingInlineStart: `${8 + indent}px`, textAlign: 'right'}}>
+                  <span style={{display:'inline-block', width:'18px', color:'#64748b', marginInlineEnd:'4px'}}>
+                    {hasChildren ? (vrAds ? (isExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />) : (isExpanded ? '\u25bc' : '\u25c0')) : ''}
                   </span>
-                  {level === 0 && data.source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:data.source.includes('google')?'var(--rose-50)':'var(--sky-50)',color:data.source.includes('google')?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{data.source.includes('google')?'G':'F'}</span> : null}
-                  {name}
-                  {level === 0 && data.source ? <span className={`platform-tag${data.source.includes('google')?' google':''}`} style={{marginRight:'8px'}}>{data.source.includes('facebook')?'FACEBOOK':'GOOGLE'}</span> : null}
+                  <bdi>{name}</bdi>
                 </td>
-                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
+                <td style={{fontSize, whiteSpace:'nowrap'}}>
+                  {level === 0 && data.source ? (vrAds
+                    ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
+                    : <span className={`platform-tag${data.source.includes('google')?' google':''}`}>{data.source.includes('google')?'GOOGLE':'FACEBOOK'}</span>) : <span style={{color:'#cbd5e1'}}>-</span>}
+                </td>
+                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : 'rgba(226,75,74,0.12)'; const col = isActive ? '#059669' : '#c0322f'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; // סטטוס ריק פירושו קמפיין שאינו פעיל — עד היום הוא הוצג כמקף אפור ונקרא כמו
+                  // "אין נתון". עכשיו "מכובה" באדום (ויטלי, 21.9).
+                  if (vrAds) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status off"><i aria-hidden="true" />מכובה</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{background:'rgba(226,75,74,0.12)',color:'#c0322f',borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>מכובה</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
                 <td style={{fontSize}}>{formatNum(data.impressions)}</td>
                 <td style={{fontSize}}>{formatCurrency(cpc)}</td>
@@ -4889,10 +5976,46 @@ const selectProject = async (client, project) => {
           return (
             <div className="section">
               <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>{'\u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd, \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05d5\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</h2><span className="sub"><InfoTip text="טבלאה מאוחדת עם כל הרמות של החשבון הפרסומי" /></span></div>
-              <div style={{fontSize:'0.85em',color:'#64748b',marginBottom:'12px',textAlign:'right'}}>{'\ud83d\udca1 \u05dc\u05d7\u05e5 \u05e2\u05dc \u05e7\u05de\u05e4\u05d9\u05d9\u05df \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea, \u05d5\u05e2\u05dc \u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea'}</div>
+              {(() => {
+                // "פתח הכל" נוגע רק ברמת הקמפיין ובקבוצות שלו; פתיחה של כל העץ
+                // בחשבון עם מאות מודעות תוקעת את הדפדפן, ולכן אין כאן רמה שלישית.
+                const _allCampsOpen = campaignNames.length > 0 && campaignNames.every(n => expandedCampaigns.has(n));
+                const _toggleAllCamps = () => {
+                  if (_allCampsOpen) { setExpandedCampaigns(new Set()); setExpandedAdSets(new Set()); return; }
+                  setExpandedCampaigns(new Set(campaignNames));
+                };
+                const _exportTree = () => {
+                  const out = [];
+                  const row = (level, camp, adset, ad, d) => out.push({
+                    'רמה': level, 'קמפיין': camp, 'קבוצת מודעות': adset, 'מודעה': ad,
+                    'פלטפורמה': (d.source || '').includes('google') ? 'Google' : (d.source ? 'Meta' : ''),
+                    'סטטוס': d.status || '', 'קליקים': d.clicks || 0, 'חשיפות': d.impressions || 0,
+                    'עלות לקליק': Math.round(((d.clicks || 0) > 0 ? d.spend / d.clicks : 0) * 100) / 100,
+                    'CTR': Math.round(((d.impressions || 0) > 0 ? d.clicks / d.impressions * 100 : 0) * 100) / 100,
+                    'CPM': Math.round(((d.impressions || 0) > 0 ? d.spend / d.impressions * 1000 : 0) * 100) / 100,
+                    'לידים': Math.round(d.leads || 0),
+                    'עלות לליד': Math.round(((d.leads || 0) > 0 ? d.spend / d.leads : 0) * 100) / 100,
+                    'תקציב שנוצל': Math.round(d.spend || 0),
+                  });
+                  campaignNames.forEach(cn => {
+                    const cd = tree[cn];
+                    row('קמפיין', cn, '', '', cd);
+                    Object.keys(cd.adSets || {}).forEach(an => {
+                      const ad2 = cd.adSets[an];
+                      row('קבוצת מודעות', cn, an, '', ad2);
+                      Object.keys(ad2.ads || {}).forEach(adn => row('מודעה', cn, an, adn, ad2.ads[adn]));
+                    });
+                  });
+                  downloadXlsx(out, 'קמפיינים-קבוצות-ומודעות_' + (selectedMonth || ''), 'קמפיינים');
+                };
+                return tableToolbar({
+                  hint: '\ud83d\udca1 \u05dc\u05d7\u05e5 \u05e2\u05dc \u05e7\u05de\u05e4\u05d9\u05d9\u05df \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea, \u05d5\u05e2\u05dc \u05e7\u05d1\u05d5\u05e6\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea \u05db\u05d3\u05d9 \u05dc\u05e8\u05d0\u05d5\u05ea \u05de\u05d5\u05d3\u05e2\u05d5\u05ea',
+                  allOpen: _allCampsOpen, onToggleAll: _toggleAllCamps, onExport: _exportTree,
+                });
+              })()}
               <div className="table-wrapper">
                 <table className="data-table">
-                  <thead><tr>{cols.map(c => <th key={c.key} style={{whiteSpace:'nowrap',cursor:'pointer',userSelect:'none'}} onClick={() => handleSort('campTree', c.key)}>{c.label}{treeSort.key === c.key ? (treeSort.dir === 'desc' ? ' \u25bc' : ' \u25b2') : ' \u21c5'}</th>)}</tr></thead>
+                  <thead><tr>{cols.map(c => <th key={c.key} style={{whiteSpace:'nowrap',cursor:c.noSort?'default':'pointer',userSelect:'none'}} onClick={c.noSort ? undefined : (() => handleSort('campTree', c.key))}>{c.label}{c.noSort ? '' : (treeSort.key === c.key ? (treeSort.dir === 'desc' ? ' \u25bc' : ' \u25b2') : ' \u21c5')}</th>)}</tr></thead>
                   <tbody>
                     {campaignNames.flatMap(cName => {
                       const cData = tree[cName];
@@ -4916,8 +6039,7 @@ const selectProject = async (client, project) => {
                   </tbody>
                 </table>
               </div>
-          <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div>
-            </div>
+                      </div>
           );
         })()}
 
@@ -4984,14 +6106,14 @@ const selectProject = async (client, project) => {
 
         {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section section-demographics">
           <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>פילוח דמוגרפי</h2><span className="sub">חלוקת ביצועים לפי מגדר וקבוצת גיל</span></div>
-        <div style={{display:'flex',gap:'20px',alignItems:'flex-start'}}>
-          <div style={{flex:1,minWidth:0}}>
+        <div className={vrAds ? 'vr-demo-grid' : undefined} style={vrAds ? undefined : {display:'flex',gap:'20px',alignItems:'flex-start'}}>
+          <div className={vrAds ? 'vr-demo-block' : undefined} style={vrAds ? undefined : {flex:1,minWidth:0}}>
           {!isPmax && genderNames.length > 0 && (() => {
           const gd = data.genders;
           const genderLabel = (g) => g === 'female' ? '\u05e0\u05e9\u05d9\u05dd' : g === 'male' ? '\u05d2\u05d1\u05e8\u05d9\u05dd' : g === 'unknown' ? '\u05dc\u05d0 \u05d9\u05d3\u05d5\u05e2' : g;
           const orderedKeys = ['female', 'male', 'unknown'].filter(g => gd[g]);
           return (<div style={{marginBottom: ageNames.length > 0 ? '28px' : 0}}>
-            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}><span style={{fontSize:'1.2em'}}>⚧</span>פילוח מגדרי</h3>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}>{!vrAds && <span style={{fontSize:'1.2em'}}>⚧</span>}פילוח מגדרי</h3>
             <div className="card"><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'gender',label:'\u05de\u05d2\u05d3\u05e8'},{key:'clicks',label:'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd'},{key:'impressions',label:'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea'},{key:'cpc',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05e7\u05dc\u05d9\u05e7'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'\u05dc\u05d9\u05d3\u05d9\u05dd'},{key:'cpl',label:'\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'},{key:'spend',label:'\u05ea\u05e7\u05e6\u05d9\u05d1 \u05e9\u05e0\u05d5\u05e6\u05dc'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('genders',c.key)}>{c.label}{(()=>{const s=sortConfig['genders'];if(!s||s.key!==c.key)return ' \u21c5';return s.dir==='desc'?' \u25bc':' \u25b2';})()}</th>))}
@@ -5012,12 +6134,12 @@ const selectProject = async (client, project) => {
           </div>);
         })()}
           </div>
-          <div style={{flex:1,minWidth:0}}>
+          <div className={vrAds ? 'vr-demo-block' : undefined} style={vrAds ? undefined : {flex:1,minWidth:0}}>
           {!isPmax && ageNames.length > 0 && (() => {
           const ad = data.ages;
           const sortedAges = ageNames.sort((a, b) => { const na = parseInt(a); const nb = parseInt(b); return na - nb; });
           return (<div>
-            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}><span style={{fontSize:'1.2em'}}>📅</span>פילוח גילאי</h3>
+            <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}>{!vrAds && <span style={{fontSize:'1.2em'}}>📅</span>}פילוח גילאי</h3>
             <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
                 {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
@@ -5047,7 +6169,6 @@ const selectProject = async (client, project) => {
           const activeAdsList = fbReports.flatMap(r => r.summary?.activeAds || []);
           if (activeAdsList.length === 0) return null;
           // activeAds hold ALL active ads (API no longer trims); we dedupe by name + take the top by leads below
-          const _isZohoClient = crmReports[0]?.summary?.crmType === 'zoho';
           let _adsPool = activeAdsList;
           {
             // Dedupe the same creative shown across multiple campaigns/adsets — group by normalized name, sum metrics.
@@ -5067,17 +6188,19 @@ const selectProject = async (client, project) => {
             }
             _adsPool = Object.values(_byName);
           }
+          // Top 10 לכל הלקוחות (ויטלי, 20.9). קודם זה היה 6, ו-10 ל-Zoho בלבד —
+          // שלושה מספרים שונים לאותו רכיב בלי סיבה. הבריכה עצמה לא מוגבלת.
           const topAds = [..._adsPool]
             .sort((a, b) => (b.metrics?.leads || 0) - (a.metrics?.leads || 0))
-            .slice(0, _isZohoClient ? 10 : 6);
+            .slice(0, 10);
           return (
             <div className="section section-top-ads">
               <div className="section-head">
                 <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="8 6 2 6 2 12 8 12"/><polyline points="16 6 22 6 22 12 16 12"/><path d="M12 19v-7"/><path d="M8 19h8"/><path d="M8 12c0 2.21 1.79 4 4 4s4-1.79 4-4V6H8v6z"/></svg></div>
                 <h2>המודעות הכי מובילות ב-Facebook</h2>
-                <span className="sub">Top {topAds.length}</span>
+                <span className="sub">{vrAds ? 'Top ' + topAds.length + ' · דירוג לפי לידים בתקופה (Meta) · מודעה זהה בכמה קבוצות נספרת פעם אחת' : 'Top ' + topAds.length}</span>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'20px'}}>
+              <div className={vrAds ? 'vr-ad-grid' : undefined} style={vrAds ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'20px'}}>
                 {topAds.map((ad, i) => {
                   const metrics = ad.metrics || {};
                   const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
@@ -5086,9 +6209,9 @@ const selectProject = async (client, project) => {
                   // קריאייטיב מקומי של הדמו (/demo/...) מוצג חד; כל מקור חיצוני מטושטש.
                   const demoBlur = (isDemoProject && !String(previewImg || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined;
                   return (
-                    <div key={ad.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
-                      {/* Media: video if available, else image */}
-                      <div style={{position:'relative',width:'100%',aspectRatio:'4/5',background:'#0f172a',overflow:'hidden'}}>
+                    <div key={ad.id || i} className="card" style={vrAds ? {overflow:'hidden',display:'flex',flexDirection:'column'} : {overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+                      {/* Media: video if available, else image. עיצוב מחודש: רקע בהיר, המדיה בשלמותה (contain) */}
+                      <div className={vrAds ? 'vr-ad-media-box' : undefined} style={vrAds ? undefined : {position:'relative',width:'100%',aspectRatio:'4/5',background:'#0f172a',overflow:'hidden'}}>
                         {hasVideo ? (
                           <video
                             src={ad.videoUrl}
@@ -5096,10 +6219,10 @@ const selectProject = async (client, project) => {
                             controls
                             playsInline
                             preload="metadata"
-                            style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background:'#000'}}
+                            style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrAds ? 'transparent' : '#000'}}
                           />
                         ) : previewImg ? (
-                          <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background:'#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
+                          <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrAds ? 'transparent' : '#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
                         ) : (
                           <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'3em',color:'#64748b'}}>{'\ud83d\udcf7'}</div>
                         )}
@@ -5183,21 +6306,29 @@ const selectProject = async (client, project) => {
           reports.filter(r => r.source && r.source.startsWith('google') && /^\d{4}-\d{2}$/.test(r.month || ''))
             .sort((a, b) => (String(a.month) < String(b.month) ? 1 : -1))
             .forEach(r => (r.summary?.assetGroups || []).forEach(g => { if (g && g.id != null && !(g.id in _agCur)) _agCur[g.id] = g.status; }));
+          // ⚠️ הסטטוס שמוצג הוא הסטטוס החי האחרון שנמשך לקבוצה הזו, לא הסטטוס שהיה
+          // בתקופה הנבחרת. לכן "פעיל" כאן פירושו "פעילה עכשיו", וזה מה שוויטלי ביקש
+          // לוודא (21.9): קבוצה שכבויה היום תסומן "מושהה" גם אם הוציאה כסף בתקופה.
+          // כשאין סטטוס כלל — לא ממציאים "פעיל", אלא אומרים שאינו ידוע.
           const _agStatusOf = (g) => (g && g.id != null && _agCur[g.id]) ? _agCur[g.id] : (g.status || '');
           // Show ONLY asset groups that spent money this period (matches Google Ads' "spent this month"
           // view) + dedupe by id (the same group can appear across google/google_pmax reports).
           // Removed/paused/0-spend groups are hidden — they cluttered the gallery and confused clients.
           const _agSeen = new Set();
-          const groups = allGroups.filter(g => {
+          // מדורגות לפי לידים ואז לפי הוצאה, כמו המודעות המובילות של Facebook.
+          // בטאב "הכל" מוצגות שתיים בלבד (ויטלי, 20.9); בטאב Google — כולן.
+          const _agAll = allGroups.filter(g => {
             if (!g || (g.spend || 0) <= 0) return false;
             if (g.id != null) { if (_agSeen.has(g.id)) return false; _agSeen.add(g.id); }
             return true;
-          });
+          }).sort((a, b) => ((b.conversions || b.leads || 0) - (a.conversions || a.leads || 0)) || ((b.spend || 0) - (a.spend || 0)));
+          const _agCap = dashTab === 'all' ? 2 : _agAll.length;
+          const groups = _agAll.slice(0, _agCap);
           if (groups.length === 0) return null;
           return (
             <div className="section section-asset-gallery">
-              <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קריאייטיב Google PMax</h2></div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
+              <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קריאייטיב Google PMax</h2><span className="sub">{dashTab === 'all' ? ('Top ' + groups.length + ' \u00b7 \u05d3\u05d9\u05e8\u05d5\u05d2 \u05dc\u05e4\u05d9 \u05dc\u05d9\u05d3\u05d9\u05dd \u00b7 \u05db\u05dc \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d4\u05e0\u05db\u05e1\u05d9\u05dd \u05d1\u05d8\u05d0\u05d1 Google') : ('\u05db\u05dc \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d4\u05e0\u05db\u05e1\u05d9\u05dd \u05e9\u05d4\u05d5\u05e6\u05d9\u05d0\u05d5 \u05d1\u05ea\u05e7\u05d5\u05e4\u05d4 (' + groups.length + ')')}</span></div>
+              <div className={vrAds ? 'vr-ad-grid' : undefined} style={vrAds ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
                   // Handle both old field names (imageUrl, type) and new GAQL names (image_url, field_type)
                   const ft = (a) => (a.field_type || a.type || '').toUpperCase();
@@ -5221,31 +6352,48 @@ const selectProject = async (client, project) => {
                   return (
                     <div key={ag.id || i} className="card" style={{overflow:'hidden',display:'flex',flexDirection:'column'}}>
                       {firstImg ? (
-                        <div style={{width:'100%',aspectRatio:'16/9',background:'#0f172a',overflow:'hidden'}}>
+                        <div className={vrAds ? 'vr-ad-media-box vr-ad-media-wide' : undefined} style={vrAds ? undefined : {width:'100%',aspectRatio:'16/9',background:'#0f172a',overflow:'hidden'}}>
                           <img src={imgUrl(firstImg)} alt={ag.name} style={{width:'100%',height:'100%',objectFit:'contain'}} onError={(e)=>{e.target.style.display='none'}} />
                         </div>
                       ) : (
                         <div style={{width:'100%',aspectRatio:'16/9',background:'linear-gradient(135deg,#dbeafe,#cffafe)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5em',color:'#64748b'}}>{'\ud83c\udfaf'}</div>
                       )}
                       <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'10px'}}>
-                        {(() => { const agSt = _agStatusOf(ag); const isAgA = agSt === 'ENABLED'; const isAgP = agSt === 'PAUSED'; const agC = isAgA ? '#059669' : isAgP ? '#d97706' : '#64748b'; const agL = isAgA ? 'פעיל' : isAgP ? 'מושהה' : agSt || 'לא ידוע'; return <div style={{fontSize:'0.75em',color:agC,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {agL}</div>; })()}
+                        {(() => {
+                          const agSt = _agStatusOf(ag);
+                          const isAgA = agSt === 'ENABLED';
+                          const isAgP = agSt === 'PAUSED';
+                          const isOff = agSt === 'REMOVED' || agSt === 'DELETED' || agSt === 'ARCHIVED';
+                          // קבוצה כבויה שכן הוציאה כסף בתקופה מקבלת הבהרה, כדי שלא ייראה
+                          // סותר: "מושהה" ליד הוצאה של ₪475 זה בדיוק המצב שוויטלי תיאר.
+                          const spentInPeriod = (ag.spend || 0) > 0;
+                          const agC = isAgA ? '#059669' : isAgP ? '#d97706' : isOff ? '#c0322f' : '#64748b';
+                          const agL = isAgA ? 'פעיל' : isAgP ? 'מושהה' : isOff ? 'הוסרה' : agSt ? agSt : 'סטטוס לא ידוע';
+                          const note = (!isAgA && spentInPeriod) ? ' · הוציאה בתקופה' : '';
+                          return <div style={{fontSize:'0.75em',color:agC,fontWeight:700,letterSpacing:'0.04em'}}>{'\u25cf'} {agL}{note}</div>;
+                        })()}
                         <div style={{fontWeight:700,fontSize:'1em',color:'#0f172a'}}>{ag.name}</div>
                         <div style={{fontSize:'0.72em',color:'#94a3b8',unicodeBidi:'plaintext'}}>{'\ud83d\udcca'} {ag.campaign || '-'}</div>
+                        {/* כל הכותרות והתיאורים, לא רק החמש/שלוש הראשונות (ויטלי, 20.9).
+                            הרשימה נגללת בתוך הקארד כדי שהגובה לא יתפוצץ. */}
+                        {/* הטקסטים מקופלים כברירת מחדל (ויטלי, 21.9): 18 כותרות ו-5 תיאורים
+                            פרושים הפכו את הכרטיס לגבוה פי שלושה מהתמונה שמעליו. שום נכס
+                            לא הוסר — רק נדרשת לחיצה אחת כדי לפרוש אותו. */}
                         {headlines.length > 0 && (
-                          <div>
-                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05db\u05d5\u05ea\u05e8\u05d5\u05ea'} ({headlines.length})</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'80px',overflowY:'auto'}}>
-                              {headlines.slice(0,5).map((h,j) => <div key={j} style={{fontSize:'0.82em',color:'#334155',unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{h.text}</div>)}
+                          <details className="vr-ag-fold">
+                            <summary>{'\u05db\u05d5\u05ea\u05e8\u05d5\u05ea'} ({headlines.length})</summary>
+                            <div className="vr-ag-list">
+                              {headlines.map((h,j) => <div key={j} style={{fontSize:'0.82em',color:'#334155',unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{h.text}</div>)}
                             </div>
-                          </div>
+                          </details>
                         )}
                         {descriptions.length > 0 && (
-                          <div>
-                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05ea\u05d9\u05d0\u05d5\u05e8\u05d9\u05dd'} ({descriptions.length})</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'80px',overflowY:'auto'}}>
-                              {descriptions.slice(0,3).map((d,j) => <div key={j} style={{fontSize:'0.8em',color:'#475569',lineHeight:1.4,unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{d.text}</div>)}
+                          <details className="vr-ag-fold">
+                            <summary>{'\u05ea\u05d9\u05d0\u05d5\u05e8\u05d9\u05dd'} ({descriptions.length})</summary>
+                            <div className="vr-ag-list">
+                              {descriptions.map((d,j) => <div key={j} style={{fontSize:'0.8em',color:'#475569',lineHeight:1.4,unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{d.text}</div>)}
                             </div>
-                          </div>
+                          </details>
                         )}
                         {/* Metrics row */}
                         {(metrics.spend > 0 || metrics.leads > 0) && (
@@ -5255,17 +6403,46 @@ const selectProject = async (client, project) => {
                             <div style={{textAlign:'center'}}><div style={{fontSize:'0.65em',color:'#64748b'}}>CPL</div><div style={{fontWeight:700,fontSize:'0.95em'}}>{'\u20aa'}{Math.round(cpl)}</div></div>
                           </div>
                         )}
-                        {images.length > 1 && (
-                          <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
-                            {images.slice(1,5).map((img,j) => (
-                              <img key={j} src={imgUrl(img)} alt="" style={{width:'44px',height:'44px',objectFit:'cover',borderRadius:'4px',border:'1px solid #e2e8f0'}} onError={(e)=>{e.target.style.display='none'}} />
-                            ))}
-                            {images.length > 5 && <div style={{fontSize:'0.75em',color:'#64748b',alignSelf:'center'}}>{'+'}{images.length - 5}</div>}
-                          </div>
-                        )}
+                        {/* כל התמונות, לא ארבע (ויטלי, 20.9). לחיצה פותחת את הקובץ המלא
+                            בלשונית חדשה — הנכס יושב ב-CDN של גוגל ואין לנו גרסה גדולה יותר בדף. */}
+                        {images.length > 1 && (() => {
+                          // שמונה ממוזערות גלויות, והשאר מאחורי קיפול אחד. כל התמונות
+                          // נשארות נגישות; רק הגובה הפסיק לגדול לינארית עם מספרן.
+                          const _shown = images.slice(1), _head = _shown.slice(0, 8), _rest = _shown.slice(8);
+                          const thumb = (img, j) => (
+                            <a key={j} href={imgUrl(img)} target="_blank" rel="noopener noreferrer" title={'\u05e4\u05ea\u05d9\u05d7\u05ea \u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05d1\u05d2\u05d5\u05d3\u05dc \u05de\u05dc\u05d0'}>
+                              <img src={imgUrl(img)} alt="" loading="lazy" style={{width:'48px',height:'48px',objectFit:'cover',borderRadius:'6px',border:'1px solid #e2e8f0',display:'block'}} onError={(e)=>{e.target.style.display='none'}} />
+                            </a>
+                          );
+                          return (
+                            <div>
+                              <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05ea\u05de\u05d5\u05e0\u05d5\u05ea'} ({images.length})</div>
+                              <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>{_head.map(thumb)}</div>
+                              {_rest.length > 0 && (
+                                <details className="vr-ag-fold">
+                                  <summary>{'\u05e2\u05d5\u05d3 ' + _rest.length + ' \u05ea\u05de\u05d5\u05e0\u05d5\u05ea'}</summary>
+                                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginTop:'6px'}}>{_rest.map(thumb)}</div>
+                                </details>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        {/* סרטונים: עד היום הוצג רק מספרם. עכשיו תמונה ממוזערת מ-YouTube,
+                            ולחיצה על "נגן כאן" פורשת נגן מוטמע בתוך הקארד. */}
                         {videos.length > 0 && (
-                          <div style={{fontSize:'0.72em',color:'#64748b',marginTop:'4px'}}>
-                            {'\ud83c\udfac'} {videos.length} {'\u05e1\u05e8\u05d8\u05d5\u05e0\u05d9\u05dd'}
+                          <div>
+                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05e1\u05e8\u05d8\u05d5\u05e0\u05d9\u05dd'} ({videos.length})</div>
+                            {/* שורת תמונות ממוזערות במקום נגן מתחת לנגן: שישה סרטונים
+                                בטור הוסיפו כ-900px לכרטיס. לחיצה פותחת את הסרטון ב-YouTube. */}
+                            <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                              {videos.map((v,j) => { const vid = v.youtube_id || v.youtubeId; return (
+                                <a key={j} href={`https://www.youtube.com/watch?v=${vid}`} target="_blank" rel="noopener noreferrer"
+                                   className="vr-ag-video" title={v.name || ('\u05e1\u05e8\u05d8\u05d5\u05df ' + (j+1))}>
+                                  <img src={`https://img.youtube.com/vi/${vid}/mqdefault.jpg`} alt="" loading="lazy" onError={(e)=>{e.target.style.display='none'}} />
+                                  <span aria-hidden="true">{'\u25b6'}</span>
+                                </a>
+                              ); })}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -5277,21 +6454,23 @@ const selectProject = async (client, project) => {
           );
         })()}
 
-        </>)}
+        </div>)}
       </>
     );
+  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
     // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
     // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
     // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.
     // דווקא ה-id ולא האובייקט — עדכון תקציב יוצר אובייקט חדש ואין סיבה לבנות מחדש בגללו.
-  }, [selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch, meetingsOn, selectedProject?.id, isClientView]);
+    meetingsOn, selectedProject?.id, isClientView]);
 
-  if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
+  if (loading && !isClientView) return <div className="loading-page"><TovnoLoader hint={'\u05d8\u05d5\u05e2\u05df \u05d0\u05ea \u05d4\u05d3\u05e9\u05d1\u05d5\u05e8\u05d3\u2026'} /></div>;
 
   if (!session && !isClientView) {
     return (
       <div className="login-container">
-        <h1 className="logo" style={{fontSize: '3em'}}>VITAS</h1>
+        {/* \u05d4\u05de\u05d9\u05ea\u05d5\u05d2 \u05d4\u05d7\u05d3\u05e9: \u05d4\u05dc\u05d5\u05d2\u05d5 \u05d1\u05de\u05e7\u05d5\u05dd \u05d4-wordmark \u05d4\u05d8\u05e7\u05e1\u05d8\u05d5\u05d0\u05dc\u05d9 "VITAS" \u05e9\u05d4\u05d9\u05d4 \u05db\u05d0\u05df. */}
+        <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" style={{display:'block',margin:'0 auto 18px',inlineSize:150,blockSize:'auto'}} />
         <p className="subtitle">{'\u05de\u05e2\u05e8\u05db\u05ea \u05d3\u05d5\u05d7\u05d5\u05ea \u05e9\u05d9\u05d5\u05d5\u05e7 \u05d3\u05d9\u05d2\u05d9\u05d8\u05dc\u05d9'}</p>
         <div className="card">
           <form onSubmit={handleAuth} method="post" action="#">
@@ -5351,7 +6530,7 @@ const selectProject = async (client, project) => {
       })()}
       <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes loadingSlide{0%{margin-right:-40%} 100%{margin-right:100%}} @keyframes loadingSlide{0%{transform:translateX(-150%)} 100%{transform:translateX(300%)}}`}</style>
       <div className={`sidebar-overlay${sidebarOpen ? ' active' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
-      <Header
+      <Header className={vrChrome ? 'header-vr' : ''}
         onMenuOpen={() => setSidebarOpen(true)}
         onExport={!isClientView && !isDemoProject ? handleExport : undefined}
         onClientAccess={!isClientView ? handleClientAccess : undefined}
@@ -5365,7 +6544,7 @@ const selectProject = async (client, project) => {
         ) : null}
       />
 
-      <div className="app-layout">
+      <div className={vrChrome ? 'app-layout vr-shell' : 'app-layout'}>
         <Sidebar
           clients={visibleClients}
           activeClient={selectedClient?.name}
@@ -5374,7 +6553,8 @@ const selectProject = async (client, project) => {
           onSelectProject={(client, project) => { selectProject(client, project); setSidebarOpen(false); }}
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
-          footerText="VITAS Reports v3.2"
+          footerText="Tovno by Vitas · v3.2"
+          brand={vrChrome ? { logo: '/brand/tovno/tovno-logo-white.svg' } : null}
           lockedProjects={[]}
           demoProjects={clients.flatMap(c=>(c.projects||[]).filter(p=>p.is_demo).map(p=>p.name))}
           isOpen={sidebarOpen}
@@ -5384,7 +6564,9 @@ const selectProject = async (client, project) => {
         />
 
         <div className="main-content">
-          {view === 'welcome' && (<div className="welcome-center"><div className="icon">{'\ud83d\udcca'}</div><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05de\u05d4\u05ea\u05e4\u05e8\u05d9\u05d8 \u05db\u05d3\u05d9 \u05dc\u05e6\u05e4\u05d5\u05ea \u05d1\u05d3\u05d5\u05d7, \u05d0\u05d5 \u05d4\u05e2\u05dc\u05d4 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05d3\u05e9\u05d9\u05dd'}</p></div>)}
+          {/* \u05d5\u05d9\u05d8\u05dc\u05d9, 21.9: \u05d4\u05d0\u05d9\u05de\u05d5\u05d2'\u05d9 \ud83d\udcca \u05d9\u05e8\u05d3 \u2014 \u05d4\u05d0\u05e0\u05d9\u05de\u05e6\u05d9\u05d4 \u05e9\u05dc Tovno \u05d9\u05d5\u05e9\u05d1\u05ea \u05db\u05d0\u05df \u05d1\u05de\u05e7\u05d5\u05de\u05d5.
+              decorative, \u05db\u05d9 \u05d4\u05de\u05e1\u05da \u05d4\u05d6\u05d4 \u05dc\u05d0 \u05d8\u05d5\u05e2\u05df \u05db\u05dc\u05d5\u05dd: \u05d4\u05d5\u05d0 \u05e4\u05e9\u05d5\u05d8 \u05de\u05de\u05ea\u05d9\u05df \u05dc\u05d1\u05d7\u05d9\u05e8\u05ea \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8. */}
+          {view === 'welcome' && (<div className="welcome-center"><TovnoLoader decorative width={300} className="welcome-mark" /><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8/\u05d9 \u05d0\u05ea \u05e9\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7 \u05d5\u05dc\u05d0\u05d7\u05e8 \u05de\u05db\u05df \u05d0\u05ea \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d4\u05e8\u05e6\u05d5\u05d9.'}</p></div>)}
 
           {view === 'dashboard' && selectedProject && (<>
                         {isDemoProject && (
@@ -5405,6 +6587,10 @@ const selectProject = async (client, project) => {
               onToggleComparison={() => onComparisonToggle(!compareEnabled)}
               showQuarters={!(/bcurelaser|ismooth/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
               allowedPresets={isDemoProject ? DEMO_PRESETS : undefined}
+              /* בורר הפרויקט במובייל. visibleClients כבר מסונן להרשאות של
+                 המשתמש, ולכן לקוח רואה בו רק את הפרויקטים שלו. */
+              projects={visibleClients.find(c => c.name === selectedClient?.name)?.projects || []}
+              onSelectProject={(p) => selectProject(selectedClient, p)}
             />
             {/* לאדמין בלבד: הלקוח לא צריך לדעת מתי הקרון רץ, ומספר "ימים" עלול להיראות לו כתקלה. */}
             {!isClientView && (
@@ -5427,16 +6613,50 @@ const selectProject = async (client, project) => {
               const budgets = selectedProject?.monthly_budgets || {};
               const budget = budgets[ym];
               if (isClientView) {
-                return budget != null ? (
+                return budget != null ? (vrChrome ? (
+                  <div className="vr-budget"><div className="vr-budget-main">
+                    <span className="vr-budget-label"><Wallet size={16} aria-hidden="true" />תקציב חודשי</span>
+                    <span className="vr-budget-total"><bdi>{formatCurrency(budget)}</bdi></span>
+                  </div></div>
+                ) : (
                   <div style={{padding:'8px 20px',fontSize:14,fontWeight:600,borderBottom:'1px solid var(--border,#e2e8f0)'}}>💰 תקציב חודשי — {formatCurrency(budget)}</div>
-                ) : null;
+                )) : null;
               }
               const _spend = reports.filter(r => r.month === ym && (r.source==='facebook' || (r.source||'').startsWith('google'))).reduce((a,r)=>a+(r.summary?.spend||0),0);
               const pct = budget ? Math.round(_spend/budget*100) : null;
               const monthOpts = [];
               for (let i=-2;i<=3;i++){ const dd=new Date(_d.getFullYear(),_d.getMonth()+i,1); monthOpts.push(dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')); }
               const shownVal = budgetDraft !== null ? budgetDraft : (budget!=null ? String(budget) : '');
-              return (
+              // עיצוב מחודש: כרטיס לבן עם פס התקדמות (DESIGN-SPEC: משטח לבן, min-height 56, labels גלויים, חודש כתוב)
+              const _lvl = pct == null ? 'none' : pct >= 100 ? 'over' : pct >= 95 ? 'hot' : pct >= 75 ? 'warm' : 'ok';
+              return vrChrome ? (
+                <div className="vr-budget">
+                  <div className="vr-budget-main">
+                    <span className="vr-budget-label"><Wallet size={16} aria-hidden="true" />תקציב חודשי</span>
+                    <label className="vr-budget-field"><span className="vr-sr-only">חודש התקציב</span>
+                      <select value={ym} onChange={e=>{ setBudgetMonth(e.target.value); setBudgetDraft(null); }}>
+                        {monthOpts.map(m=><option key={m} value={m}>{formatMonth ? formatMonth(m) : m}</option>)}
+                      </select>
+                    </label>
+                    <label className="vr-budget-field vr-budget-amount"><span className="vr-sr-only">סכום התקציב בש״ח</span>
+                      <span className="vr-budget-currency" aria-hidden="true">₪</span>
+                      {/* שדה טקסט עם מפריד אלפים (type=number לא יודע להציג 25,000); בשמירה נשלחות ספרות בלבד */}
+                      <input type="text" inputMode="numeric" placeholder="0" dir="ltr" value={shownVal !== '' && !isNaN(Number(shownVal)) ? Number(shownVal).toLocaleString('he-IL') : shownVal} onChange={e=>setBudgetDraft(e.target.value.replace(/[^0-9]/g, ''))} />
+                    </label>
+                    <button type="button" className="vr-button vr-budget-save" onClick={async ()=>{ await saveMonthlyBudget(ym, shownVal); setBudgetDraft(null); }}>שמור</button>
+                  </div>
+                  <div className="vr-budget-progress" data-level={_lvl}>
+                    <div className="vr-budget-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct != null ? Math.min(100, pct) : 0} aria-label="ניצול התקציב החודשי">
+                      <div className="vr-budget-fill" style={{ width: (pct != null ? Math.min(100, pct) : 0) + '%' }} />
+                    </div>
+                    <span className="vr-budget-used">
+                      {budget != null
+                        ? <>נוצל החודש: <bdi>{formatCurrency(_spend)}</bdi>{pct != null ? <> · <bdi>{pct}%</bdi></> : null}{pct != null && pct >= 100 ? ' · חריגה' : ''}</>
+                        : 'לא הוגדר תקציב לחודש זה'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
                 <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'10px 20px',background:'var(--surface-2,#f8fafc)',borderBottom:'1px solid var(--border,#e2e8f0)',fontSize:13}}>
                   <span style={{fontWeight:700}}>💰 תקציב חודשי</span>
                   <select value={ym} onChange={e=>{ setBudgetMonth(e.target.value); setBudgetDraft(null); }} style={{padding:'4px 8px',borderRadius:6}}>
@@ -5450,7 +6670,7 @@ const selectProject = async (client, project) => {
                 </div>
               );
             })()}
-            {isFetching && hasDataForPeriod ? (<div className="period-loading-overlay"><div className="period-loading-spinner" /></div>) : null}
+            {isFetching && hasDataForPeriod ? (<div className="period-loading-overlay"><TovnoLoader width={220} label={'טוען את התקופה'} hint={'מעדכנים את התקופה שנבחרה…'} /></div>) : null}
             {reports.length === 0
               ? (isFetching
                   ? <SkeletonDashboard />
@@ -5459,7 +6679,7 @@ const selectProject = async (client, project) => {
                 ? (isFetching
                     ? <PeriodFetching />
                     : <PeriodEmpty onRefresh={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }, { live: !isClientView })} />)
-                : renderDashboard()}
+                : (vrChrome ? <VitasPresentation>{renderDashboard()}</VitasPresentation> : renderDashboard())}
           </>)}
 
           
@@ -5971,6 +7191,7 @@ const selectProject = async (client, project) => {
       )}
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
+      <BackToTop />
     </div>
   );
 }

@@ -1,0 +1,189 @@
+/* app/components/report-ui/kloss.css — מסך רשת של KLOSS בשפה של ש.ברוך.
+   חבילה: 01-Handoffs/VITAS-KLOSS-Network-Handoff.
+
+   כל הכללים תחת .vr-kloss בלבד, שיושב בתוך .vr-ui. הסיבה לתיחום: ההוראות בחבילה
+   אוסרות במפורש שינוי עיצוב או לוגיקה של BMBY או Zoho כתוצאת לוואי, ו-KLOSS הוא
+   הלקוח היחיד על Salesforce.
+
+   הקארדים והמעטפת מגיעים מהרכיבים המשותפים (MetricCard, ReportSection ב-
+   VitasPresentation.jsx). מה שאין שם הוא שורות הברים של שני הדוחות, והן מוגדרות כאן.
+   צבעים ורדיוסים מהטוקנים המשותפים ב-:root — לא צבעים חדשים. */
+
+/* ── רשת הקארדים: ארבע על ארבע ───────────────────────────────────────────
+   vr-metric-grid המשותף הוא auto-fill ולכן נותן חמש עמודות ברוחב 1440, והקארד
+   ה-16 נופל לשורה בודדת. המפרט מחייב ארבע שורות על ארבע עמודות. */
+.vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+
+/* ארבע עמודות פירושן כרטיס רחב יותר מזה שבטאב "הכל" (חמש עמודות), ועם אותו
+   min-block-size הוא נראה גדול ומרוח (ויטלי, 21.9). כאן הכרטיס מתקצר ומתהדק —
+   אותם ערכים, אותם צבעים, פחות אוויר. */
+.vr-ui.vr-kloss .vr-metric { min-block-size: 132px; padding: 16px 16px 14px; }
+.vr-ui.vr-kloss .vr-metric-top h3 { font-size: 14.5px; }
+.vr-ui.vr-kloss .vr-metric-icon { padding: 6px; }
+.vr-ui.vr-kloss .vr-metric-value { font-size: clamp(24px, 1.7vw, 30px); margin-block-start: 10px !important; }
+.vr-ui.vr-kloss .vr-metric-note { font-size: 12px; margin-block-start: 4px !important; }
+@media (max-width: 1100px) { .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* המפרט (PAGE-SPECS §מסך רשת): "כל 16 הכרטיסים נשמרים, 2 בעמודה במובייל".
+   קודם ירדנו לעמודה אחת ב-620px, כלומר 16 כרטיסים בטור אחד — גלילה של
+   מסך וחצי כדי לראות את המדד האחרון. עמודה אחת נשארת רק למסכים צרים
+   מאוד, שם שני כרטיסים באמת נחתכים. */
+@media (max-width: 767px) {
+  .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .vr-ui.vr-kloss .vr-metric-value { font-size: 22px; }
+}
+@media (max-width: 340px) { .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: 1fr; } }
+
+/* ── מסגרת דוח: תג סוג תקופה ליד הכותרת ─────────────────────────────────── */
+.vr-ui .vr-kloss-tag {
+  display: inline-flex; align-items: center;
+  padding: 3px 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  margin-inline-start: 10px; vertical-align: middle;
+}
+/* "לידים של התקופה" — קבוצה סגורה שנמדדת לאורך זמן. */
+.vr-ui .vr-kloss-tag-cohort { background: var(--emerald-50, #e4f6ee); color: var(--emerald, #0e9f6e); }
+/* "פעילות בתקופה" — מה שקרה בחלון, כולל לידים ישנים. */
+.vr-ui .vr-kloss-tag-period { background: var(--violet-50, #f0ebfd); color: var(--violet, #7c6cf5); }
+
+/* ── שורת בר ────────────────────────────────────────────────────────────────
+   סדר RTL: תווית, כמות בעמודה ברוחב קבוע, מסילת הבר, ואז האחוזים.
+   העמודות קבועות כדי שהמספרים יהיו מיושרים בין השורות ובין שני הדוחות. */
+.vr-ui .vr-kloss-bars { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+
+.vr-ui .vr-kloss-bar {
+  display: grid;
+  grid-template-columns: 140px 58px minmax(0, 1fr) 230px;
+  align-items: center; gap: 12px;
+}
+.vr-ui .vr-kloss-bar-label { font-size: 14px; font-weight: 600; color: var(--text, #142044); }
+/* המספר לא נחתך כשהבר קצר — הוא יושב בעמודה משלו ולא בתוך הבר. */
+.vr-ui .vr-kloss-bar-value { font-size: 15px; font-weight: 800; text-align: start; }
+/* display: block הכרחי — אלה span-ים, ו-block-size על אלמנט inline אינו עושה דבר.
+   בלעדיו המסילה קיימת אבל המילוי בגובה אפס, והברים נראים ריקים לגמרי. */
+.vr-ui .vr-kloss-bar-rail {
+  display: block; block-size: 30px; border-radius: 8px; overflow: hidden;
+  background: var(--bar-track, #eef1f7);
+}
+.vr-ui .vr-kloss-bar-fill { display: block; block-size: 100%; border-radius: 8px; min-inline-size: 6px; transition: inline-size .45s ease; }
+.vr-ui .vr-kloss-bar-note { font-size: 12.5px; color: var(--text-secondary, #66748f); }
+.vr-ui .vr-kloss-bar-note strong { color: var(--violet, #7c6cf5); font-weight: 700; }
+.vr-ui .vr-kloss-bar-amount { font-size: 12.5px; font-weight: 700; color: var(--text-secondary, #66748f); }
+
+/* צבע המילוי לפי שלב. מחלקה ולא inline style, כדי שלא ייווצרו סגנונות עיצוב חדשים
+   בקוד — ההוראות בחבילה אוסרות זאת. אותו שלב מקבל את אותו צבע בשני הדוחות. */
+.vr-ui .vr-kloss-fill-leads    { background: #10b981; }
+.vr-ui .vr-kloss-fill-meetings { background: #3b82f6; }
+.vr-ui .vr-kloss-fill-arrived  { background: #14b8a6; }
+.vr-ui .vr-kloss-fill-opps     { background: #06b6d4; }
+.vr-ui .vr-kloss-fill-quotes   { background: #f97316; }
+.vr-ui .vr-kloss-fill-paid     { background: #a855f7; }
+.vr-ui .vr-kloss-fill-noshow   { background: #ef4444; }
+.vr-ui .vr-kloss-fill-lost     { background: #94a3b8; }
+
+/* הסתעפות (לא הגיעו לפגישה / לא רכשו) — מוזחת ומסומנת, ואינה שלב שעוברים בו. */
+.vr-ui .vr-kloss-bar-aux .vr-kloss-bar-label { padding-inline-start: 16px; color: var(--rose, #e24b4a); font-weight: 600; }
+.vr-ui .vr-kloss-bar-aux .vr-kloss-bar-rail { block-size: 22px; }
+.vr-ui .vr-kloss-bar-aux .vr-kloss-bar-value { color: var(--rose, #e24b4a); }
+
+@media (max-width: 900px) {
+  .vr-ui .vr-kloss-bar { grid-template-columns: minmax(0, 1fr) 54px; grid-template-areas: 'label value' 'rail rail' 'note note'; gap: 6px 10px; }
+  .vr-ui .vr-kloss-bar-label { grid-area: label; }
+  .vr-ui .vr-kloss-bar-value { grid-area: value; text-align: end; }
+  .vr-ui .vr-kloss-bar-rail { grid-area: rail; }
+  .vr-ui .vr-kloss-bar-note { grid-area: note; }
+}
+
+/* ── סניפים (חבילת VITAS-KLOSS-Branches-Handoff) ─────────────────────────────
+   המסך משתמש ב-.section / .data-table הקיימים, שכבר מקבלים את המידות של השפה
+   המשותפת מ-vitas-bridge.css ברגע שהם יושבים בתוך .vr-ui. מה שאין שם הוא כפתור
+   פתיחת השורה ורקע השורה הפתוחה, והם מוגדרים כאן. */
+
+/* המפרט אוסר להקטין טקסט כדי לדחוס עמודות; ט' הסניפים רחבה, ולכן גלילה אופקית
+   בתוך המיכל בלבד — לא של העמוד. .table-wrapper כבר עושה זאת. */
+.vr-ui.vr-kloss-branches .section-head h2 { display: inline-flex; align-items: center; }
+
+/* כפתור פתיחת פירוט הסניף. הוא יושב בתחילת השורה (inline-start = ימין ב-RTL),
+   כמו שהמפרט מבקש, ולא בקצה השמאלי שבסקיצה. */
+.vr-ui .vr-kloss-expand {
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 26px; block-size: 26px;
+  margin-inline-end: 8px; vertical-align: middle;
+  border: 1px solid var(--border, #dde2ec); border-radius: 7px;
+  background: var(--surface, #fff); color: var(--text-secondary, #66748f);
+  cursor: pointer; padding: 0;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.vr-ui .vr-kloss-expand:hover { background: var(--violet, #7c6cf5); border-color: var(--violet, #7c6cf5); color: #fff; }
+/* focus נראה: ניווט במקלדת בלי טבעת מיקוד הוא ניווט עיוור. */
+.vr-ui .vr-kloss-expand:focus-visible { outline: 2px solid var(--violet, #7c6cf5); outline-offset: 2px; }
+.vr-ui .vr-kloss-expand[aria-expanded='true'] { background: var(--violet, #7c6cf5); border-color: var(--violet, #7c6cf5); color: #fff; }
+
+/* שורה פתוחה — רקע כחול־לבנדר עדין, כדי שהפירוט שנפרש מתחתיה ייקרא כשייך אליה.
+   הכלל גובר על ה-hover ועל פסי הזברה של .data-table, ולכן !important: אחרת
+   העכבר מעל שורה פתוחה היה מבטל את הסימון בדיוק כשמסתכלים עליה. */
+.vr-ui .data-table tbody tr.vr-kloss-row-open,
+.vr-ui .data-table tbody tr.vr-kloss-row-open:hover { background: #eef1fd !important; }
+
+@media (prefers-reduced-motion: reduce) { .vr-ui .vr-kloss-expand { transition: none; } }
+
+/* ── אנשי מכירות ומוצרים (VITAS-KLOSS-Sales-Products-Handoff) ────────────────
+   הטבלאות משתמשות ב-.data-table המשותף. שתי התאמות בלבד:
+   th של שורה (שם הנציג / שם המוצר) צריך להיראות כמו תא רגיל ולא כמו כותרת, ושמות
+   ארוכים צריכים להישבר במקום לדחוק את שאר העמודות. */
+.vr-ui.vr-kloss-people .data-table tbody th {
+  background: transparent; color: inherit; font-weight: 600;
+  padding-block: 15px; padding-inline: 14px;
+  border-block-end: 1px solid var(--divider, #e5e9f1);
+  white-space: normal; text-align: start;
+}
+.vr-ui.vr-kloss-people .data-table tbody tr:last-child th { border-block-end: 0; }
+/* עמודת המוצר רחבה; הכמות והשווי בעמודות צרות ועקביות. */
+.vr-ui.vr-kloss-people .data-table td { white-space: nowrap; }
+
+/* ── זמנים (VITAS-KLOSS-Timing-Handoff) ──────────────────────────────────────
+   הגרפים נשארים כפי שהם — אותן סדרות, אותם דליים, אותם מכנים. כאן רק כותרות
+   הקבוצות ("כניסת לידים", "פגישות", "המרה וזמן טיפול") מקבלות את המידות של
+   כותרות המשנה בשפה המשותפת, במקום h3 קטן בגודל טקסט רגיל. */
+.vr-ui.vr-kloss-timing h3 {
+  font-size: 17px; font-weight: 700; color: var(--text, #142044);
+  margin-block: 34px 2px; margin-inline: 4px;
+}
+.vr-ui.vr-kloss-timing h3:first-of-type { margin-block-start: 6px; }
+/* הגרפים גוללים בתוך עצמם במסך צר; העמוד עצמו לעולם לא גולל אופקית. */
+.vr-ui.vr-kloss-timing .section > div[style*='overflow-x'] { scrollbar-width: thin; }
+
+/* ── השוואת סניפים (VITAS-KLOSS-Branches-Handoff) ───────────────────────────
+   הכרטיסים היו inline styles ולכן לא הושפעו מהעטיפה ב-.vr-ui. כאן הם מקבלים את
+   אותו משטח, גבול, רדיוס וצל של שאר הכרטיסים במערכת. הסקאלה והאחוזים לא השתנו:
+   אורך הבר עדיין מנורמל ללידים של אותו סניף, כפי שכתוב בהערה שמעל הגריד. */
+.vr-ui .vr-bcmp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 1280px) { .vr-ui .vr-bcmp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 820px)  { .vr-ui .vr-bcmp-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.vr-ui .vr-bcmp-card {
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #dde2ec);
+  border-radius: var(--r-md, 12px);
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(11, 15, 30, 0.06));
+  padding: 18px 20px;
+  min-inline-size: 0;
+}
+.vr-ui .vr-bcmp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-block-end: 14px; }
+.vr-ui .vr-bcmp-name { font-size: 15.5px; font-weight: 700; color: var(--text, #142044); overflow-wrap: anywhere; }
+/* תג ההמרה ניטרלי ולא ירוק/אדום לפי סף: המפרט אוסר ציון הצלחה/כישלון חדש. */
+.vr-ui .vr-bcmp-conv {
+  flex-shrink: 0; white-space: nowrap;
+  font-size: 12.5px; font-weight: 700;
+  color: var(--violet, #7c6cf5); background: var(--violet-50, #f0ebfd);
+  padding: 3px 10px; border-radius: 999px;
+}
+.vr-ui .vr-bcmp-rows { display: flex; flex-direction: column; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.vr-ui .vr-bcmp-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 46px 40px; align-items: center; gap: 9px; }
+.vr-ui .vr-bcmp-label { font-size: 12px; color: var(--text-secondary, #66748f); }
+/* display: block על ה-span — block-size על אלמנט inline אינו עושה דבר, וזה בדיוק
+   מה שהשאיר את הברים של מסך הרשת ריקים בפעם הקודמת. */
+.vr-ui .vr-bcmp-rail { display: block; block-size: 20px; border-radius: 6px; overflow: hidden; background: var(--bar-track, #eef1f7); }
+.vr-ui .vr-bcmp-fill { display: block; block-size: 100%; border-radius: 6px; transition: inline-size .4s ease; }
+.vr-ui .vr-bcmp-val { font-size: 13.5px; font-weight: 700; color: var(--text, #142044); text-align: start; font-variant-numeric: tabular-nums; }
+.vr-ui .vr-bcmp-step { font-size: 11px; color: var(--text-secondary, #98a0b2); text-align: start; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .vr-ui .vr-bcmp-fill { transition: none; } }

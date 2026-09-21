@@ -29,33 +29,101 @@
      ============================================================ */
 
   :root {
+    /* ══════════════════════════════════════════════════════════════════════
+       Tovno by Vitas — מיתוג (Tovno-Claude-Color-Spec.md, ויטלי 21.9)
+       ══════════════════════════════════════════════════════════════════════
+       המפרט מגדיר משתני --tv-*. הם מוגדרים כאן פעם אחת כמקור האמת, ומיד
+       אחריהם הטוקנים הקיימים של המוצר (--bg, --surface, --side-bg…) מקבלים
+       את ערכיהם. זו הדרישה המפורשת במפרט: "אם קיימים tokens מקבילים, מפה
+       אליהם ואל תיצור מערכת מתחרה".
+
+       למה מיפוי ולא החלפה: בקוד חיות שתי שכבות עיצוב — הוותיקה (.kpi,
+       .section) והחדשה (.vr-ui). שתיהן קוראות את אותם טוקנים. מיפוי במקום
+       אחד מזיז את שתיהן יחד; החלפה ידנית בכל קובץ הייתה מפצלת אותן.
+
+       ⚠️ כרטיסי ה-KPI הצבעוניים אינם חלק מהמיתוג (ויטלי, 21.9: "אני לא רוצה
+       לגעת בצבעים באף לקוח של הקארדס הצבעוני"). סעיף 5 במפרט לא מיושם,
+       ו--g-* ו--shadow-* של הכרטיסים נשארים בדיוק כפי שהם.
+       ────────────────────────────────────────────────────────────────────── */
+    --tv-brand: #315CF5;
+    --tv-brand-hover: #2549D8;
+    --tv-brand-pressed: #1D3BB8;
+    --tv-brand-soft: #EEF2FF;
+    --tv-brand-tint: #DEE6FF;
+    --tv-brand-line: #C8D4FF;
+    --tv-navy: #14243C;
+    --tv-white: #FFFFFF;
+
+    --tv-canvas: #F5F7FC;
+    --tv-surface: #FFFFFF;
+    --tv-surface-subtle: #F8FAFD;
+    --tv-border: #DCE3EF;
+    --tv-divider: #E8EDF5;
+    --tv-text: #14243C;
+    --tv-text-secondary: #52627A;
+    --tv-text-muted: #64748B;
+    --tv-link: #2549D8;
+    --tv-focus: #315CF5;
+    --tv-placeholder: #64748B;
+    --tv-disabled-bg: #E9EEF5;
+    --tv-disabled-fg: #64748B;
+
+    --tv-sidebar: #14243C;
+    --tv-sidebar-text: #FFFFFF;
+    --tv-sidebar-muted: #B7C4DA;
+    --tv-sidebar-divider: #2B3B54;
+    --tv-sidebar-hover: #1D3150;
+    --tv-sidebar-active: #294988;
+
+    --tv-success-fg: #08744A;
+    --tv-success-bg: #E8F7EF;
+    --tv-success-border: #B6E4CB;
+    --tv-warning-fg: #855000;
+    --tv-warning-bg: #FFF4D6;
+    --tv-warning-border: #EFCB75;
+    --tv-danger-fg: #B4233B;
+    --tv-danger-bg: #FFF0F2;
+    --tv-danger-border: #F0BBC5;
+    --tv-info-fg: #2549D8;
+    --tv-info-bg: #EEF2FF;
+    --tv-info-border: #C8D4FF;
+
+    --tv-shadow: 0 2px 10px rgba(20, 36, 60, 0.05);
+    --tv-kpi-shadow: 0 3px 10px rgba(20, 36, 60, 0.12);
+
+    /* ── הטוקנים הקיימים, ממופים ל---tv-* ───────────────────────────────── */
     /* Surfaces */
-    --bg: #FFFFFF;
-    --surface: #F5F7FB;
-    --surface-2: #EDF0F6;
-    --card: #FFFFFF;
-    --border: #DDE2EC;
-    --border-strong: #C4CAD6;
-    --divider: #E5E9F1;
+    --bg: var(--tv-canvas);
+    --surface: var(--tv-surface-subtle);
+    --surface-2: #EDF1F9;
+    --card: var(--tv-surface);
+    --border: var(--tv-border);
+    --border-strong: #C3CEE0;
+    --divider: var(--tv-divider);
 
     /* Text */
-    --text: #0B0F1E;
-    --text-2: #383E52;
-    --text-3: #5E6478;
-    --text-4: #98A0B2;
+    --text: var(--tv-text);
+    --text-2: #2B3C55;
+    --text-3: var(--tv-text-secondary);
+    --text-4: #8A98AD;
 
     /* Sidebar */
-    --side-bg: #0B0F1E;
-    --side-bg-2: #11162A;
-    --side-fg: #C9CEDC;
-    --side-fg-mute: #6E7388;
-    --side-active: rgba(99,102,241,0.16);
-    --side-active-fg: #FFFFFF;
-    --side-divider: rgba(255,255,255,0.06);
+    --side-bg: var(--tv-sidebar);
+    --side-bg-2: #1A2C46;
+    --side-fg: var(--tv-sidebar-muted);
+    --side-fg-mute: #7D8DA8;
+    --side-active: var(--tv-sidebar-active);
+    --side-active-fg: var(--tv-sidebar-text);
+    --side-divider: var(--tv-sidebar-divider);
 
     /* Accents (used sparingly — pills, badges, focus, sparklines) */
-    --indigo: #5B5EF4;
-    --indigo-50: #EEF0FF;
+    /* --indigo הוא צבע ההדגשה של המוצר: קישורים, focus, טאב נבחר, תגיות
+       ואייקוני פעולה. הוא הופך לכחול של Tovno, ובכך כל אלה מתיישרים בבת אחת.
+       הגוונים הנוספים (emerald, rose, amber…) נשארים — הם צבעי מצב וקטגוריה
+       ולא צבעי מותג, והמפרט משאיר אותם בתפקידם. */
+    --indigo: var(--tv-brand);
+    --indigo-50: var(--tv-brand-soft);
+    --indigo-100: var(--tv-brand-tint);
     --emerald: #10B981;
     --emerald-50: #E7F8F2;
     --rose: #F43F5E;
@@ -139,7 +207,9 @@
     gap: 24px;
   }
   .h-brand { display: flex; align-items: center; gap: 14px; }
-  .h-brand img { height: 22px; display: block; }
+  /* הלוגו הוגדל (ויטלי, 21.9). SVG, ולכן ההגדלה לא פוגעת בחדות.
+     block-size: auto שומר על יחס הממדים — ערכת הלוגו אוסרת מתיחה. */
+  .h-brand img { inline-size: 120px; block-size: auto; display: block; }
   .h-brand .pipe { width: 1px; height: 18px; background: var(--border-strong); }
   .h-brand .eyebrow {
     font-size: 10.5px; font-weight: 800; letter-spacing: 0.16em;
@@ -1767,6 +1837,38 @@
   color: var(--text-3);
 }
 
+/* ── טוען Tovno (app/components/TovnoLoader.jsx) ─────────────────────────────
+   הנכס עצמו מנפיש את עצמו; כאן רק המסגרת והמידה. min() כדי שבמובייל
+   הלוגו יצטמצם לרוחב המסך במקום לגלוש — היחס נשמר כי block-size הוא auto. */
+.tovno-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.tovno-loader img {
+  display: block;
+  inline-size: min(var(--tovno-loader-w, 280px), 72vw);
+  block-size: auto;
+}
+/* מונפש או דומם. ה-SVG נטען כ-<img>, ולהעדפת "תנועה מופחתת" של המשתמש אין
+   דרך להיכנס פנימה (נמדד ב-Chromium — הכלל שבתוך הקובץ לא נכנס לתוקף), ולכן
+   ההחלפה נעשית כאן, במדיה קוורי של העמוד עצמו. */
+.tovno-loader .tovno-loader-still { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .tovno-loader .tovno-loader-motion { display: none; }
+  .tovno-loader .tovno-loader-still { display: block; }
+}
+.tovno-loader-hint {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-3);
+  text-align: center;
+}
+/* במסך "ברוכים הבאים" האנימציה היא סימן המותג ולא חיווי — היא תופסת את
+   מקומו של האימוג'י שהיה שם, ולכן צריכה את אותו מרווח שהיה ל-.icon. */
+.welcome-center .tovno-loader.welcome-mark { margin-bottom: 18px; }
+
 /* --- Recommendation cards (preserved from Stage 4 work) --- */
 .rec-card {
   background: var(--card);
@@ -2467,7 +2569,8 @@
     transform: translateX(-50%);
     gap: 0;
   }
-  .h-brand img { height: 16px; }
+  /* במובייל הלוגו ממורכז ולכן צר יותר, אבל עדיין קריא. */
+  .h-brand img { inline-size: 96px; block-size: auto; }
   .h-brand .pipe,
   .h-brand .eyebrow { display: none; }
 
@@ -2582,8 +2685,16 @@
   .crumb { font-size: 9.5px; margin-bottom: 0; gap: 6px; }
 
   .controls { flex-wrap: wrap; gap: 6px; }
-  .controls .switch,            /* comparison mode toggle */
-  .controls .switch-compare { display: none !important; }
+  /* מתג "השוואה לאותה תקופה" — היה מוסתר במובייל, אבל הסקיצות (לוחות
+     01 ו-04) מציגות אותו מפורשות. הוא חוזר, ברוחב מלא ובגובה יעד מגע.
+     (החולשה של הפיצ'ר עצמו מטופלת ב-D11 בלוח המשימות, לא בהסתרה.) */
+  .controls .switch,
+  .controls .switch-compare {
+    inline-size: 100%;
+    min-block-size: 44px;
+    gap: 10px;
+    font-size: 13px;
+  }
 
   /* Date-range pill: full-width, compact 28px */
   .pill {
@@ -2692,18 +2803,18 @@
   .section { margin-bottom: 8px; }
   .section-head { gap: 8px; margin-bottom: 6px; }
   .section-head h2 { font-size: 13px; }
-  .section-head .sub { display: none; }
+  /* ה-.sub נושא את המכנה ("לפי לידים" / "לפי פגישות") — בלעדיו המספר
+     שמתחת חסר משמעות. המפרט: "שומרים הסבר קצר ליד כל חלק". */
+  .section-head .sub { font-size: 11.5px; }
   .section-head .ico { width: 22px; height: 22px; border-radius: 6px; }
   .section-head .ico svg { width: 12px; height: 12px; }
-  .section-head .head-right { display: none; }
+  .section-head .head-right { display: none; }   /* אין לו שימוש ב-JSX */
 
   /* Standalone time-series chart sections add too much chrome for
      dense mobile (section head + card padding + chart-box).
      Drop them — KPI trend % and the funnel already carry the trend
      story. Re-enable a specific one by removing this rule. */
-  /* :has(> .chart-card) removed — not supported by cssnano in this Next.js version.
-     To hide a chart section on mobile, add class="section mobile-hide" to its wrapper. */
-  .section.mobile-hide { display: none; }
+  /* :has(> .chart-card) removed — not supported by cssnano in this Next.js version. */
 
   /* ---------------------------------------------------------------
      9 · Funnel — 3×2 mini grid
@@ -2748,76 +2859,57 @@
   .unit .lbl .tech { font-size: 9px; }
 
   /* ---------------------------------------------------------------
-     10 · Charts — single column, ultra-compact 70px
+     10 · Charts — עמודה אחת, גובה קריא
+
+     🔴 שינוי מדיניות (Tovno-Mobile-Handoff, MOBILE-SYSTEM §גרפים):
+     עד כאן הגרפים נדחסו ל-70px ו-.chart-meta הוסתר. גרף של 24 שעות
+     בגובה 70px אינו קריא, וזו אותה גישה של "שיתאים בכוח" שהסתירה את
+     הטבלאות. המפרט: "גובה שטח ציור טיפוסי 240–320px, תוויות 12px
+     ומעלה; כותרת ומקרא מחוץ לשטח הקנבס."
      --------------------------------------------------------------- */
   .two-col,
   .chart-grid,
   .demo-grid {
     grid-template-columns: 1fr !important;
-    gap: 6px;
+    gap: 12px;
   }
-  .chart-card { padding: 8px 10px; }
+  .chart-card { padding: 14px 12px; }
   .chart-card .chart-box {
-    height: 70px !important;
-    min-height: 60px;
+    height: 260px !important;
+    min-height: 240px;
   }
-  .chart-card .chart-box.tall { height: 100px !important; }
-  .chart-card .chart-head { margin-bottom: 4px; }
-  .chart-card .chart-title { font-size: 11.5px; }
-  .chart-card .chart-meta { display: none; }
+  .chart-card .chart-box.tall { height: 320px !important; }
+  .chart-card .chart-head { margin-bottom: 10px; }
+  .chart-card .chart-title { font-size: 15px; }
 
   /* ---------------------------------------------------------------
-     11 · Data tables → hide entirely, show "open on desktop" notice
-     Applies to: campaigns/ad-sets/ads/asset-groups + demographic tables.
-     The notice element is opt-in: render <div class="desktop-only-msg">
-     immediately AFTER each .tbl-wrap or .demo-grid in the JSX.
+     11 · Data tables → גלילה אופקית, לא הסתרה
+
+     🔴 שינוי מדיניות (חבילת Tovno-Mobile-Handoff, 21.9): עד כאן הטבלאות
+     פשוט הוסתרו במובייל והוצג במקומן "פתח מהמחשב". המפרט החדש אוסר את
+     זה מפורשות — "כל העמודות קיימות", "אין להסתיר מדד משום שלא נכנס
+     לצילום". הכללים למטה מחליפים את ההסתרה בגלילה אופקית בתוך הכרטיס,
+     עם עמודת הזיהוי דביקה כדי שלא מאבדים את ההקשר בגלילה.
+     הבלוק עצמו יושב מחוץ ל-media query הזה (חפש "Tovno Mobile · טבלאות").
      --------------------------------------------------------------- */
-  .tbl-wrap,
-  .table-wrapper,
-  .demo-grid,
-  .perf,                     /* perf-by-placement table on Facebook */
-  .pmax-body {               /* PMAX asset-group table on Google */
-    display: none !important;
-  }
-  .desktop-only-msg {
-    display: flex !important;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    background: var(--surface, #F5F7FB);
-    border: 1px dashed var(--border-strong, #C4CAD6);
-    border-radius: var(--r-sm, 8px);
-    color: var(--text-2, #383E52);
-    font-size: 11.5px;
-    font-weight: 600;
-    line-height: 1.35;
-  }
-  .desktop-only-msg .icon {
-    font-size: 16px;
-    flex-shrink: 0;
-  }
-  .desktop-only-msg .body {
-    flex: 1;
-    text-wrap: pretty;
-  }
-  .desktop-only-msg .body .hint {
-    display: block;
-    margin-top: 2px;
-    font-size: 10px;
-    font-weight: 500;
-    color: var(--text-3, #5E6478);
-  }
 
   /* ---------------------------------------------------------------
-     12 · CRM — objections list
-     Hide the desktop ranked-list table; render top-3 as cards.
-     Cards are opt-in: <ul class="objections-mobile"><li>…
-     --------------------------------------------------------------- */
-  .rank-list.objections,
-  .crm-objections-table { display: none !important; }
+     12 · CRM — מקורות והתנגדויות
 
+     🔴 שינוי מדיניות (Tovno-Mobile-Handoff): עד כאן הטבלה האמיתית
+     הוסתרה במובייל והוצגה במקומה רשימת כרטיסים של חמש השורות
+     המובילות בלבד. המפרט: "אין לקצץ את הטבלה לטופ 10 בגלל הגרף",
+     "אין להסתיר מדד משום שלא נכנס לצילום".
+
+     הטבלאות גוללות עכשיו (סעיף 11) ומציגות את כל השורות, ולכן
+     ה-<ul class="objections-mobile"> הפך לכפילות חלקית ונשאר מוסתר
+     בנייד בדיוק כמו בדסקטופ. ה-CSS שלו נשאר להיסטוריה; אם יוחלט
+     בעתיד על תצוגת כרטיסים במקום טבלה, היא תצטרך להציג את כל השורות.
+     --------------------------------------------------------------- */
+
+  /* הבורר לידים/פגישות שלט רק ברשימת הכרטיסים שלמעלה. משהסתתרה,
+     הוא פקד בלי השפעה נראית — ולכן נשאר מוסתר גם הוא. */
   .src-metric-toggle {
-    display: flex !important;
     gap: 8px;
     margin: 0 0 10px;
     justify-content: center;
@@ -2841,14 +2933,14 @@
     background: var(--indigo-50, rgba(99,102,241,0.1));
     color: var(--indigo, #6366f1);
   }
+  /* נשאר display:none (ראה ההערה בראש סעיף 12) — רשימה מקוצצת אינה
+     תחליף לטבלה המלאה, שכעת נגללת ומציגה את כל השורות. */
   .objections-mobile {
-    display: grid !important;
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 4px;
     margin: 0; padding: 0;
     list-style: none;
   }
-  .objections-mobile { gap: 4px !important; }
   .objections-mobile li {
     display: flex; align-items: center; gap: 8px;
     padding: 8px 10px;
@@ -3579,27 +3671,15 @@ body.drp-no-scroll { overflow: hidden; }
      possible; otherwise tag via specific section selectors.)
      --------------------------------------------------------------- */
 
-  /* CRM details that are useful on desktop but redundant on mobile:
-     - "פילוח לפי יום בשבוע" — day-of-week breakdown
-     - "זמן מענה לפי איש מכירות" — per-rep response time table
-     - "הכי איטיים - לפי מקור" — slowest by source
-     - "נתונים לפי מקור הגעה" — source breakdown table (already a table,
-        will hit the .table-wrapper hide path)
-     - "המודעות הכי מובילות ב-Facebook" — top ads gallery
-     These all live inside .section blocks; opt them in via .mobile-hide
-     in JSX. For now, hide any .chart-grid that lives inside a section
-     marked .mobile-hide. */
-  .section.mobile-hide,
-  .section.mobile-hide ~ .section.mobile-hide { display: none !important; }
+  /* 🔴 שינוי מדיניות (Tovno-Mobile-Handoff): הסעיף הזה נועד להסתיר
+     סקשנים שלמים במובייל — פילוח לפי יום בשבוע, זמן מענה לפי איש
+     מכירות, הכי איטיים לפי מקור, נתונים לפי מקור הגעה וגלריית
+     המודעות. PAGE-SPECS דורש את כולם מפורשות ("שומרים את כל רכיבי
+     המסך", ומונה אותם אחד־אחד), ולכן ההסתרות ירדו.
 
-  /* Demographics gender+age grid inside Facebook — hidden via
-     .demo-grid path. Already covered in original mobile.css; the
-     desktop-only-msg next to it carries the "פתח מהמחשב" notice. */
-
-  /* "המודעות הכי מובילות" gallery — uses .rec-ads-preview but inside
-     a non-reco .section. Hide the section heading + body via a
-     dedicated class hook the JSX can opt into: .section-top-ads. */
-  .section-top-ads { display: none !important; }
+     .mobile-hide נשאר ככלי — אף רכיב ב-JSX לא משתמש בו היום, והוא
+     דורש הצמדה מפורשת בקוד. אין להצמיד אותו למשהו שהמפרט מונה. */
+  .section.mobile-hide { display: none !important; }
 
   /* ---------------------------------------------------------------
      P2-7 · Tooltip / InfoTip popovers — keep them compact on mobile,
@@ -3750,57 +3830,97 @@ body.drp-no-scroll { overflow: hidden; }
 }
 
 /* ============================================================
-   VITAS Reports — Mobile, Phase 4
-   Hide orphan data tables that aren't wrapped in .table-wrapper.
-   The original mobile.css hides .tbl-wrap / .table-wrapper, but
-   several tables in admin/page.js sit directly inside a .card or
-   .card-body (no wrapper) — specifically:
-     - Demographics gender table (~L2509)
-     - Demographics age table (~L2535)
-     - Asset groups PMax table (~L2458)
-   These tables are illegible at phone width. Hide them.
+   Tovno Mobile · טבלאות — גלילה אופקית במקום הסתרה
+   (מחליף את Phase 4 ו-Phase 5 הישנים, שהסתירו טבלאות ומדיה במובייל)
 
-   IMPORTANT: cssnano-simple in this Next.js version does NOT support
-   :has() — using it breaks the CSS build (see CHAT_HANDOFF). We hide
-   the table cells but DO NOT collapse the wrapping .card itself,
-   because .card is shared with many real content cards (reco, role,
-   ad gallery). A future JSX pass should add a per-section
-   .desktop-only-msg under each orphan table.
+   המפרט: "נתונים להשוואה: table אמיתי בתוך overflow-x:auto, עמודת
+   הזיהוי דביקה ב-inline-start עם רקע אטום. כל העמודות קיימות; אין
+   overflow של body."
+
+   ב-RTL ‎inset-inline-start:0‎ מתמפה ל-right:0 — כלומר העמודה הראשונה,
+   שהיא עמודת הזיהוי, נדבקת לקצה שממנו קוראים. זו הסיבה שמשתמשים
+   בתכונה הלוגית ולא ב-right.
    ============================================================ */
 @media (max-width: 768px) {
 
-  /* Any data-table that sits inside a .card or .card-body is a
-     wide tabular view that doesn't fit a phone. Hide. */
+  /* המעטפות הגוללות. min-inline-size:0 על ההורים מונע מהטבלה למתוח
+     את העמוד — בלעדיו overflow-x על הילד לא עוזר, כי ה-grid נותן לו
+     רוחב auto והעמוד כולו מקבל גלילה אופקית. */
+  .tbl-wrap,
+  .table-wrapper,
+  .demo-grid,
+  .perf,
+  .pmax-body,
+  .card .data-table-scroll,
+  .card-body .data-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+    min-inline-size: 0;
+  }
+  .app-layout, .main-content, .section, .card, .card-body { min-inline-size: 0; }
+
+  /* הטבלה עצמה לא מתכווצת: רוחב מינימלי לכל עמודה, והגלילה עושה את
+     השאר. בלי זה הדפדפן דוחס עמודות עד שהמספרים נשברים לשתי שורות. */
+  .tbl-wrap .data-table,
+  .table-wrapper .data-table,
+  .demo-grid .data-table,
   .card .data-table,
   .card-body .data-table {
-    display: none !important;
+    min-inline-size: max-content;
+    font-size: 12.5px;
+  }
+  .data-table thead th,
+  .data-table tbody td {
+    padding-block: 8px;
+    padding-inline: 10px;
+    white-space: nowrap;
   }
 
-  /* When the .card-body's ONLY child is a now-hidden .data-table, the
-     .card-body still takes default padding. Tighten that padding for
-     all .card-body on mobile (cheap visual fix, hurts no other use). */
-  .card-body { padding: 8px 10px !important; }
-}
-
-/* ============================================================
-   VITAS Reports — Mobile, Phase 5
-   Hide rich-media sections that don't compress to a phone.
-   These section wrappers each get a class hook in JSX (1-line each):
-     .section-top-ads        — "המודעות הכי מובילות ב-Facebook"
-                                 image gallery (Facebook tab)
-     .section-demographics   — "פילוח דמוגרפי" gender+age tables
-                                 (already hidden via .card .data-table,
-                                  but the empty section shell remained;
-                                  hide the whole section now)
-     .section-asset-gallery  — "קמפיינים Google Search" / PMax asset
-                                 group image gallery (Google tab)
-   ============================================================ */
-@media (max-width: 768px) {
-  .section-top-ads,
-  .section-demographics,
-  .section-asset-gallery {
-    display: none !important;
+  /* עמודת הזיהוי דביקה. הרקע חייב להיות אטום — שקוף היה מראה את
+     העמודות שנגללות מתחתיו. הקו בקצה מסמן את הגבול בזמן גלילה. */
+  .data-table thead th:first-child,
+  .data-table tbody td:first-child {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 2;
+    background: var(--card, #fff);
+    box-shadow: 1px 0 0 var(--border, #DDE2EC) inset;
+    max-inline-size: 148px;
+    white-space: normal;
   }
+  .data-table thead th:first-child { z-index: 3; background: #EEF3FC; }
+  .data-table tbody tr:nth-child(even) td:first-child { background: var(--tv-surface-subtle, #F5F7FB); }
+
+  /* חיווי שאפשר לגלול. אין hover בנייד, ובלי סימן אין שום דרך לדעת
+     שיש עוד עמודות מעבר לקצה. הנוסח מהסקיצה של המעצב (לוח 01). */
+  .tbl-wrap::after,
+  .table-wrapper::after,
+  .demo-grid::after,
+  .perf::after,
+  .pmax-body::after {
+    content: 'החלק לצפייה במדדים נוספים';
+    display: block;
+    position: sticky;
+    inset-inline-start: 0;
+    inline-size: fit-content;
+    margin-block-start: 6px;
+    font-size: 11px;
+    color: var(--text-3, #98A0B2);
+  }
+
+  /* מדיה: עמודה אחת, ויחס המקור נשמר. המפרט: "object-fit:contain/גודל
+     טבעי, לא crop כפוי" — cover היה חותך מודעות 16:9 לריבוע. */
+  .section-top-ads .vr-ad-grid,
+  .section-asset-gallery .vr-ad-grid,
+  .vr-ui .section-top-ads .vr-ad-grid,
+  .vr-ui .section-asset-gallery .vr-ad-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px !important;
+  }
+  .ad-thumb { aspect-ratio: auto; }
+  .ad-thumb img { object-fit: contain; inline-size: 100%; block-size: auto; }
+  .vr-ag-video img { object-fit: contain; block-size: auto; }
 }
 
 /* ============================================================
@@ -3921,17 +4041,9 @@ body.drp-no-scroll { overflow: hidden; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-}
-.period-loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid var(--indigo, #6366f1);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 /* ============================================================
@@ -3974,10 +4086,220 @@ textarea:focus-visible,
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  /* ספינרים הם חיווי שהמערכת עובדת — משאירים אותם, רק מאטים מאוד */
-  .period-loading-spinner,
+  /* ספינרים הם חיווי שהמערכת עובדת — משאירים אותם, רק מאטים מאוד.
+     הטוען של Tovno לא ברשימה: הוא <img>, וה-CSS של העמוד לא נכנס לתוכו —
+     כלל prefers-reduced-motion משלו יושב בתוך קובץ ה-SVG. */
   .skel {
     animation-duration: 2.4s !important;
     animation-iteration-count: infinite !important;
   }
 }
+
+/* ── כפתור חזרה לראש העמוד (app/components/BackToTop.jsx) ──────────────────────
+   צף בפינה התחתונה. inset-inline-start ולא left: בעמוד RTL הפינה ה"התחלתית"
+   היא הימנית, והכפתור צריך לשבת בצד ההפוך לתוכן שהעין קוראת — כלומר משמאל. */
+.back-to-top {
+  position: fixed;
+  inset-block-end: 22px;
+  inset-inline-start: 22px;
+  z-index: 900;
+  inline-size: 46px;
+  block-size: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  color: var(--violet, #6d28d9);
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.14);
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.back-to-top:hover { background: var(--violet, #6d28d9); color: #fff; transform: translateY(-2px); box-shadow: 0 10px 26px rgba(15, 23, 42, 0.2); }
+.back-to-top:focus-visible { outline: 2px solid var(--violet, #6d28d9); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .back-to-top { transition: none; } .back-to-top:hover { transform: none; } }
+
+/* במובייל הכפתור יושב מעט גבוה יותר, שלא יתנגש בסרגל הדפדפן. */
+@media (max-width: 640px) { .back-to-top { inset-block-end: 16px; inset-inline-start: 16px; inline-size: 42px; block-size: 42px; } }
+
+/* ============================================================================
+   Tovno by Vitas — מיתוג: רכיבים
+   מקור: Tovno-Claude-Color-Spec.md (ויטלי, 21.9), סעיפים 4, 6, 7, 8, 9.
+
+   ⚠️ סעיף 5 (כרטיסי KPI) לא מיושם בכוונה. ויטלי: "אני לא רוצה לגעת בצבעים
+   באף לקוח של הקארדס הצבעוני". --g-* ו--shadow-* נשארים כפי שהם.
+
+   הכללים כאן מגיעים אחרי כל השאר בקובץ, ולכן גוברים על ערכים ישנים בלי
+   !important. אין כאן nth-child ואין מיפוי לפי מיקום.
+   ============================================================================ */
+
+/* ── 4. טאבים ופילטרים ───────────────────────────────────────────────────── */
+.client-tabs { background: var(--tv-surface); border-color: var(--tv-border); }
+.client-tab { color: var(--tv-text-secondary); }
+.client-tab:hover { background: var(--tv-brand-soft); color: var(--tv-link); }
+/* הטאב הנבחר מסומן גם בקו עליון ולא רק בצבע — המפרט מחייב סימון שאינו צבע בלבד. */
+.client-tab.active { background: var(--tv-surface); color: var(--tv-brand); box-shadow: inset 0 3px 0 var(--tv-brand); }
+.vr-ui .client-tab.active { box-shadow: inset 0 -3px 0 var(--tv-brand); }
+
+/* ── 6. טבלאות ───────────────────────────────────────────────────────────── */
+.data-table thead th { background: #EEF3FC; color: var(--tv-text); }
+.data-table tbody td { color: var(--tv-text); border-block-end-color: var(--tv-divider); }
+.data-table tbody tr:nth-child(even) { background: var(--tv-surface-subtle); }
+.data-table tbody tr:hover { background: var(--tv-brand-soft); }
+.vr-ui .data-table thead th { background: #EEF3FC; color: var(--tv-text); }
+.vr-ui .data-table tbody tr:nth-child(even) { background: var(--tv-surface-subtle); }
+.vr-ui .data-table tbody tr:hover { background: var(--tv-brand-soft); }
+/* שורת סיכום: גוון כחול מובחן מהשורות הרגילות ומההובר. */
+.data-table tfoot tr, .vr-ui .data-table tfoot tr { background: #E7EEFF; color: var(--tv-text); }
+
+/* ── 7. משפך לידים ───────────────────────────────────────────────────────── */
+/* הקופסאות לבנות והצבע חי באייקון ובפס הצדדי בלבד — כך הוא כבר בנוי. כאן רק
+   מיושרים גווני הפס לצבעי המפרט, והענף עובר לצבעי danger. */
+.vr-ui .vr-funnel-step { background: var(--tv-surface); border-color: var(--tv-border); }
+.vr-ui .vr-funnel-value { color: var(--tv-text); }
+.vr-ui .vr-funnel-leak {
+  background: var(--tv-danger-bg);
+  border-color: var(--tv-danger-border);
+  border-inline-start-color: var(--tv-danger-fg);
+}
+.vr-ui .vr-funnel-leak .vr-funnel-label h3,
+.vr-ui .vr-funnel-leak .vr-funnel-label svg,
+.vr-ui .vr-funnel-leak .vr-funnel-value { color: var(--tv-danger-fg); }
+
+/* ── 9. תקציב וסטטוסים ───────────────────────────────────────────────────── */
+.vr-status.on { color: var(--tv-success-fg); }
+.vr-status.on i { background: #26B99B; }
+.vr-status.paused, .vr-status.off { color: var(--tv-danger-fg); }
+.vr-status.paused i, .vr-status.off i { background: var(--tv-danger-fg); }
+
+/* ── כפתורי ייצוא (סעיף 4, שורת Excel/CSV) ───────────────────────────────── */
+.vr-tbl-btn-export { color: var(--tv-success-fg); border-color: var(--tv-success-border); background: var(--tv-success-bg); }
+.vr-tbl-btn-export:hover { color: var(--tv-success-fg); border-color: #8FD3B2; }
+.vr-tbl-btn-export:active { background: #D6F0E2; }
+
+/* ── focus אחיד בכל המוצר ────────────────────────────────────────────────── */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--tv-focus);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Tovno Mobile · חלונית תחתונה ובורר תצוגה
+   (app/components/shell/BottomSheet.jsx, ViewPicker.jsx)
+
+   dvh ולא vh: ב-iOS Safari שורת הכתובת משנה את גובה ה-viewport, ו-90vh
+   היה מוציא את כפתורי התחתית מתחת לקפל. fallback ל-vh לדפדפנים ישנים.
+   ============================================================ */
+.vsheet-root { position: fixed; inset: 0; z-index: 9995; display: flex; align-items: flex-end; }
+.vsheet-scrim { position: absolute; inset: 0; background: rgba(11, 15, 30, 0.45); }
+.vsheet {
+  position: relative;
+  inline-size: 100%;
+  max-block-size: 90vh;
+  max-block-size: 90dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card, #fff);
+  border-start-start-radius: 20px;
+  border-start-end-radius: 20px;
+  box-shadow: 0 -18px 48px rgba(11, 15, 30, 0.22);
+  animation: vsheetUp 0.2s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+@keyframes vsheetUp { from { transform: translateY(14px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .vsheet { animation: none; } }
+
+.vsheet-grip {
+  inline-size: 44px; block-size: 4px; border-radius: 999px;
+  background: var(--border-strong, #C4CAD6);
+  margin: 10px auto 2px;
+}
+.vsheet-head { display: flex; align-items: flex-start; gap: 10px; padding: 8px 16px 12px; }
+.vsheet-titles { flex: 1; min-inline-size: 0; text-align: center; }
+.vsheet-titles h2 { margin: 0; font-size: 18px; font-weight: 800; color: var(--text, #0B0F1E); }
+.vsheet-titles p { margin: 2px 0 0; font-size: 13px; color: var(--text-3, #5E6478); }
+.vsheet-close {
+  flex-shrink: 0;
+  inline-size: 44px; block-size: 44px;   /* יעד מגע מינימלי לפי המפרט */
+  display: grid; place-items: center;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-2, #383E52); border-radius: 10px;
+}
+.vsheet-close:hover { background: var(--surface, #F5F7FB); }
+/* גוף גולל פנימית, ו-safe-area כדי שהפריט האחרון לא ייחתך ב-iPhone. */
+.vsheet-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 0 12px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── בורר תצוגה ─────────────────────────────────────────────────────────── */
+.vpick { display: none; }   /* דסקטופ ממשיך עם שורת הטאבים */
+.vpick-trigger {
+  inline-size: 100%;
+  display: flex; align-items: center; gap: 8px;
+  min-block-size: 44px;
+  padding: 9px 12px;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #DDE2EC);
+  border-radius: var(--r-sm, 10px);
+  font: inherit; font-size: 13.5px; color: var(--text-2, #383E52);
+  cursor: pointer;
+}
+.vpick-trigger-label { color: var(--text-3, #5E6478); }
+.vpick-trigger-value { margin-inline-start: auto; font-weight: 700; color: var(--text, #0B0F1E); }
+
+.vpick-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.vpick-option {
+  inline-size: 100%;
+  display: flex; align-items: center; gap: 10px;
+  min-block-size: 52px;
+  padding: 10px 14px;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #DDE2EC);
+  border-radius: 12px;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--text, #0B0F1E);
+  text-align: start; cursor: pointer;
+}
+.vpick-option.on { background: var(--tv-brand-soft, #EEF2FF); border-color: var(--tv-brand-line, #C8D4FF); }
+.vpick-check { inline-size: 18px; display: grid; place-items: center; color: var(--tv-brand, #315CF5); }
+.vpick-option-label { flex: 1; min-inline-size: 0; }
+.vpick-option-icon { color: var(--text-3, #5E6478); display: grid; place-items: center; }
+
+@media (max-width: 768px) {
+  .vpick { display: block; margin-bottom: 10px; }
+  /* שורת תתי־הטאבים מתחלפת בבורר — לא נמחקת, רק לא מוצגת בנייד. */
+  .vcs-subtabs-row .client-tabs.vpick-replaced,
+  .client-tabs.vpick-replaced { display: none !important; }
+}
+
+/* ── בורר פרויקט במובייל (app/components/shell/ProjectPicker.jsx) ────────── */
+.vproj { display: none; }
+.vproj-trigger {
+  inline-size: 100%;
+  display: flex; align-items: center; gap: 8px;
+  min-block-size: 44px;
+  padding: 9px 12px;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #DDE2EC);
+  border-radius: var(--r-sm, 10px);
+  font: inherit; font-size: 15px; font-weight: 700; color: var(--text, #0B0F1E);
+  cursor: pointer;
+}
+.vproj-trigger-text { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vproj-sep { margin-inline: 6px; color: var(--text-4, #98A0B2); font-weight: 500; }
+
+@media (max-width: 768px) {
+  .vproj { display: block; order: -1; inline-size: 100%; margin-bottom: 10px; }
+  /* כותרת "לקוח / פרויקט" הופכת למיותרת — הבורר נושא את אותו מידע,
+     ובנוסף אפשר ללחוץ עליו. השורה עצמה לא נמחקת בדסקטופ. */
+  .titlebar > div > h1 { font-size: 20px; }
+  .titlebar { flex-wrap: wrap; }
+}
+
+/* קנבס של Chart.js לפני האתחול הוא 300×150 כברירת מחדל של HTML, ובמסך
+   320px זה 5px של גלילה אופקית לכל העמוד ברגע שבין הרינדור לבניית הגרף
+   (נמדד). Chart.js מגדיר את המידות אחרי, אבל הרגע הזה קיים. */
+.chart-box canvas,
+.chart-card canvas { max-inline-size: 100%; }

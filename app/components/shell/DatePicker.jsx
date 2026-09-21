@@ -221,7 +221,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
     return out
   })()
   const [open, setOpen] = useState(false)
-  const [tempPreset, setTempPreset] = useState(activePreset || 'lastMonth')
+  const [tempPreset, setTempPreset] = useState(activePreset || 'currentMonth')
   const [tempStart, setTempStart] = useState(since || '')
   const [tempEnd, setTempEnd] = useState(until || '')
   const [pickMode, setPickMode] = useState('done') // 'start' | 'end' | 'done'
@@ -283,7 +283,7 @@ export default function DatePicker({ activePreset, since, until, onApplyPreset, 
   // Sync temp state when picker opens
   useEffect(() => {
     if (!open) return
-    setTempPreset(activePreset || 'lastMonth')
+    setTempPreset(activePreset || 'currentMonth')
     setPickMode('done')
     setHoverYmd(null)
     const range = activePreset && activePreset !== 'custom'

@@ -183,9 +183,9 @@ export async function GET(request) {
         <p>${fmt} · ${failed.length} כשלים · ${brokenProjects.length} דוחות שבורים שדולגו</p>
         ${brokenProjects.length ? `<h3>דוחות שבורים שלא נשמרו (נשמר הקודם הטוב):</h3><ul>${brokenList}</ul>` : ''}
         ${failed.length ? `<h3>משימות שנכשלו:</h3><ul>${failList}</ul>` : ''}
-        <p style="color:#888;font-size:12px">VITAS Reports · ניטור אוטומטי</p>
+        <p style="color:#888;font-size:12px">Tovno by Vitas · ניטור אוטומטי</p>
       </div>`
-    try { await sendAlert({ subject: `⚠️ VITAS CRM cron: ${failed.length} כשלים, ${brokenProjects.length} שבורים`, html }) } catch {}
+    try { await sendAlert({ subject: `⚠️ Tovno CRM cron: ${failed.length} כשלים, ${brokenProjects.length} שבורים`, html }) } catch {}
   }
 
   // heartbeat for the health watchdog (explicit timestamp -> updates every run)

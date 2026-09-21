@@ -21,7 +21,7 @@ export function PeriodFetching() {
       <div style={wrap} role="status" aria-live="polite">
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 12,
-          background: 'rgba(91,94,244,0.08)', border: '1px solid rgba(91,94,244,0.22)',
+          background: 'var(--tv-brand-soft, #EEF2FF)', border: '1px solid var(--tv-brand-line, #C8D4FF)',
           borderRadius: 12, padding: '12px 20px', maxWidth: '100%',
         }}>
           <span className="period-state-spinner" aria-hidden="true" />
@@ -39,8 +39,8 @@ export function PeriodFetching() {
       <style jsx>{`
         .period-state-spinner {
           width: 22px; height: 22px; flex-shrink: 0;
-          border: 3px solid rgba(91, 94, 244, 0.25);
-          border-top-color: var(--indigo, #5B5EF4);
+          border: 3px solid var(--tv-brand-line, #C8D4FF);
+          border-top-color: var(--tv-brand, #315CF5);
           border-radius: 50%;
           animation: periodSpin 0.8s linear infinite;
         }

@@ -71,7 +71,7 @@ export async function GET(request) {
       <h2>🚨 ייתכן שקרון הפסיק לרוץ</h2>
       <p>השומר זיהה שקרון לא דיווח על ריצה מוצלחת בשעות הפעילות. ייתכן שלא רץ או קרס.</p>
       <ul>${rows}</ul>
-      <p style="color:#888;font-size:12px">VITAS Reports · קרון שומר (health)</p></div>`
+      <p style="color:#888;font-size:12px">Tovno by Vitas · קרון שומר (health)</p></div>`
     try { await sendAlert({ subject: `🚨 VITAS: ייתכן שקרון נתקע`, html }) } catch {}
   }
 
@@ -101,7 +101,7 @@ export async function GET(request) {
           <p>הקרונים מדווחים שהם רצים, אבל <b>לא קיימת אף שורת דוח עבור ${todayIL}</b>.</p>
           <p>כלומר המשיכה מתבצעת אך לא מגיעה למסד — לא תקלת תזמון אלא תקלת נתונים.
              בדשבורד זה ייראה כמו טווח "היום" ריק.</p>
-          <p style="color:#888;font-size:12px">VITAS Reports · שומר שקט · התראה אחת ליום</p></div>`
+          <p style="color:#888;font-size:12px">Tovno by Vitas · שומר שקט · התראה אחת ליום</p></div>`
         try {
           await sendAlert({ subject: `🚨 VITAS: לא נכתבו נתונים של ${todayIL}`, html })
           await sb.from('cron_heartbeat').upsert({ job: 'silence_alert', last_run: new Date().toISOString() }, { onConflict: 'job' })
@@ -128,10 +128,10 @@ export async function GET(request) {
       const prevReds = Array.isArray(st.reds) ? st.reds : []
       let lastMorning = st.last_morning, lastEvening = st.last_evening, sentDigest = false
       if (hr >= 7 && hr < 14 && lastMorning !== dateIL) {
-        await sendAlert({ subject: `📊 VITAS בריאות מערכת (בוקר) — ${health.anyRed ? '⚠️ יש בעיות' : '✔️ הכל תקין'}`, html: renderHealthEmail(health, { digest: true }) })
+        await sendAlert({ subject: `📊 Tovno בריאות מערכת (בוקר) — ${health.anyRed ? '⚠️ יש בעיות' : '✔️ הכל תקין'}`, html: renderHealthEmail(health, { digest: true }) })
         lastMorning = dateIL; sentDigest = true
       } else if (hr >= 20 && lastEvening !== dateIL) {
-        await sendAlert({ subject: `📊 VITAS בריאות מערכת (ערב) — ${health.anyRed ? '⚠️ יש בעיות' : '✔️ הכל תקין'}`, html: renderHealthEmail(health, { digest: true }) })
+        await sendAlert({ subject: `📊 Tovno בריאות מערכת (ערב) — ${health.anyRed ? '⚠️ יש בעיות' : '✔️ הכל תקין'}`, html: renderHealthEmail(health, { digest: true }) })
         lastEvening = dateIL; sentDigest = true
       }
       // Per-client IMMEDIATE alerts: a client whose data didn't update as expected (even one day),
@@ -150,7 +150,7 @@ export async function GET(request) {
             <h2>⚠️ VITAS: נתונים לא עודכנו אצל לקוח</h2>
             <p>הקרון רץ, אך לפריטים הבאים הנתונים לא עודכנו כמצופה (ייתכן שיום בודד לא נמשך אצל הלקוח):</p>
             <ul>${rows}</ul>
-            <p style="color:#888;font-size:12px">VITAS · חיישני בריאות פר-לקוח</p></div>`
+            <p style="color:#888;font-size:12px">Tovno by Vitas · חיישני בריאות פר-לקוח</p></div>`
           await sendAlert({ subject: `⚠️ VITAS: בעיה בנתונים אצל ${newIssues.length} לקוח/פרויקט`, html })
         }
       }
@@ -190,7 +190,7 @@ export async function GET(request) {
               <p>הפונקציה <code>prune_old_reports</code> החזירה שגיאה:</p>
               <pre style="background:#f6f6f6;padding:10px;direction:ltr;text-align:left">${pruneNote}</pre>
               <p>הטבלה תמשיך לתפוח (~10-15 שורות ליום לכל פרויקט) ובסוף הדשבורד ייטען לאט.</p>
-              <p style="color:#888;font-size:12px">VITAS · watchdog</p></div>`,
+              <p style="color:#888;font-size:12px">Tovno by Vitas · watchdog</p></div>`,
           })
           await sb.from('cron_heartbeat').upsert({ job: 'reports_cleanup_fail', last_run: new Date().toISOString() }, { onConflict: 'job' })
         }

@@ -8,7 +8,7 @@ import { GOOGLE_SCHEMA_VERSION } from '../../../../lib/crm/schema-version.js'
 // עזרי Google Ads והניתוב לפרויקטים עברו ל-lib/ads (שלב 2 של docs/daily-ranges-plan.md) — משותפים
 // לעובדות היומיות. הקוד זהה; רק המיקום השתנה.
 import { GOOGLE_ADS_API_VERSION, num, credsFor, getAccessToken, mintAccessToken, gaqlSearch, extractAdText } from '../../../../lib/ads/google-api.js'
-import { klossGoogleAgencyOf, computeTotals } from '../../../../lib/ads/routing.js'
+import { googleAgencyOf, googleSourcesForProject, computeTotals } from '../../../../lib/ads/routing.js'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -277,7 +277,16 @@ async function runSync(opts = {}) {
       if (!_assetGroupsMerged[k]) _assetGroupsMerged[k] = []
       for (const ag of arr) _assetGroupsMerged[k].push(ag)
     }
-    _custDiag.push({ customer: customerId, rows: allRows.length, ...(_creds.isOverride ? { credsOverride: true, login: _creds.loginCustomerId || null } : {}) })
+    // מספר קבוצות הנכסים לכל חשבון נרשם בנפרד. בלעדיו "הגלריה ריקה" יכולה להיות
+    // גם שאילתה שנכשלה, גם חשבון בלי הרשאה, וגם פשוט אין PMax — ואי אפשר להבדיל
+    // בלי לקרוא לוגים (ויטלי, 21.9: רואים קבוצות רק מחשבון אחד מתוך שניים).
+    _custDiag.push({
+      customer: customerId,
+      rows: allRows.length,
+      assetGroups: Object.values(assetGroupsByCampaign).reduce((a, arr) => a + arr.length, 0),
+      assetGroupCampaigns: Object.keys(assetGroupsByCampaign).length,
+      ...(_creds.isOverride ? { credsOverride: true, login: _creds.loginCustomerId || null } : {}),
+    })
   } // ===== end per-customer loop =====
 
   const allRows = _allRowsMerged
@@ -301,8 +310,11 @@ async function runSync(opts = {}) {
   for (const p of projectsList) {
     const needle = (p.name || '').toLowerCase().trim()
     if (!needle) continue
-    const isKloss = needle === 'kloss'
-    const mine = isKloss ? allRows.filter(r => klossGoogleAgencyOf(r) !== null) : allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
+    // לקוח עם כללי ניתוב משלו (KLOSS, שמי נדל"ן) משויך לפי חשבון + מילת מפתח;
+    // כל השאר לפי שם הפרויקט בשם הקמפיין, כמו קודם.
+    const _srcRules = googleSourcesForProject(p.name)
+    const _agencyOf = (r) => googleAgencyOf(_srcRules, r)
+    const mine = _srcRules ? allRows.filter(r => _agencyOf(r) !== null) : allRows.filter(r => (r.campaign || '').toLowerCase().includes(needle))
     if (mine.length === 0) {
       results.push({ project: p.name, skipped: true, reason: 'no matching campaigns' })
       continue
@@ -310,17 +322,30 @@ async function runSync(opts = {}) {
 
     const pt = computeTotals(mine)
 
-    // Gather asset groups whose campaign name contains the project name
+    // קבוצות הנכסים של הפרויקט.
+    //
+    // ⚠️ הבאג שהיה כאן: השיוך נעשה לפי campaign.includes(needle) בלבד, בעוד שורות
+    // המדידה משויכות ב-`mine` לפי כללי הניתוב (klossGoogleAgencyOf). ב-KLOSS קמפייני
+    // ה-PMax נקראים "P-max | Ongoing | General" ו-"P-max | Ongoing | New Client" —
+    // בלי המילה kloss — ולכן הקמפיינים נשמרו אבל הקריאייטיב שלהם נזרק בשקט, וגלריית
+    // "קריאייטיב Google PMax" הייתה ריקה. (ביוני זה עוד עבד רק כי היה קמפיין בשם
+    // "Kloss-6/2026-PMAX".)
+    //
+    // התיקון: קבוצת נכסים שייכת לפרויקט אם הקמפיין שלה כבר שויך לפרויקט ב-`mine`.
+    // הבדיקה הישנה נשארת כגיבוי. הנרמול מסיר סימני כיווניות בלתי נראים שגוגל מחזירה
+    // בתוך שמות קמפיינים — בלעדיו ההשוואה נכשלת בשקט על שמות מעורבים עברית/אנגלית.
+    const _campKey = (c) => String(c || '').replace(/[​-‏‪-‮⁦-⁩﻿]/g, '').trim().toLowerCase()
+    const mineCampaigns = new Set(mine.map(r => _campKey(r.campaign)))
     const projectAssetGroups = []
     for (const [campLower, groups] of Object.entries(assetGroupsByCampaign)) {
-      if (campLower.includes(needle)) projectAssetGroups.push(...groups)
+      if (mineCampaigns.has(_campKey(campLower)) || campLower.includes(needle)) projectAssetGroups.push(...groups)
     }
 
     let byAgency = null
-    if (isKloss) {
+    if (_srcRules) {
       byAgency = {}
       for (const r of mine) {
-        const ag = klossGoogleAgencyOf(r) || 'אחר'
+        const ag = _agencyOf(r) || 'אחר'
         const o = byAgency[ag] || (byAgency[ag] = { spend: 0, impressions: 0, clicks: 0, leads: 0 })
         o.spend += r.spend; o.impressions += r.impressions; o.clicks += r.clicks; o.leads += r.leads
       }

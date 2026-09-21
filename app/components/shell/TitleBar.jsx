@@ -1,6 +1,7 @@
 'use client'
 import DatePicker from './DatePicker'
 import DateRangePicker from './DateRangePicker'
+import ProjectPicker from './ProjectPicker'
 
 // ── Mobile presets (IDs match the existing DatePicker keys) ──────────────────
 const sod = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x }
@@ -43,6 +44,8 @@ export default function TitleBar({
   onToggleComparison,
   showQuarters = true,
   allowedPresets = null,
+  projects = [],
+  onSelectProject,
 }) {
   // BCureLaser / Zoho: hide the quarterly presets (unused there + they trip Zoho's
   // 2000-record fetch limit). Desktop list is filtered inside DatePicker via showQuarters.
@@ -71,11 +74,22 @@ export default function TitleBar({
     // The old className="title-bar" never matched anything → mobile rules
     // never applied → h1 stayed at 38px on phones, controls didn't shrink, etc.
     <div className="titlebar">
+      {/* מובייל: בורר פרויקט. המפרט (לוח 02) דורש בחירת פרויקט בחלונית
+          תחתונה "בלי לחשוף שמות לקוחות אחרים" — ולכן הרשימה כאן היא
+          projects של הלקוח הנוכחי בלבד, ולא עץ הלקוחות שבמגירה. */}
+      {projects.length > 0 && onSelectProject && (
+        <ProjectPicker
+          client={client}
+          project={project}
+          projects={projects}
+          onSelectProject={onSelectProject}
+        />
+      )}
       {/* Left: breadcrumb + title */}
       <div>
-        {crumb.length > 0 && (
+        {crumb.filter(Boolean).length > 0 && (
           <div className="crumb">
-            {crumb.map((part, i) => (
+            {crumb.filter(Boolean).map((part, i) => (
               <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {i > 0 && <span className="sep">/</span>}
                 <span dir={/^[a-zA-Z]/.test(part) ? 'ltr' : undefined}>{part}</span>
