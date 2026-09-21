@@ -4965,6 +4965,10 @@ const selectProject = async (client, project) => {
             const _lvlTag = (txt) => <span className="vr-erika-lvl">{txt}</span>
             // "(ללא קמפיין)" הוא ערך טכני מהנתונים; המפרט מחייב תווית מפורשת שלא
             // תיקרא כשם קמפיין אמיתי. השורה עצמה נשארת — אין למחוק אותה.
+            // תקציב כולל לשורת הסיכום. fbTotals/gTotals הם אותם סכומים שמזינים את
+            // כרטיס ה-ROAS למעלה, ולכן שתי התצוגות נשענות על אותו מכנה.
+            const _gTotalSpend = (gTotals && gTotals.spend) || 0
+            const _totalAdSpend = ((fbTotals && fbTotals.spend) || 0) + _gTotalSpend
             const _NOCAMP = '(ללא קמפיין)'
             const _campLabel = (nm) => nm === _NOCAMP ? 'ללא שיוך לקמפיין' : nm
             // המעטפת המשותפת: הרכיבים והמידות של ש.ברוך פעילים רק בתוך .vr-ui,
@@ -4990,7 +4994,7 @@ const selectProject = async (client, project) => {
                   </div>
                   <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th>ערוץ</th><th>לידים</th><th>הזדמנויות</th><th>רכשו</th><th>אחוז המרה</th><th>שווי נטו</th><th>תקציב FB</th><th>ROAS</th></tr></thead>
+                      <thead><tr><th scope="col">ערוץ</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">רכשו</th><th scope="col">אחוז המרה</th><th scope="col">שווי נטו</th><th scope="col" title="בשורות: Facebook בלבד. בשורת הסיכום: Facebook + Google">תקציב</th><th scope="col" title="בשורות: מול תקציב Facebook. בשורת הסיכום: מול התקציב הכולל">ROAS</th></tr></thead>
                       <tbody>
                         {(() => {
                           const out = [];
@@ -5047,19 +5051,20 @@ const selectProject = async (client, project) => {
                           <td style={{fontWeight:700}}>{formatNum(_fn.opportunities||0)}</td>
                           <td style={{fontWeight:700}}>{formatNum(_fn.purchased||0)}</td>
                           <td style={{fontWeight:700,color:'var(--violet)'}}>{(_fn.conversionRate||0)+'%'}</td>
-                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}}>{formatCurrency(_fbTotalSpend)}</td><td style={{fontWeight:700}} title="הכנסות מכל הערוצים חלקי תקציב Facebook בלבד — ראו ההערה מתחת לטבלה">{_fbTotalSpend>0 ? ((_fn.netRevenue||0)/_fbTotalSpend).toFixed(2)+'x' : '—'}</td>
+                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}} title={'Facebook ' + formatCurrency(_fbTotalSpend) + ' + Google ' + formatCurrency(_gTotalSpend)}>{formatCurrency(_totalAdSpend)}</td><td style={{fontWeight:700}} title="הכנסות מכל הערוצים חלקי התקציב הכולל (Facebook + Google)">{_totalAdSpend>0 ? ((_fn.netRevenue||0)/_totalAdSpend).toFixed(2)+'x' : '—'}</td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
-                  {/* ⚠️ אי-התאמה ידועה (DATA-NOTES של חבילת אריקה, סעיף 5): ה-ROAS בשורת
-                      הסיכום מחלק את ההכנסות מ*כל* הערוצים בתקציב של Facebook בלבד, ולכן
-                      הוא גבוה מה-ROAS שבכרטיס למעלה. לא שיניתי את הנוסחה — המפרט אוסר
-                      לשנות חישוב במסגרת עיצוב — אבל גם אסור להציג אותו כנתון אמין בשקט.
-                      התיקון מוצע לוויטלי בנפרד. */}
-                  {_fbTotalSpend > 0 && ((_fn.netRevenue || 0) > 0) ? (
-                    <p className="vr-erika-warn">
-                      ⚠️ ה-ROAS בשורת הסיכום מחושב כהכנסות מכל הערוצים חלקי תקציב Facebook בלבד, ולכן הוא גבוה מה-ROAS שבכרטיס למעלה. הנוסחה לא שונתה — היא ממתינה להכרעה.
+                  {/* שורת הסיכום מחלקת את ההכנסות בתקציב הכולל (ויטלי, 21.9). עד כה היא
+                      חילקה בתקציב Facebook בלבד ולכן יצאה מנופחת — זה הפער ש-DATA-NOTES
+                      של חבילת אריקה מסמן בסעיף 5.
+                      נשאר הבדל אחד מול הכרטיס למעלה, והוא מכוון: הכרטיס נקרא "ROAS לא
+                      כולל מע"מ" ומחלק את ההכנסות ב-1.18 לפני החלוקה בתקציב, והטבלה מציגה
+                      את ההכנסות כפי שהן. לכן הכרטיס תמיד נמוך בכ-15%. */}
+                  {_totalAdSpend > 0 && ((_fn.netRevenue || 0) > 0) ? (
+                    <p className="vr-erika-note">
+                      שורת הסיכום מחלקת את ההכנסות בתקציב הכולל (Facebook + Google). השורות שמעליה מציגות תקציב ו-ROAS של Facebook בלבד, כי אלה הנתונים שניתן לשייך לקמפיין. הכרטיס שבראש העמוד נמוך בכ-15% כי הוא מחושב ללא מע״מ.
                     </p>
                   ) : null}
                 </div>

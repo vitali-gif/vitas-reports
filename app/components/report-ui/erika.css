@@ -64,14 +64,14 @@
 .vr-ui .data-table tbody tr.vr-erika-lvl0.vr-erika-open,
 .vr-ui .data-table tbody tr.vr-erika-lvl0.vr-erika-open:hover { background: #eef1fd !important; }
 
-/* ── אזהרת אי-התאמה ב-ROAS של שורת הסיכום ───────────────────────────────── */
-.vr-ui .vr-erika-warn {
+/* ── הערת היקף מתחת לטבלת המשפך ─────────────────────────────────────────── */
+.vr-ui .vr-erika-note {
   margin: 12px 2px 0;
   padding: 9px 13px;
-  border: 1px solid var(--amber-200, #fde68a);
+  border: 1px solid var(--border, #dde2ec);
   border-radius: var(--r-sm, 8px);
-  background: var(--amber-50, #fffbeb);
-  color: var(--amber-900, #92400e);
+  background: var(--surface-2, #f6f8ff);
+  color: var(--text-secondary, #66748f);
   font-size: 12.5px; line-height: 1.65;
 }
 
