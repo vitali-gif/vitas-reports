@@ -32,6 +32,9 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="VITAS Reports" />
+        {/* אייקון הלשונית מגיע מ-app/icon.png, ש-Next מזריק עבורו <link rel="icon">
+            אוטומטית. בלעדיו לא היה בעמוד שום קישור אייקון, ולכן כל דפדפן ביקש
+            /favicon.ico — קובץ שלא קיים — וקיבל 404 בכל טעינת עמוד (ויטלי, 21.9). */}
         <link rel="apple-touch-icon" href="/brand/icon-192.png" />
 
         {/*
