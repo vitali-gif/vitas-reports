@@ -3926,7 +3926,7 @@ const selectProject = async (client, project) => {
     return (
       <>
         {/* Source Tabs */}
-        <div className="client-tabs">
+        <div className="client-tabs client-tabs-main">
           <button className={`client-tab ${dashTab === 'all' ? 'active' : ''}`} onClick={() => setDashTab('all')}>{'\u05d4\u05db\u05dc'}</button>
           {hasCrm && <button className={`client-tab ${dashTab === 'crm' ? 'active' : ''}`} onClick={() => setDashTab('crm')}>CRM</button>}
           {hasFb && <button className={`client-tab ${dashTab === 'facebook' ? 'active' : ''}`} onClick={() => setDashTab('facebook')}>Facebook</button>}

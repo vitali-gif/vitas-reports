@@ -4303,3 +4303,35 @@ textarea:focus-visible,
    (נמדד). Chart.js מגדיר את המידות אחרי, אבל הרגע הזה קיים. */
 .chart-box canvas,
 .chart-card canvas { max-inline-size: 100%; }
+
+/* ============================================================
+   Tovno Mobile · רק שורת הניווט הראשית דביקה
+
+   הכלל ‎.client-tabs { position: sticky; top: 48px; z-index: 30 }‎ חל על
+   *כל* שורת טאבים במסך צר — כולל שורות שיושבות בתוך התוכן: בורר המדד
+   בסקשן, ובורר ערוץ המשפך. הן נדבקו גם הן לראש המסך, הצטברו זו על זו,
+   וחסמו לחיצות על מה שמתחתיהן.
+
+   נמדד ב-E2E על מכשיר מדומה (Pixel 7):
+     "<div class=\"client-tabs\">…</div> intercepts pointer events"
+   כלומר טאב שגללו אליו פשוט לא הגיב ללחיצה.
+
+   המפרט (MOBILE-SYSTEM §מעטפת): "להבטיח שאזור דביק לא מכסה תוכן או
+   פוקוס", ו"header קומפקטי אחד דביק, לא כל אזור הכותרת+טאבים יחד".
+
+   ברירת המחדל מתהפכת: דביק רק מי שסומן ‎.client-tabs-main‎ (שורת הניווט
+   הראשית ב-admin/page.js). כל שורה פנימית, קיימת או עתידית, נשארת בזרימה.
+   ============================================================ */
+@media (max-width: 768px) {
+  .client-tabs:not(.client-tabs-main) {
+    position: static;
+    z-index: auto;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
+  /* גלילה אל טאב חייבת להשאיר מקום לשורה הדביקה שמעליו (48px כותרת +
+     ~34px שורת טאבים). בלי זה scrollIntoView מניח אותו בדיוק מתחתיה. */
+  .client-tab,
+  .vpick-trigger { scroll-margin-block-start: 96px; }
+}
