@@ -12,7 +12,16 @@
 /* ── רשת הקארדים: ארבע על ארבע ───────────────────────────────────────────
    vr-metric-grid המשותף הוא auto-fill ולכן נותן חמש עמודות ברוחב 1440, והקארד
    ה-16 נופל לשורה בודדת. המפרט מחייב ארבע שורות על ארבע עמודות. */
-.vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+
+/* ארבע עמודות פירושן כרטיס רחב יותר מזה שבטאב "הכל" (חמש עמודות), ועם אותו
+   min-block-size הוא נראה גדול ומרוח (ויטלי, 21.9). כאן הכרטיס מתקצר ומתהדק —
+   אותם ערכים, אותם צבעים, פחות אוויר. */
+.vr-ui.vr-kloss .vr-metric { min-block-size: 132px; padding: 16px 16px 14px; }
+.vr-ui.vr-kloss .vr-metric-top h3 { font-size: 14.5px; }
+.vr-ui.vr-kloss .vr-metric-icon { padding: 6px; }
+.vr-ui.vr-kloss .vr-metric-value { font-size: clamp(24px, 1.7vw, 30px); margin-block-start: 10px !important; }
+.vr-ui.vr-kloss .vr-metric-note { font-size: 12px; margin-block-start: 4px !important; }
 @media (max-width: 1100px) { .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px)  { .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: 1fr; } }
 

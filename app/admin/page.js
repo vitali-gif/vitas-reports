@@ -34,6 +34,10 @@ import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
 
+// טאב "המלצות חכמות" מוסתר בכל הלקוחות עד שהתוכן שלו ישופר (ויטלי, 21.9).
+// להחזרה: להפוך ל-true. הרינדור עצמו נשאר בקוד ולא נמחק.
+const RECOMMENDATIONS_TAB_ON = false
+
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
 function InfoTip({ text, icon = 'i' }) {
@@ -443,7 +447,14 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // vrShell — המעטפת (סיידבר, header, כותרת, תקציב) בעיצוב החדש בכל הטאבים של פרויקט נדל"ן, כדי שהמסך לא
   // יקפוץ בין שני עיצובים במעבר טאב. vrMode — תוכן הטאב "הכל" בלבד (הפיילוט).
   const _vrOwnCrm = ['zoho', 'salesforce'].includes(_vrCrmType)
-  const vrShell = view === 'dashboard' && !isDemoProject && !_vrOwnCrm
+  // vrChrome — המעטפת עצמה: header, סיידבר, כותרת, פס התקציב ושורת הטאבים הראשית,
+  // וכן העטיפה ב-.vr-ui. דלוקה לכל לקוח ובכל טאב (ויטלי, 21.9). קודם היא הייתה קשורה
+  // ל-vrShell, שכבוי ל-KLOSS ולאריקה, ולכן אצלם שורת הטאבים התחלפה בין העיצוב החדש
+  // לישן לפי הטאב הפעיל — חדש ב"הכל"/Facebook/Google, ישן ב-CRM וב"ישיבות שיווק".
+  const vrChrome = view === 'dashboard' && !isDemoProject
+  // vrShell — נשאר כפי שהיה: הוא מגדיר את מסכי ה-CRM המעוצבים של BMBY בלבד
+  // (vrCrm/vrResp/vrObj/vrCity/vrMeet למטה), שאינם קיימים ל-Zoho ול-Salesforce.
+  const vrShell = vrChrome && !_vrOwnCrm
   // טאבי המדיה ("הכל", Facebook, Google) זהים בין כל הלקוחות — אותם כרטיסים, אותה טבלת
   // קמפיינים, אותם פילוחים וגלריות. לכן הם מקבלים את העיצוב המחודש גם ב-KLOSS וב-אריקה
   // (ויטלי, 20.9), בעוד שטאב ה-CRM נשאר לפי מבנה ה-CRM של כל לקוח.
@@ -2459,18 +2470,23 @@ const selectProject = async (client, project) => {
       const channel = _noChannelSplit ? 'all' : (channelOverride || funnelChannel);
 
       const mediaRows = channel === 'facebook' ? fbR : channel === 'google' ? gR : [...fbR, ...gR];
-      let hasMedia = false, impr = 0, clk = 0;
+      let hasMedia = false, impr = 0, clk = 0, mediaSpend = 0;
       for (const r of mediaRows) {
         const sm = r.summary || {};
         if (sm.impressions != null || sm.clicks != null) hasMedia = true;
         impr += Number(sm.impressions) || 0;
         clk += Number(sm.clicks) || 0;
+        mediaSpend += Number(sm.spend) || 0;
       }
+      // CPM מוצג מתחת ל"חשיפות" (ויטלי, 21.9). זו עלות אלף חשיפות בתקופה — אותה
+      // הוצאה ואותן חשיפות שמוצגות בכרטיסים, בלי חישוב חדש.
+      const _cpm = (hasMedia && impr > 0) ? (mediaSpend / impr) * 1000 : null;
+      const _cpmLabel = _cpm != null ? ('CPM ' + formatCurrency(_cpm)) : '';
       let chF = fbR.length > 0, chG = gR.length > 0;
 
       // שתי תחנות הפתיחה משותפות לכל ה-CRM.
       const AD_STAGES = [
-        { key: 'impr',  label: 'חשיפות',          of: null,   ofLabel: 'ראש המשפך' },
+        { key: 'impr',  label: 'חשיפות',          of: null,   ofLabel: _cpmLabel || 'ראש המשפך' },
         { key: 'click', label: 'קליקים על קישור', of: 'impr', ofLabel: 'מהחשיפות' },
       ];
       const AD_V = { impr: hasMedia ? impr : null, click: hasMedia ? clk : null };
@@ -2540,9 +2556,13 @@ const selectProject = async (client, project) => {
         scopeNote = 'לידים שנכנסו בתקופה. ' + MEDIA_NOTE
           + ' "עברו להזדמנות" ו"רכשו" נמדדים שניהם מהלידים; "ביטולים" נמדד מהרכישות.';
         cohortCfg = {
-          stageKeys: ['lead', 'zOpp', 'zBuy'],
+          // ויטלי (21.9): למשפך של אריקה יש פחות תחנות מזה של ש.ברוך, ולכן שתי תחנות
+          // המדיה בכרטיסים הקטנים שמעל נראו מנותקות. כאן הן נכנסות לאותה שורה עם שאר
+          // התחנות, ו"ביטולים" נשאר ענף מתחת ל"רכשו".
+          inlineMedia: true,
+          stageKeys: ['impr', 'click', 'lead', 'zOpp', 'zBuy'],
           leak: { key: 'zCanc', parentStageId: 'zBuy', denomNoun: 'רכישות' },
-          transitionNote: 'אחוזי המעבר מוצגים מהלידים; הביטולים נמדדים מהרכישות.',
+          transitionNote: 'אחוזי המעבר מוצגים מהשלב הקודם, למעט "רכשו" שנמדד מהלידים; הביטולים נמדדים מהרכישות.',
         };
       } else {
         const _nlRoot = crmR[0]?.summary?.namedLeads || null;
@@ -2565,8 +2585,11 @@ const selectProject = async (client, project) => {
           ...AD_STAGES,
           { key: 'lead',  label: 'לידים',            of: 'click', ofLabel: 'מהקליקים' },
           { key: 'cont',  label: 'נוצר קשר',         of: 'lead',  ofLabel: 'מהלידים' },
-          { key: 'sched', label: 'פגישה נקבעה',      of: 'cont',  ofLabel: 'מנוצר קשר' },
-          { key: 'held',  label: 'פגישות שהגיעו',    of: 'sched', ofLabel: 'מהפגישות שנקבעו' },
+          // ויטלי (21.9): שתי התחנות האלה נמדדות מסך הלידים ולא מהתחנה שלפניהן. "פגישה
+          // נקבעה מתוך נוצר קשר" הוא יחס פנימי של צוות המכירות; מה שמעניין הוא כמה
+          // מכלל הלידים הגיעו לפגישה בפועל.
+          { key: 'sched', label: 'פגישה נקבעה',      of: 'lead',  ofLabel: 'מהלידים' },
+          { key: 'held',  label: 'פגישות שהגיעו',    of: 'lead',  ofLabel: 'מהלידים' },
           { key: 'canc',  label: 'פגישות שהתבטלו',   of: 'sched', ofLabel: 'מהפגישות שנקבעו', leak: true },
           { key: 'reg',   label: 'הרשמות',           of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
           { key: 'deal',  label: 'חוזים',            of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
@@ -2610,13 +2633,13 @@ const selectProject = async (client, project) => {
         if (!cohortCfg) return null;
         const byKey = Object.fromEntries(rows.map(r => [r.key, r]));
         const denomLabel = (r) => r.denom != null ? `מתוך ${formatNum(r.denom)} ${r.ofLabel.replace(/^מ/, '')}` : r.ofLabel;
-        const STAGE_ICON = { lead: Users, cont: Phone, sched: CalendarCheck, held: UserCheck, reg: FileText, deal: FileSignature, zOpp: Handshake, zBuy: CheckCircle2 };
-        const STAGE_TONE = { lead: 'indigo', cont: 'emerald', sched: 'sky', held: 'indigo', reg: 'emerald', deal: 'rose', zOpp: 'sky', zBuy: 'emerald' };
+        const STAGE_ICON = { lead: Users, cont: Phone, sched: CalendarCheck, held: UserCheck, reg: FileText, deal: FileSignature, zOpp: Handshake, zBuy: CheckCircle2, impr: Eye, click: MousePointerClick };
+        const STAGE_TONE = { lead: 'indigo', cont: 'emerald', sched: 'sky', held: 'indigo', reg: 'emerald', deal: 'rose', zOpp: 'sky', zBuy: 'emerald', impr: 'violet', click: 'violet' };
         const stage = (k) => { const r = byKey[k]; return { id: k, label: r.label, icon: STAGE_ICON[k], tone: STAGE_TONE[k], value: r.value == null ? null : formatNum(r.value),
-          rate: (r.value != null && r.of && r.pct != null) ? fmtPct(r.pct) : null, denominatorLabel: r.of ? denomLabel(r) : '', smallSample: !!(r.value != null && r.weak) }; };
+          rate: (r.value != null && r.of && r.pct != null) ? fmtPct(r.pct) : null, denominatorLabel: r.of ? denomLabel(r) : (r.ofLabel === 'ראש המשפך' ? '' : (r.ofLabel || '')), smallSample: !!(r.value != null && r.weak) }; };
         const canc = cohortCfg.leak ? byKey[cohortCfg.leak.key] : null;
         const model = {
-          advertising: ['impr', 'click'].map(k => ({ id: k, label: byKey[k].label, value: byKey[k].value == null ? null : formatNum(byKey[k].value) })),
+          advertising: cohortCfg.inlineMedia ? [] : ['impr', 'click'].map(k => ({ id: k, label: byKey[k].label, value: byKey[k].value == null ? null : formatNum(byKey[k].value) })),
           stages: cohortCfg.stageKeys.map(stage),
           cancellation: canc ? { parentStageId: cohortCfg.leak.parentStageId, value: canc.value == null ? null : formatNum(canc.value), denominatorLabel: canc.denom != null ? `מתוך ${formatNum(canc.denom)} ${cohortCfg.leak.denomNoun}` : '' } : null,
           transitionNote: cohortCfg.transitionNote,
@@ -2650,7 +2673,7 @@ const selectProject = async (client, project) => {
           id: r.key, label: r.label, tone: VR_TONE[r.key], icon: VR_ICON[r.key],
           value: r.value == null ? null : formatNum(r.value),
           rate: (r.value != null && r.of) ? ((r.weak && r.pct != null ? '~' : '') + fmtPct(r.pct)) : null,
-          denominatorLabel: r.of ? (r.ofLabel + (r.denom != null ? ' (' + formatNum(r.denom) + ')' : '')) : '',
+          denominatorLabel: r.of ? (r.ofLabel + (r.denom != null ? ' (' + formatNum(r.denom) + ')' : '')) : (r.ofLabel === 'ראש המשפך' ? '' : (r.ofLabel || '')),
         }));
         const notes = [scopeNote];
         if (anyWeak) notes.push('~ אחוז על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו.');
@@ -3056,6 +3079,9 @@ const selectProject = async (client, project) => {
             <table className="data-table">
               <thead><tr>
                 <th>{'\u05de\u05e7\u05d5\u05e8'}</th>
+                {/* אייקון המקור בעמודה משלו (ויטלי, 21.9) — קודם הוא ישב בתוך תא השם
+                    ודחף את הטקסט, ובשורות הבן הוא לא הופיע כלל. */}
+                <th>{'\u05e1\u05d5\u05d2'}</th>
                 <th>{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</th>
                 <th>{'\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</th>
                 <th>{'\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</th>
@@ -3079,12 +3105,12 @@ const selectProject = async (client, project) => {
                   const toggle = () => setExpandedCrmSources(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; });
                   return (<Fragment key={name}>
                     <tr style={hasChildren ? {cursor:'pointer'} : undefined} onClick={hasChildren ? toggle : undefined}>
-                      <td style={{fontWeight:600,whiteSpace:'nowrap'}}>
+                      <td dir="rtl" style={{fontWeight:600,whiteSpace:'nowrap',textAlign:'start'}}>
                         {hasChildren && <span style={{display:'inline-block',width:'18px',color:'var(--accent)',userSelect:'none'}}>{vrCrm ? (isOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />) : (isOpen ? '▼' : '◀')}</span>}
-                        {vrCrm && <SourceMark name={name} />}
-                        {name}
-                        {hasChildren && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginRight:'6px'}}>({children.length})</span>}
+                        <bdi>{name}</bdi>
+                        {hasChildren && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginInlineStart:'6px'}}>({children.length})</span>}
                       </td>
+                      <td><SourceMark name={name} /></td>
                       <td style={(d.leads && d.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(d.leads && d.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: name, leads: d.leads}); } : undefined}>{formatNum(d.totalLeads)}</td>
                       <td>{formatNum(d.relevantLeads)}</td>
                       <td>{formatNum(d.irrelevantLeads)}</td>
@@ -3103,7 +3129,10 @@ const selectProject = async (client, project) => {
                       const cComp  = ch.totalLeads > 0 ? (ch.meetingsCompleted / ch.totalLeads * 100).toFixed(1) : '0.0';
                       return (
                         <tr key={`${name}::${ch.name}`} style={{background:'var(--bg-secondary)',fontSize:'0.92em'}}>
-                          <td style={{paddingRight:'42px',color:'#475569',unicodeBidi:'plaintext'}}>{ch.name}</td>
+                          {/* dir=rtl על התא + bdi סביב השם: קודם התא כולו היה unicodeBidi:'plaintext',
+                              ולכן שם קמפיין שמתחיל באנגלית הפך את כל השורה לשמאל-ימין. */}
+                          <td dir="rtl" style={{paddingInlineStart:'42px',color:'#475569',textAlign:'start',whiteSpace:'normal'}}><bdi>{ch.name}</bdi></td>
+                          <td><SourceMark name={name} /></td>
                           <td style={(ch.leads && ch.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(ch.leads && ch.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: ch.name, leads: ch.leads}); } : undefined}>{formatNum(ch.totalLeads)}</td>
                           <td>{formatNum(ch.relevantLeads)}</td>
                           <td>{formatNum(ch.irrelevantLeads)}</td>
@@ -3122,6 +3151,7 @@ const selectProject = async (client, project) => {
                 })}
                 <tr style={{fontWeight:700,background:'var(--bg-secondary)'}}>
                   <td>{'\u05e1\u05d4"\u05db'}</td>
+                  <td />
                   <td>{formatNum(ct.totalLeads)}</td>
                   <td>{formatNum(ct.relevantLeads)}</td>
                   <td>{formatNum(ct.irrelevantLeads)}</td>
@@ -3349,7 +3379,11 @@ const selectProject = async (client, project) => {
       }
     }
 
-    const allMonths = [...new Set(reports.map(r => r.month))].sort();
+    // ⚠️ רק מפתחות של חודש מלא ("2026-09"). `reports` מחזיק גם דוחות של טווחי
+    // תאריכים מותאמים, שהמפתח שלהם הוא "2026-09-01_2026-09-15" — והם נכנסו לכאן
+    // ומוינו לקסיקוגרפית בין החודשים. התוצאה: גרף המגמה הקטן שבכרטיסים ערבב חודשים
+    // שלמים עם חלונות חלקיים, ונקודה שנראתה כמו "חודש חלש" הייתה בעצם טווח של יומיים.
+    const allMonths = [...new Set(reports.map(r => r.month))].filter(m => /^\d{4}-\d{2}$/.test(m || '')).sort();
     // Built from per-report `summary` (not heavy `data`) so sparklines work under lazy-loading.
     const trendData = allMonths.map(m => {
       let leads = 0, spend = 0;
@@ -3391,7 +3425,11 @@ const selectProject = async (client, project) => {
       const v2cls = v2Color[color] || 'indigo';
       // sparkline: extract this metric's values from trendData
       const metricKey = label === 'לידים' ? 'leads' : label === 'תקציב' ? 'spend' : label === 'עלות לליד' ? 'cpl' : label === 'פגישות שתואמו' ? 'meetingsScheduled' : label === 'פגישות שבוצעו' ? 'meetingsCompleted' : label === 'הרשמות' ? 'registrations' : label === 'חוזים' ? 'contracts' : null;
+      // הגרף הקטן שבכרטיס אינו קישוט: הוא הערך של אותו מדד בכל אחד מהחודשים המלאים
+      // שנטענו לפרויקט, לפי הסדר. מוצג רק למדדים שיש להם סדרה אמיתית (שבעה כרגע);
+      // לשאר הכרטיסים אין גרף, ולכן היעדרו הוא מידע ולא חוסר עקביות.
       const sparkVals = metricKey && trendData.length >= 2 ? trendData.map(d => d[metricKey] || 0) : null;
+      const sparkTitle = sparkVals ? (label + ' לאורך ' + trendData.length + ' חודשים: ' + trendData.map(d => d.month).join(', ')) : undefined;
       const trendPct = ch ? (ch.pct > 0 ? '+' : '') + Math.abs(ch.pct).toFixed(0) + '%' : null;
       const _hasNames = namesArr && namesArr.length > 0;
       // גם טאב ה-CRM של אריקה מקבל את הכרטיס המשותף — אותם ערכים, אותה תגית שינוי.
@@ -3410,7 +3448,7 @@ const selectProject = async (client, project) => {
         return (
           <MetricCard key={label} label={label === 'תקציב' ? 'תקציב שנוצל' : label} value={value} tone={v2cls} icon={VR_ICON[label]}
             description={subNote || undefined} badge={badge}
-            trend={sparkVals ? <Sparkline values={sparkVals} /> : null}
+            trend={sparkVals ? <span title={sparkTitle}><Sparkline values={sparkVals} /></span> : null}
             onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} />
         );
       }
@@ -3442,7 +3480,7 @@ const selectProject = async (client, project) => {
           <div className="kpi-label">{label}</div>
           <div className="kpi-value">{value}</div>
           {subNote ? <div style={{fontSize:'0.74em',color:'rgba(255,255,255,0.92)',marginTop:2,fontWeight:700,whiteSpace:'nowrap'}}>{subNote}</div> : null}
-          {sparkVals ? <Sparkline values={sparkVals} /> : <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>}
+          {sparkVals ? <span title={sparkTitle}><Sparkline values={sparkVals} /></span> : <div className="kpi-spark" style={{height:28,marginTop:'auto'}}/>}
         </div>
       );
     };
@@ -3516,7 +3554,7 @@ const selectProject = async (client, project) => {
       const extremes = {};
       cols.forEach(c => { if (c.key === 'name' || c.key === 'spend') return; const vals = entries.map(([n,d]) => c.get(d,n)).filter(v => typeof v === 'number' && v > 0); if (vals.length < 2) return; extremes[c.key] = {min: Math.min(...vals), max: Math.max(...vals)}; });
       const cellBg = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return {}; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return {}; if (val === e.max) return col.higher ? {color:'#059669',fontWeight:800} : {color:'#dc2626',fontWeight:800}; if (val === e.min) return col.higher ? {color:'#dc2626',fontWeight:800} : {color:'#059669',fontWeight:800}; return {}; };
-      return (<><div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map(c=>(<th key={c.key} style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}><td style={{fontWeight: 600}}>{source ? <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'20px',height:'20px',borderRadius:'5px',background:source==='google'?'var(--rose-50)':'var(--sky-50)',color:source==='google'?'var(--rose)':'var(--sky)',fontWeight:800,fontSize:'11px',marginLeft:'6px',flexShrink:0}}>{source==='google'?'G':'F'}</span> : null}{name}{source ? <span className={`platform-tag${source==='google'?' google':''}`} style={{marginRight:'8px'}}>{source==='google'?'GOOGLE':'FACEBOOK'}</span> : null}</td><td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{formatNum(Math.round(d.leads))} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>
+      return (<><div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map((c,ci)=>(<Fragment key={c.key}><th style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>{ci===0 && source ? <th style={{whiteSpace:'nowrap'}}>{'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4'}</th> : null}</Fragment>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}>{/* שם הקמפיין בתא RTL עם bdi, והפלטפורמה בעמודה משלה (ויטלי, 21.9) */}<td dir="rtl" style={{fontWeight: 600, textAlign:'start', whiteSpace:'normal'}}><bdi>{name}</bdi></td>{source ? <td style={{whiteSpace:'nowrap'}}>{vrAds ? <span className={`vr-platform ${source==='google'?'google':'meta'}`}>{source==='google' ? <GoogleMark size={14} /> : <MetaMark size={16} />}{source==='google'?'Google':'Meta'}</span> : <span className={`platform-tag${source==='google'?' google':''}`}>{source==='google'?'GOOGLE':'FACEBOOK'}</span>}</td> : null}<td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{formatNum(Math.round(d.leads))} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>
           <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div></>);
     };
 
@@ -3524,7 +3562,14 @@ const selectProject = async (client, project) => {
     pendingChartsRef.current.push(setTimeout(() => {
       destroyCharts();
       // monthly trend charts removed
-      const campNames2 = Object.keys(data.campaigns);
+      // ⚠️ הגרפים הציגו כל קמפיין שקיים בנתונים, כולל עשרות קמפיינים משנים קודמות
+      // שנשארו עם חשיפה בודדת ובלי שקל הוצאה (ויטלי, 21.9). המקרא התארך על פני חצי
+      // מסך והציר היה שורה אחת של אפסים. עכשיו הגרפים מסננים בדיוק כמו הטבלה שמתחת:
+      // רק קמפיין שהוציא כסף בתקופה, ממוין מהגדול לקטן. הטבלה מסננת רחב יותר (גם
+      // חשיפות או קליקים בלבד) כי שם שורה נוספת לא שוברת את התצוגה.
+      const campNames2 = Object.keys(data.campaigns)
+        .filter(n => (data.campaigns[n].spend || 0) > 0)
+        .sort((a, b) => (data.campaigns[b].spend || 0) - (data.campaigns[a].spend || 0));
       if (campNames2.length > 0) {
         createChart('campSpend', 'doughnut', campNames2, [{ data: campNames2.map(n => data.campaigns[n].spend), backgroundColor: COLORS.slice(0, campNames2.length) }]);
         createChart('campLeads', 'bar', campNames2, [
@@ -3628,7 +3673,9 @@ const selectProject = async (client, project) => {
             {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
             {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
             {meetingsOn && <button className={`client-tab ${dashTab === 'meetings' ? 'active' : ''}`} onClick={() => setDashTab('meetings')}>ישיבות שיווק</button>}
-            {hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
+            {/* "המלצות חכמות" מוסתר לכל הלקוחות עד שנשפר אותו (ויטלי, 21.9). הקוד של
+                הטאב נשאר במקומו — רק הכניסה אליו חסומה, כדי שהחזרה תהיה שינוי של שורה. */}
+            {RECOMMENDATIONS_TAB_ON && hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
         </div>
 
         {dashTab === 'meetings' ? (
@@ -4994,7 +5041,7 @@ const selectProject = async (client, project) => {
                   </div>
                   <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th scope="col">ערוץ</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">רכשו</th><th scope="col">אחוז המרה</th><th scope="col">שווי נטו</th><th scope="col" title="בשורות: Facebook בלבד. בשורת הסיכום: Facebook + Google">תקציב</th><th scope="col" title="בשורות: מול תקציב Facebook. בשורת הסיכום: מול התקציב הכולל">ROAS</th></tr></thead>
+                      <thead><tr><th scope="col">ערוץ</th><th scope="col">סוג</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">רכשו</th><th scope="col">אחוז המרה</th><th scope="col">שווי נטו</th><th scope="col" title="בשורות: Facebook בלבד. בשורת הסיכום: Facebook + Google">תקציב</th><th scope="col" title="בשורות: מול תקציב Facebook. בשורת הסיכום: מול התקציב הכולל">ROAS</th></tr></thead>
                       <tbody>
                         {(() => {
                           const out = [];
@@ -5004,6 +5051,7 @@ const selectProject = async (client, project) => {
                             out.push(
                               <tr key={c.channel} className={'vr-erika-lvl0' + (chOpen ? ' vr-erika-open' : '')} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
                                 <td style={{fontWeight:600}}>{_twist(camps.length > 0, chOpen, 'הערוץ ' + c.channel, () => toggleFunnelCh(c.channel))}{_lvlTag('ערוץ')}<bdi>{c.channel}</bdi></td>
+                                <td><SourceMark name={c.channel} /></td>
                                 <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>{_fbCell(_isFb(c.channel) ? _fbTotalSpend : null)}{_roasCell(c.netRevenue, _isFb(c.channel) ? _fbTotalSpend : null)}
                               </tr>
                             );
@@ -5015,6 +5063,7 @@ const selectProject = async (client, project) => {
                               out.push(
                                 <tr key={campKey} className={'vr-erika-lvl1' + (cmOpen ? ' vr-erika-open' : '')} style={{cursor: adSets.length ? 'pointer' : 'default'}} onClick={adSets.length ? () => toggleFunnelCamp(campKey) : undefined}>
                                   <td className="vr-erika-name" style={{paddingInlineStart:26,fontSize:'0.9em'}}>{_twist(adSets.length > 0, cmOpen, 'הקמפיין ' + _campLabel(cm.campaign), () => toggleFunnelCamp(campKey))}{_lvlTag('קמפיין')}<bdi>{_campLabel(cm.campaign)}</bdi></td>
+                                  <td><SourceMark name={c.channel} size={14} /></td>
                                   <td style={{fontSize:'0.9em'}}>{formatNum(cm.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(cm.purchased)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(cm.conversionRate||0)+'%'}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(cm.netRevenue||0)}</td>{_fbCell(_spCamp(c.channel, cm.campaign), '0.9em')}{_roasCell(cm.netRevenue, _spCamp(c.channel, cm.campaign), '0.9em')}
                                 </tr>
                               );
@@ -5026,6 +5075,7 @@ const selectProject = async (client, project) => {
                                 out.push(
                                   <tr key={astKey} className={'vr-erika-lvl2' + (asOpen ? ' vr-erika-open' : '')} style={{cursor: ads.length ? 'pointer' : 'default'}} onClick={ads.length ? () => toggleFunnelAst(astKey) : undefined}>
                                     <td className="vr-erika-name" style={{paddingInlineStart:46,fontSize:'0.85em',color:'#475569'}}>{_twist(ads.length > 0, asOpen, as.adset, () => toggleFunnelAst(astKey))}{_lvlTag(_isG(c.channel) ? 'מילת חיפוש (UTM Term)' : 'קבוצת מודעות')}<bdi>{as.adset}</bdi></td>
+                                    <td><SourceMark name={c.channel} size={14} /></td>
                                     <td style={{fontSize:'0.85em'}}>{formatNum(as.leads)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.opportunities)}</td><td style={{fontSize:'0.85em'}}>{formatNum(as.purchased)}</td><td style={{fontSize:'0.85em',color:'var(--violet)'}}>{(as.conversionRate||0)+'%'}</td><td style={{fontSize:'0.85em'}}>{formatCurrency(as.netRevenue||0)}</td>{_fbCell(_spAdset(c.channel, cm.campaign, as.adset), '0.85em')}{_roasCell(as.netRevenue, _spAdset(c.channel, cm.campaign, as.adset), '0.85em')}
                                   </tr>
                                 );
@@ -5034,6 +5084,7 @@ const selectProject = async (client, project) => {
                                   out.push(
                                     <tr key={astKey+'|'+ad.ad} className="vr-erika-lvl3">
                                       <td className="vr-erika-name" style={{paddingInlineStart:66,fontSize:'0.8em',color:'#64748b'}}><span className="vr-erika-twist-empty" aria-hidden="true" />{_lvlTag('מודעה')}<bdi>{_resolveAd(c.channel, ad.ad)}</bdi></td>
+                                      <td><SourceMark name={c.channel} size={14} /></td>
                                       <td style={{fontSize:'0.8em'}}>{formatNum(ad.leads)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.opportunities)}</td><td style={{fontSize:'0.8em'}}>{formatNum(ad.purchased)}</td><td style={{fontSize:'0.8em',color:'var(--violet)'}}>{(ad.conversionRate||0)+'%'}</td><td style={{fontSize:'0.8em'}}>{formatCurrency(ad.netRevenue||0)}</td>{_fbCell(_spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}{_roasCell(ad.netRevenue, _spAd(c.channel, cm.campaign, as.adset, ad.ad), '0.8em')}
                                     </tr>
                                   );
@@ -5047,6 +5098,7 @@ const selectProject = async (client, project) => {
                       <tfoot>
                         <tr style={{fontWeight:700, borderTop:'2px solid rgba(99,102,241,0.35)', background:'rgba(99,102,241,0.06)'}}>
                           <td style={{fontWeight:700}}>סה"כ</td>
+                          <td />
                           <td style={{fontWeight:700}}>{formatNum(_fn.leads||0)}</td>
                           <td style={{fontWeight:700}}>{formatNum(_fn.opportunities||0)}</td>
                           <td style={{fontWeight:700}}>{formatNum(_fn.purchased||0)}</td>
@@ -5079,7 +5131,7 @@ const selectProject = async (client, project) => {
                   </div>
                   <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th>נציג</th><th>לידים</th><th>הזדמנויות</th><th>מכירות</th><th>שווי מכירות</th><th>אחוז המרה</th></tr></thead>
+                      <thead><tr><th scope="col">נציג</th><th scope="col">מקור</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">מכירות</th><th scope="col">שווי מכירות</th><th scope="col">אחוז המרה</th></tr></thead>
                       <tbody>
                         {_agents.map(ag => {
                           const srcs = ag.bySource || [];
@@ -5087,12 +5139,14 @@ const selectProject = async (client, project) => {
                           const rows = [
                             <tr key={ag.agent} className={'vr-erika-lvl0' + (isOpen ? ' vr-erika-open' : '')} style={{fontWeight:600, cursor: srcs.length ? 'pointer' : 'default'}} onClick={srcs.length ? () => toggleAgent(ag.agent) : undefined}>
                               <td style={{fontWeight:600}}>{_twist(srcs.length > 0, isOpen, 'הנציג ' + ag.agent, () => toggleAgent(ag.agent))}<bdi>{ag.agent}</bdi></td>
+                              <td />
                               <td>{formatNum(ag.leads)}</td><td>{formatNum(ag.opportunities)}</td><td>{formatNum(ag.purchased)}</td><td>{formatCurrency(ag.netRevenue||0)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(ag.conversionRate||0)+'%'}</td>
                             </tr>
                           ];
                           if (isOpen) srcs.forEach(sr => rows.push(
                             <tr key={ag.agent+'|'+sr.source} className="vr-erika-lvl1">
                               <td className="vr-erika-name" style={{paddingInlineStart:26,fontSize:'0.9em'}}><span className="vr-erika-twist-empty" aria-hidden="true" />{_lvlTag('מקור ליד')}<bdi>{sr.source}</bdi></td>
+                              <td><SourceMark name={sr.source} size={14} /></td>
                               <td style={{fontSize:'0.9em'}}>{formatNum(sr.leads)}</td><td style={{fontSize:'0.9em'}}>{formatNum(sr.opportunities)}</td><td style={{fontSize:'0.9em'}}>{formatNum(sr.purchased)}</td><td style={{fontSize:'0.9em'}}>{formatCurrency(sr.netRevenue||0)}</td><td style={{fontSize:'0.9em',color:'var(--violet)'}}>{(sr.conversionRate||0)+'%'}</td>
                             </tr>
                           ));
@@ -5533,7 +5587,9 @@ const selectProject = async (client, project) => {
                     ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
                     : <span className={`platform-tag${data.source.includes('google')?' google':''}`}>{data.source.includes('google')?'GOOGLE':'FACEBOOK'}</span>) : <span style={{color:'#cbd5e1'}}>-</span>}
                 </td>
-                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; if (vrAds) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status none">-</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{color:'#cbd5e1'}}>-</span>; })()}</td>
+                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; // סטטוס ריק פירושו קמפיין שאינו פעיל — עד היום הוא הוצג כמקף אפור ונקרא כמו
+                  // "אין נתון". עכשיו "מכובה" באדום (ויטלי, 21.9).
+                  if (vrAds) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status off"><i aria-hidden="true" />מכובה</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{background:'rgba(226,75,74,0.12)',color:'#c0322f',borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>מכובה</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
                 <td style={{fontSize}}>{formatNum(data.impressions)}</td>
                 <td style={{fontSize}}>{formatCurrency(cpc)}</td>
@@ -5843,6 +5899,10 @@ const selectProject = async (client, project) => {
           reports.filter(r => r.source && r.source.startsWith('google') && /^\d{4}-\d{2}$/.test(r.month || ''))
             .sort((a, b) => (String(a.month) < String(b.month) ? 1 : -1))
             .forEach(r => (r.summary?.assetGroups || []).forEach(g => { if (g && g.id != null && !(g.id in _agCur)) _agCur[g.id] = g.status; }));
+          // ⚠️ הסטטוס שמוצג הוא הסטטוס החי האחרון שנמשך לקבוצה הזו, לא הסטטוס שהיה
+          // בתקופה הנבחרת. לכן "פעיל" כאן פירושו "פעילה עכשיו", וזה מה שוויטלי ביקש
+          // לוודא (21.9): קבוצה שכבויה היום תסומן "מושהה" גם אם הוציאה כסף בתקופה.
+          // כשאין סטטוס כלל — לא ממציאים "פעיל", אלא אומרים שאינו ידוע.
           const _agStatusOf = (g) => (g && g.id != null && _agCur[g.id]) ? _agCur[g.id] : (g.status || '');
           // Show ONLY asset groups that spent money this period (matches Google Ads' "spent this month"
           // view) + dedupe by id (the same group can appear across google/google_pmax reports).
@@ -5892,26 +5952,41 @@ const selectProject = async (client, project) => {
                         <div style={{width:'100%',aspectRatio:'16/9',background:'linear-gradient(135deg,#dbeafe,#cffafe)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5em',color:'#64748b'}}>{'\ud83c\udfaf'}</div>
                       )}
                       <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'10px'}}>
-                        {(() => { const agSt = _agStatusOf(ag); const isAgA = agSt === 'ENABLED'; const isAgP = agSt === 'PAUSED'; const agC = isAgA ? '#059669' : isAgP ? '#d97706' : '#64748b'; const agL = isAgA ? 'פעיל' : isAgP ? 'מושהה' : agSt || 'לא ידוע'; return <div style={{fontSize:'0.75em',color:agC,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{'\u25cf'} {agL}</div>; })()}
+                        {(() => {
+                          const agSt = _agStatusOf(ag);
+                          const isAgA = agSt === 'ENABLED';
+                          const isAgP = agSt === 'PAUSED';
+                          const isOff = agSt === 'REMOVED' || agSt === 'DELETED' || agSt === 'ARCHIVED';
+                          // קבוצה כבויה שכן הוציאה כסף בתקופה מקבלת הבהרה, כדי שלא ייראה
+                          // סותר: "מושהה" ליד הוצאה של ₪475 זה בדיוק המצב שוויטלי תיאר.
+                          const spentInPeriod = (ag.spend || 0) > 0;
+                          const agC = isAgA ? '#059669' : isAgP ? '#d97706' : isOff ? '#c0322f' : '#64748b';
+                          const agL = isAgA ? 'פעיל' : isAgP ? 'מושהה' : isOff ? 'הוסרה' : agSt ? agSt : 'סטטוס לא ידוע';
+                          const note = (!isAgA && spentInPeriod) ? ' · הוציאה בתקופה' : '';
+                          return <div style={{fontSize:'0.75em',color:agC,fontWeight:700,letterSpacing:'0.04em'}}>{'\u25cf'} {agL}{note}</div>;
+                        })()}
                         <div style={{fontWeight:700,fontSize:'1em',color:'#0f172a'}}>{ag.name}</div>
                         <div style={{fontSize:'0.72em',color:'#94a3b8',unicodeBidi:'plaintext'}}>{'\ud83d\udcca'} {ag.campaign || '-'}</div>
                         {/* כל הכותרות והתיאורים, לא רק החמש/שלוש הראשונות (ויטלי, 20.9).
                             הרשימה נגללת בתוך הקארד כדי שהגובה לא יתפוצץ. */}
+                        {/* הטקסטים מקופלים כברירת מחדל (ויטלי, 21.9): 18 כותרות ו-5 תיאורים
+                            פרושים הפכו את הכרטיס לגבוה פי שלושה מהתמונה שמעליו. שום נכס
+                            לא הוסר — רק נדרשת לחיצה אחת כדי לפרוש אותו. */}
                         {headlines.length > 0 && (
-                          <div>
-                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05db\u05d5\u05ea\u05e8\u05d5\u05ea'} ({headlines.length})</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'150px',overflowY:'auto'}}>
+                          <details className="vr-ag-fold">
+                            <summary>{'\u05db\u05d5\u05ea\u05e8\u05d5\u05ea'} ({headlines.length})</summary>
+                            <div className="vr-ag-list">
                               {headlines.map((h,j) => <div key={j} style={{fontSize:'0.82em',color:'#334155',unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{h.text}</div>)}
                             </div>
-                          </div>
+                          </details>
                         )}
                         {descriptions.length > 0 && (
-                          <div>
-                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05ea\u05d9\u05d0\u05d5\u05e8\u05d9\u05dd'} ({descriptions.length})</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'150px',overflowY:'auto'}}>
+                          <details className="vr-ag-fold">
+                            <summary>{'\u05ea\u05d9\u05d0\u05d5\u05e8\u05d9\u05dd'} ({descriptions.length})</summary>
+                            <div className="vr-ag-list">
                               {descriptions.map((d,j) => <div key={j} style={{fontSize:'0.8em',color:'#475569',lineHeight:1.4,unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{d.text}</div>)}
                             </div>
-                          </div>
+                          </details>
                         )}
                         {/* Metrics row */}
                         {(metrics.spend > 0 || metrics.leads > 0) && (
@@ -5923,34 +5998,42 @@ const selectProject = async (client, project) => {
                         )}
                         {/* כל התמונות, לא ארבע (ויטלי, 20.9). לחיצה פותחת את הקובץ המלא
                             בלשונית חדשה — הנכס יושב ב-CDN של גוגל ואין לנו גרסה גדולה יותר בדף. */}
-                        {images.length > 1 && (
-                          <div>
-                            <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05ea\u05de\u05d5\u05e0\u05d5\u05ea'} ({images.length})</div>
-                            <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-                              {images.slice(1).map((img,j) => (
-                                <a key={j} href={imgUrl(img)} target="_blank" rel="noopener noreferrer" title={'\u05e4\u05ea\u05d9\u05d7\u05ea \u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05d1\u05d2\u05d5\u05d3\u05dc \u05de\u05dc\u05d0'}>
-                                  <img src={imgUrl(img)} alt="" loading="lazy" style={{width:'52px',height:'52px',objectFit:'cover',borderRadius:'6px',border:'1px solid #e2e8f0',display:'block'}} onError={(e)=>{e.target.style.display='none'}} />
-                                </a>
-                              ))}
+                        {images.length > 1 && (() => {
+                          // שמונה ממוזערות גלויות, והשאר מאחורי קיפול אחד. כל התמונות
+                          // נשארות נגישות; רק הגובה הפסיק לגדול לינארית עם מספרן.
+                          const _shown = images.slice(1), _head = _shown.slice(0, 8), _rest = _shown.slice(8);
+                          const thumb = (img, j) => (
+                            <a key={j} href={imgUrl(img)} target="_blank" rel="noopener noreferrer" title={'\u05e4\u05ea\u05d9\u05d7\u05ea \u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05d1\u05d2\u05d5\u05d3\u05dc \u05de\u05dc\u05d0'}>
+                              <img src={imgUrl(img)} alt="" loading="lazy" style={{width:'48px',height:'48px',objectFit:'cover',borderRadius:'6px',border:'1px solid #e2e8f0',display:'block'}} onError={(e)=>{e.target.style.display='none'}} />
+                            </a>
+                          );
+                          return (
+                            <div>
+                              <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05ea\u05de\u05d5\u05e0\u05d5\u05ea'} ({images.length})</div>
+                              <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>{_head.map(thumb)}</div>
+                              {_rest.length > 0 && (
+                                <details className="vr-ag-fold">
+                                  <summary>{'\u05e2\u05d5\u05d3 ' + _rest.length + ' \u05ea\u05de\u05d5\u05e0\u05d5\u05ea'}</summary>
+                                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginTop:'6px'}}>{_rest.map(thumb)}</div>
+                                </details>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                         {/* סרטונים: עד היום הוצג רק מספרם. עכשיו תמונה ממוזערת מ-YouTube,
                             ולחיצה על "נגן כאן" פורשת נגן מוטמע בתוך הקארד. */}
                         {videos.length > 0 && (
                           <div>
                             <div style={{fontSize:'0.72em',color:'#64748b',fontWeight:600,marginBottom:'4px'}}>{'\u05e1\u05e8\u05d8\u05d5\u05e0\u05d9\u05dd'} ({videos.length})</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                            {/* שורת תמונות ממוזערות במקום נגן מתחת לנגן: שישה סרטונים
+                                בטור הוסיפו כ-900px לכרטיס. לחיצה פותחת את הסרטון ב-YouTube. */}
+                            <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
                               {videos.map((v,j) => { const vid = v.youtube_id || v.youtubeId; return (
-                                <details key={j}>
-                                  <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:'8px'}}>
-                                    <img src={`https://img.youtube.com/vi/${vid}/mqdefault.jpg`} alt="" loading="lazy" style={{width:'88px',height:'50px',objectFit:'cover',borderRadius:'6px',border:'1px solid #e2e8f0',flexShrink:0}} onError={(e)=>{e.target.style.display='none'}} />
-                                    <span style={{fontSize:'0.78em',color:'#4f46e5',fontWeight:600}}>{'\u25b6 \u05e0\u05d2\u05df \u05db\u05d0\u05df'}</span>
-                                  </summary>
-                                  <div style={{marginTop:'6px',aspectRatio:'16/9',width:'100%'}}>
-                                    <iframe src={`https://www.youtube.com/embed/${vid}`} title={v.name || ('\u05e1\u05e8\u05d8\u05d5\u05df ' + (j+1))} allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen loading="lazy" style={{width:'100%',height:'100%',border:0,borderRadius:'8px'}} />
-                                  </div>
-                                </details>
+                                <a key={j} href={`https://www.youtube.com/watch?v=${vid}`} target="_blank" rel="noopener noreferrer"
+                                   className="vr-ag-video" title={v.name || ('\u05e1\u05e8\u05d8\u05d5\u05df ' + (j+1))}>
+                                  <img src={`https://img.youtube.com/vi/${vid}/mqdefault.jpg`} alt="" loading="lazy" onError={(e)=>{e.target.style.display='none'}} />
+                                  <span aria-hidden="true">{'\u25b6'}</span>
+                                </a>
                               ); })}
                             </div>
                           </div>
@@ -6039,7 +6122,7 @@ const selectProject = async (client, project) => {
       })()}
       <style jsx>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes loadingSlide{0%{margin-right:-40%} 100%{margin-right:100%}} @keyframes loadingSlide{0%{transform:translateX(-150%)} 100%{transform:translateX(300%)}}`}</style>
       <div className={`sidebar-overlay${sidebarOpen ? ' active' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
-      <Header className={vrShell ? 'header-vr' : ''}
+      <Header className={vrChrome ? 'header-vr' : ''}
         onMenuOpen={() => setSidebarOpen(true)}
         onExport={!isClientView && !isDemoProject ? handleExport : undefined}
         onClientAccess={!isClientView ? handleClientAccess : undefined}
@@ -6053,7 +6136,7 @@ const selectProject = async (client, project) => {
         ) : null}
       />
 
-      <div className={vrShell ? 'app-layout vr-shell' : 'app-layout'}>
+      <div className={vrChrome ? 'app-layout vr-shell' : 'app-layout'}>
         <Sidebar
           clients={visibleClients}
           activeClient={selectedClient?.name}
@@ -6063,7 +6146,7 @@ const selectProject = async (client, project) => {
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
           footerText="VITAS Reports v3.2"
-          brand={vrShell ? { logo: '/brand/vitas-logo-white.png', tagline: 'Real Estate Intelligence' } : null}
+          brand={vrChrome ? { logo: '/brand/vitas-logo-white.png', tagline: 'Real Estate Intelligence' } : null}
           lockedProjects={[]}
           demoProjects={clients.flatMap(c=>(c.projects||[]).filter(p=>p.is_demo).map(p=>p.name))}
           isOpen={sidebarOpen}
@@ -6116,7 +6199,7 @@ const selectProject = async (client, project) => {
               const budgets = selectedProject?.monthly_budgets || {};
               const budget = budgets[ym];
               if (isClientView) {
-                return budget != null ? (vrShell ? (
+                return budget != null ? (vrChrome ? (
                   <div className="vr-budget"><div className="vr-budget-main">
                     <span className="vr-budget-label"><Wallet size={16} aria-hidden="true" />תקציב חודשי</span>
                     <span className="vr-budget-total"><bdi>{formatCurrency(budget)}</bdi></span>
@@ -6132,7 +6215,7 @@ const selectProject = async (client, project) => {
               const shownVal = budgetDraft !== null ? budgetDraft : (budget!=null ? String(budget) : '');
               // עיצוב מחודש: כרטיס לבן עם פס התקדמות (DESIGN-SPEC: משטח לבן, min-height 56, labels גלויים, חודש כתוב)
               const _lvl = pct == null ? 'none' : pct >= 100 ? 'over' : pct >= 95 ? 'hot' : pct >= 75 ? 'warm' : 'ok';
-              return vrShell ? (
+              return vrChrome ? (
                 <div className="vr-budget">
                   <div className="vr-budget-main">
                     <span className="vr-budget-label"><Wallet size={16} aria-hidden="true" />תקציב חודשי</span>
@@ -6182,7 +6265,7 @@ const selectProject = async (client, project) => {
                 ? (isFetching
                     ? <PeriodFetching />
                     : <PeriodEmpty onRefresh={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }, { live: !isClientView })} />)
-                : ((vrShell || vrAds) ? <VitasPresentation>{renderDashboard()}</VitasPresentation> : renderDashboard())}
+                : (vrChrome ? <VitasPresentation>{renderDashboard()}</VitasPresentation> : renderDashboard())}
           </>)}
 
           

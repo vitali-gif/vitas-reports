@@ -169,7 +169,9 @@
 .vr-status i { inline-size: 8px; block-size: 8px; border-radius: 50%; background: #98A0B2; }
 .vr-status.on { color: #0E9F6E; } .vr-status.on i { background: #10B981; }
 .vr-status.paused { color: var(--vr-muted, #586581); } .vr-status.paused i { background: #C4CAD6; }
-.vr-status.off { color: var(--vr-muted, #586581); } .vr-status.off i { background: #E5E9F1; }
+/* "מכובה" — קמפיין שאינו פעיל. אדום ולא אפור, כי אפור נקרא כמו "אין נתון"
+   ולא כמו "כבוי" (ויטלי, 21.9). */
+.vr-status.off { color: #C0322F; } .vr-status.off i { background: #E24B4A; }
 .vr-status.none { color: var(--vr-muted, #586581); }
 
 /* פילוח דמוגרפי: שתי טבלאות זו מתחת לזו, כל אחת בכרטיס לבן עם הכותרת בתוכו (כמו בסקיצה) */
@@ -310,3 +312,29 @@
   .vr-ui .vfb-root .vfb-tab-heading h2 { font-size: 24px; }
 }
 @media (max-width: 380px) { .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── כרטיס קבוצת נכסים של Google PMax: קיפולים ותמונות ממוזערות ───────────────
+   אחרי שכל הנכסים הוצגו (18 כותרות, 5 תיאורים, 14 תמונות, 6 סרטונים) הכרטיס
+   הגיע לגובה של כמה מסכים. הנכסים נשארו — רק הטקסטים והתמונות העודפות מקופלים
+   מאחורי לחיצה אחת, והסרטונים ירדו לשורת ממוזערות (ויטלי, 21.9). */
+.vr-ag-fold { border-block-start: 1px solid #f1f5f9; padding-block-start: 8px; }
+.vr-ag-fold > summary {
+  cursor: pointer; list-style: none;
+  font-size: 0.74em; font-weight: 700; color: var(--indigo, #4f46e5);
+  padding-block: 2px;
+}
+.vr-ag-fold > summary::-webkit-details-marker { display: none; }
+.vr-ag-fold > summary::before { content: '▸ '; display: inline-block; }
+.vr-ag-fold[open] > summary::before { content: '▾ '; }
+.vr-ag-fold > summary:focus-visible { outline: 2px solid var(--indigo, #4f46e5); outline-offset: 2px; border-radius: 4px; }
+/* גלילה פנימית ולא גובה אינסופי: 22 כותרות נשארות נגישות בלי למתוח את הכרטיס. */
+.vr-ag-list { max-block-size: 190px; overflow-y: auto; margin-block-start: 4px; }
+
+.vr-ag-video { position: relative; display: block; inline-size: 76px; block-size: 44px; border-radius: 6px; overflow: hidden; border: 1px solid #e2e8f0; }
+.vr-ag-video img { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
+.vr-ag-video span {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 15px; background: rgba(15, 23, 42, 0.32);
+}
+.vr-ag-video:hover span { background: rgba(15, 23, 42, 0.12); }
+.vr-ag-video:focus-visible { outline: 2px solid var(--indigo, #4f46e5); outline-offset: 2px; }
