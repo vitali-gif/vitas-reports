@@ -23,7 +23,15 @@
 .vr-ui.vr-kloss .vr-metric-value { font-size: clamp(24px, 1.7vw, 30px); margin-block-start: 10px !important; }
 .vr-ui.vr-kloss .vr-metric-note { font-size: 12px; margin-block-start: 4px !important; }
 @media (max-width: 1100px) { .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 620px)  { .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: 1fr; } }
+/* המפרט (PAGE-SPECS §מסך רשת): "כל 16 הכרטיסים נשמרים, 2 בעמודה במובייל".
+   קודם ירדנו לעמודה אחת ב-620px, כלומר 16 כרטיסים בטור אחד — גלילה של
+   מסך וחצי כדי לראות את המדד האחרון. עמודה אחת נשארת רק למסכים צרים
+   מאוד, שם שני כרטיסים באמת נחתכים. */
+@media (max-width: 767px) {
+  .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .vr-ui.vr-kloss .vr-metric-value { font-size: 22px; }
+}
+@media (max-width: 340px) { .vr-ui.vr-kloss .vr-metric-grid { grid-template-columns: 1fr; } }
 
 /* ── מסגרת דוח: תג סוג תקופה ליד הכותרת ─────────────────────────────────── */
 .vr-ui .vr-kloss-tag {

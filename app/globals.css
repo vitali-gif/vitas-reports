@@ -4297,3 +4297,9 @@ textarea:focus-visible,
   .titlebar > div > h1 { font-size: 20px; }
   .titlebar { flex-wrap: wrap; }
 }
+
+/* קנבס של Chart.js לפני האתחול הוא 300×150 כברירת מחדל של HTML, ובמסך
+   320px זה 5px של גלילה אופקית לכל העמוד ברגע שבין הרינדור לבניית הגרף
+   (נמדד). Chart.js מגדיר את המידות אחרי, אבל הרגע הזה קיים. */
+.chart-box canvas,
+.chart-card canvas { max-inline-size: 100%; }
