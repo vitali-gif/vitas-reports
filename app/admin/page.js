@@ -26,6 +26,7 @@ import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
 import BackToTop from '../components/BackToTop'
 import TovnoLoader from '../components/TovnoLoader'
+import ViewPicker from '../components/shell/ViewPicker'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
@@ -38,6 +39,23 @@ import MeetingsTab from '../components/meetings/MeetingsTab'
 // טאב "המלצות חכמות" מוסתר בכל הלקוחות עד שהתוכן שלו ישופר (ויטלי, 21.9).
 // להחזרה: להפוך ל-true. הרינדור עצמו נשאר בקוד ולא נמחק.
 const RECOMMENDATIONS_TAB_ON = false
+
+// תצוגות ה-CRM לבורר המובייל. הסדר והתוויות זהים לשורת תתי־הטאבים בדסקטופ —
+// הבורר מחליף את אופן הבחירה, לא את מה שאפשר לבחור.
+const BMBY_CRM_VIEWS = [
+  { key: 'sources',    label: 'מקורות הגעה',    icon: <Users size={18} /> },
+  { key: 'response',   label: 'זמני תגובה',     icon: <Clock size={18} /> },
+  { key: 'objections', label: 'התנגדויות',      icon: <MessageSquareWarning size={18} /> },
+  { key: 'reports',    label: 'יישובים',        icon: <MapPin size={18} /> },
+  { key: 'meetings',   label: 'פגישות שבוצעו',  icon: <CalendarCheck size={18} /> },
+]
+const KLOSS_CRM_VIEWS = [
+  { key: 'network',   label: 'מסך רשת',              icon: <Building2 size={18} /> },
+  { key: 'branches',  label: 'סניפים',               icon: <MapPin size={18} /> },
+  { key: 'people',    label: 'אנשי מכירות ומוצרים',  icon: <Users size={18} /> },
+  { key: 'timing',    label: 'זמנים',                icon: <Clock size={18} /> },
+  { key: 'breakdown', label: 'מקורות וסטטוסים',      icon: <ListChecks size={18} /> },
+]
 
 
 // Reusable info tooltip - click ⓘ to open a styled popover with the explanation.
@@ -5100,7 +5118,9 @@ const selectProject = async (client, project) => {
                   {refreshingCrm ? '\u23f3' : '\ud83d\udd04'} {refreshingCrm ? 'מושך...' : 'רענן CRM'}
                 </button>
               </div>
-              <div className="client-tabs" style={{marginBottom:15}}>
+              {/* מובייל: בורר אחד במקום שורת תתי־הטאבים (Tovno-Mobile-Handoff). */}
+              <ViewPicker title="תצוגות CRM" value={sfTab} onChange={setSfTab} options={KLOSS_CRM_VIEWS} />
+              <div className="client-tabs vpick-replaced" style={{marginBottom:15}}>
                 <button type="button" className={`client-tab ${sfTab === 'network' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('network'); }}>מסך רשת</button>
                 <button type="button" className={`client-tab ${sfTab === 'branches' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('branches'); }}>סניפים</button>
                 <button type="button" className={`client-tab ${sfTab === 'people' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSfTab('people'); }}>אנשי מכירות ומוצרים</button>
@@ -5406,8 +5426,15 @@ const selectProject = async (client, project) => {
 
           // BMBY CRM (existing behavior — unchanged)
           return (<>
+            {/* מובייל: בורר אחד במקום שורת תתי־הטאבים (Tovno-Mobile-Handoff). */}
+            <ViewPicker
+              title="תצוגות CRM"
+              value={crmSubTab}
+              onChange={setCrmSubTab}
+              options={BMBY_CRM_VIEWS}
+            />
             <div className={vrShell ? 'vcs-subtabs-row' : undefined}>
-            <div className="client-tabs" style={vrShell ? undefined : {marginBottom: 15}}>
+            <div className="client-tabs vpick-replaced" style={vrShell ? undefined : {marginBottom: 15}}>
               <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>{vrShell ? '' : '📂 '}מקורות הגעה</button>
               <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>{vrShell ? '' : '⏱️ '}זמני תגובה</button>
               <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>{vrShell ? '' : '🚫 '}התנגדויות</button>
@@ -6517,6 +6544,10 @@ const selectProject = async (client, project) => {
               onToggleComparison={() => onComparisonToggle(!compareEnabled)}
               showQuarters={!(/bcurelaser|ismooth/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
               allowedPresets={isDemoProject ? DEMO_PRESETS : undefined}
+              /* בורר הפרויקט במובייל. visibleClients כבר מסונן להרשאות של
+                 המשתמש, ולכן לקוח רואה בו רק את הפרויקטים שלו. */
+              projects={visibleClients.find(c => c.name === selectedClient?.name)?.projects || []}
+              onSelectProject={(p) => selectProject(selectedClient, p)}
             />
             {/* לאדמין בלבד: הלקוח לא צריך לדעת מתי הקרון רץ, ומספר "ימים" עלול להיראות לו כתקלה. */}
             {!isClientView && (

@@ -4175,3 +4175,117 @@ textarea:focus-visible,
   outline: 2px solid var(--tv-focus);
   outline-offset: 2px;
 }
+
+/* ============================================================
+   Tovno Mobile · חלונית תחתונה ובורר תצוגה
+   (app/components/shell/BottomSheet.jsx, ViewPicker.jsx)
+
+   dvh ולא vh: ב-iOS Safari שורת הכתובת משנה את גובה ה-viewport, ו-90vh
+   היה מוציא את כפתורי התחתית מתחת לקפל. fallback ל-vh לדפדפנים ישנים.
+   ============================================================ */
+.vsheet-root { position: fixed; inset: 0; z-index: 9995; display: flex; align-items: flex-end; }
+.vsheet-scrim { position: absolute; inset: 0; background: rgba(11, 15, 30, 0.45); }
+.vsheet {
+  position: relative;
+  inline-size: 100%;
+  max-block-size: 90vh;
+  max-block-size: 90dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card, #fff);
+  border-start-start-radius: 20px;
+  border-start-end-radius: 20px;
+  box-shadow: 0 -18px 48px rgba(11, 15, 30, 0.22);
+  animation: vsheetUp 0.2s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+@keyframes vsheetUp { from { transform: translateY(14px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .vsheet { animation: none; } }
+
+.vsheet-grip {
+  inline-size: 44px; block-size: 4px; border-radius: 999px;
+  background: var(--border-strong, #C4CAD6);
+  margin: 10px auto 2px;
+}
+.vsheet-head { display: flex; align-items: flex-start; gap: 10px; padding: 8px 16px 12px; }
+.vsheet-titles { flex: 1; min-inline-size: 0; text-align: center; }
+.vsheet-titles h2 { margin: 0; font-size: 18px; font-weight: 800; color: var(--text, #0B0F1E); }
+.vsheet-titles p { margin: 2px 0 0; font-size: 13px; color: var(--text-3, #5E6478); }
+.vsheet-close {
+  flex-shrink: 0;
+  inline-size: 44px; block-size: 44px;   /* יעד מגע מינימלי לפי המפרט */
+  display: grid; place-items: center;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-2, #383E52); border-radius: 10px;
+}
+.vsheet-close:hover { background: var(--surface, #F5F7FB); }
+/* גוף גולל פנימית, ו-safe-area כדי שהפריט האחרון לא ייחתך ב-iPhone. */
+.vsheet-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 0 12px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── בורר תצוגה ─────────────────────────────────────────────────────────── */
+.vpick { display: none; }   /* דסקטופ ממשיך עם שורת הטאבים */
+.vpick-trigger {
+  inline-size: 100%;
+  display: flex; align-items: center; gap: 8px;
+  min-block-size: 44px;
+  padding: 9px 12px;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #DDE2EC);
+  border-radius: var(--r-sm, 10px);
+  font: inherit; font-size: 13.5px; color: var(--text-2, #383E52);
+  cursor: pointer;
+}
+.vpick-trigger-label { color: var(--text-3, #5E6478); }
+.vpick-trigger-value { margin-inline-start: auto; font-weight: 700; color: var(--text, #0B0F1E); }
+
+.vpick-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.vpick-option {
+  inline-size: 100%;
+  display: flex; align-items: center; gap: 10px;
+  min-block-size: 52px;
+  padding: 10px 14px;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #DDE2EC);
+  border-radius: 12px;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--text, #0B0F1E);
+  text-align: start; cursor: pointer;
+}
+.vpick-option.on { background: var(--tv-brand-soft, #EEF2FF); border-color: var(--tv-brand-line, #C8D4FF); }
+.vpick-check { inline-size: 18px; display: grid; place-items: center; color: var(--tv-brand, #315CF5); }
+.vpick-option-label { flex: 1; min-inline-size: 0; }
+.vpick-option-icon { color: var(--text-3, #5E6478); display: grid; place-items: center; }
+
+@media (max-width: 768px) {
+  .vpick { display: block; margin-bottom: 10px; }
+  /* שורת תתי־הטאבים מתחלפת בבורר — לא נמחקת, רק לא מוצגת בנייד. */
+  .vcs-subtabs-row .client-tabs.vpick-replaced,
+  .client-tabs.vpick-replaced { display: none !important; }
+}
+
+/* ── בורר פרויקט במובייל (app/components/shell/ProjectPicker.jsx) ────────── */
+.vproj { display: none; }
+.vproj-trigger {
+  inline-size: 100%;
+  display: flex; align-items: center; gap: 8px;
+  min-block-size: 44px;
+  padding: 9px 12px;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #DDE2EC);
+  border-radius: var(--r-sm, 10px);
+  font: inherit; font-size: 15px; font-weight: 700; color: var(--text, #0B0F1E);
+  cursor: pointer;
+}
+.vproj-trigger-text { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vproj-sep { margin-inline: 6px; color: var(--text-4, #98A0B2); font-weight: 500; }
+
+@media (max-width: 768px) {
+  .vproj { display: block; order: -1; inline-size: 100%; margin-bottom: 10px; }
+  /* כותרת "לקוח / פרויקט" הופכת למיותרת — הבורר נושא את אותו מידע,
+     ובנוסף אפשר ללחוץ עליו. השורה עצמה לא נמחקת בדסקטופ. */
+  .titlebar > div > h1 { font-size: 20px; }
+  .titlebar { flex-wrap: wrap; }
+}
