@@ -21,7 +21,7 @@
   padding: 40px 32px;
   box-sizing: border-box;
 }
-.vsign-card img { display: block; margin: 0 auto 26px; block-size: 30px; }
+.vsign-card img { display: block; margin: 0 auto 26px; inline-size: auto; block-size: 34px; }
 .vsign-card h1 { margin: 0 0 10px; font-size: 30px; font-weight: 800; text-align: center; line-height: 1.3; }
 .vsign-card > p { margin: 0 0 26px; font-size: 15px; color: var(--vs-muted); text-align: center; line-height: 1.7; }
 

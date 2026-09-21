@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { apiFetch, accessToken } from '../../lib/api-fetch'
 import dynamic from 'next/dynamic'
 import { GoogleMark, MicrosoftMark } from '../components/auth/ProviderMarks'
+import TovnoLoader from '../components/TovnoLoader'
 
 const AdminPage = dynamic(() => import('../admin/page'), { ssr: false })
 
@@ -294,8 +295,7 @@ export default function ClientPage() {
   if (loading) return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)'}}>
       <div style={{textAlign:'center'}}>
-        <div style={{width:44,height:44,border:'3px solid var(--indigo,#5B5EF4)',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite',margin:'0 auto 16px'}}/>
-        <p style={{color:'var(--text-3)',fontSize:14}}>טוען...</p>
+        <TovnoLoader hint="טוען את הדוח…" />
         <div id="vitas-stuck" style={{display:'none',marginTop:18}}>
           <p style={{color:'var(--text-3)',fontSize:13,margin:'0 0 10px'}}>הטעינה לוקחת יותר מהרגיל.</p>
           <button type="button" onClick={() => window.location.reload()}
@@ -303,7 +303,6 @@ export default function ClientPage() {
             טען מחדש
           </button>
         </div>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         <script dangerouslySetInnerHTML={{ __html:
           "setTimeout(function(){if(window.__vitasHydrated)return;var e=document.getElementById('vitas-stuck');if(!e)return;e.style.display='block';var b=e.querySelector('button');if(b)b.onclick=function(){location.reload()}},15000);" }} />
       </div>
@@ -367,7 +366,7 @@ export default function ClientPage() {
   if (step === 'login') return (
     <div className="vsign">
       <div className="vsign-card">
-        <img src="/brand/vitas-logo-black.png" alt="VITAS" />
+        <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" />
         <h1>ברוכים הבאים</h1>
         <p>נכנסים לחשבון וממשיכים לפרויקטים שלכם.</p>
 
@@ -521,7 +520,7 @@ export default function ClientPage() {
 
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <img src="/brand/vitas-logo-black.png" alt="VITAS" style={{ height: 24, marginBottom: 14 }} />
+              <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" style={{ height: 30, width: 'auto', marginBottom: 14 }} />
               <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: '#0B0F1E', letterSpacing: '-0.02em' }}>
                 ברוכים הבאים לדוח הביצועים 👋
               </h2>

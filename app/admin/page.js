@@ -25,6 +25,7 @@ import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
 import BackToTop from '../components/BackToTop'
+import TovnoLoader from '../components/TovnoLoader'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
@@ -6389,12 +6390,13 @@ const selectProject = async (client, project) => {
     // דווקא ה-id ולא האובייקט — עדכון תקציב יוצר אובייקט חדש ואין סיבה לבנות מחדש בגללו.
     meetingsOn, selectedProject?.id, isClientView]);
 
-  if (loading && !isClientView) return <div className="loading-page">{'\u05d8\u05d5\u05e2\u05df...'}</div>;
+  if (loading && !isClientView) return <div className="loading-page"><TovnoLoader hint={'\u05d8\u05d5\u05e2\u05df \u05d0\u05ea \u05d4\u05d3\u05e9\u05d1\u05d5\u05e8\u05d3\u2026'} /></div>;
 
   if (!session && !isClientView) {
     return (
       <div className="login-container">
-        <h1 className="logo" style={{fontSize: '3em'}}>VITAS</h1>
+        {/* \u05d4\u05de\u05d9\u05ea\u05d5\u05d2 \u05d4\u05d7\u05d3\u05e9: \u05d4\u05dc\u05d5\u05d2\u05d5 \u05d1\u05de\u05e7\u05d5\u05dd \u05d4-wordmark \u05d4\u05d8\u05e7\u05e1\u05d8\u05d5\u05d0\u05dc\u05d9 "VITAS" \u05e9\u05d4\u05d9\u05d4 \u05db\u05d0\u05df. */}
+        <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" style={{display:'block',margin:'0 auto 18px',inlineSize:150,blockSize:'auto'}} />
         <p className="subtitle">{'\u05de\u05e2\u05e8\u05db\u05ea \u05d3\u05d5\u05d7\u05d5\u05ea \u05e9\u05d9\u05d5\u05d5\u05e7 \u05d3\u05d9\u05d2\u05d9\u05d8\u05dc\u05d9'}</p>
         <div className="card">
           <form onSubmit={handleAuth} method="post" action="#">
@@ -6588,7 +6590,7 @@ const selectProject = async (client, project) => {
                 </div>
               );
             })()}
-            {isFetching && hasDataForPeriod ? (<div className="period-loading-overlay"><div className="period-loading-spinner" /></div>) : null}
+            {isFetching && hasDataForPeriod ? (<div className="period-loading-overlay"><TovnoLoader width={220} label={'טוען את התקופה'} hint={'מעדכנים את התקופה שנבחרה…'} /></div>) : null}
             {reports.length === 0
               ? (isFetching
                   ? <SkeletonDashboard />
