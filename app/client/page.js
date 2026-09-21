@@ -332,7 +332,7 @@ export default function ClientPage() {
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)',fontFamily:'var(--font)'}}>
       <div style={{maxWidth:380,width:'100%',padding:'0 24px'}}>
         <div style={{textAlign:'center',marginBottom:28}}>
-          <img src="/brand/vitas-logo-black.png" alt="VITAS" style={{height:28,marginBottom:24}} />
+          <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" style={{height:30,marginBottom:24}} />
           <h2 style={{margin:'0 0 8px',fontSize:22,fontWeight:800,color:'var(--text)'}}>בחר סיסמה</h2>
           <p style={{margin:0,fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>
             נכנסת בקישור. כדי להיכנס בפעם הבאה עם מייל וסיסמה, בחר סיסמה משלך.

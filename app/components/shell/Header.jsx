@@ -35,7 +35,7 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onSession
 
       {/* Brand: logo · pipe · eyebrow */}
       <div className="h-brand">
-        <img src="/brand/vitas-logo-black.png" alt="VITAS" />
+        <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" />
         <div className="pipe" />
         <span className="eyebrow">REPORTS</span>
       </div>

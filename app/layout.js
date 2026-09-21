@@ -12,7 +12,7 @@ import './components/meetings/meetings.css';
 import './components/auth/signin.css';
 
 export const metadata = {
-  title: 'VITAS Reports - מערכת דוחות',
+  title: 'Tovno by Vitas — מערכת דוחות',
   description: 'מערכת דוחות ללקוחות',
 };
 
@@ -27,15 +27,16 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
         {/* PWA */}
-        <meta name="theme-color" content="#0B0F1E" />
+        <meta name="theme-color" content="#14243C" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="VITAS Reports" />
-        {/* אייקון הלשונית מגיע מ-app/icon.png, ש-Next מזריק עבורו <link rel="icon">
-            אוטומטית. בלעדיו לא היה בעמוד שום קישור אייקון, ולכן כל דפדפן ביקש
-            /favicon.ico — קובץ שלא קיים — וקיבל 404 בכל טעינת עמוד (ויטלי, 21.9). */}
-        <link rel="apple-touch-icon" href="/brand/icon-192.png" />
+        <meta name="apple-mobile-web-app-title" content="Tovno" />
+        {/* אייקוני Tovno (Tovno-Logo-Kit). קודם לא היה בעמוד שום <link rel="icon">,
+            ולכן כל דפדפן ביקש /favicon.ico שלא היה קיים וקיבל 404 בכל טעינה. */}
+        <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
         {/*
           Microsoft Clarity הוסר מהפרויקט לגמרי (לא בשימוש). הוא ישב כאן ורץ על

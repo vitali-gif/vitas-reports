@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { apiFetch } from '../../lib/api-fetch'
-import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, getRecommendationsWindowMonths } from '../../lib/helpers'
+import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, sourceColor, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
@@ -3063,7 +3063,9 @@ const selectProject = async (client, project) => {
         createChart('crmPieChart', 'doughnut', sourceNames, [{
           label: srcMobileMetric === 'meetings' ? 'פגישות' : 'לידים',
           data: sourceNames.map(n => srcMobileMetric === 'meetings' ? (crmData.sources[n].meetingsScheduled || 0) : crmData.sources[n].totalLeads),
-          backgroundColor: COLORS.slice(0, sourceNames.length)
+          // צבע קבוע לפי שם המקור (סעיף 8 במפרט Tovno): מקור שנעלם בתקופה אחרת
+          // לא מזיז את הצבעים של השאר. מקור לא מוכר נופל חזרה לפלטה לפי אינדקס.
+          backgroundColor: sourceNames.map((n, i) => sourceColor(n) || COLORS[i % COLORS.length])
         }]);
       }
     }, 200));
@@ -6471,8 +6473,8 @@ const selectProject = async (client, project) => {
           onSelectProject={(client, project) => { selectProject(client, project); setSidebarOpen(false); }}
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
-          footerText="VITAS Reports v3.2"
-          brand={vrChrome ? { logo: '/brand/vitas-logo-white.png', tagline: 'Real Estate Intelligence' } : null}
+          footerText="Tovno by Vitas · v3.2"
+          brand={vrChrome ? { logo: '/brand/tovno/tovno-logo-white.svg', tagline: 'Marketing Intelligence' } : null}
           lockedProjects={[]}
           demoProjects={clients.flatMap(c=>(c.projects||[]).filter(p=>p.is_demo).map(p=>p.name))}
           isOpen={sidebarOpen}

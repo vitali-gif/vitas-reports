@@ -28,7 +28,7 @@ export default function Sidebar({
   onAddProject,
   lockedProjects = [],
   demoProjects = [],
-  footerText = 'VITAS Reports v3.2',
+  footerText = 'Tovno by Vitas · v3.2',
   isOpen = false,
   onClose,
   onExport,

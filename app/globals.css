@@ -29,33 +29,101 @@
      ============================================================ */
 
   :root {
+    /* ══════════════════════════════════════════════════════════════════════
+       Tovno by Vitas — מיתוג (Tovno-Claude-Color-Spec.md, ויטלי 21.9)
+       ══════════════════════════════════════════════════════════════════════
+       המפרט מגדיר משתני --tv-*. הם מוגדרים כאן פעם אחת כמקור האמת, ומיד
+       אחריהם הטוקנים הקיימים של המוצר (--bg, --surface, --side-bg…) מקבלים
+       את ערכיהם. זו הדרישה המפורשת במפרט: "אם קיימים tokens מקבילים, מפה
+       אליהם ואל תיצור מערכת מתחרה".
+
+       למה מיפוי ולא החלפה: בקוד חיות שתי שכבות עיצוב — הוותיקה (.kpi,
+       .section) והחדשה (.vr-ui). שתיהן קוראות את אותם טוקנים. מיפוי במקום
+       אחד מזיז את שתיהן יחד; החלפה ידנית בכל קובץ הייתה מפצלת אותן.
+
+       ⚠️ כרטיסי ה-KPI הצבעוניים אינם חלק מהמיתוג (ויטלי, 21.9: "אני לא רוצה
+       לגעת בצבעים באף לקוח של הקארדס הצבעוני"). סעיף 5 במפרט לא מיושם,
+       ו--g-* ו--shadow-* של הכרטיסים נשארים בדיוק כפי שהם.
+       ────────────────────────────────────────────────────────────────────── */
+    --tv-brand: #315CF5;
+    --tv-brand-hover: #2549D8;
+    --tv-brand-pressed: #1D3BB8;
+    --tv-brand-soft: #EEF2FF;
+    --tv-brand-tint: #DEE6FF;
+    --tv-brand-line: #C8D4FF;
+    --tv-navy: #14243C;
+    --tv-white: #FFFFFF;
+
+    --tv-canvas: #F5F7FC;
+    --tv-surface: #FFFFFF;
+    --tv-surface-subtle: #F8FAFD;
+    --tv-border: #DCE3EF;
+    --tv-divider: #E8EDF5;
+    --tv-text: #14243C;
+    --tv-text-secondary: #52627A;
+    --tv-text-muted: #64748B;
+    --tv-link: #2549D8;
+    --tv-focus: #315CF5;
+    --tv-placeholder: #64748B;
+    --tv-disabled-bg: #E9EEF5;
+    --tv-disabled-fg: #64748B;
+
+    --tv-sidebar: #14243C;
+    --tv-sidebar-text: #FFFFFF;
+    --tv-sidebar-muted: #B7C4DA;
+    --tv-sidebar-divider: #2B3B54;
+    --tv-sidebar-hover: #1D3150;
+    --tv-sidebar-active: #294988;
+
+    --tv-success-fg: #08744A;
+    --tv-success-bg: #E8F7EF;
+    --tv-success-border: #B6E4CB;
+    --tv-warning-fg: #855000;
+    --tv-warning-bg: #FFF4D6;
+    --tv-warning-border: #EFCB75;
+    --tv-danger-fg: #B4233B;
+    --tv-danger-bg: #FFF0F2;
+    --tv-danger-border: #F0BBC5;
+    --tv-info-fg: #2549D8;
+    --tv-info-bg: #EEF2FF;
+    --tv-info-border: #C8D4FF;
+
+    --tv-shadow: 0 2px 10px rgba(20, 36, 60, 0.05);
+    --tv-kpi-shadow: 0 3px 10px rgba(20, 36, 60, 0.12);
+
+    /* ── הטוקנים הקיימים, ממופים ל---tv-* ───────────────────────────────── */
     /* Surfaces */
-    --bg: #FFFFFF;
-    --surface: #F5F7FB;
-    --surface-2: #EDF0F6;
-    --card: #FFFFFF;
-    --border: #DDE2EC;
-    --border-strong: #C4CAD6;
-    --divider: #E5E9F1;
+    --bg: var(--tv-canvas);
+    --surface: var(--tv-surface-subtle);
+    --surface-2: #EDF1F9;
+    --card: var(--tv-surface);
+    --border: var(--tv-border);
+    --border-strong: #C3CEE0;
+    --divider: var(--tv-divider);
 
     /* Text */
-    --text: #0B0F1E;
-    --text-2: #383E52;
-    --text-3: #5E6478;
-    --text-4: #98A0B2;
+    --text: var(--tv-text);
+    --text-2: #2B3C55;
+    --text-3: var(--tv-text-secondary);
+    --text-4: #8A98AD;
 
     /* Sidebar */
-    --side-bg: #0B0F1E;
-    --side-bg-2: #11162A;
-    --side-fg: #C9CEDC;
-    --side-fg-mute: #6E7388;
-    --side-active: rgba(99,102,241,0.16);
-    --side-active-fg: #FFFFFF;
-    --side-divider: rgba(255,255,255,0.06);
+    --side-bg: var(--tv-sidebar);
+    --side-bg-2: #1A2C46;
+    --side-fg: var(--tv-sidebar-muted);
+    --side-fg-mute: #7D8DA8;
+    --side-active: var(--tv-sidebar-active);
+    --side-active-fg: var(--tv-sidebar-text);
+    --side-divider: var(--tv-sidebar-divider);
 
     /* Accents (used sparingly — pills, badges, focus, sparklines) */
-    --indigo: #5B5EF4;
-    --indigo-50: #EEF0FF;
+    /* --indigo הוא צבע ההדגשה של המוצר: קישורים, focus, טאב נבחר, תגיות
+       ואייקוני פעולה. הוא הופך לכחול של Tovno, ובכך כל אלה מתיישרים בבת אחת.
+       הגוונים הנוספים (emerald, rose, amber…) נשארים — הם צבעי מצב וקטגוריה
+       ולא צבעי מותג, והמפרט משאיר אותם בתפקידם. */
+    --indigo: var(--tv-brand);
+    --indigo-50: var(--tv-brand-soft);
+    --indigo-100: var(--tv-brand-tint);
     --emerald: #10B981;
     --emerald-50: #E7F8F2;
     --rose: #F43F5E;
@@ -4009,3 +4077,64 @@ textarea:focus-visible,
 
 /* במובייל הכפתור יושב מעט גבוה יותר, שלא יתנגש בסרגל הדפדפן. */
 @media (max-width: 640px) { .back-to-top { inset-block-end: 16px; inset-inline-start: 16px; inline-size: 42px; block-size: 42px; } }
+
+/* ============================================================================
+   Tovno by Vitas — מיתוג: רכיבים
+   מקור: Tovno-Claude-Color-Spec.md (ויטלי, 21.9), סעיפים 4, 6, 7, 8, 9.
+
+   ⚠️ סעיף 5 (כרטיסי KPI) לא מיושם בכוונה. ויטלי: "אני לא רוצה לגעת בצבעים
+   באף לקוח של הקארדס הצבעוני". --g-* ו--shadow-* נשארים כפי שהם.
+
+   הכללים כאן מגיעים אחרי כל השאר בקובץ, ולכן גוברים על ערכים ישנים בלי
+   !important. אין כאן nth-child ואין מיפוי לפי מיקום.
+   ============================================================================ */
+
+/* ── 4. טאבים ופילטרים ───────────────────────────────────────────────────── */
+.client-tabs { background: var(--tv-surface); border-color: var(--tv-border); }
+.client-tab { color: var(--tv-text-secondary); }
+.client-tab:hover { background: var(--tv-brand-soft); color: var(--tv-link); }
+/* הטאב הנבחר מסומן גם בקו עליון ולא רק בצבע — המפרט מחייב סימון שאינו צבע בלבד. */
+.client-tab.active { background: var(--tv-surface); color: var(--tv-brand); box-shadow: inset 0 3px 0 var(--tv-brand); }
+.vr-ui .client-tab.active { box-shadow: inset 0 -3px 0 var(--tv-brand); }
+
+/* ── 6. טבלאות ───────────────────────────────────────────────────────────── */
+.data-table thead th { background: #EEF3FC; color: var(--tv-text); }
+.data-table tbody td { color: var(--tv-text); border-block-end-color: var(--tv-divider); }
+.data-table tbody tr:nth-child(even) { background: var(--tv-surface-subtle); }
+.data-table tbody tr:hover { background: var(--tv-brand-soft); }
+.vr-ui .data-table thead th { background: #EEF3FC; color: var(--tv-text); }
+.vr-ui .data-table tbody tr:nth-child(even) { background: var(--tv-surface-subtle); }
+.vr-ui .data-table tbody tr:hover { background: var(--tv-brand-soft); }
+/* שורת סיכום: גוון כחול מובחן מהשורות הרגילות ומההובר. */
+.data-table tfoot tr, .vr-ui .data-table tfoot tr { background: #E7EEFF; color: var(--tv-text); }
+
+/* ── 7. משפך לידים ───────────────────────────────────────────────────────── */
+/* הקופסאות לבנות והצבע חי באייקון ובפס הצדדי בלבד — כך הוא כבר בנוי. כאן רק
+   מיושרים גווני הפס לצבעי המפרט, והענף עובר לצבעי danger. */
+.vr-ui .vr-funnel-step { background: var(--tv-surface); border-color: var(--tv-border); }
+.vr-ui .vr-funnel-value { color: var(--tv-text); }
+.vr-ui .vr-funnel-leak {
+  background: var(--tv-danger-bg);
+  border-color: var(--tv-danger-border);
+  border-inline-start-color: var(--tv-danger-fg);
+}
+.vr-ui .vr-funnel-leak .vr-funnel-label h3,
+.vr-ui .vr-funnel-leak .vr-funnel-label svg,
+.vr-ui .vr-funnel-leak .vr-funnel-value { color: var(--tv-danger-fg); }
+
+/* ── 9. תקציב וסטטוסים ───────────────────────────────────────────────────── */
+.vr-status.on { color: var(--tv-success-fg); }
+.vr-status.on i { background: #26B99B; }
+.vr-status.paused, .vr-status.off { color: var(--tv-danger-fg); }
+.vr-status.paused i, .vr-status.off i { background: var(--tv-danger-fg); }
+
+/* ── כפתורי ייצוא (סעיף 4, שורת Excel/CSV) ───────────────────────────────── */
+.vr-tbl-btn-export { color: var(--tv-success-fg); border-color: var(--tv-success-border); background: var(--tv-success-bg); }
+.vr-tbl-btn-export:hover { color: var(--tv-success-fg); border-color: #8FD3B2; }
+.vr-tbl-btn-export:active { background: #D6F0E2; }
+
+/* ── focus אחיד בכל המוצר ────────────────────────────────────────────────── */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--tv-focus);
+  outline-offset: 2px;
+}
