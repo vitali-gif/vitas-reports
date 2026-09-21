@@ -2870,46 +2870,15 @@
   .chart-card .chart-meta { display: none; }
 
   /* ---------------------------------------------------------------
-     11 · Data tables → hide entirely, show "open on desktop" notice
-     Applies to: campaigns/ad-sets/ads/asset-groups + demographic tables.
-     The notice element is opt-in: render <div class="desktop-only-msg">
-     immediately AFTER each .tbl-wrap or .demo-grid in the JSX.
+     11 · Data tables → גלילה אופקית, לא הסתרה
+
+     🔴 שינוי מדיניות (חבילת Tovno-Mobile-Handoff, 21.9): עד כאן הטבלאות
+     פשוט הוסתרו במובייל והוצג במקומן "פתח מהמחשב". המפרט החדש אוסר את
+     זה מפורשות — "כל העמודות קיימות", "אין להסתיר מדד משום שלא נכנס
+     לצילום". הכללים למטה מחליפים את ההסתרה בגלילה אופקית בתוך הכרטיס,
+     עם עמודת הזיהוי דביקה כדי שלא מאבדים את ההקשר בגלילה.
+     הבלוק עצמו יושב מחוץ ל-media query הזה (חפש "Tovno Mobile · טבלאות").
      --------------------------------------------------------------- */
-  .tbl-wrap,
-  .table-wrapper,
-  .demo-grid,
-  .perf,                     /* perf-by-placement table on Facebook */
-  .pmax-body {               /* PMAX asset-group table on Google */
-    display: none !important;
-  }
-  .desktop-only-msg {
-    display: flex !important;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    background: var(--surface, #F5F7FB);
-    border: 1px dashed var(--border-strong, #C4CAD6);
-    border-radius: var(--r-sm, 8px);
-    color: var(--text-2, #383E52);
-    font-size: 11.5px;
-    font-weight: 600;
-    line-height: 1.35;
-  }
-  .desktop-only-msg .icon {
-    font-size: 16px;
-    flex-shrink: 0;
-  }
-  .desktop-only-msg .body {
-    flex: 1;
-    text-wrap: pretty;
-  }
-  .desktop-only-msg .body .hint {
-    display: block;
-    margin-top: 2px;
-    font-size: 10px;
-    font-weight: 500;
-    color: var(--text-3, #5E6478);
-  }
 
   /* ---------------------------------------------------------------
      12 · CRM — objections list
@@ -3853,57 +3822,97 @@ body.drp-no-scroll { overflow: hidden; }
 }
 
 /* ============================================================
-   VITAS Reports — Mobile, Phase 4
-   Hide orphan data tables that aren't wrapped in .table-wrapper.
-   The original mobile.css hides .tbl-wrap / .table-wrapper, but
-   several tables in admin/page.js sit directly inside a .card or
-   .card-body (no wrapper) — specifically:
-     - Demographics gender table (~L2509)
-     - Demographics age table (~L2535)
-     - Asset groups PMax table (~L2458)
-   These tables are illegible at phone width. Hide them.
+   Tovno Mobile · טבלאות — גלילה אופקית במקום הסתרה
+   (מחליף את Phase 4 ו-Phase 5 הישנים, שהסתירו טבלאות ומדיה במובייל)
 
-   IMPORTANT: cssnano-simple in this Next.js version does NOT support
-   :has() — using it breaks the CSS build (see CHAT_HANDOFF). We hide
-   the table cells but DO NOT collapse the wrapping .card itself,
-   because .card is shared with many real content cards (reco, role,
-   ad gallery). A future JSX pass should add a per-section
-   .desktop-only-msg under each orphan table.
+   המפרט: "נתונים להשוואה: table אמיתי בתוך overflow-x:auto, עמודת
+   הזיהוי דביקה ב-inline-start עם רקע אטום. כל העמודות קיימות; אין
+   overflow של body."
+
+   ב-RTL ‎inset-inline-start:0‎ מתמפה ל-right:0 — כלומר העמודה הראשונה,
+   שהיא עמודת הזיהוי, נדבקת לקצה שממנו קוראים. זו הסיבה שמשתמשים
+   בתכונה הלוגית ולא ב-right.
    ============================================================ */
 @media (max-width: 768px) {
 
-  /* Any data-table that sits inside a .card or .card-body is a
-     wide tabular view that doesn't fit a phone. Hide. */
+  /* המעטפות הגוללות. min-inline-size:0 על ההורים מונע מהטבלה למתוח
+     את העמוד — בלעדיו overflow-x על הילד לא עוזר, כי ה-grid נותן לו
+     רוחב auto והעמוד כולו מקבל גלילה אופקית. */
+  .tbl-wrap,
+  .table-wrapper,
+  .demo-grid,
+  .perf,
+  .pmax-body,
+  .card .data-table-scroll,
+  .card-body .data-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+    min-inline-size: 0;
+  }
+  .app-layout, .main-content, .section, .card, .card-body { min-inline-size: 0; }
+
+  /* הטבלה עצמה לא מתכווצת: רוחב מינימלי לכל עמודה, והגלילה עושה את
+     השאר. בלי זה הדפדפן דוחס עמודות עד שהמספרים נשברים לשתי שורות. */
+  .tbl-wrap .data-table,
+  .table-wrapper .data-table,
+  .demo-grid .data-table,
   .card .data-table,
   .card-body .data-table {
-    display: none !important;
+    min-inline-size: max-content;
+    font-size: 12.5px;
+  }
+  .data-table thead th,
+  .data-table tbody td {
+    padding-block: 8px;
+    padding-inline: 10px;
+    white-space: nowrap;
   }
 
-  /* When the .card-body's ONLY child is a now-hidden .data-table, the
-     .card-body still takes default padding. Tighten that padding for
-     all .card-body on mobile (cheap visual fix, hurts no other use). */
-  .card-body { padding: 8px 10px !important; }
-}
-
-/* ============================================================
-   VITAS Reports — Mobile, Phase 5
-   Hide rich-media sections that don't compress to a phone.
-   These section wrappers each get a class hook in JSX (1-line each):
-     .section-top-ads        — "המודעות הכי מובילות ב-Facebook"
-                                 image gallery (Facebook tab)
-     .section-demographics   — "פילוח דמוגרפי" gender+age tables
-                                 (already hidden via .card .data-table,
-                                  but the empty section shell remained;
-                                  hide the whole section now)
-     .section-asset-gallery  — "קמפיינים Google Search" / PMax asset
-                                 group image gallery (Google tab)
-   ============================================================ */
-@media (max-width: 768px) {
-  .section-top-ads,
-  .section-demographics,
-  .section-asset-gallery {
-    display: none !important;
+  /* עמודת הזיהוי דביקה. הרקע חייב להיות אטום — שקוף היה מראה את
+     העמודות שנגללות מתחתיו. הקו בקצה מסמן את הגבול בזמן גלילה. */
+  .data-table thead th:first-child,
+  .data-table tbody td:first-child {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 2;
+    background: var(--card, #fff);
+    box-shadow: 1px 0 0 var(--border, #DDE2EC) inset;
+    max-inline-size: 148px;
+    white-space: normal;
   }
+  .data-table thead th:first-child { z-index: 3; background: #EEF3FC; }
+  .data-table tbody tr:nth-child(even) td:first-child { background: var(--tv-surface-subtle, #F5F7FB); }
+
+  /* חיווי שאפשר לגלול. אין hover בנייד, ובלי סימן אין שום דרך לדעת
+     שיש עוד עמודות מעבר לקצה. הנוסח מהסקיצה של המעצב (לוח 01). */
+  .tbl-wrap::after,
+  .table-wrapper::after,
+  .demo-grid::after,
+  .perf::after,
+  .pmax-body::after {
+    content: 'החלק לצפייה במדדים נוספים';
+    display: block;
+    position: sticky;
+    inset-inline-start: 0;
+    inline-size: fit-content;
+    margin-block-start: 6px;
+    font-size: 11px;
+    color: var(--text-3, #98A0B2);
+  }
+
+  /* מדיה: עמודה אחת, ויחס המקור נשמר. המפרט: "object-fit:contain/גודל
+     טבעי, לא crop כפוי" — cover היה חותך מודעות 16:9 לריבוע. */
+  .section-top-ads .vr-ad-grid,
+  .section-asset-gallery .vr-ad-grid,
+  .vr-ui .section-top-ads .vr-ad-grid,
+  .vr-ui .section-asset-gallery .vr-ad-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px !important;
+  }
+  .ad-thumb { aspect-ratio: auto; }
+  .ad-thumb img { object-fit: contain; inline-size: 100%; block-size: auto; }
+  .vr-ag-video img { object-fit: contain; block-size: auto; }
 }
 
 /* ============================================================

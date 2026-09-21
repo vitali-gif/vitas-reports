@@ -3316,8 +3316,7 @@ const selectProject = async (client, project) => {
               </tbody>
             </table>
           </div>
-          <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div>
-          {/* MOBILE: leads/meetings toggle (mobile only via CSS) */}
+                    {/* MOBILE: leads/meetings toggle (mobile only via CSS) */}
           <div className="src-metric-toggle">
             {[['leads','לידים'],['meetings','פגישות']].map(([k,l]) => (
               <button key={k} className={srcMobileMetric === k ? 'active' : ''} onClick={() => setSrcMobileMetric(k)}>{l}</button>
@@ -3719,7 +3718,7 @@ const selectProject = async (client, project) => {
         };
       }), labelName + '_' + (selectedMonth || ''), labelName);
       return (<>{tableToolbar({ onExport: entries.length ? _exportRows : undefined })}<div className="table-wrapper"><table className="data-table"><thead><tr>{cols.map((c,ci)=>(<Fragment key={c.key}><th style={thStyle} onClick={()=>handleSort(tableId,c.key)}>{c.label}{sortIcon(c.key)}</th>{ci===0 && source ? <th style={{whiteSpace:'nowrap'}}>{'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4'}</th> : null}</Fragment>))}</tr></thead><tbody>{entries.map(([name, d]) => { const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (<tr key={name}>{/* שם הקמפיין בתא RTL עם bdi, והפלטפורמה בעמודה משלה (ויטלי, 21.9) */}<td dir="rtl" style={{fontWeight: 600, textAlign:'start', whiteSpace:'normal'}}><bdi>{name}</bdi></td>{source ? <td style={{whiteSpace:'nowrap'}}>{vrAds ? <span className={`vr-platform ${source==='google'?'google':'meta'}`}>{source==='google' ? <GoogleMark size={14} /> : <MetaMark size={16} />}{source==='google'?'Google':'Meta'}</span> : <span className={`platform-tag${source==='google'?' google':''}`}>{source==='google'?'GOOGLE':'FACEBOOK'}</span>}</td> : null}<td style={cellBg('clicks',d.clicks)}>{cellMark('clicks',d.clicks)}{formatNum(d.clicks)} {ch(d.clicks, prevItems?.[name]?.clicks, false)}</td><td style={cellBg('impressions',d.impressions)}>{cellMark('impressions',d.impressions)}{formatNum(d.impressions)} {ch(d.impressions, prevItems?.[name]?.impressions, false)}</td><td style={cellBg('cpc',cpc)}>{cellMark('cpc',cpc)}{formatCurrency(cpc)} {ch(cpc, prevItems?.[name]?.clicks > 0 ? prevItems[name].spend/prevItems[name].clicks : null, true)}</td><td style={cellBg('ctr',ctr)}>{cellMark('ctr',ctr)}{ctr.toFixed(2)}%</td><td style={cellBg('cpm',cpm)}>{cellMark('cpm',cpm)}{formatCurrency(cpm)}</td><td style={cellBg('leads',d.leads)}>{cellMark('leads',d.leads)}{formatNum(Math.round(d.leads))} {ch(d.leads, prevItems?.[name]?.leads, false)}</td><td style={cellBg('cpl',cpl)}><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)} {ch(d.spend, prevItems?.[name]?.spend, true)}</td></tr>); })}</tbody></table></div>
-          <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div></>);
+          </>);
     };
 
 
@@ -5970,8 +5969,7 @@ const selectProject = async (client, project) => {
                   </tbody>
                 </table>
               </div>
-          <div className="desktop-only-msg"><div className="icon">💻</div><div className="body">לצפייה בטבלאות המפורטות, פתח מהמחשב<span className="hint">הטבלאות המלאות זמינות בגרסת המחשב</span></div></div>
-            </div>
+                      </div>
           );
         })()}
 
