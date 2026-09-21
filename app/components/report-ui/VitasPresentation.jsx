@@ -64,14 +64,30 @@ export function MetricGrid({ metrics }) {
 
 // Supply denominatorLabel with every rate. Never calculate cross-population
 // ratios here. The screenshot is not a source of funnel values or formulas.
+// VITAS: leak — תחנה שהיא ענף ולא שלב ברצף (ביטולים, "לא הגיעו לפגישה"). היא יורדת
+// לשורה שנייה מתחת לשלב שממנו היא מסתעפת, על רקע אדום ועם חץ ↳, כדי שלא תיקרא כשלב
+// שעוברים בו (ויטלי, 21.9). המיקום נעשה ב-grid: כל שלב ראשי תופס עמודה, והענף מקבל
+// את העמודה של השלב שלפניו.
 export function Funnel({ items, description }) {
+  const mains = items.filter(it => !it.leak);
+  let col = 0;
+  const placed = items.map(it => {
+    if (!it.leak) { col += 1; return { ...it, col }; }
+    return { ...it, col: Math.max(1, col) };
+  });
   return <div className="vr-funnel-panel">
     {description && <p className="vr-caption">{description}</p>}
-    <ol className="vr-funnel">{items.map(({ id, label, value, rate, denominatorLabel, tone, icon: Icon }) => <li key={id} className={`vr-funnel-step ${toneClass(tone)}`}>
-      <div className="vr-funnel-label">{Icon && <Icon size={18} aria-hidden="true" />}<h3>{label}</h3></div>
-      <p className="vr-funnel-value"><bdi>{value ?? 'אין נתון'}</bdi></p>
-      {rate != null && <p className="vr-caption"><bdi>{rate}</bdi>{' '}{denominatorLabel}</p>}
-    </li>)}</ol>
+    <ol className="vr-funnel" style={{ '--vr-funnel-cols': mains.length }}>
+      {placed.map(({ id, label, value, rate, denominatorLabel, tone, leak, col: gridCol, icon: Icon }) =>
+        <li key={id} className={`vr-funnel-step ${toneClass(tone)}${leak ? ' vr-funnel-leak' : ''}`}
+            style={{ gridColumn: gridCol, gridRow: leak ? 2 : 1 }}>
+          <div className="vr-funnel-label">{Icon && <Icon size={18} aria-hidden="true" />}<h3>{leak ? <><span aria-hidden="true">↳ </span>{label}</> : label}</h3></div>
+          <p className="vr-funnel-value"><bdi>{value ?? 'אין נתון'}</bdi></p>
+          {/* גם בלי אחוז יש מה לומר כאן — למשל ה-CPM שמתחת ל"חשיפות". קודם הכיתוב
+              הוצג רק כשהיה rate, ולכן התחנה הראשונה נשארה בלי שורת המשנה שלה. */}
+          {(rate != null || denominatorLabel) && <p className="vr-caption">{rate != null ? <><bdi>{rate}</bdi>{' '}</> : null}{denominatorLabel}</p>}
+        </li>)}
+    </ol>
   </div>;
 }
 

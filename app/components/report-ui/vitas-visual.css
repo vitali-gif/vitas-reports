@@ -45,8 +45,15 @@
 .vr-help summary { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 .vr-help p { margin-block-start: 8px; }
 .vr-funnel-panel > .vr-caption { margin-block-end: 12px; }
-.vr-funnel { display: flex; list-style: none; padding: 0; margin: 0; gap: 14px; overflow-x: auto; padding-block-end: 8px; }
-.vr-funnel-step { flex: 1 0 145px; background: var(--card, #fff); border: 1px solid var(--border, #dce3f1); border-inline-start: 3px solid var(--vr-accent); border-radius: var(--r-sm, 8px); padding: 18px; }
+/* grid ולא flex: הענפים (ביטולים וכד') יורדים לשורה שנייה מתחת לשלב שממנו הם
+   מסתעפים, ולשם כך צריך שכל שלב ראשי יתפוס עמודה קבועה. --vr-funnel-cols מגיע
+   מהרכיב ושווה למספר השלבים הראשיים. */
+.vr-funnel { display: grid; grid-template-columns: repeat(var(--vr-funnel-cols, 6), minmax(145px, 1fr)); align-items: start; list-style: none; padding: 0; margin: 0; gap: 14px; overflow-x: auto; padding-block-end: 8px; }
+.vr-funnel-step { background: var(--card, #fff); border: 1px solid var(--border, #dce3f1); border-inline-start: 3px solid var(--vr-accent); border-radius: var(--r-sm, 8px); padding: 18px; min-inline-size: 0; }
+/* ענף: רקע אדום עדין, שהוא הסימן שהמשתמש כבר מכיר מהעיצוב הקודם. */
+.vr-funnel-leak { background: #fdf2f3; border-color: #f6cdcd; border-inline-start-color: var(--rose, #e24b4a); padding-block: 14px; }
+.vr-funnel-leak .vr-funnel-label h3 { color: var(--rose, #e24b4a); }
+.vr-funnel-leak .vr-funnel-value { font-size: 23px; color: var(--rose, #e24b4a); }
 .vr-funnel-label { display: flex; gap: 8px; align-items: center; }
 .vr-funnel-label svg { color: var(--vr-accent); flex-shrink: 0; }
 .vr-funnel-label h3 { font-size: 15px; font-weight: 650; }
@@ -89,6 +96,11 @@
   .vr-content { padding-inline: 24px; }
 }
 @media (max-width: 767px) {
+  /* במסך צר המשפך נערם לעמודה אחת; הענף מאבד את המיקום מתחת לשלב שלו, ולכן ההזחה
+     והחץ ↳ הם מה שמסמן אותו. */
+  .vr-funnel { grid-template-columns: minmax(0, 1fr); }
+  .vr-funnel-step { grid-column: 1 !important; grid-row: auto !important; }
+  .vr-funnel-leak { margin-inline-start: 18px; }
   .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .vr-content { padding-inline: 16px; }
   .vr-metric { padding: 18px 14px; }

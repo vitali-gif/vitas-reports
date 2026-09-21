@@ -2670,7 +2670,9 @@ const selectProject = async (client, project) => {
           sfSched: CalendarCheck, sfNoShow: XCircle, sfArr: UserCheck, sfOpp: Handshake, sfQuote: FileText, sfPaid: CheckCircle2, sfLost: Ban,
           zOpp: Handshake, zBuy: CheckCircle2, zCanc: XCircle };
         const items = rows.map(r => ({
-          id: r.key, label: r.label, tone: VR_TONE[r.key], icon: VR_ICON[r.key],
+          // leak — ענף ולא שלב ברצף. הרכיב מוריד אותו לשורה שנייה על רקע אדום,
+          // מתחת לשלב שממנו הוא מסתעף (ויטלי, 21.9).
+          id: r.key, label: r.label, tone: VR_TONE[r.key], icon: VR_ICON[r.key], leak: !!r.leak,
           value: r.value == null ? null : formatNum(r.value),
           rate: (r.value != null && r.of) ? ((r.weak && r.pct != null ? '~' : '') + fmtPct(r.pct)) : null,
           denominatorLabel: r.of ? (r.ofLabel + (r.denom != null ? ' (' + formatNum(r.denom) + ')' : '')) : (r.ofLabel === 'ראש המשפך' ? '' : (r.ofLabel || '')),
@@ -4519,34 +4521,36 @@ const selectProject = async (client, project) => {
                 <p className="vr-caption" style={{margin:'0 2px 14px',fontSize:12.5,color:'#66748f'}}>
                   אורך הבר בכל כרטיס מנורמל ללידים של אותו סניף — כלומר הכרטיסים משווים שיעורי מעבר, לא נפחים. להשוואת נפחים יש את הטבלה שלמעלה.
                 </p>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:12}}>
+                {/* הכרטיסים היו בנויים כולם מ-inline styles, ולכן עטיפה ב-.vr-ui לא שינתה
+                    אותם — מה שוויטלי ראה (21.9) כ"הסקשן הזה לא עוצב". עכשיו הם מחלקות
+                    תחומות ל-.vr-kloss-branches, עם המידות והצללים של השפה המשותפת.
+                    הערכים, הסקאלה ואחוזי המעבר לא השתנו. */}
+                <div className="vr-bcmp-grid">
                   {_bcRows.map(b => {
                     const v = _bcVal(b)
                     const _vals = [b.leads || 0, b.meetings || 0, v.opp, v.paid]
                     const _base = Math.max(1, b.leads || 0)
-                    const _convColor = v.conv >= 30 ? '#0f6e56' : v.conv >= 15 ? '#854f0b' : '#a32d2d'
-                    const _convBg = v.conv >= 30 ? '#e1f5ee' : v.conv >= 15 ? '#faeeda' : '#fcebeb'
                     return (
-                      <div key={b.branch} style={{background:'var(--surface-2, #fff)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px'}}>
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-                          <span style={{fontSize:15,fontWeight:600,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.branch}</span>
-                          <span style={{fontSize:12,fontWeight:600,color:_convColor,background:_convBg,padding:'3px 10px',borderRadius:20,whiteSpace:'nowrap',flexShrink:0}}>{v.conv}% המרה</span>
+                      <div key={b.branch} className="vr-bcmp-card">
+                        <div className="vr-bcmp-head">
+                          <span className="vr-bcmp-name"><bdi>{b.branch}</bdi></span>
+                          <span className="vr-bcmp-conv"><bdi>{v.conv}%</bdi> המרה</span>
                         </div>
-                        {_bcSeries.map((sr, i) => {
-                          const val = _vals[i]
-                          const w = Math.max(4, Math.round(val / _base * 100))
-                          const step = i > 0 ? Math.round(val / Math.max(1, _vals[i-1]) * 100) : null
-                          return (
-                            <div key={sr.key} style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
-                              <span style={{fontSize:11,color:'#64748b',width:60,flexShrink:0,textAlign:'start'}}>{sr.label}</span>
-                              <div style={{flex:1,background:'#f1f5f9',borderRadius:5,height:20,overflow:'hidden'}}>
-                                <div style={{width:w+'%',height:'100%',background:sr.color,borderRadius:5}}></div>
-                              </div>
-                              <span style={{fontSize:13,fontWeight:600,color:'#0f172a',width:40,textAlign:'start',flexShrink:0}}>{formatNum(val)}</span>
-                              <span style={{fontSize:10,color:'#94a3b8',width:38,textAlign:'start',flexShrink:0}}>{step !== null ? step+'%' : ''}</span>
-                            </div>
-                          )
-                        })}
+                        <ol className="vr-bcmp-rows">
+                          {_bcSeries.map((sr, i) => {
+                            const val = _vals[i]
+                            const w = Math.max(4, Math.round(val / _base * 100))
+                            const step = i > 0 ? Math.round(val / Math.max(1, _vals[i-1]) * 100) : null
+                            return (
+                              <li key={sr.key} className="vr-bcmp-row">
+                                <span className="vr-bcmp-label">{sr.label}</span>
+                                <span className="vr-bcmp-rail"><span className="vr-bcmp-fill" style={{inlineSize:w+'%',background:sr.color}} /></span>
+                                <span className="vr-bcmp-val"><bdi>{formatNum(val)}</bdi></span>
+                                <span className="vr-bcmp-step">{step !== null ? <bdi>{step+'%'}</bdi> : ''}</span>
+                              </li>
+                            )
+                          })}
+                        </ol>
                       </div>
                     )
                   })}
@@ -5587,7 +5591,7 @@ const selectProject = async (client, project) => {
                     ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
                     : <span className={`platform-tag${data.source.includes('google')?' google':''}`}>{data.source.includes('google')?'GOOGLE':'FACEBOOK'}</span>) : <span style={{color:'#cbd5e1'}}>-</span>}
                 </td>
-                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : isPaused ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.12)'; const col = isActive ? '#059669' : isPaused ? '#d97706' : '#64748b'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; // סטטוס ריק פירושו קמפיין שאינו פעיל — עד היום הוא הוצג כמקף אפור ונקרא כמו
+                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : 'rgba(226,75,74,0.12)'; const col = isActive ? '#059669' : '#c0322f'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; // סטטוס ריק פירושו קמפיין שאינו פעיל — עד היום הוא הוצג כמקף אפור ונקרא כמו
                   // "אין נתון". עכשיו "מכובה" באדום (ויטלי, 21.9).
                   if (vrAds) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status off"><i aria-hidden="true" />מכובה</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{background:'rgba(226,75,74,0.12)',color:'#c0322f',borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>מכובה</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>

@@ -168,7 +168,10 @@
 .vr-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 .vr-status i { inline-size: 8px; block-size: 8px; border-radius: 50%; background: #98A0B2; }
 .vr-status.on { color: #0E9F6E; } .vr-status.on i { background: #10B981; }
-.vr-status.paused { color: var(--vr-muted, #586581); } .vr-status.paused i { background: #C4CAD6; }
+/* "מושהה" גם הוא אדום: גוגל ומטא מדווחים סטטוסים שונים לאותו מצב עסקי — קמפיין
+   שאינו רץ — וויטלי ביקש (21.9) שהם ייקראו אותו דבר בשתי הפלטפורמות. ירוק פירושו
+   רץ; כל דבר אחר אדום. */
+.vr-status.paused { color: #C0322F; } .vr-status.paused i { background: #E24B4A; }
 /* "מכובה" — קמפיין שאינו פעיל. אדום ולא אפור, כי אפור נקרא כמו "אין נתון"
    ולא כמו "כבוי" (ויטלי, 21.9). */
 .vr-status.off { color: #C0322F; } .vr-status.off i { background: #E24B4A; }
