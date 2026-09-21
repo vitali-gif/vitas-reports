@@ -496,7 +496,11 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // וכן העטיפה ב-.vr-ui. דלוקה לכל לקוח ובכל טאב (ויטלי, 21.9). קודם היא הייתה קשורה
   // ל-vrShell, שכבוי ל-KLOSS ולאריקה, ולכן אצלם שורת הטאבים התחלפה בין העיצוב החדש
   // לישן לפי הטאב הפעיל — חדש ב"הכל"/Facebook/Google, ישן ב-CRM וב"ישיבות שיווק".
-  const vrChrome = view === 'dashboard' && !isDemoProject
+  // ⚠️ בלי תלות ב-view (ויטלי, 21.9): המעטפת היא מסגרת העמוד, לא תוכן הדוח.
+  // כשהתנאי כלל view === 'dashboard', מסך "ברוכים הבאים" נפל למעטפת הישנה —
+  // הלוגו הופיע כהה על רקע לבן מעל הסיידבר, ואז קפץ פנימה אל הסיידבר בלבן
+  // ברגע שנבחר פרויקט. אותו לוגו בשני מקומות ובשני צבעים באותו מסך.
+  const vrChrome = !isDemoProject
   // vrShell — נשאר כפי שהיה: הוא מגדיר את מסכי ה-CRM המעוצבים של BMBY בלבד
   // (vrCrm/vrResp/vrObj/vrCity/vrMeet למטה), שאינם קיימים ל-Zoho ול-Salesforce.
   const vrShell = vrChrome && !_vrOwnCrm
