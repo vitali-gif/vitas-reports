@@ -44,8 +44,8 @@ export async function POST(request) {
   if (crossings.length) {
     const ils = n => '₪' + Math.round(n).toLocaleString('he-IL')
     const rows = crossings.map(c => `<li><b>${c.project}</b> — ${c.pct}% מהתקציב (${ils(c.spend)} / ${ils(c.budget)}) · ספים שנחצו: ${c.newly.join('%, ')}%</li>`).join('')
-    const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right"><h2>💰 התראת תקציב חודשי (${ym})</h2><ul>${rows}</ul><p style="color:#888;font-size:12px">VITAS Reports · בדיקת תקציב</p></div>`
-    await sendAlert({ subject: `💰 VITAS תקציב: ` + crossings.map(c => `${c.project} ${c.pct}%`).join(', '), html })
+    const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right"><h2>💰 התראת תקציב חודשי (${ym})</h2><ul>${rows}</ul><p style="color:#888;font-size:12px">Tovno by Vitas · בדיקת תקציב</p></div>`
+    await sendAlert({ subject: `💰 Tovno תקציב: ` + crossings.map(c => `${c.project} ${c.pct}%`).join(', '), html })
   }
   return Response.json({ ok: true, ym, alertsSent: crossings.length, checked })
 }

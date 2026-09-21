@@ -45,7 +45,7 @@ export async function POST(request) {
       ${pct != null ? `<tr><td style="padding:4px 12px">אחוז ניצול</td><td style="padding:4px 12px"><b>${pct}%${flag}</b></td></tr>` : ''}
       ${budget ? `<tr><td style="padding:4px 12px">נותר</td><td style="padding:4px 12px"><b>${ils(Math.max(0, budget - spend))}</b></td></tr>` : ''}
     </table>
-    <p style="color:#888;font-size:12px">VITAS Reports · ${body.budget != null ? 'תקציב לדוגמה (לא נשמר)' : 'מצב נוכחי'}</p>
+    <p style="color:#888;font-size:12px">Tovno by Vitas · ${body.budget != null ? 'תקציב לדוגמה (לא נשמר)' : 'מצב נוכחי'}</p>
   </div>`
 
   const res = await sendAlert({ subject: `💰 מצב תקציב — ${pr.name} (${ym})${pct != null ? ` · ${pct}%` : ''}`, html })

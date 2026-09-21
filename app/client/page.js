@@ -317,7 +317,7 @@ export default function ClientPage() {
         <p style={{margin:'0 0 20px',fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>לכתובת המייל הזו אין גישה לאף פרויקט.</p>
         {/* קודם היה כתוב "צור קשר עם VITAS" בלי שום דרך ליצור קשר — מסך ללא מוצא. */}
         <a
-          href="mailto:vitali@vitas.co.il?subject=בקשת%20גישה%20לדוח%20VITAS"
+          href="mailto:vitali@vitas.co.il?subject=בקשת%20גישה%20לדוח%20Tovno"
           style={{display:'block',marginBottom:12,padding:'10px 24px',background:'var(--indigo,#5B5EF4)',color:'#fff',borderRadius:8,fontSize:14,fontWeight:700,textDecoration:'none',fontFamily:'var(--font)'}}
         >
           בקש גישה במייל
