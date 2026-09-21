@@ -193,6 +193,23 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [ruleError, setRuleError] = useState(null)
   const [creatingRule, setCreatingRule] = useState(false)
   const chartsRef = useRef([])
+  // המקרא של גרף התפלגות התקציב (Google). נבנה יחד עם הגרף ומוצג ב-JSX לצד
+  // הדונאט, במקום המקרא האופקי של Chart.js שנמתח על פני חצי מסך.
+  const [campLegend, setCampLegend] = useState([])
+  const [campHidden, setCampHidden] = useState(() => new Set())
+  // ⚠️ בניית הגרפים רצה בתוך setTimeout שנקבע בכל רינדור של renderDashboard.
+  // setState שם, בלי שמירה, היה מפעיל רינדור → timeout חדש → setState → לולאה
+  // אינסופית. הרף מחזיק את המקרא האחרון שנכתב, וכותבים רק כשהוא באמת השתנה.
+  const campLegendRef = useRef('')
+  const _applyCampLegend = (next) => {
+    const key = JSON.stringify(next)
+    if (campLegendRef.current === key) return
+    campLegendRef.current = key
+    setCampLegend(next)
+    // תקופה חדשה = פלחים חדשים. בלי האיפוס, קמפיין שהוסתר היה נשאר מסומן כמוסתר
+    // במקרא בזמן שהפלח שלו מצויר — כלומר המקרא משקר על מצב הגרף.
+    setCampHidden(new Set())
+  }
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
   const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was SUCCESSFULLY lazy-loaded
   const monthDataInFlight = useRef(new Set())  // month-keys with a heavy-data fetch currently in flight (dedupe)
@@ -1299,6 +1316,31 @@ const selectProject = async (client, project) => {
       });
       ctx.restore();
     },
+  };
+
+  /**
+   * קיצור דטרמיניסטי של תוויות לציר X (חבילת Ads-Sections).
+   *
+   * המפרט אוסר לשנות את שם הקמפיין בנתונים, אבל שמות באורך 40 תווים על ציר של
+   * ארבעה קמפיינים הם קיר טקסט. כאן חותכים לתצוגה בלבד, והשם המלא חוזר ב-tooltip.
+   *
+   * "דטרמיניסטי" פירושו גם "מבחין": שני קמפיינים שמתחילים אותו דבר
+   * ("P-max | Ongoing | General" ו-"P-max | Ongoing | New Client") היו מתקצרים
+   * לאותה מחרוזת, ואז אי אפשר לדעת איזו עמודה שייכת למי. לכן כשיש התנגשות,
+   * הקיצור מתארך עד שהוא ייחודי.
+   */
+  const shortenLabels = (names, max = 18) => {
+    const cut = (n, len) => {
+      const t = String(n || '').trim();
+      return t.length <= len ? t : t.slice(0, len - 1).trimEnd() + '\u2026';
+    };
+    let len = max;
+    let out = names.map(n => cut(n, len));
+    while (new Set(out).size !== out.length && len < 60) {
+      len += 8;
+      out = names.map(n => cut(n, len));
+    }
+    return out;
   };
 
   const createChart = (id, type, labels, datasets, scalesConfig, onSliceClick, extra) => {
@@ -3573,8 +3615,25 @@ const selectProject = async (client, project) => {
         .filter(n => (data.campaigns[n].spend || 0) > 0)
         .sort((a, b) => (data.campaigns[b].spend || 0) - (data.campaigns[a].spend || 0));
       if (campNames2.length > 0) {
-        createChart('campSpend', 'doughnut', campNames2, [{ data: campNames2.map(n => data.campaigns[n].spend), backgroundColor: COLORS.slice(0, campNames2.length) }]);
-        createChart('campLeads', 'bar', campNames2, [
+        // חבילת VITAS-KLOSS-Ads-Sections-Handoff:
+        // • המקרא המובנה של Chart.js כבוי; במקומו מקרא אנכי ב-JSX לצד הדונאט.
+        //   הוא נגיש למקלדת ומחזיק את השם המלא, מה שהמקרא האופקי לא יכול היה.
+        // • תוויות ציר X מקוצרות בקיצור דטרמיניסטי (setCampLabels), והשם המלא
+        //   חוזר ב-tooltip — אסור לשנות את שם הקמפיין בנתונים עצמם.
+        const _campColors = campNames2.map((_, i) => COLORS[i % COLORS.length]);
+        const _campSpendTot = campNames2.reduce((a, n) => a + (data.campaigns[n].spend || 0), 0);
+        _applyCampLegend(campNames2.map((n, i) => ({
+          name: n, color: _campColors[i],
+          pct: _campSpendTot > 0 ? Math.round((data.campaigns[n].spend || 0) / _campSpendTot * 1000) / 10 : 0,
+        })));
+        createChart('campSpend', 'doughnut', campNames2, [{ data: campNames2.map(n => data.campaigns[n].spend), backgroundColor: _campColors }], null, null, {
+          options: { plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => ' ' + ctx.label + ': ' + formatCurrency(ctx.parsed || 0) } },
+          } },
+        });
+        const _shortCamp = shortenLabels(campNames2);
+        createChart('campLeads', 'bar', _shortCamp, [
           { label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: campNames2.map(n => data.campaigns[n].leads),
             backgroundColor: '#10B981', maxBarThickness: 80, yAxisID: 'y', order: 2 },
           { label: 'CPL', data: campNames2.map(n => data.campaigns[n].leads > 0 ? data.campaigns[n].spend / data.campaigns[n].leads : 0),
@@ -3584,13 +3643,26 @@ const selectProject = async (client, project) => {
             pointBackgroundColor: '#F43F5E', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
             yAxisID: 'y1', order: 1 }
         ], {
-          x: { grid: { display: false }, ticks: { font: { size: 10.5, weight: '700' } } },
+          x: { grid: { display: false }, ticks: { font: { size: 10.5, weight: '700' }, autoSkip: false, maxRotation: 0, minRotation: 0 } },
           y: { position: 'right', beginAtZero: true, grid: { color: '#F2F4F8' },
                title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: 10.5, weight: '700' }, color: '#5E6478' } },
           y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false },
-                title: { display: true, text: '\u20aa CPL', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
+                title: { display: true, text: '\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3 \u20aa', font: { size: 10.5, weight: '700' }, color: '#5E6478' },
                 ticks: { callback: v => '\u20aa' + Math.round(v) } }
+        }, null, {
+          options: { plugins: {
+            legend: { labels: { usePointStyle: true } },
+            tooltip: { callbacks: {
+              // הכותרת היא השם המלא, לא הקיצור שעל הציר.
+              title: (items) => campNames2[items[0]?.dataIndex] ?? '',
+              label: (ctx) => ctx.dataset.label === 'CPL'
+                ? ' \u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3: ' + formatCurrency(ctx.parsed.y || 0)
+                : ' \u05dc\u05d9\u05d3\u05d9\u05dd: ' + formatNum(Math.round(ctx.parsed.y || 0)),
+            } },
+          } },
         });
+      } else {
+        _applyCampLegend([]);
       }
       // gender doughnut charts removed (replaced by table)
       const an = Object.keys(data.ages).filter(a => a !== 'unknown').sort((a, b) => (parseInt(a) || 999) - (parseInt(b) || 999));
@@ -5257,23 +5329,44 @@ const selectProject = async (client, project) => {
           return (
             <div className="section">
               <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><h2>פילוח לפי משרד פרסום</h2><span className="sub">{dashTab === 'facebook' ? 'Facebook' : 'Google'}</span></div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:12}}>
-                {_rows.map(([ag, o]) => { const pc = _tot > 0 ? Math.round((o.spend || 0) / _tot * 100) : 0; return (
-                  <div key={ag} style={{background:'var(--surface-2, #fff)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                      <span style={{fontSize:15,fontWeight:600,color:'#0f172a'}}>{ag}</span>
-                      <span style={{fontSize:11,fontWeight:600,color:'#0369a1',background:'#e0f2fe',padding:'2px 8px',borderRadius:20}}>{pc}% מהתקציב</span>
-                    </div>
-                    <div style={{fontSize:24,fontWeight:700,color:'#0f172a',lineHeight:1.1}}>{formatCurrency(o.spend || 0)}</div>
-                    <div style={{fontSize:11,color:'#94a3b8',marginBottom:12}}>הוצאה</div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px 10px',fontSize:13}}>
-                      <div><span style={{color:'#64748b'}}>לידים </span><b style={{color:'#0f172a'}}>{formatNum(Math.round(o.leads || 0))}</b></div>
-                      <div><span style={{color:'#64748b'}}>עלות לליד </span><b style={{color:'#7c3aed'}}>{formatCurrency(o.cpl || 0)}</b></div>
-                      <div><span style={{color:'#64748b'}}>קליקים </span><b style={{color:'#0f172a'}}>{formatNum(o.clicks || 0)}</b></div>
-                      <div><span style={{color:'#64748b'}}>CTR </span><b style={{color:'#0f172a'}}>{(o.ctr || 0).toFixed(2)}%</b></div>
-                    </div>
-                  </div>
-                )})}
+              {/* חבילת VITAS-KLOSS-Ads-Sections-Handoff. אותם נתונים ואותו מכנה: האחוז
+                  הוא חלק המשרד מסך ההוצאה של הפלטפורמה בתקופה — לא ניצול יעד חודשי.
+                  אין דירוג "משרד מנצח" ואין לוגואים מומצאים; אייקון ניטרלי בלבד. */}
+              <div className="vr-agency-grid">
+                {_rows.map(([ag, o]) => {
+                  const pc = _tot > 0 ? Math.round((o.spend || 0) / _tot * 100) : 0;
+                  const cells = [
+                    { k: 'leads', label: 'לידים',      value: formatNum(Math.round(o.leads || 0)), Icon: Users },
+                    { k: 'cpl',   label: 'עלות לליד',  value: formatCurrency(o.cpl || 0),          Icon: Tag },
+                    { k: 'clicks',label: 'קליקים',     value: formatNum(o.clicks || 0),            Icon: MousePointerClick },
+                    { k: 'ctr',   label: 'CTR',        value: (o.ctr || 0).toFixed(2) + '%',       Icon: Eye },
+                  ];
+                  return (
+                    <section key={ag} className="vr-agency-card">
+                      <header className="vr-agency-head">
+                        <span className="vr-agency-name"><Building2 size={16} aria-hidden="true" /><bdi>{ag}</bdi></span>
+                        <span className="vr-agency-share" title={'חלק המשרד מסך ההוצאה של ' + (dashTab === 'facebook' ? 'Facebook' : 'Google') + ' בתקופה'}><bdi>{pc}%</bdi> מהתקציב</span>
+                      </header>
+                      <p className="vr-agency-label">תקציב שנוצל</p>
+                      <p className="vr-agency-value"><bdi>{formatCurrency(o.spend || 0)}</bdi></p>
+                      {/* הפס מתאר בדיוק את אותו אחוז שבתג — אותו מספר, לא חלוקה חדשה. */}
+                      <span className="vr-agency-rail" role="img" aria-label={pc + '% מהתקציב'}>
+                        <span className="vr-agency-fill" style={{ inlineSize: pc + '%' }} />
+                      </span>
+                      <dl className="vr-agency-cells">
+                        {cells.map(({ k, label, value, Icon }) => (
+                          <div key={k} className={'vr-agency-cell vr-agency-' + k}>
+                            <span className="vr-agency-ico"><Icon size={14} aria-hidden="true" /></span>
+                            <div>
+                              <dt>{label}</dt>
+                              <dd><bdi>{value}</bdi></dd>
+                            </div>
+                          </div>
+                        ))}
+                      </dl>
+                    </section>
+                  );
+                })}
               </div>
             </div>
           )
@@ -5497,7 +5590,38 @@ const selectProject = async (client, project) => {
         )}
 
                 {/* Non-FB tabs: keep existing campaigns charts + flat table */}
-        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid"><div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4><div className="chart-container"><canvas id="campSpend"></canvas></div></div><div className="chart-card"><h4>{'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5-CPL'}</h4><div className="chart-container"><canvas id="campLeads"></canvas></div></div></div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns', 'google')}</div>)}
+        {isPmax && campNames.length > 0 && (<div className="section"><div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קמפיינים</h2><span className="sub"><InfoTip text="סיכום ביצועים פר קמפיין" /></span></div><div className="chart-grid">
+          {/* חבילת Ads-Sections: הדונאט מימין והמקרא האנכי משמאלו, באותו כרטיס.
+              המקרא הוא כפתורים אמיתיים — לחיצה מסתירה פלח, בדיוק כמו המקרא המובנה
+              של Chart.js שהוחלף, ועכשיו זה עובד גם במקלדת. */}
+          <div className="chart-card"><h4>{'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1'}</h4>
+            <div className="vr-camp-chart">
+              <div className="chart-container"><canvas id="campSpend" role="img" aria-label={'\u05d4\u05ea\u05e4\u05dc\u05d2\u05d5\u05ea \u05d4\u05ea\u05e7\u05e6\u05d9\u05d1 \u05d1\u05d9\u05df ' + campLegend.length + ' \u05e7\u05de\u05e4\u05d9\u05d9\u05e0\u05d9\u05dd. \u05d4\u05e4\u05d9\u05e8\u05d5\u05d8 \u05d4\u05de\u05dc\u05d0 \u05d1\u05de\u05e7\u05e8\u05d0 \u05e9\u05dc\u05d9\u05d3 \u05d5\u05d1\u05d8\u05d1\u05dc\u05d4 \u05e9\u05de\u05ea\u05d7\u05ea.'}></canvas></div>
+              <ul className="vr-camp-legend">
+                {campLegend.map((it, i) => {
+                  const hidden = campHidden.has(it.name);
+                  return (
+                    <li key={it.name}>
+                      <button type="button" aria-pressed={!hidden} title={it.name}
+                        onClick={() => {
+                          // Chart.js שומר את מצב ההסתרה על ה-meta של הפלח, ולכן
+                          // הלחיצה נוגעת ישירות במופע הגרף ולא מרנדרת אותו מחדש.
+                          const chart = chartsRef.current.find(c => c?.canvas?.id === 'campSpend');
+                          if (chart) { chart.toggleDataVisibility(i); chart.update(); }
+                          setCampHidden(prev => { const n = new Set(prev); if (n.has(it.name)) n.delete(it.name); else n.add(it.name); return n; });
+                        }}>
+                        <span className="vr-camp-dot" style={{background: it.color}} aria-hidden="true" />
+                        <span className="vr-camp-name">{it.name}</span>
+                        <span className="vr-camp-pct"><bdi>{it.pct}%</bdi></span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+          <div className="chart-card"><h4>{'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3'}</h4><div className="chart-container"><canvas id="campLeads" role="img" aria-label={'\u05dc\u05d9\u05d3\u05d9\u05dd \u05d5\u05e2\u05dc\u05d5\u05ea \u05dc\u05dc\u05d9\u05d3 \u05dc\u05e4\u05d9 \u05e7\u05de\u05e4\u05d9\u05d9\u05df. \u05d4\u05e2\u05e8\u05db\u05d9\u05dd \u05d4\u05de\u05dc\u05d0\u05d9\u05dd \u05d1\u05d8\u05d1\u05dc\u05d4 \u05e9\u05de\u05ea\u05d7\u05ea.'}></canvas></div></div>
+        </div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns', 'google')}</div>)}
 
         {/* Nested expandable table - Campaign → Ad Set → Ad - for FB, All, Google Search */}
         {(isFb || dashTab === 'all' || dashTab === 'google_search') && campNames.length > 0 && (() => {
