@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { apiFetch } from '../../lib/api-fetch'
-import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, COLORS, sourceColor, getRecommendationsWindowMonths } from '../../lib/helpers'
+import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, comparisonPeriodKey, comparisonPeriodLabel, COLORS, sourceColor, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
@@ -849,7 +849,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const onComparisonToggle = async (enabled) => {
     setCompareEnabled(enabled);
     if (!enabled || !selectedMonth) return;
-    const prev = getPrevMonth(selectedMonth);
+    const prev = comparisonPeriodKey(selectedMonth);
     if (!prev) return;
     // If prev-period isn't loaded yet, fetch it
     if (!reports.some(r => r.month === prev)) {
@@ -958,11 +958,24 @@ const loadClients = async () => {
     // Otherwise the first render and every project switch waited on ~3 months of heavy raw
     // data that isn't displayed — making tables/breakdowns appear late and switching slow.
     if (dashTab === 'recommendations') { try { getRecommendationsWindowMonths(60).forEach(m => needed.add(m)); } catch {} }
-    if (compareEnabled && selectedMonth) { const pm = getPrevMonth(selectedMonth); if (pm) needed.add(pm); }
+    if (compareEnabled && selectedMonth) { const pm = comparisonPeriodKey(selectedMonth); if (pm) needed.add(pm); }
     const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && !monthDataInFlight.current.has(m) && reports.some(r => r.month === m && r.data == null));
     if (!toLoad.length) return;
     loadMonthsData(selectedProject.id, toLoad);   // marks monthDataLoaded only on SUCCESS (inside)
   }, [selectedProject, selectedMonth, compareEnabled, reports, dashTab]);
+
+  // תקופת ההשוואה של חודש שרץ היא טווח תאריכים (1 עד היום, בחודש שעבר),
+  // ולטווח אין שורה שמורה — הקרון כותב חודשים. בלי המשיכה הזאת המתג היה
+  // נדלק ולא קורה כלום, כי אין מול מה להשוות.
+  useEffect(() => {
+    if (!compareEnabled || !selectedProject || !selectedMonth) return;
+    const key = comparisonPeriodKey(selectedMonth);
+    if (!key || !key.includes('_')) return;               // חודש מלא — כבר קיים
+    if (reports.some(r => r.month === key)) return;       // כבר נטען
+    if (monthDataInFlight.current.has(key)) return;
+    monthDataInFlight.current.add(key);
+    loadRangeRows(selectedProject.id, key).finally(() => monthDataInFlight.current.delete(key));
+  }, [compareEnabled, selectedProject, selectedMonth, reports]);
 
   const loadProjectTasks = async (projectId) => {
     const { data } = await supabase.from('vitas_tasks').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
@@ -3015,7 +3028,7 @@ const selectProject = async (client, project) => {
 
     let prevCrmData = null;
     if (compareEnabled) {
-      const prevMonth = getPrevMonth(selectedMonth);
+      const prevMonth = comparisonPeriodKey(selectedMonth);
       const prevCrmReports = reports.filter(r => r.month === prevMonth && r.source === 'crm');
       if (prevCrmReports.length > 0) {
         // נקרא רק דרך .totals ולא משתנה, ולכן אין צורך בעותק.
@@ -3515,7 +3528,7 @@ const selectProject = async (client, project) => {
 
     let prevData = null;
     if (compareEnabled) {
-      const prevMonth = getPrevMonth(selectedMonth);
+      const prevMonth = comparisonPeriodKey(selectedMonth);
       const prevReports = reports.filter(r => r.month === prevMonth);
       const displayPrev = dashTab === 'all'
         ? prevReports.filter(r => r.source !== 'crm')
@@ -3535,7 +3548,7 @@ const selectProject = async (client, project) => {
     let prevCrmTotals = null;
     let prevCrmTotalLeads = 0;
     if (compareEnabled) {
-      const prevMonth2 = getPrevMonth(selectedMonth);
+      const prevMonth2 = comparisonPeriodKey(selectedMonth);
       const prevCrmReps = reports.filter(r => r.month === prevMonth2 && r.source === 'crm');
       if (prevCrmReps.length > 0) {
         let allPrevCrm = [];
@@ -3622,9 +3635,13 @@ const selectProject = async (client, project) => {
           'הובלה והרכבה': ClipboardList, 'עלות להזמנה': Wallet, 'זמן תגובה חציוני': Clock };
         const badge = !ch ? null : ch.newVal ? '↑ חדש'
           : ((ch.pct > 0 ? '↑ ' : ch.pct < 0 ? '↓ ' : '− ') + (ch.pct === 0 ? '0%' : (ch.pct > 0 ? '+' : '-') + Math.abs(ch.pct).toFixed(0) + '%'));
+        // ויטלי, 21.9: "רק האחוזים... זה לא אומר לי כלום". האחוז לבדו באמת לא —
+        // חסרים הערך שממנו השתנה והתקופה שמולה משווים. שניהם כאן.
+        const badgeTitle = (!ch || ch.newVal || prev == null) ? null
+          : 'מול ' + (isCost ? formatCurrency(prev) : formatNum(Math.round(prev))) + ' ב-' + comparisonPeriodLabel(selectedMonth);
         return (
           <MetricCard key={label} label={label === 'תקציב' ? 'תקציב שנוצל' : label} value={value} tone={v2cls} icon={VR_ICON[label]}
-            description={subNote || undefined} badge={badge}
+            description={subNote || undefined} badge={badge} badgeTitle={badgeTitle}
             trend={sparkVals ? <span title={sparkTitle}><Sparkline values={sparkVals} /></span> : null}
             onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} />
         );

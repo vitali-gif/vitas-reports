@@ -38,7 +38,10 @@ export function ReportSection({ title, description, actions, children }) {
  * onClick (פתיחת רשימת הלידים; הכרטיס הופך לכפתור נגיש), className (למשל vr-metric-text לערך
  * טקסטואלי כמו שם התנגדות/יישוב). שאר ה-API כמו בחבילה.
  */
-export function MetricCard({ label, value, description, tone = 'indigo', icon: Icon, trend, details, badge, onClick, className = '' }) {
+// badgeTitle — הטקסט המלא של ההשוואה ("מול 226 ב-01.08–21.08"). התגית עצמה
+// מציגה חץ ואחוז בלבד כדי לא לצעוק בכרטיס, אבל אחוז בלי הערך שממנו השתנה לא
+// אומר כלום (ויטלי, 21.9), ולכן הטקסט המלא נגיש גם ב-title וגם לקורא מסך.
+export function MetricCard({ label, value, description, tone = 'indigo', icon: Icon, trend, details, badge, badgeTitle, onClick, className = '' }) {
   const hintId = useId();
   const clickable = typeof onClick === 'function';
   const a11y = clickable ? {
@@ -49,9 +52,11 @@ export function MetricCard({ label, value, description, tone = 'indigo', icon: I
     <div className="vr-metric-top">
       {Icon && <span className="vr-metric-icon"><Icon aria-hidden="true" size={22} strokeWidth={1.7} /></span>}
       <h3>{label}</h3>
-      {badge && <span className="vr-metric-badge"><bdi>{badge}</bdi></span>}
+      {badge && <span className="vr-metric-badge" title={badgeTitle || undefined}><bdi>{badge}</bdi>{badgeTitle && <span className="vr-sr-only">{' — ' + badgeTitle}</span>}</span>}
     </div>
     <p className="vr-metric-value"><bdi>{value ?? 'אין נתון'}</bdi></p>
+    {/* שורת ההשוואה. title לבדו לא קיים במגע, ולכן היא מוצגת כטקסט. */}
+    {badgeTitle && <p className="vr-metric-compare"><bdi>{badgeTitle}</bdi></p>}
     {description && <p className="vr-metric-note">{description}</p>}
     {trend && <div className="vr-metric-trend">{trend}</div>}
     {details && <details className="vr-help"><summary aria-describedby={hintId}><Info size={16} aria-hidden="true" /><span>הסבר המדד</span></summary><p id={hintId}>{details}</p></details>}
