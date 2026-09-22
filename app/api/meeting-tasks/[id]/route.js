@@ -12,7 +12,7 @@
  * והוא יכול להיות שונה — שדה נפרד, לא נגזרת.
  */
 import { meetingsClient, requireSignedIn } from '../../../../lib/meetings/store'
-import { requireProjectAccess } from '../../../../lib/auth'
+import { requireProjectPlan } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -40,7 +40,9 @@ export async function PATCH(request, { params }) {
   if (findErr) return json({ error: 'DB: ' + findErr.message }, 500)
   if (!task) return json({ error: 'משימה לא נמצאה' }, 404)
 
-  const gate = await requireProjectAccess(request, task.project_id)
+  // גישה לפרויקט **וגם** מנוי PRO — ישיבות שיווק נמכר בנפרד (מיגרציה 020). אותו
+  // שער בדיוק כמו ב-lib/meetings/store.js, כי משימה היא נגזרת של ישיבה.
+  const gate = await requireProjectPlan(request, task.project_id, 'pro')
   if (!gate.ok) return gate.res
 
   let body

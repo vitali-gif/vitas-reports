@@ -18,11 +18,12 @@ export const maxDuration = 60
 // basis and is routinely late — the 04:30 UTC slot has landed as late as 07:46. Combined
 // with the legitimate overnight gap (last run ~18:30 UTC, next ~04:30 UTC = 10h), a tight
 // threshold produced a false "cron stopped" alarm every single morning.
-// 6h absorbs the 2h cadence + a few hours of GH delay; the window starts at 10:00 UTC so the
-// (possibly delayed) first run of the day has landed before we start judging.
+// הסף היה 6h כדי לספוג את האיחורים של GitHub, והחלון נפתח ב-10:00 UTC כדי שהריצה
+// הראשונה של היום (גם אם אוחרה) תספיק לנחות לפני שמתחילים לשפוט.
 // 2026-09-08: המתזמן הוחלף ל-cron-job.org (דיוק של דקה) ו-GitHub Actions נשאר כגיבוי בלבד,
-// אז אין יותר צורך בסבלנות לאיחורים של שעות. החלון נפתח ב-05:00 UTC (08:00 בישראל) כדי שהתקלה
-// תתגלה לפני שמישהו פותח את הדשבורד, ולא ב-13:00 כמו קודם.
+// אז אין יותר צורך בסבלנות לאיחורים של שעות. הסף ירד ל-3h והחלון נפתח ב-05:00 UTC
+// (08:00 בישראל) כדי שהתקלה תתגלה לפני שמישהו פותח את הדשבורד, ולא ב-13:00 כמו קודם.
+// גבול החלון העליון — ראה ההערה ב-inActiveWindow למטה.
 const STALE_HOURS = 3
 const JOBS = [
   { job: 'prefetch-ads', label: 'קרון מודעות (Meta/Google)' },
@@ -43,7 +44,17 @@ export async function GET(request) {
 
   // Only judge once the (often-delayed) first run of the day has had time to land.
   const utcH = new Date().getUTCHours()
-  const inActiveWindow = utcH >= 5 && utcH <= 21
+  // ⚠️ הגבול העליון נגזר מלוח הזמנים של הקרונים, לא מ"שעות פעילות" מופשטות.
+  // 🔴 21.9.2026: החלון הסתיים ב-21, והתוצאה הייתה התראת שווא **כל לילה**.
+  //    המשבצת האחרונה של קרון המודעות היא 18:07 UTC, ואז יש פער לילי לגיטימי עד 04:07.
+  //    השומר רץ כל שעה ב-:15, ולכן ב-21:15 הגיל הוא 3.1 שעות — בדיוק מעבר לסף של 3 —
+  //    והוא ירה "ייתכן שהקרון נתקע" ב-00:15 שעון ישראל, כשהכל תקין לגמרי.
+  // עם גבול 20 הבדיקה האחרונה של היום היא 20:15, שבה הגיל הוא 2.1 שעות — שקט.
+  // לא מאבדים כיסוי: אם משבצת 18:07 באמת נכשלה, המדידה האחרונה היא 16:07, וכבר
+  // ב-19:15 הגיל הוא 3.1 שעות וההתראה יוצאת — שעה מוקדם יותר מקודם.
+  // נשאר ב-UTC ולא בשעון ישראל בכוונה: המשבצות עצמן מתוזמנות ב-UTC, ומעבר שעון קיץ
+  // היה מזיז את החלון ביחס אליהן.
+  const inActiveWindow = utcH >= 5 && utcH <= 20
 
   let beats
   try {

@@ -11,7 +11,9 @@
     "test:crm": "node scripts/tests/bmby-summary.smoke.mjs && node scripts/tests/raw-store.smoke.mjs && node scripts/tests/zoho-summary.smoke.mjs && node scripts/tests/salesforce-summary.smoke.mjs",
     "test:ads": "node scripts/tests/ads-range.smoke.mjs",
     "test:meetings": "node scripts/tests/transcript-parse.smoke.mjs",
-    "test": "npm run test:crm && npm run test:ads && npm run test:meetings",
+    "test:plan": "node scripts/tests/plan-gate.smoke.mjs",
+    "test:backfill": "node scripts/tests/backfill-gaps.smoke.mjs",
+    "test": "npm run test:crm && npm run test:ads && npm run test:meetings && npm run test:plan && npm run test:backfill",
     "test:e2e": "playwright test",
     "test:e2e:public": "playwright test --grep ציבורי",
     "qa": "npm run lint && npm run check:auth && npm test"

@@ -34,10 +34,13 @@ const PUBLIC_ROUTES = new Set([
 ])
 
 // requireMeeting / requireProject הם השומרים של פיצ'ר הישיבות (lib/meetings/store.js).
-// שניהם עוטפים את requireProjectAccess: requireMeeting שולף קודם את project_id של הישיבה
+// שניהם עוטפים את requireProjectPlan: requireMeeting שולף קודם את project_id של הישיבה
 // מה-DB ורק אז בודק הרשאה עליו, כדי שלא נסמוך על projectId שמגיע מהדפדפן. הם מופיעים כאן
 // כי הם באמת בדיקת הרשאה — לא כדי לעקוף את הבדיקה.
-const GUARDS = /requireAdmin\s*\(|requireProjectAccess\s*\(|requireFetchAccess\s*\(|requireUser\s*\(|isInternalCall\s*\(|requireMeeting\s*\(|requireProject\s*\(|CRON_SECRET|api_tokens/
+//
+// requireProjectPlan = requireProjectAccess + בדיקת מנוי (clients.plan, מיגרציה 020).
+// הוא שומר חזק יותר מ-requireProjectAccess, לא חלש יותר: הוא מריץ אותו ואז מוסיף תנאי.
+const GUARDS = /requireAdmin\s*\(|requireProjectAccess\s*\(|requireProjectPlan\s*\(|requireFetchAccess\s*\(|requireUser\s*\(|isInternalCall\s*\(|requireMeeting\s*\(|requireProject\s*\(|CRON_SECRET|api_tokens/
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {

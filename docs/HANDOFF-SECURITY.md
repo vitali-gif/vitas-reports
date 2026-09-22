@@ -49,10 +49,17 @@
 ```
 requireAdmin(req)                      אדמין או קריאה פנימית
 requireProjectAccess(req, projectId)   אדמין / פנימי / לקוח עם שורה ב-client_access
+requireProjectPlan(req, projectId, p)  כנ"ל + מנוי הלקוח (clients.plan) מספיק לפיצ'ר
 requireFetchAccess(req, projectId)     כנ"ל + הגבלת קצב ללקוח: 12 משיכות חיות בשעה
 isInternalCall(req)                    CRON_SECRET בלבד
 monitorTokenOf(req)                    טוקן api_tokens בהיקף '*'
 ```
+
+`requireProjectPlan` הוא הרחבה של `requireProjectAccess`, לא תחליף: הוא מריץ אותו
+במלואו ורק אז מוסיף תנאי. הוא מחזיר 403 עם `code: 'PLAN_REQUIRED'` — קוד נפרד מ-403
+של הרשאה, כדי שהדפדפן יבדיל בין "אין לך גישה לפרויקט" ל"הפיצ'ר אינו במנוי". אדמין
+וקריאה פנימית עוברים אותו תמיד. המנוי נגזר מ-`projects.client_id → clients.plan`,
+והוא fail-closed בכל נתיב: עמודה חסרה, שגיאת שאילתה או ערך לא מוכר = `basic`.
 
 כולן `fail-closed`: משתנה סביבה חסר → דחייה, לא מעבר.
 
@@ -219,8 +226,8 @@ CRON_SECRET או JWT, ולכן ראויה לתשומת לב מיוחדת.**
 | `google/fetch` | `requireFetchAccess` |
 | `google/script-ingest` | `GOOGLE_SCRIPT_SECRET` |
 | `keepalive` | ציבורי — ping בלבד, לא מחזיר נתונים |
-| `meetings`, `meeting-tasks/[id]` | `requireProjectAccess` |
-| `meetings/[id]`, `/summary`, `/transcript` | `requireMeeting` (פרויקט הישיבה → הרשאה עליו) |
+| `meetings`, `meeting-tasks/[id]` | `requireProjectPlan(…, 'pro')` — הרשאה **וגם** מנוי |
+| `meetings/[id]`, `/summary`, `/transcript` | `requireMeeting` (פרויקט הישיבה → `requireProjectPlan` עליו) |
 | `meta/diagnose`, `meta/rules` | `requireAdmin` |
 | `meta/fetch` | `requireFetchAccess` |
 | `reports/by-project` | `requireProjectAccess` |
