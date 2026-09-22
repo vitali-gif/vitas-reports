@@ -61,24 +61,27 @@ commit;
 --
 -- רק ימים שקיימים בפועל. חור נשאר לא רשום, וה-backfill ימשוך אותו מחדש.
 --
--- ⚠️ למה now() ולא max(fetched_at): העמודה fetched_at אינה חלק מהמפתח הראשי
--- (source, account, day, row_key), ולכן max(fetched_at) מכריח את Postgres לגשת
--- לטבלה עצמה — סריקה מלאה של מאות אלפי שורות מהדיסק. בלעדיה האגרגציה מסתפקת
--- באינדקס (index-only scan) ורצה בשניות. הערך עצמו הוא רישום בלבד ולא נקרא
--- בשום מקום בקוד, אז "מתי זרענו" טוב בדיוק כמו "מתי נמשך במקור".
+-- עלות: זול. ad_daily_coverage_idx הוא על (source, account, day, fetched_at) ולכן
+-- מכסה את השאילתה במלואה — Parallel Index Only Scan על אינדקס של 2.6MB, בלי לגעת
+-- ב-heap של 157MB. נמדד ב-EXPLAIN: cost 7,322.
+--
+-- (להשוואה, ולתיעוד: שאילתת ביקורת עם `like '%שם-קמפיין%'` על אותה טבלה היא
+--  Parallel Seq Scan בעלות 22,527 וקוראת את כל ה-heap. shared_buffers כאן הוא
+--  224MB, ו-ad_daily לבדה 157MB — כמה סריקות כאלה ברצף מפנות את המטמון ומאטות
+--  את כל הדשבורד. זה מה שקרה ב-22.9 בצהריים, ולא הזריעה הזאת.)
 -- ═══════════════════════════════════════════════════════════════════════════
 insert into public.ad_daily_fetch (source, account, day, fetched_at, rows)
-select source, account, day, now(), count(*)::int
+select source, account, day, max(fetched_at), count(*)::int
 from public.ad_daily
 group by source, account, day
 on conflict (source, account, day) do nothing;
 
 
--- ── אם גם זה נופל על timeout: אותה זריעה, חודש בכל פעם ──────────────────────
+-- ── אם בכל זאת נופל על timeout: אותה זריעה, חודש בכל פעם ────────────────────
 -- מריצים שוב ושוב ומשנים את החודש. idempotent — אפשר לחזור על חודש שכבר נזרע.
 --
 --   insert into public.ad_daily_fetch (source, account, day, fetched_at, rows)
---   select source, account, day, now(), count(*)::int
+--   select source, account, day, max(fetched_at), count(*)::int
 --   from public.ad_daily
 --   where day >= date '2026-09-01' and day < date '2026-10-01'
 --   group by source, account, day
