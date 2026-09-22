@@ -27,8 +27,15 @@
 --
 -- RLS דלוק בלי מדיניות: service_role בלבד. אין PII בטבלה.
 -- הרצה חוזרת בטוחה (idempotent). rollback בתחתית הקובץ.
+--
+-- ⚠️ שני חלקים — מריצים בנפרד, לא הכל בהדבקה אחת.
+--    חלק 1 (DDL) מיידי. חלק 2 (זריעה) סורק את ad_daily ולוקח כמה שניות.
+--    אם חלק 2 נופל על timeout, יש בתחתיתו גרסה מחולקת לפי חודש.
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- ═══════════════════════════════════════════════════════════════════════════
+-- חלק 1 מתוך 2 — הטבלה. מיידי.
+-- ═══════════════════════════════════════════════════════════════════════════
 begin;
 
 create table if not exists public.ad_daily_fetch (
@@ -46,15 +53,41 @@ create index if not exists ad_daily_fetch_acct_day_idx
 alter table public.ad_daily_fetch enable row level security;
 -- אין policies בכוונה: רק service_role.
 
--- ── זריעה: מה שכבר יש ב-ad_daily נחשב נמשך ──────────────────────────────────
+commit;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- חלק 2 מתוך 2 — זריעה: מה שכבר יש ב-ad_daily נחשב נמשך.
+--
 -- רק ימים שקיימים בפועל. חור נשאר לא רשום, וה-backfill ימשוך אותו מחדש.
+--
+-- ⚠️ למה now() ולא max(fetched_at): העמודה fetched_at אינה חלק מהמפתח הראשי
+-- (source, account, day, row_key), ולכן max(fetched_at) מכריח את Postgres לגשת
+-- לטבלה עצמה — סריקה מלאה של מאות אלפי שורות מהדיסק. בלעדיה האגרגציה מסתפקת
+-- באינדקס (index-only scan) ורצה בשניות. הערך עצמו הוא רישום בלבד ולא נקרא
+-- בשום מקום בקוד, אז "מתי זרענו" טוב בדיוק כמו "מתי נמשך במקור".
+-- ═══════════════════════════════════════════════════════════════════════════
 insert into public.ad_daily_fetch (source, account, day, fetched_at, rows)
-select source, account, day, max(fetched_at), count(*)::int
+select source, account, day, now(), count(*)::int
 from public.ad_daily
 group by source, account, day
 on conflict (source, account, day) do nothing;
 
-commit;
+
+-- ── אם גם זה נופל על timeout: אותה זריעה, חודש בכל פעם ──────────────────────
+-- מריצים שוב ושוב ומשנים את החודש. idempotent — אפשר לחזור על חודש שכבר נזרע.
+--
+--   insert into public.ad_daily_fetch (source, account, day, fetched_at, rows)
+--   select source, account, day, now(), count(*)::int
+--   from public.ad_daily
+--   where day >= date '2026-09-01' and day < date '2026-10-01'
+--   group by source, account, day
+--   on conflict (source, account, day) do nothing;
+--
+-- בדיקה שהזריעה שלמה (שני המספרים אמורים להיות זהים):
+--   select (select count(*) from public.ad_daily_fetch) as seeded,
+--          (select count(*) from (select 1 from public.ad_daily
+--                                 group by source, account, day) x) as expected;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- rollback
