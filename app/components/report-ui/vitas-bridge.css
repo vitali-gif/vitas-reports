@@ -416,3 +416,34 @@
   .vr-ui .vcs-root .vcs-source-link,
   .vr-ui .vcs-root .vcs-sort { min-block-size: 44px; }
 }
+
+/* ============================================================
+   מובייל: ‎.vr-shell‎ חוזר לעמודה אחת
+
+   ‎.vr-shell‎ מוגדר למעלה (בלי media query) כ-‎grid-template-columns:
+   224px minmax(0, 1fr)‎ — כלומר עמודת סיידבר קבועה ועוד עמודה ראשית.
+   הכלל הזה נועד לדסקטופ, ו-‎@media (min-width: 769px)‎ אף מחליף אותו
+   בעמודה אחת עם ‎margin-inline-start‎. אבל **מתחת ל-769px לא היה כלום**,
+   ולכן כלל הבסיס נשאר בתוקף דווקא במסך הצר.
+
+   מה זה עשה בפועל (Pixel 7, 412px): 224px הלכו לעמודת הסיידבר ולתוכן
+   נשארו 188px. הסיידבר עצמו הוא ‎position: fixed‎ במובייל (globals.css),
+   כלומר מחוץ לזרימה — אז העמודה שלו פשוט נשארה ריקה. התוצאה היא הדוח
+   דחוס לשליש מהמסך והשאר ריק, וזה מה שוויטלי תיאר כ"המסך נשבר" וכ"עמוס
+   בנתונים", וזה מה שראינו בצילומי הכשל של ה-E2E.
+
+   למה זה גם חסם לחיצות: ה-header (‎position: fixed‎) והשורה הדביקה נשארו
+   ברוחב המסך המלא בזמן שהתוכן הצטמצם, ולכן נחתו על שורת הטאבים. ב-call
+   log של Playwright זה הופיע כ-‎<button class="h-kebab"> from <header
+   class="header header-vr"> subtree intercepts pointer events‎.
+
+   הפריסה הישנה (‎.layout‎) קיבלה כלל מובייל ב-globals.css עוד בשלב 2 של
+   המובייל. השכבה המחודשת (PR #41) לא קיבלה — זה הפער.
+   ============================================================ */
+@media (max-width: 768px) {
+  .vr-shell {
+    grid-template-columns: minmax(0, 1fr);
+    margin-inline-start: 0;
+  }
+  .header.header-vr { margin-inline-start: 0; }
+}
