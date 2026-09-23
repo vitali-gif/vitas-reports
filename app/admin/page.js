@@ -207,7 +207,7 @@ const downloadXlsx = async (rows, filename, sheetName = 'נתונים') => {
   }
 };
 
-export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null }) {
+export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null, onLogout = null }) {
   // שמות הדמו מגיעים מה-DB (הפרויקט/הלקוח שסומנו is_demo) ולא מקודדים בקוד,
   // אחרת הכותרת והסיידבר מציגים שני שמות שונים.
   const [session, setSession] = useState(null)
@@ -6568,7 +6568,10 @@ const selectProject = async (client, project) => {
         onExport={!isClientView && !isDemoProject ? handleExport : undefined}
         onClientAccess={!isClientView ? handleClientAccess : undefined}
         onSessionLogs={!isClientView ? handleSessionLogs : undefined}
-        onLogout={handleLogout}
+        // בצד הלקוח ההתנתקות שייכת לדף /client, כי שם יושב המצב שמחליט אם להציג את הדשבורד
+        // או את מסך הכניסה. handleLogout של האדמין רק מנקה את ה-state של הרכיב הזה, והדף שמעליו
+        // לא ידע שהמשתמש התנתק — הכפתור "לא עשה כלום" (ויטלי, 23.9).
+        onLogout={onLogout || handleLogout}
         loadingIndicator={(refreshing || refreshingCrm) ? (
           <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'6px 12px',background:'rgba(99,102,241,0.1)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:13}}>
             <span style={{display:'inline-block',width:12,height:12,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
