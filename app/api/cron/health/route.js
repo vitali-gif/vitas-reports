@@ -100,18 +100,31 @@ export async function GET(request) {
     const todayKey = `${todayIL}_${todayIL}`
     const { data: todayRows } = await sb.from('reports').select('id').eq('month', todayKey).limit(1)
     todayKeyRows = (todayRows || []).length
-    // רק מ-06:00 UTC (09:00 בישראל) — לריצה הראשונה של היום (04:07 UTC) יש זמן לנחות.
-    // ורק אם ה-heartbeat תקין, אחרת זו תקלת תזמון שהשומר למעלה כבר כיסה.
-    if (utcH >= 6 && utcH <= 21 && stale.length === 0 && todayKeyRows === 0) {
+    // 🔴 23–24.9.2026: התראת שווא כל בוקר, יומיים ברצף. השער נפתח ב-06:00 UTC בהנחה
+    //    שהריצה הראשונה של היום היא ב-04:07 UTC — וזה נכון רק ל-GitHub Actions, שהוא
+    //    **מתזמן הגיבוי**. המתזמן בפועל הוא cron-job.org, ושם prefetch-ads רץ כל שעתיים
+    //    **מ-07:07 UTC** (docs/daily-ranges.md, טבלת הקרונים). כלומר ב-06:15 מפתח היום
+    //    עוד לא נכתב כי הקרון פשוט לא רץ עדיין, וההתראה יצאה בכל בוקר.
+    // עכשיו 08:00 UTC — שעה שלמה אחרי המשבצת הראשונה, אותו מרווח ביטחון שיש לגבול העליון.
+    // לא מאבדים כיסוי: אם ריצת 07:07 באמת נכשלה, הבדיקה של 08:15 תתפוס את זה, וכך גם
+    // כל בדיקה שעתית אחריה עד 21:15.
+    // ⚠️ הגבול הזה קשור ללוח הזמנים של prefetch-ads. אם המשבצת הראשונה זזה — לעדכן גם כאן.
+    if (utcH >= 8 && utcH <= 21 && stale.length === 0 && todayKeyRows === 0) {
       const _fmtIL = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(d)
       const alertRow = beats.find(b => b.job === 'silence_alert')
       const alertedToday = !!(alertRow && alertRow.last_run && _fmtIL(new Date(alertRow.last_run)) === todayIL)
       if (!alertedToday) {
         const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
           <h2>🚨 לא נכתבו נתונים של היום</h2>
-          <p>הקרונים מדווחים שהם רצים, אבל <b>לא קיימת אף שורת דוח עבור ${todayIL}</b>.</p>
-          <p>כלומר המשיכה מתבצעת אך לא מגיעה למסד — לא תקלת תזמון אלא תקלת נתונים.
+          <p>הקרונים מדווחים שהם רצים, אבל <b>לא קיימת אף שורת דוח עבור ${todayIL}</b>.
              בדשבורד זה ייראה כמו טווח "היום" ריק.</p>
+          <p>מה לבדוק, לפי הסדר:<br>
+             1. האם <code>prefetch-ads</code> באמת רץ היום — <code>job_log</code>, לא רק ה-heartbeat.<br>
+             2. אם רץ ודיווח הצלחה — לחפש את המפתח <code>${todayIL}_${todayIL}</code> בטבלת
+                <code>reports</code>. הוא נכתב על ידי ה-preset בשם <code>today</code> ב-prefetch-ads.<br>
+             3. אם הוא קיים עכשיו — ההתראה הזו הקדימה את הקרון, וזו תקלת תזמון בשומר ולא בנתונים.</p>
+          <!-- ⚠️ אל תכתוב כאן "זו תקלת נתונים ולא תזמון". הניסוח הזה היה בגרסה הקודמת
+               והטעה פעמיים (23–24.9): בשני המקרים הקרון היה תקין והשומר פשוט הקדים אותו. -->
           <p style="color:#888;font-size:12px">Tovno by Vitas · שומר שקט · התראה אחת ליום</p></div>`
         try {
           await sendAlert({ subject: `🚨 VITAS: לא נכתבו נתונים של ${todayIL}`, html })

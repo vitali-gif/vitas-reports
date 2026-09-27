@@ -335,6 +335,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [expandedCampaigns, setExpandedCampaigns] = useState(new Set());
   const [expandedAdSets, setExpandedAdSets] = useState(new Set());
   const [expandedCrmSources, setExpandedCrmSources] = useState(new Set());
+  // רמה שלישית בטבלת מקורות ההגעה: שמות המודעות מתחת למקור (ויטלי, 27.9).
+  // מפתח = שם המקור, כי מודעות תלויות במקור אחד בלבד.
+  const [expandedCrmAds, setExpandedCrmAds] = useState(new Set());
   const [expandedAdTree, setExpandedAdTree] = useState(new Set());
   const [adsSpentOnly, setAdsSpentOnly] = useState(true); // ads drill: show only ads that spent money this month
   const [expandedFunnelCh, setExpandedFunnelCh] = useState(new Set());
@@ -1973,34 +1976,85 @@ const selectProject = async (client, project) => {
     const leadHourTotal = leadHourMerged.reduce((a, b) => a + b, 0);
     const contactHourTotal = contactHourMerged.reduce((a, b) => a + b, 0);
     const hourHasData = hourTotal > 0 || leadHourTotal > 0 || contactHourTotal > 0;
-    // Conversion per hour (per user request): meetings SCHEDULED at hour h ÷ first-contacts made at hour h.
-    // e.g. 10:00 → 2 meetings scheduled / 15 contacts = 13%. null where there were no contacts that hour
-    // (so the line skips empty hours). Note: numerator counts meetings by their scheduling hour, which may
-    // include meetings for leads first-contacted in a different hour — this is the simple same-hour ratio.
-    const contactRate = contactHourMerged.map((c, h) => c > 0 ? Math.round((hourMerged[h] / c) * 100) : null);
+
+    // ── תקופת ההשוואה ─────────────────────────────────────────────────────────
+    // אותן שתי סדרות מהתקופה הקודמת, כדי לראות אם חלון שעות מסוים השתפר. נטען רק
+    // כשמתג ההשוואה דלוק, ומאותם שדות בדיוק — ההבדל היחיד הוא מפתח התקופה.
+    // ויטלי, 27.9: הבדיקה של "מנהלת המכירות מטפלת 11:00–13:00" היא שאלה של לפני
+    // ואחרי, ובלי הקו הזה צריך להחזיק את המספרים של החודש שעבר בראש.
+    const _cmpKey = compareEnabled ? comparisonPeriodKey(selectedMonth) : '';
+    const cmpContactHour = Array.from({ length: 24 }, () => 0);
+    const cmpContactMeeting = Array.from({ length: 24 }, () => 0);
+    let cmpHasData = false;
+    if (_cmpKey) {
+      for (const r of reports.filter(x => x.month === _cmpKey && x.source === 'crm')) {
+        const _c = r.summary && r.summary.hourlyContactStats;
+        const _m = r.summary && r.summary.hourlyContactMeeting;
+        if (Array.isArray(_c)) { for (let i = 0; i < 24; i++) cmpContactHour[i] += _c[i] || 0; cmpHasData = true; }
+        if (Array.isArray(_m)) for (let i = 0; i < 24; i++) cmpContactMeeting[i] += _m[i] || 0;
+      }
+    }
+    const cmpRate = cmpContactHour.map((c, h) => c > 0 ? Math.round((cmpContactMeeting[h] / c) * 100) : null);
+
+    // אחוז ההמרה לפי שעת הטיפול: מתוך הלידים שנוצר איתם קשר בשעה h, כמה הבשילו לפגישה.
+    //
+    // 🔴 27.9.2026: המונה כאן היה `hourMerged` — פגישות ש**נוצרו** בשעה h — בעוד
+    //    שהמכנה הוא יצירות הקשר באותה שעה. אלה לא אותם לידים: ליד שנוצר איתו קשר
+    //    ב-11:00 ופגישתו נקבעה ב-15:00 נספר במכנה של 11 ובמונה של 15. התוצאה יכולה
+    //    לעבור 100% ואין לה פירוש. ההערה הישנה כאן אף תיארה את זה כ"יחס פשוט לאותה
+    //    שעה", כלומר הבעיה הייתה ידועה ולא סומנה כתקלה.
+    //    `hourlyContactMeeting` סופר בדיוק את מה שצריך (bmby-summary.js: אותה שורה
+    //    שמגדילה את hourlyContactStats מגדילה אותו כש-scheduledHit), הוא ממוזג כאן
+    //    מאז ומתמיד — ופשוט אף אחד לא השתמש בו. עכשיו המונה הוא תת-קבוצה של המכנה,
+    //    ולכן היחס תמיד 0–100%.
+    const contactRate = contactHourMerged.map((c, h) => c > 0 ? Math.round((contactMeetingMerged[h] / c) * 100) : null);
     if (hourHasData) {
       pendingChartsRef.current.push(setTimeout(() => {
         const hLabels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
         if (vrResp) {
-          const _idx = Array.from({ length: 24 }, (_, h) => h).filter(h => leadHourMerged[h] > 0 || hourMerged[h] > 0 || contactHourMerged[h] > 0);
+          // 🔴 27.9.2026: העיצוב המחודש השאיר כאן שתי סדרות בלבד (לידים, תיאומי פגישות)
+          //    והוריד את "יצירת קשר" ואת קו ההמרה ל-tooltip. שתיים משלוש השאלות שהמסך
+          //    הזה אמור לענות עליהן הפכו לתלויות ריחוף — כלומר לא קיימות במובייל.
+          //    הן חוזרות לגרף עצמו. הסדרה הסגולה הוחלפה מ-hourMerged (פגישות שנוצרו
+          //    בשעה h) ל-contactMeetingMerged (מתוך מי שטופל בשעה h — כמה קיבלו פגישה),
+          //    כי רק היא מתחברת ל"לידים שטופלו" ורק ממנה נגזר אחוז המרה בעל פירוש.
+          const _idx = Array.from({ length: 24 }, (_, h) => h).filter(h => leadHourMerged[h] > 0 || contactHourMerged[h] > 0 || contactMeetingMerged[h] > 0 || (cmpHasData && cmpContactHour[h] > 0));
           const _from = _idx.length ? Math.min(..._idx) : 8, _to = _idx.length ? Math.max(..._idx) : 20;
           const _hours = Array.from({ length: _to - _from + 1 }, (_, i) => _from + i);
           const _line = (color) => ({ borderColor: color, backgroundColor: color, borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 6,
-            pointBackgroundColor: color, pointBorderColor: '#FFFFFF', pointBorderWidth: 1.5, tension: 0, fill: false });
-          createChart('apptHourChart', 'line', _hours.map(h => h + ':00'), [
-            { label: 'לידים', data: _hours.map(h => leadHourMerged[h]), ..._line('#3B82F6') },
-            { label: 'תיאומי פגישות', data: _hours.map(h => hourMerged[h]), ..._line('#8B5CF6') },
-          ], {
+            pointBackgroundColor: color, pointBorderColor: '#FFFFFF', pointBorderWidth: 1.5, tension: 0, fill: false, yAxisID: 'y' });
+          const _sets = [
+            { label: 'לידים שנכנסו', data: _hours.map(h => leadHourMerged[h]), ..._line('#3B82F6') },
+            { label: 'לידים שטופלו', data: _hours.map(h => contactHourMerged[h]), ..._line('#F59E0B') },
+            { label: 'מתוכם תואמה פגישה', data: _hours.map(h => contactMeetingMerged[h]), ..._line('#8B5CF6') },
+            { label: '% המרה לפגישה', data: _hours.map(h => contactRate[h]), ..._line('#EF4444'), borderDash: [5, 4], pointRadius: 3, spanGaps: true, yAxisID: 'y1' },
+          ];
+          if (cmpHasData) _sets.push({ label: '% המרה · תקופה קודמת', data: _hours.map(h => cmpRate[h]),
+            ..._line('#9AA3B5'), borderWidth: 2, borderDash: [2, 3], pointRadius: 0, spanGaps: true, yAxisID: 'y1' });
+          createChart('apptHourChart', 'line', _hours.map(h => h + ':00'), _sets, {
             x: { grid: { display: false }, ticks: { font: { size: cfs(11), weight: '600' }, color: '#374151', maxRotation: 0 } },
-            y: { beginAtZero: true, grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' } },
+            y: { beginAtZero: true, position: 'right', grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' },
+                 title: { display: true, text: 'כמות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
+            y1: { beginAtZero: true, suggestedMax: 100, position: 'left', grid: { display: false },
+                  ticks: { precision: 0, color: '#EF4444', callback: (v) => v + '%' },
+                  title: { display: true, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#EF4444' } },
           }, undefined, { options: { plugins: {
             legend: { position: 'top', align: 'center', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 18, font: { weight: '600', size: 12 }, color: '#374151' } },
-            tooltip: { callbacks: { afterBody: (items) => { const h = _hours[items[0].dataIndex]; const c = contactHourMerged[h]; return c > 0 ? ['יצירת קשר: ' + c, '% המרה לפגישה: ' + contactRate[h] + '%'] : []; } } },
+            tooltip: { callbacks: { afterBody: (items) => {
+              const h = _hours[items[0].dataIndex];
+              const c = contactHourMerged[h];
+              if (!c) return [];
+              const out = [`${contactMeetingMerged[h]} מתוך ${c} שטופלו בשעה זו קיבלו פגישה`];
+              if (cmpHasData && cmpContactHour[h] > 0) out.push(`תקופה קודמת: ${cmpContactMeeting[h]} מתוך ${cmpContactHour[h]} (${cmpRate[h]}%)`);
+              return out;
+            } } },
           } } });
         } else createChart('apptHourChart', 'bar', hLabels, [
-          { label: 'לידים', type: 'bar', data: leadHourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 3 },
-          { label: 'יצירת קשר', type: 'bar', data: contactHourMerged.slice(), backgroundColor: '#F59E0B', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 2 },
-          { label: 'פגישות שתואמו', type: 'bar', data: hourMerged.slice(), backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
+          { label: 'לידים שנכנסו', type: 'bar', data: leadHourMerged.slice(), backgroundColor: '#6366F1', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 3 },
+          { label: 'לידים שטופלו', type: 'bar', data: contactHourMerged.slice(), backgroundColor: '#F59E0B', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 2 },
+          // אותו תיקון כמו בגרף החדש: מתוך מי שטופל בשעה h, כמה קיבלו פגישה — ולא
+          // כמה פגישות נוצרו בשעה h, שהן קבוצה אחרת של לידים.
+          { label: 'מתוכם תואמה פגישה', type: 'bar', data: contactMeetingMerged.slice(), backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 26, yAxisID: 'y', order: 1 },
           { label: '% המרה לפגישה', type: 'line', data: contactRate, borderColor: '#EF4444', backgroundColor: '#EF4444', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.3, spanGaps: true, yAxisID: 'y1', order: 0 },
         ], {
           x: { grid: { display: false }, ticks: { font: { size: cfs(9), weight: '600' }, maxRotation: 0, autoSkip: isNarrowViewport() } },
@@ -2146,7 +2200,7 @@ const selectProject = async (client, project) => {
 
         {hourHasData && (
           <div className="section">
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות תיאום פגישות ולידים</h2>{!vrResp && <span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, מתי אנשי המכירות יצרו קשר, וכמה פגישות תואמו. הקו האדום = פגישות שנקבעו באותה שעה חלקי יצירות הקשר באותה שעה (אחוז המרה)</span>}</div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות טיפול בלידים ותיאום פגישות</h2><span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, כמה מהם טופלו בפועל, וכמה מהלידים שטופלו באותה שעה הבשילו לפגישה. הקו המקווקו הוא אחוז ההמרה — מתוך אותם לידים עצמם, ולכן תמיד 0–100%.</span></div>
             <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="apptHourChart"></canvas></div></div>
           </div>
         )}
@@ -2200,7 +2254,9 @@ const selectProject = async (client, project) => {
         </div>
       </div>
     );
-  }, [vrResp, selectedMonth, reports]);
+    // compareEnabled נקרא בתוך ה-callback (סדרת "תקופה קודמת"), ולכן חייב להיות כאן —
+    // בלעדיו הדלקת מתג ההשוואה לא מציירת את הגרף מחדש.
+  }, [vrResp, selectedMonth, reports, compareEnabled]);
 
     // ==================== CRM OBJECTIONS SUB-TAB ====================
   const renderCrmObjectionsDashboard = useCallback(() => {
@@ -3024,6 +3080,84 @@ const selectProject = async (client, project) => {
       crmData.sources['Google'] = _gMerged;
     }
 
+    // ── רמה שלישית: שם המודעה (ויטלי, 27.9) ──────────────────────────────────
+    // "אני רוצה שיהיה עוד דרופ של שם מודעה, וככה אדע איזו מודעה מביאה
+    //  פגישות/הרשמות/חוזים."
+    //
+    // adBreakdown כבר מחזיק בדיוק את זה — לכל צומת מודעה יש source, platform,
+    // campaign, adset, ad, ולצידם לידים, רלוונטיים, תואמו, בוצעו, הרשמות וחוזים.
+    // הוא נבנה ב-bmby-summary.js ונשמר בסיכום מזמן, ופשוט לא היה בשימוש בטבלה הזאת.
+    //
+    // ⚠️ למה החיבור בטוח: המפתח `source` ב-adBreakdown מגיע מ-`cidToMedia.get(cid)`,
+    //    בדיוק אותו מקור שממנו נבנים מפתחות crmData.sources (ensureSrc באותו קובץ).
+    //    לכן אין כאן התאמת מחרוזות מנחשת, ואין צורך בשינוי סכמה או במשיכה מחדש.
+    //
+    // ⚠️ מה שאין ב-adBreakdown: ביטולי פגישות ושווי כספי של הרשמות וחוזים. בשורות
+    //    המודעה הן מוצגות כ-"—" ולא כאפס, כדי שלא ייראה כאילו נמדד ויצא אפס.
+    const _adsBySource = new Map();
+    for (const _r of crmReports) {
+      for (const a of (_r.summary?.adBreakdown || [])) {
+        const src = ((a.source || '').toString().trim()) || 'ללא מקור';
+        // מודעות בלי שם (למשל לידים שהגיעו בלי תיוג מלא) מקובצות תחת הקמפיין שלהן,
+        // ורק אם גם הוא חסר — תחת תווית מפורשת. מחיקה שקטה שלהן הייתה מסתירה לידים.
+        const adName = ((a.ad || '').toString().trim())
+          || ((a.campaign || '').toString().trim())
+          || 'ללא שם מודעה';
+        if (!_adsBySource.has(src)) _adsBySource.set(src, new Map());
+        const byAd = _adsBySource.get(src);
+        let row = byAd.get(adName);
+        if (!row) {
+          row = { name: adName, campaign: (a.campaign || '').toString().trim(),
+                  totalLeads: 0, relevantLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, registrations: 0, contracts: 0 };
+          byAd.set(adName, row);
+        }
+        row.totalLeads += a.leads || 0;
+        row.relevantLeads += a.relevantLeads || 0;
+        row.meetingsScheduled += a.meetings || 0;
+        row.meetingsCompleted += a.meetingsCompleted || 0;
+        row.registrations += a.registrations || 0;
+        row.contracts += a.contracts || 0;
+      }
+    }
+    const _adsFor = (src) => {
+      const m = _adsBySource.get(src);
+      if (!m) return [];
+      return [...m.values()].filter(r => r.totalLeads > 0).sort((a, b) => b.totalLeads - a.totalLeads);
+    };
+    const _adToggle = (srcName) => setExpandedCrmAds(prev => {
+      const n = new Set(prev);
+      if (n.has(srcName)) n.delete(srcName); else n.add(srcName);
+      return n;
+    });
+    // שורות המודעה. מוגדר כאן ולא בתוך ה-JSX כי הוא משמש בשני מקומות: מתחת לקמפיין
+    // (פייסבוק/גוגל, שם הרמה השנייה היא מחרוזת המקור של BMBY) ומתחת למקור שאין לו
+    // קמפיינים כלל (yad2, מקורבים, אתר החברה).
+    const _renderAdRows = (srcName, padStart) => _adsFor(srcName).map(ad => {
+      const _s = ad.totalLeads > 0 ? (ad.meetingsScheduled / ad.totalLeads * 100).toFixed(1) : '0.0';
+      const _c = ad.totalLeads > 0 ? (ad.meetingsCompleted / ad.totalLeads * 100).toFixed(1) : '0.0';
+      return (
+        <tr key={`${srcName}::ad::${ad.name}`} style={{background:'var(--bg-secondary)',fontSize:'0.86em'}}>
+          <td dir="rtl" style={{paddingInlineStart:padStart,color:'#64748b',textAlign:'start',whiteSpace:'normal'}}>
+            <span aria-hidden="true" style={{color:'#cbd5e1',marginInlineEnd:'6px'}}>{'└'}</span><bdi>{ad.name}</bdi>
+          </td>
+          <td><SourceMark name={srcName} /></td>
+          <td>{formatNum(ad.totalLeads)}</td>
+          <td>{formatNum(ad.relevantLeads)}</td>
+          <td>{formatNum(Math.max(0, ad.totalLeads - ad.relevantLeads))}</td>
+          <td>{formatNum(ad.meetingsScheduled)}</td>
+          <td>{_s}%</td>
+          <td>{formatNum(ad.meetingsCompleted)}</td>
+          <td>{_c}%</td>
+          {/* ביטולים ושווי כספי אינם נשמרים ברמת המודעה. "—" ולא 0, כדי שלא ייראה
+              כאילו נמדד ויצא אפס. */}
+          <td style={{color:'#cbd5e1'}} title="לא נמדד ברמת המודעה">—</td>
+          <td>{formatNum(ad.registrations)}</td>
+          <td style={{color:'#cbd5e1'}} title="לא נמדד ברמת המודעה">—</td>
+          <td>{formatNum(ad.contracts)}</td>
+          <td style={{color:'#cbd5e1'}} title="לא נמדד ברמת המודעה">—</td>
+        </tr>);
+    });
+
     // Add platform leads to CRM totals (only if CRM doesn't already have that source)
     let _platformSpend = 0, _fbSpend = 0, _gSpend = 0;
     const _fbR = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
@@ -3291,14 +3425,29 @@ const selectProject = async (client, project) => {
               'חוזים': d.contracts || 0, 'שווי חוזים': Math.round(d.contractValue || 0),
             });
             return tableToolbar({
-              hint: 'לחצו על מקור כדי לראות את הקמפיינים שמתחתיו',
+              hint: 'לחצו על מקור כדי לראות את הקמפיינים שמתחתיו, ועל קמפיין כדי לראות את המודעות',
               allOpen: _allOpen,
               onToggleAll: _parents.length ? () => setExpandedCrmSources(_allOpen ? new Set() : new Set(_parents)) : undefined,
               onExport: () => {
                 const out = [];
+                // הייצוא כולל את כל שלוש הרמות בלי קשר למה פתוח על המסך — מי שמייצא
+                // רוצה את הכל, ולא צילום של מצב התצוגה.
+                const _adRow = (ad) => ({
+                  'רמה': 'מודעה', 'מקור': ad.name,
+                  'סה"כ לידים': ad.totalLeads || 0, 'רלוונטיים': ad.relevantLeads || 0,
+                  'לא רלוונטיים': Math.max(0, (ad.totalLeads || 0) - (ad.relevantLeads || 0)),
+                  'תואמו': ad.meetingsScheduled || 0,
+                  '% תיאום': (ad.totalLeads > 0 ? Math.round(ad.meetingsScheduled / ad.totalLeads * 1000) / 10 : 0),
+                  'בוצעו': ad.meetingsCompleted || 0,
+                  '% ביצוע': (ad.totalLeads > 0 ? Math.round(ad.meetingsCompleted / ad.totalLeads * 1000) / 10 : 0),
+                  'בוטלו': '', 'הרשמות': ad.registrations || 0, 'שווי הרשמות': '',
+                  'חוזים': ad.contracts || 0, 'שווי חוזים': '',
+                });
                 sourceEntries.forEach(([n, d]) => {
                   out.push(_row('מקור', n, d));
-                  (Array.isArray(d.children) ? d.children : []).forEach(ch => out.push(_row('קמפיין', ch.name, ch)));
+                  const kids = Array.isArray(d.children) ? d.children : [];
+                  kids.forEach(ch => { out.push(_row('קמפיין', ch.name, ch)); _adsFor(ch.name).forEach(ad => out.push(_adRow(ad))); });
+                  if (!kids.length) _adsFor(n).forEach(ad => out.push(_adRow(ad)));
                 });
                 downloadXlsx(out, 'נתונים-לפי-מקור-הגעה_' + (selectedMonth || ''), 'מקורות הגעה');
               },
@@ -3332,12 +3481,20 @@ const selectProject = async (client, project) => {
                   const hasChildren = children.length > 0;
                   const isOpen = expandedCrmSources.has(name);
                   const toggle = () => setExpandedCrmSources(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; });
+                  // מקור בלי קמפיינים עדיין יכול להחזיק מודעות — אז הוא נפתח למודעות
+                  // במקום לקמפיינים, ולא נשאר סתמית לא־לחיץ.
+                  const ownAds = hasChildren ? [] : _adsFor(name);
+                  const expandable = hasChildren || ownAds.length > 0;
+                  const rowOpen = hasChildren ? isOpen : expandedCrmAds.has(name);
+                  const rowToggle = hasChildren ? toggle : () => _adToggle(name);
                   return (<Fragment key={name}>
-                    <tr style={hasChildren ? {cursor:'pointer'} : undefined} onClick={hasChildren ? toggle : undefined}>
+                    <tr style={expandable ? {cursor:'pointer'} : undefined} onClick={expandable ? rowToggle : undefined}>
                       <td dir="rtl" style={{fontWeight:600,whiteSpace:'nowrap',textAlign:'start'}}>
-                        {hasChildren && <span style={{display:'inline-block',width:'18px',color:'var(--accent)',userSelect:'none'}}>{vrCrm ? (isOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />) : (isOpen ? '▼' : '◀')}</span>}
+                        {expandable && <span style={{display:'inline-block',width:'18px',color:'var(--accent)',userSelect:'none'}}>{vrCrm ? (rowOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />) : (rowOpen ? '▼' : '◀')}</span>}
                         <bdi>{name}</bdi>
-                        {hasChildren && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginInlineStart:'6px'}}>({children.length})</span>}
+                        {hasChildren
+                          ? <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginInlineStart:'6px'}}>({children.length})</span>
+                          : ownAds.length > 0 && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginInlineStart:'6px'}}>({ownAds.length} מודעות)</span>}
                       </td>
                       <td><SourceMark name={name} /></td>
                       <td style={(d.leads && d.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(d.leads && d.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: name, leads: d.leads}); } : undefined}>{formatNum(d.totalLeads)}</td>
@@ -3356,11 +3513,19 @@ const selectProject = async (client, project) => {
                     {hasChildren && isOpen && children.map(ch => {
                       const cSched = ch.totalLeads > 0 ? (ch.meetingsScheduled / ch.totalLeads * 100).toFixed(1) : '0.0';
                       const cComp  = ch.totalLeads > 0 ? (ch.meetingsCompleted / ch.totalLeads * 100).toFixed(1) : '0.0';
+                      const chAds = _adsFor(ch.name);
+                      const chAdsOpen = expandedCrmAds.has(ch.name);
                       return (
-                        <tr key={`${name}::${ch.name}`} style={{background:'var(--bg-secondary)',fontSize:'0.92em'}}>
+                        <Fragment key={`${name}::${ch.name}`}>
+                        <tr style={{background:'var(--bg-secondary)',fontSize:'0.92em',...(chAds.length ? {cursor:'pointer'} : {})}}
+                            onClick={chAds.length ? () => _adToggle(ch.name) : undefined}>
                           {/* dir=rtl על התא + bdi סביב השם: קודם התא כולו היה unicodeBidi:'plaintext',
                               ולכן שם קמפיין שמתחיל באנגלית הפך את כל השורה לשמאל-ימין. */}
-                          <td dir="rtl" style={{paddingInlineStart:'42px',color:'#475569',textAlign:'start',whiteSpace:'normal'}}><bdi>{ch.name}</bdi></td>
+                          <td dir="rtl" style={{paddingInlineStart:'42px',color:'#475569',textAlign:'start',whiteSpace:'normal'}}>
+                            {chAds.length > 0 && <span style={{display:'inline-block',width:'18px',color:'var(--accent)',userSelect:'none'}}>{chAdsOpen ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronLeft size={13} aria-hidden="true" />}</span>}
+                            <bdi>{ch.name}</bdi>
+                            {chAds.length > 0 && <span style={{color:'#94a3b8',fontWeight:400,fontSize:'0.85em',marginInlineStart:'6px'}}>({chAds.length} מודעות)</span>}
+                          </td>
                           <td><SourceMark name={name} /></td>
                           <td style={(ch.leads && ch.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(ch.leads && ch.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: ch.name, leads: ch.leads}); } : undefined}>{formatNum(ch.totalLeads)}</td>
                           <td>{formatNum(ch.relevantLeads)}</td>
@@ -3374,8 +3539,13 @@ const selectProject = async (client, project) => {
                           <td>{formatCurrency(ch.registrationValue)}</td>
                           <td>{formatNum(ch.contracts)}</td>
                           <td>{formatCurrency(ch.contractValue)}</td>
-                        </tr>);
+                        </tr>
+                        {chAdsOpen && _renderAdRows(ch.name, '68px')}
+                        </Fragment>);
                     })}
+                    {/* מקור בלי קמפיינים (yad2, מקורבים, אתר החברה) — המודעות תלויות
+                        ישירות מתחתיו, ברמה שנייה ולא שלישית. */}
+                    {!hasChildren && expandedCrmAds.has(name) && _renderAdRows(name, '42px')}
                   </Fragment>);
                 })}
                 <tr style={{fontWeight:700,background:'var(--bg-secondary)'}}>
@@ -3434,7 +3604,8 @@ const selectProject = async (client, project) => {
         </div>)}
       </div>
     );
-  }, [vrCrm, selectedMonth, compareEnabled, reports, expandedCrmSources, srcMobileMetric, renderFunnelBar]);
+    // expandedCrmAds — רמת המודעות. בלעדיו פתיחת מודעה לא מציירת את הטבלה מחדש.
+  }, [vrCrm, selectedMonth, compareEnabled, reports, expandedCrmSources, expandedCrmAds, srcMobileMetric, renderFunnelBar]);
 
   const renderDashboard = useCallback(() => {
     if (!selectedMonth || reports.length === 0) return null;
@@ -6488,7 +6659,7 @@ const selectProject = async (client, project) => {
         </div>)}
       </>
     );
-  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
+  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedCrmAds, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
     // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
     // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
     // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.

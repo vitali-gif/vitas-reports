@@ -69,30 +69,88 @@ export async function GET(request) {
     { id: 'q3', ...q(7,1,9,30) }, { id: 'q4', ...q(10,1,12,31) },
   ]
   const sources = ['meta', 'google']  // ADS ONLY — BMBY handled by prefetch-crm
-  const jobs = []
 
-  for (const month of months) {
-    for (const source of sources) { jobs.push({ kind: 'month', label: month, source, payload: { month } }) }
-  }
+  // ═══ חלוקה לחם/קר (27.9.2026) ═════════════════════════════════════════════
+  //
+  // הרקע: הריצה נמדדה על 181–235 שניות מול maxDuration של 300 — כלומר 60–78%
+  // מהתקציב, כל ריצה. ב-27.9 משיכת google/last14 נתקעה, הריצה הגיעה ל-372
+  // שניות והשער החזיר 504. זו לא הייתה תקלה חד־פעמית אלא החצייה הראשונה של קו
+  // שהתקרבנו אליו מזמן.
+  //
+  // ומספר המשימות לא גדל עם מספר הפרויקטים — הוא נגזר מ-presets × מקורות. מה
+  // שגדל הוא העבודה *בתוך* כל משימה, כי כל route עובר על כל הפרויקטים בפנים.
+  // ב-7 פרויקטים ו-200 שניות זה יוצא כ-28 שניות לפרויקט, כלומר התקרה היא סביב
+  // 10–14 פרויקטים. לא 50.
+  //
+  // הקריטריון לחלוקה הוא אחד: **האם התקופה עוד יכולה להשתנות.**
+  //   חם  — טווח שנוגע בחלון הייחוס של מטא (8 ימים אחורה). רץ כל שעתיים.
+  //   קר  — רבעון או חודש סגורים. הנתונים שלהם קפואים; פעם ביום מספיק.
+  //   דילוג — טווח שטרם התחיל. אין מה למשוך.
+  //
+  // ⚠️ למה 8 ימים ולא "נוגע בהיום": last7/last14/last30 מסתיימים *אתמול*
+  //    (daysBackRange מחזיר until = agoD(1)), ולכן כלל של "עד היום" היה מסווג
+  //    אותם כקרים — בעוד שדווקא הם החלון שבו מטא עוד מעדכנת המרות.
+  const ATTRIBUTION_DAYS = 8
+  const _today = toYMD(nowIsrael())
+  const _hotFrom = toYMD(agoD(ATTRIBUTION_DAYS))
+  const mode = (new URL(request.url).searchParams.get('mode') || 'all').toLowerCase()
+  const wants = (hot) => mode === 'all' || (hot ? mode === 'hot' : mode === 'cold')
+
+  const jobs = []
+  const skipped = []
+
+  months.forEach((month, i) => {
+    const hot = i === 0            // רק החודש הנוכחי עוד משתנה
+    if (!wants(hot)) return
+    for (const source of sources) jobs.push({ kind: 'month', label: month, source, hot, payload: { month } })
+  })
+
   for (const r of rangePresets) {
-    for (const source of sources) { jobs.push({ kind: 'range', label: `${r.id} (${r.since}..${r.until})`, source, payload: { since: r.since, until: r.until } }) }
+    // 🔴 רבעון עתידי נמשך עד היום כל שעתיים והחזיר תמיד כלום — שתי משימות מבוזבזות
+    //    בכל ריצה. גרוע מזה: המפתח שנוצר ממנו (2026-10-01_2026-12-31) גדול מכל
+    //    מפתח של ספטמבר, ולכן pickDefaultMonth נחת עליו וכל לקוח ראה אפסים
+    //    (נמצא ב-19.9). הדילוג כאן מסיר את המקור, ולא רק את התסמין.
+    if (r.since > _today) { skipped.push(r.id); continue }
+    const hot = r.until >= _hotFrom
+    if (!wants(hot)) continue
+    for (const source of sources) jobs.push({ kind: 'range', label: `${r.id} (${r.since}..${r.until})`, source, hot, payload: { since: r.since, until: r.until } })
   }
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
   const internalKey = process.env.CRON_SECRET || ''   // קריאה פנימית שרת-לשרת
   const results = []
 
+  // תקציב הריצה כולה. הפונקציה נהרגת ב-maxDuration בלי אזהרה, ולכן עוצרים לפני —
+  // עדיף ריצה שמדווחת "נשארו 4 משימות" מאשר ריצה שנעלמת באמצע בלי job_log.
+  const RUN_BUDGET_MS = 250_000
+  const deadline = startedAt + RUN_BUDGET_MS
+  // תקרה למשיכה בודדת. ב-27.9 משיכת google/last14 נתקעה וגררה את כל הריצה ל-372
+  // שניות — מעל ה-300 — והשער החזיר 504 על *הריצה*, לא על המשיכה. עם תקרה
+  // פרטנית משיכה תקועה נקטעת לבד, נרשמת ככישלון אחד, ושאר 25 המשימות ממשיכות.
+  const JOB_TIMEOUT_MS = 90_000
+
   async function run(job) {
     const t0 = Date.now()
+    const budgetLeft = deadline - Date.now()
+    if (budgetLeft <= 0) {
+      results.push({ kind: job.kind, label: job.label, source: job.source, ok: false, deferred: true, ms: 0, error: 'run budget exhausted' })
+      return
+    }
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), Math.min(JOB_TIMEOUT_MS, budgetLeft))
     try {
       // cache:'no-store' is ESSENTIAL: without it these internal fetches were served from
       // cache (a whole 26-job run finished in ~1.2s, individual Meta calls in ~21ms) — so the
       // cron reported ok:true while NOT actually pulling fresh data or writing the heartbeat.
-      const res = await fetch(`${base}/api/${job.source}/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify(job.payload) })
+      const res = await fetch(`${base}/api/${job.source}/fetch`, { method: 'POST', cache: 'no-store', signal: ctrl.signal, next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify(job.payload) })
       const data = await res.json().catch(() => ({}))
       results.push({ kind: job.kind, label: job.label, source: job.source, ok: res.ok, status: res.status, ms: Date.now()-t0, ..._slim(data) })
     } catch (err) {
-      results.push({ kind: job.kind, label: job.label, source: job.source, ok: false, ms: Date.now()-t0, error: String(err) })
+      const aborted = ctrl.signal.aborted
+      results.push({ kind: job.kind, label: job.label, source: job.source, ok: false, ...(aborted ? { timedOut: true } : {}),
+        ms: Date.now()-t0, error: aborted ? `job timeout after ${Math.round((Date.now()-t0)/1000)}s` : String(err) })
+    } finally {
+      clearTimeout(timer)
     }
   }
 
@@ -179,13 +237,23 @@ export async function GET(request) {
     if (_su && _sk) {
       const _hb = createClient(_su, _sk, { auth: { persistSession: false } })
       await logJob(_hb, 'prefetch-ads', failed.length === 0, Date.now() - startedAt, {
+        mode,                                   // hot / cold / all — כדי שאפשר יהיה להשוות זמנים בין המצבים
         totalJobs: jobs.length,
         completed: results.length,
         failed: failed.length,
+        timedOut: results.filter(r => r.timedOut).length,
+        deferred: results.filter(r => r.deferred).length,
+        skippedFuture: skipped.length ? skipped : undefined,
         firstError: failed.length ? String(failed[0]?.error || failed[0]?.label || '').slice(0, 200) : null,
       })
-      await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-ads', last_run: new Date().toISOString() }, { onConflict: 'job' })
+      // ⚠️ ה-heartbeat נכתב רק בריצה שכוללת את החלק החם. ריצת cold בלילה אינה
+      //    עדות לכך שהמשיכות השוטפות עובדות, ואם היא תעדכן את ה-heartbeat —
+      //    שומר הקרונים יראה "רץ לפני שעה" בזמן שהחלק החם מת. זה בדיוק סוג
+      //    ההסתרה שהשומר נועד למנוע.
+      if (mode !== 'cold') {
+        await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-ads', last_run: new Date().toISOString() }, { onConflict: 'job' })
+      }
     }
   } catch {}
-  return Response.json({ ok: failed.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, elapsedMs: Date.now()-startedAt }, results })
+  return Response.json({ ok: failed.length === 0, summary: { mode, totalJobs: jobs.length, completed: results.length, failed: failed.length, timedOut: results.filter(r => r.timedOut).length, deferred: results.filter(r => r.deferred).length, skippedFuture: skipped, elapsedMs: Date.now()-startedAt }, results })
 }
