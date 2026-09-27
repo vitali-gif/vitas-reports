@@ -1,23 +1,22 @@
+// עמוד הבית של reports.vitas.co.il הוא גם העמוד שגוגל בודקת באימות המותג
+// (Brand Verification) ובבקשה לרמת Basic של Google Ads API. לכן השם, הלוגו
+// ותיאור השימוש ב-API כאן חייבים להתאים למה שמוגדר ב-Google Cloud (Tovno by
+// Vitas + icon-512.png) ולמדיניות הפרטיות ב-vitas.co.il/privacy. שינוי באחד
+// מהם בלי השני = אי-התאמה שגוגל דוחה עליה.
 export const metadata = {
-  title: 'VITAS Campaign Manager - Digital Marketing Reports',
-  description: 'Unified marketing performance dashboard by VITAS. Consolidates Meta Ads and Google Ads data into a single reporting platform.',
+  title: 'Tovno by Vitas - Marketing Performance Reports',
+  description: 'Tovno by Vitas is a unified marketing performance dashboard built by VITAS Digital Marketing. It consolidates Meta Ads and Google Ads data into a single reporting platform.',
 }
 
-// Logo rendered inline as SVG so it works without any external image upload
+// הלוגו הלבן — אותו קובץ שבסיידבר של הדשבורד. הרקע כאן כהה.
 function Logo({ height = 90 }) {
   return (
-    <svg
-      viewBox="0 0 680 240"
+    <img
+      src="/brand/tovno/tovno-logo-white.svg"
+      alt="Tovno by Vitas"
       height={height}
-      style={{ display: 'block' }}
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="VITAS Campaign Manager"
-    >
-      <g fill="#e8e8e8" style={{ fontFamily: "'Orbitron', 'Audiowide', sans-serif" }}>
-        <text x="340" y="115" textAnchor="middle" fontSize="130" fontWeight="600" letterSpacing="22">VITAS</text>
-        <text x="340" y="185" textAnchor="middle" fontSize="38" fontWeight="400" letterSpacing="14">CAMPAIGN MANAGER</text>
-      </g>
-    </svg>
+      style={{ display: 'block', height, width: 'auto' }}
+    />
   )
 }
 
@@ -37,7 +36,7 @@ export default function Home() {
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Heebo:wght@400;500;600;700;800;900&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap"
         rel="stylesheet"
       />
 
@@ -58,7 +57,7 @@ export default function Home() {
           Unified Digital Marketing Reporting for Agencies and Advertisers
         </h1>
         <p style={{ fontSize: '1.15em', color: '#94a3b8', lineHeight: 1.7, margin: '0 0 26px', maxWidth: 820 }}>
-          VITAS Campaign Manager is a proprietary reporting dashboard built by VITAS Digital Marketing. It consolidates campaign performance data from multiple advertising platforms - including Meta Ads (Facebook / Instagram) and Google Ads - into a single, unified interface that agencies and advertisers use to track spend, leads, cost-per-lead, and ad creative performance across all their clients and projects in real time.
+          Tovno by Vitas is a proprietary reporting dashboard built by VITAS Digital Marketing. It consolidates campaign performance data from multiple advertising platforms - including Meta Ads (Facebook / Instagram) and Google Ads - into a single, unified interface that agencies and advertisers use to track spend, leads, cost-per-lead, and ad creative performance across all their clients and projects in real time.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ background: 'rgba(59,130,246,0.15)', color: '#93c5fd', padding: '6px 14px', borderRadius: 20, fontSize: '0.85em', fontWeight: 600 }}>Meta Marketing API</span>
@@ -92,9 +91,9 @@ export default function Home() {
               </div>
             </div>
             <div style={{ background: '#0b1220', padding: 24, borderRadius: 12, borderLeft: '4px solid #f59e0b' }}>
-              <div style={{ fontSize: '1.05em', fontWeight: 700, marginBottom: 8 }}>Token-based client sharing</div>
+              <div style={{ fontSize: '1.05em', fontWeight: 700, marginBottom: 8 }}>Private client accounts</div>
               <div style={{ color: '#94a3b8', fontSize: '0.95em', lineHeight: 1.6 }}>
-                Each client receives a private, token-protected URL where they can review their own campaign performance without needing any login. Row-level security ensures each client only sees their own data.
+                Each client signs in to a personal account and sees only the projects the agency has granted them. Access is enforced on the server for every request, so a client can never view another client&apos;s data.
               </div>
             </div>
           </div>
@@ -106,10 +105,10 @@ export default function Home() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <h2 style={{ fontSize: '1.9em', fontWeight: 800, marginTop: 0, marginBottom: 20 }}>How we use the Google Ads API</h2>
           <p style={{ color: '#94a3b8', lineHeight: 1.75, fontSize: '1em', maxWidth: 900 }}>
-            VITAS Campaign Manager uses the Google Ads API in <strong style={{ color: '#e2e8f0' }}>read-only mode</strong> to retrieve campaign, ad group, ad, and performance metrics for the Google Ads accounts that our MCC manages. Retrieved data is transformed into a common schema - identical to the schema used for Meta Ads data - and stored in a Supabase Postgres database. Users of the platform view the data through the web dashboard; the API itself is never exposed directly to end users or clients.
+            Tovno by Vitas uses the Google Ads API in <strong style={{ color: '#e2e8f0' }}>read-only mode</strong> to retrieve campaign, ad group, ad, and performance metrics for the Google Ads accounts that our MCC manages. Retrieved data is transformed into a common schema - identical to the schema used for Meta Ads data - and stored in a Supabase Postgres database. Users of the platform view the data through the web dashboard; the API itself is never exposed directly to end users or clients.
           </p>
           <p style={{ color: '#94a3b8', lineHeight: 1.75, fontSize: '1em', maxWidth: 900, marginTop: 16 }}>
-            The API is called either on demand by a logged-in agency employee (via a &quot;Refresh from Google Ads&quot; button) or automatically once per day via a scheduled Vercel Cron job. We do not create, modify, pause, or delete campaigns through the API - all campaign management is done by our team directly in the Google Ads UI. Refresh tokens are stored as encrypted environment variables in Vercel and are never written to source code or logs.
+            The API is called either on demand by a logged-in agency employee (via a &quot;Refresh&quot; button) or automatically by scheduled jobs a few times a day, so that each client&apos;s report stays current. We do not create, modify, pause, or delete campaigns through the API - all campaign management is done by our team directly in the Google Ads UI. Refresh tokens are stored as encrypted environment variables in Vercel and are never written to source code or logs.
           </p>
         </div>
       </section>
@@ -119,7 +118,7 @@ export default function Home() {
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
           <h2 style={{ fontSize: '1.9em', fontWeight: 800, marginTop: 0, marginBottom: 10, textAlign: 'center' }}>Get in touch</h2>
           <p style={{ color: '#94a3b8', textAlign: 'center', marginBottom: 36, fontSize: '1.02em', lineHeight: 1.6 }}>
-            Interested in VITAS Campaign Manager? Leave your details and we&apos;ll get back to you.
+            Interested in Tovno by Vitas? Leave your details and we&apos;ll get back to you.
           </p>
 
           <form
@@ -189,7 +188,12 @@ export default function Home() {
       {/* Footer */}
       <footer style={{ background: '#080c14', padding: '26px 24px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', color: '#64748b', fontSize: '0.9em' }}>
-          Built by <strong style={{ color: '#94a3b8' }}>VITAS Digital Marketing</strong> · Internal reporting tool · Contact: vitali@vitas.co.il
+          <strong style={{ color: '#94a3b8' }}>Tovno by Vitas</strong> · Built by VITAS Digital Marketing · Contact: vitali@vitas.co.il
+        </div>
+        {/* גוגל דורשת קישור למדיניות הפרטיות ולתנאי השימוש מעמוד הבית של האפליקציה. */}
+        <div style={{ maxWidth: 1100, margin: '10px auto 0', fontSize: '0.9em', display: 'flex', gap: 18, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <a href="https://vitas.co.il/privacy" style={{ color: '#93c5fd', textDecoration: 'none' }}>Privacy Policy</a>
+          <a href="https://vitas.co.il/terms" style={{ color: '#93c5fd', textDecoration: 'none' }}>Terms of Service</a>
         </div>
       </footer>
     </div>

@@ -4435,3 +4435,47 @@ textarea:focus-visible,
   .client-tab,
   .vpick-trigger { scroll-margin-block-start: 96px; }
 }
+
+/* ============================================================
+   Tovno Mobile · אין גלילה אופקית, ואין מגירה שצפה מעל הדוח
+
+   ויטלי (22.9): "המסך נשבר והסיידבר עולה על הדוח ואז הוא מסתיר אותו."
+   אותו דבר בדיוק נתפס ב-E2E על Pixel 7, ושם יש גם צילומים וגם call log:
+
+     - <button class="client-tab">…</button> intercepts pointer events
+     - <button aria-label="עוד פעולות" class="btn h-kebab"> from
+       <header class="header header-vr"> subtree intercepts pointer events
+
+   בצילומי הכשל רואים את התוכן מוזז אופקית, ואת פאנל המגירה הכהה יושב
+   מעל כרטיסי ה-KPI.
+
+   השרשרת: לדף יש גלילה אופקית במובייל. ‎.sidebar‎ ו-‎.header‎ הם
+   position: fixed, כלומר הם נצמדים ל-viewport ולא זזים עם הגלילה — בזמן
+   שהתוכן כן זז. לכן המגירה שחונה מחוץ למסך (translateX(100%)) מתגלה מעל
+   הדוח, וה-header נוחת על שורת הטאבים וחוטף את הלחיצה. ‎.shell‎ כבר מגדיר
+   overflow-x: hidden, אבל הוא לא חוסם צאצא position: fixed ולא את הגלילה
+   של המסמך עצמו.
+
+   overflow-x: clip ולא hidden — hidden על html/body הופך אותם למיכל
+   גלילה ושובר position: sticky של ה-header ושל שורת הטאבים. clip חוסם
+   בלי ליצור מיכל.
+
+   בנוסף: מגירה סגורה מקבלת visibility: hidden, כך שגם אם משהו אחר יגרור
+   גלילה אופקית היא לא תהיה גלויה ולא לחיצה. ה-visibility מושהה באורך
+   האנימציה כדי שההחלקה החוצה עדיין תיראה.
+   ============================================================ */
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
+  .sidebar {
+    visibility: hidden;
+    transition: transform .26s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear .26s;
+  }
+  .sidebar.mobile-open {
+    visibility: visible;
+    transition: transform .26s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
+  }
+}

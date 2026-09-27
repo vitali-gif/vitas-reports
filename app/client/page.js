@@ -123,6 +123,14 @@ export default function ClientPage() {
         const email = session.user.email
         setTimeout(() => finish(email), 0)
       }
+      // התנתקות מכל מקור (הכפתור, לשונית אחרת, טוקן שבוטל) מחזירה למסך הכניסה. עד 23.9 האירוע
+      // נבלע, והדשבורד נשאר על המסך אחרי שהחיבור כבר נסגר. רק setState — בלי קריאה לספרייה
+      // מתוך ה-callback, מאותה סיבה של ה-deadlock שמתואר למעלה.
+      if (event === 'SIGNED_OUT') {
+        setStep('login')
+        setAccessInfo(null)
+        setAccessList([])
+      }
     })
 
     // Step 3: existing session
@@ -462,7 +470,7 @@ export default function ClientPage() {
 
   return (
     <>
-      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} />
+      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} onLogout={logout} />
 
       {/* כפתור עזרה קבוע — מחליף את המודאל שחזר עשר פעמים. */}
       {!showOnboarding && (
