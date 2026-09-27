@@ -109,7 +109,25 @@ export async function GET(request) {
     // לא מאבדים כיסוי: אם ריצת 07:07 באמת נכשלה, הבדיקה של 08:15 תתפוס את זה, וכך גם
     // כל בדיקה שעתית אחריה עד 21:15.
     // ⚠️ הגבול הזה קשור ללוח הזמנים של prefetch-ads. אם המשבצת הראשונה זזה — לעדכן גם כאן.
-    if (utcH >= 8 && utcH <= 21 && stale.length === 0 && todayKeyRows === 0) {
+    // 🔴 27.9.2026 — הסיבה האמיתית להתראות של 23–24.9, ולתיקון שגוי שקדם לה.
+    //
+    // הבדיקה שואלת "האם קיים מפתח עבור **היום בישראל**", אבל השער נמדד ב**שעות UTC**.
+    // ישראל היא UTC+3, ולכן ב-21:00 UTC כבר עברה חצות בישראל ו-todayIL הוא **מחר** —
+    // ומפתח של מחר לא יכול להתקיים. utcH=21 עבר את הגבול העליון, וההתראה יצאה בכל
+    // לילה בחצות שעון ישראל, עם התאריך של יום המחרת.
+    //
+    // ⚠️ מה שתוקן ב-24.9 (הזזת הגבול התחתון מ-6 ל-8) **לא נגע בזה בכלל** — הירי היה
+    //    בגבול העליון. האבחנה שם הסתמכה על כך שהמתזמן רץ מ-07:07 UTC; בפועל
+    //    cron-job.org מוגדר Asia/Jerusalem, כלומר 07:07 בישראל = 04:07 UTC. ההערה
+    //    המקורית בקוד הייתה נכונה. אומת ב-27.9 מול ה-API של cron-job.org ומול
+    //    created_at של מפתחות היום: 24, 25, 26 ו-27.9 כולם נכתבו ב-04:07–04:08 UTC.
+    //    (23.9 חסר בטבלה בגלל הניקוי המתגלגל, לא בגלל חור בנתונים.)
+    //
+    // התיקון: למדוד את החלון באותו אזור זמן שבו נמדד התאריך. 09:00–22:00 בישראל —
+    // פותח שעתיים אחרי הריצה הראשונה (07:07), נסגר אחרי האחרונה (21:07), ולעולם
+    // לא חוצה חצות.
+    const ilH = israelHour()
+    if (ilH >= 9 && ilH <= 22 && stale.length === 0 && todayKeyRows === 0) {
       const _fmtIL = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(d)
       const alertRow = beats.find(b => b.job === 'silence_alert')
       const alertedToday = !!(alertRow && alertRow.last_run && _fmtIL(new Date(alertRow.last_run)) === todayIL)
@@ -226,5 +244,7 @@ export async function GET(request) {
     }
   } catch (e) { pruneNote = `threw: ${e?.message || e}` }
 
-  return Response.json({ ok: true, utcH, inActiveWindow, status, todayKeyRows, alerted: stale.length, pruned, pruneNote, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
+  // ilH מוחזר לצד utcH כדי שאפשר יהיה לראות בתשובה באיזה חלון הבדיקה נמצאת —
+  // אי-ההתאמה בין השניים היא בדיוק מה שייצר את התראות השווא של 23–24.9.
+  return Response.json({ ok: true, utcH, ilH: israelHour(), inActiveWindow, status, todayKeyRows, alerted: stale.length, pruned, pruneNote, health: health ? { anyRed: health.anyRed, reds: health.reds } : null })
 }
