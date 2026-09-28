@@ -6492,6 +6492,11 @@ const selectProject = async (client, project) => {
                   const metrics = ad.metrics || {};
                   const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
                   const hasVideo = Boolean(ad.videoUrl);
+                  // סרטון בלי קובץ שאפשר לנגן (סרטון של עמוד הפייסבוק — Meta לא מוסר את ה-source לאפליקציה):
+                  // הפוסטר עם כפתור הפעלה שפותח את הסרטון בפייסבוק, במקום תמונה בלי שום סימן שזה סרטון.
+                  const fbVideoLink = !hasVideo && ad.videoId
+                    ? (ad.videoPermalink ? (String(ad.videoPermalink).startsWith('http') ? ad.videoPermalink : 'https://www.facebook.com' + ad.videoPermalink) : 'https://www.facebook.com/watch/?v=' + encodeURIComponent(ad.videoId))
+                    : null;
                   const previewImg = ad.imageUrl || ad.thumbnailUrl;
                   // קריאייטיב מקומי של הדמו (/demo/...) מוצג חד; כל מקור חיצוני מטושטש.
                   const demoBlur = (isDemoProject && !String(previewImg || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined;
@@ -6508,6 +6513,15 @@ const selectProject = async (client, project) => {
                             preload="metadata"
                             style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrAds ? 'transparent' : '#000'}}
                           />
+                        ) : fbVideoLink ? (
+                          <a href={fbVideoLink} target="_blank" rel="noopener noreferrer" className="vr-ad-fbvideo" aria-label={'צפייה בסרטון בפייסבוק: ' + (ad.name || '')}
+                            style={{position:'relative',display:'block',width:'100%',height:'100%',background: vrAds ? 'transparent' : '#000'}}>
+                            {previewImg && <img src={previewImg} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} style={{width:'100%',height:'100%',objectFit:'contain',display:'block',...(demoBlur || {})}} />}
+                            <span aria-hidden="true" style={{position:'absolute',inset:0,margin:'auto',width:64,height:64,borderRadius:'50%',background:'rgba(11,15,30,0.62)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+                            </span>
+                            <span style={{position:'absolute',insetInlineStart:10,bottom:10,background:'rgba(11,15,30,0.72)',color:'#fff',fontSize:12,fontWeight:700,padding:'4px 10px',borderRadius:999}}>צפייה בפייסבוק ↗</span>
+                          </a>
                         ) : previewImg ? (
                           <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrAds ? 'transparent' : '#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
                         ) : (
