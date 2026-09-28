@@ -19,6 +19,7 @@ on:
     - cron: '17 4,6,8,10,12,14,16,18 * * *'   # prefetch-crm (months — fast, critical)
     - cron: '37 4,6,8,10,12,14,16,18 * * *'   # prefetch-crm (ranges — own 300s budget)
     - cron: '47 * * * *'                      # health watchdog
+    - cron: '52 * * * *'                      # fireberry-notes — הערות על לידים של אלפא (זמני תגובה)
   workflow_dispatch:
     inputs:
       target:
@@ -26,7 +27,7 @@ on:
         required: true
         default: 'all'
         type: choice
-        options: [all, prefetch-ads, prefetch-crm, health]
+        options: [all, prefetch-ads, prefetch-crm, health, fireberry-notes]
 
 concurrency:
   group: vitas-cron-${{ github.event.schedule || github.event.inputs.target }}
@@ -46,6 +47,7 @@ jobs:
               '17 4,6,8,10,12,14,16,18 * * *') echo 'paths=prefetch-crm?only=months' >> "$GITHUB_OUTPUT" ;;
               '37 4,6,8,10,12,14,16,18 * * *') echo 'paths=prefetch-crm?only=ranges' >> "$GITHUB_OUTPUT" ;;
               '47 * * * *')                    echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
+              '52 * * * *')                    echo 'paths=fireberry-notes' >> "$GITHUB_OUTPUT" ;;
               *)                               echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
             esac
           elif [ "${{ github.event.inputs.target }}" = "all" ]; then

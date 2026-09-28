@@ -76,10 +76,10 @@ const BMBY_CRM_VIEWS = [
   { key: 'meetings',   label: 'פגישות שבוצעו',  icon: <CalendarCheck size={18} /> },
 ]
 // Fireberry (אלפא) — רק התצוגות שיש להן מקור נתונים. נמדד ב-28.9 על 265 לידים:
-// עיר מולאה ב-1, התנגדויות ב-0, סיבת סגירה ב-0, ולוג השיחות ריק לגמרי (אין ממה
-// לחשב זמני תגובה). שלושת תתי-הטאבים האלה הוצגו ריקים, וזה נראה כמו תקלה ולא
-// כמו "הצוות לא ממלא את השדה". אם הצוות יתחיל למלא — להחזיר אותם לכאן.
-const FIREBERRY_CRM_VIEWS = BMBY_CRM_VIEWS.filter(v => v.key === 'sources' || v.key === 'meetings')
+// עיר מולאה ב-1, התנגדויות (השדה) ב-0, סיבת סגירה ב-0. תת-טאב ריק נראה כמו תקלה
+// ולא כמו "הצוות לא ממלא את השדה". אם הצוות יתחיל למלא — להחזיר אותם לכאן.
+// זמני תגובה כן מוצג: הוא מחושב מההערות על הליד (syncNotes ב-fireberry/fetch).
+const FIREBERRY_CRM_VIEWS = BMBY_CRM_VIEWS.filter(v => ['sources', 'response', 'meetings'].includes(v.key))
 const KLOSS_CRM_VIEWS = [
   { key: 'network',   label: 'מסך רשת',              icon: <Building2 size={18} /> },
   { key: 'branches',  label: 'סניפים',               icon: <MapPin size={18} /> },
@@ -5719,7 +5719,7 @@ const selectProject = async (client, project) => {
             <div className={vrShell ? 'vcs-subtabs-row' : undefined}>
             <div className="client-tabs vpick-replaced" style={vrShell ? undefined : {marginBottom: 15}}>
               <button className={`client-tab ${_sub === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>{vrShell ? '' : '📂 '}מקורות הגעה</button>
-              {!_fbCrm && <button className={`client-tab ${_sub === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>{vrShell ? '' : '⏱️ '}זמני תגובה</button>}
+              <button className={`client-tab ${_sub === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>{vrShell ? '' : '⏱️ '}זמני תגובה</button>
               {!_fbCrm && <button className={`client-tab ${_sub === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>{vrShell ? '' : '🚫 '}התנגדויות</button>}
               {!_fbCrm && <button className={`client-tab ${_sub === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>{vrShell ? '' : '🏘️ '}יישובים</button>}
               <button className={`client-tab ${_sub === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>{vrShell ? '' : '📅 '}פגישות שבוצעו</button>

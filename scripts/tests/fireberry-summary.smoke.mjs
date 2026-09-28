@@ -156,6 +156,44 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   ok(!('phone' in all.allLeads[0]), 'אין טלפון ברשימות השמיות')
 }
 
+// ── זמני תגובה מההערות ──────────────────────────────────────────────────────
+// בכל ליד של אלפא יש שתי הערות אוטומטיות ברגע היצירה (הטקסט = שם הליד) והערה
+// שהיא מספר טלפון בלבד. אם נספור אותן, כל ליד "נענה תוך 0 דקות".
+{
+  const { isHumanNote } = await import('../../lib/crm/fireberry-summary.js')
+  const L = lead('r1', '2026-09-01T18:22:57')
+  const note = (id, createdon, text, by = 'אופיר אסולין') => ({ noteid: id, objectid: 'r1', createdon, text, by })
+  ok(!isHumanNote(note('a', '2026-09-01T18:22:57', 'ליד r1', 'משי אלפא'), L), 'הערה עם שם הליד — אוטומטית')
+  ok(!isHumanNote(note('b', '2026-09-01T18:30:00', '0537618235', 'משי אלפא'), L), 'הערה שהיא טלפון בלבד — אוטומטית')
+  ok(!isHumanNote(note('c', '2026-09-01T18:31:00', '   '), L), 'הערה ריקה — לא תגובה')
+  ok(isHumanNote(note('d', '2026-09-02T09:27:46', 'אין מענה', 'עידו בן יהושע'), L), '"אין מענה" — תגובה אנושית (ניסיון התקשרות)')
+  ok(isHumanNote(note('e', '2026-09-02T10:00:00', 'לחזור אליו ב-0537618235 מחר', 'משי אלפא'), L), 'טקסט שמכיל טלפון אבל לא רק טלפון — אנושי, גם אם כתבה משי')
+
+  const notes = [
+    note('a', '2026-09-01T18:22:57', 'ליד r1', 'משי אלפא'),
+    note('b', '2026-09-01T18:22:57', 'ליד r1', 'משי אלפא'),
+    note('c', '2026-09-01T18:32:00', '0537618235', 'משי אלפא'),
+    note('d', '2026-09-02T09:27:46', 'אין מענה', 'עידו בן יהושע'),
+    note('e', '2026-09-07T10:42:08', 'מתעניין ומעוניין להגיע'),
+  ]
+  const leads = [L, lead('r2', '2026-09-03T10:00:00', { ownername: 'משי אלפא' })]   // r2 בלי אף הערה
+  const R = computeFireberrySummary({ leads, meetings: [], notes }, { since: '2026-09-01', until: '2026-09-30' })
+  const r = R.responseTimeStats
+  ok(r, 'יש responseTimeStats כשיש הערות')
+  eq(r.totalLids, 2, 'זמני תגובה: כל לידי התקופה')
+  eq(r.respondedCount, 1, 'זמני תגובה: ליד אחד נענה')
+  eq(r.medianMinutes, Math.round((Date.parse('2026-09-02T09:27:46') - Date.parse('2026-09-01T18:22:57')) / 60000), 'זמן התגובה נמדד עד ההערה האנושית הראשונה ולא עד האוטומטית')
+  eq(Object.keys(r.byUser).join(), 'עידו בן יהושע', 'המגיב הראשון הוא מי שכתב את ההערה האנושית הראשונה')
+  eq(r.noResponseByUser['משי אלפא'], 1, 'ליד בלי תגובה נספר תחת הבעלים שלו')
+  eq(R.hourlyContactStats[9], 1, 'שעת הטיפול הראשון — 09')
+  eq(R.noAnswerContactHour[9], 1, '"אין מענה" נספר בשעה שבה נוסה')
+  ok(r.business && typeof r.business.medianMinutes === 'number', 'יש גם חישוב בשעות עבודה')
+  eq(Object.keys(r.buckets).length, 7, 'שבעה דליים — אותה צורה של BMBY')
+
+  const R0 = computeFireberrySummary({ leads, meetings: [], notes: [] }, { since: '2026-09-01', until: '2026-09-30' })
+  eq(R0.responseTimeStats, null, 'בלי הערות מסונכרנות: null ולא אפסים — "אין נתון"')
+}
+
 // ── מזהה יציב לכל רשומה בתמונת המצב ─────────────────────────────────────────
 // ב-28.9 כל 267 הלידים קיבלו אותו מזהה (גיבוב של שדות BMBY שכולם ריקים), ו-crm_raw
 // החזיק ליד אחד. הדוח החודשי נראה תקין, וכל טווח תאריכים אחר הציג 1.
@@ -168,6 +206,8 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   eq(a.field, 'accountid', 'ליד: לא נפל לגיבוב')
   const m = extIdOf('meetings', meeting('act-9', 'acc-1', '2026-09-10T11:00:00', '2026-09-12T09:00:00'))
   eq(m.id, 'act-9', 'פגישה: המזהה הוא activityid')
+  eq(extIdOf('notes', { noteid: 'n-1', objectid: 'acc-1', text: 'x' }).id, 'n-1', 'הערה: המזהה הוא noteid ולא הליד שהיא שייכת אליו')
+  eq(extIdOf('note_index', { accountid: 'acc-1', noteCount: 3 }).id, 'acc-1', 'אינדקס ההערות: מזהה לפי הליד')
   // שלא נשבר דבר ל-Zoho: רשומה עם id ממשיכה להשתמש בו.
   eq(extIdOf('leads', { id: 'z1', accountid: 'x' }).id, 'z1', 'Zoho: id עדיין קודם ל-accountid')
 }
