@@ -75,6 +75,11 @@ const BMBY_CRM_VIEWS = [
   { key: 'reports',    label: 'יישובים',        icon: <MapPin size={18} /> },
   { key: 'meetings',   label: 'פגישות שבוצעו',  icon: <CalendarCheck size={18} /> },
 ]
+// Fireberry (אלפא) — רק התצוגות שיש להן מקור נתונים. נמדד ב-28.9 על 265 לידים:
+// עיר מולאה ב-1, התנגדויות ב-0, סיבת סגירה ב-0, ולוג השיחות ריק לגמרי (אין ממה
+// לחשב זמני תגובה). שלושת תתי-הטאבים האלה הוצגו ריקים, וזה נראה כמו תקלה ולא
+// כמו "הצוות לא ממלא את השדה". אם הצוות יתחיל למלא — להחזיר אותם לכאן.
+const FIREBERRY_CRM_VIEWS = BMBY_CRM_VIEWS.filter(v => v.key === 'sources' || v.key === 'meetings')
 const KLOSS_CRM_VIEWS = [
   { key: 'network',   label: 'מסך רשת',              icon: <Building2 size={18} /> },
   { key: 'branches',  label: 'סניפים',               icon: <MapPin size={18} /> },
@@ -806,8 +811,13 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
 
   const refreshFromBmby = async () => {
     if (refreshingCrm) return;
+    // "\u05e8\u05e2\u05e0\u05d5\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd" \u05d1\u05d8\u05d0\u05d1 CRM \u05de\u05e9\u05de\u05e9 \u05d0\u05ea \u05db\u05dc \u05e4\u05e8\u05d9\u05e1\u05ea \u05d4\u05e0\u05d3\u05dc"\u05df, \u05d5\u05e4\u05d9\u05d9\u05e8\u05d1\u05e8\u05d9 \u05e0\u05d5\u05e4\u05dc \u05dc\u05d0\u05d5\u05ea\u05d4 \u05e4\u05e8\u05d9\u05e1\u05d4.
+    // \u05d1\u05dc\u05d9 \u05d4\u05d4\u05e4\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d0\u05ea \u05d4\u05db\u05e4\u05ea\u05d5\u05e8 \u05d0\u05e6\u05dc \u05d0\u05dc\u05e4\u05d0 \u05de\u05e9\u05da \u05de-BMBY, \u05e9\u05d3\u05d9\u05dc\u05d2 \u05e2\u05dc \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 (\u05d0\u05d9\u05df \u05dc\u05d5 \u05de\u05d9\u05e4\u05d5\u05d9)
+    // \u05d5\u05d4\u05e6\u05d9\u05d2 "\u05e2\u05d5\u05d3\u05db\u05e0\u05d5 0 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd" \u2014 \u05db\u05d0\u05d9\u05dc\u05d5 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05e2\u05d1\u05d3.
+    const _isFb = _vrCrmType === 'fireberry';
+    const _crmLabel = _isFb ? 'Fireberry' : 'BMBY';
     setRefreshingCrm(true);
-    showToast('\u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de-BMBY...');
+    showToast('\u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de-' + _crmLabel + '...');
     try {
       let payload = selectedMonth && !selectedMonth.includes('_')
         ? { month: selectedMonth }
@@ -815,19 +825,19 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
           ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
           : {};
       if (selectedProject) payload = { ...payload, projectId: selectedProject.id };
-      const res = await apiFetch('/api/bmby/fetch', {
+      const res = await apiFetch(_isFb ? '/api/fireberry/fetch' : '/api/bmby/fetch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (json.pending) {
-        showToast('\u26a0\ufe0f BMBY: ' + (json.message || 'credentials not configured'));
-      } else if (!res.ok) {
-        showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (json.error || 'unknown'));
+        showToast('\u26a0\ufe0f ' + _crmLabel + ': ' + (json.message || 'credentials not configured'));
+      } else if (!res.ok || (_isFb && json.ok === false)) {
+        showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (json.error || json.message || 'unknown'));
       } else {
-        const okProjects = (json.projects || []).filter(p => !p.skipped).length;
-        showToast(`\u2713 BMBY: \u05e2\u05d5\u05d3\u05db\u05e0\u05d5 ${okProjects} \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd`);
+        const okProjects = (json.projects || []).filter(p => !p.skipped && (!_isFb || p.ok !== false)).length;
+        showToast(`\u2713 ${_crmLabel}: \u05e2\u05d5\u05d3\u05db\u05e0\u05d5 ${okProjects} \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd`);
       }
       await loadClients();
       if (selectedProject) await loadProjectReports(selectedProject.id);
@@ -1352,6 +1362,13 @@ const selectProject = async (client, project) => {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [dashTab, crmSubTab, namedLeadsModal, sfNoteModal, objModal, noteModal]);
+
+  // פרויקט Fireberry מציג רק חלק מתתי-הטאבים של CRM (FIREBERRY_CRM_VIEWS). תת-טאב
+  // שנשאר ממעבר מפרויקט אחר ("יישובים" של ש.ברוך) מאופס ל"מקורות הגעה" — גם כדי
+  // שהמסך לא יהיה ריק, וגם כי vrCrm נקבע לפי crmSubTab ולא לפי מה שמוצג בפועל.
+  useEffect(() => {
+    if (_vrCrmType === 'fireberry' && !FIREBERRY_CRM_VIEWS.some(v => v.key === crmSubTab)) setCrmSubTab('sources');
+  }, [_vrCrmType, crmSubTab]);
 
   const destroyCharts = () => {
     // Cancel any pending chart-creation timeouts (prevents stale charts from
@@ -3164,6 +3181,12 @@ const selectProject = async (client, project) => {
     });
 
     // Add platform leads to CRM totals (only if CRM doesn't already have that source)
+    //
+    // ⚠️ לא ב-Fireberry: שם ה-CRM עצמו מפצל לפי מקור הגעה ("פייסבוק", "גוגל") והוא
+    //    המקור המוסמך ללידים. המיזוג כאן מחפש מקור בשם 'Facebook'/'Google' באנגלית, לא
+    //    מוצא, ומוסיף את לידי הפלטפורמה כמקור נוסף — כלומר סופר כל ליד פעמיים (201
+    //    מה-CRM ועוד 213 ממטא). ההוצאה עדיין נצברת, כי ממנה מחושבת עלות לליד.
+    const _crmIsFireberry = crmReports[0]?.summary?.crmType === 'fireberry';
     let _platformSpend = 0, _fbSpend = 0, _gSpend = 0;
     const _fbR = reports.filter(r => r.month === selectedMonth && r.source === 'facebook');
     const _gR = reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google'));
@@ -3176,7 +3199,9 @@ const selectProject = async (client, project) => {
       _platformSpend += _fbAgg.totals.spend || 0;
       _fbSpend = _fbAgg.totals.spend || 0;
       const _fbLeads = _fbAgg.totals.leads || 0;
-      if (!crmData.sources['Facebook']) {
+      if (_crmIsFireberry) {
+        // ראה למעלה — רק ההוצאה.
+      } else if (!crmData.sources['Facebook']) {
         crmData.totals.totalLeads += _fbLeads;
         crmData.sources['Facebook'] = { ..._emptySource, totalLeads: _fbLeads };
       } else {
@@ -3193,7 +3218,9 @@ const selectProject = async (client, project) => {
       _platformSpend += _gAgg.totals.spend || 0;
       _gSpend = _gAgg.totals.spend || 0;
       const _gLeads = _gAgg.totals.leads || 0;
-      if (!crmData.sources['Google']) {
+      if (_crmIsFireberry) {
+        // ראה למעלה — רק ההוצאה.
+      } else if (!crmData.sources['Google']) {
         crmData.totals.totalLeads += _gLeads;
         crmData.sources['Google'] = { ..._emptySource, totalLeads: _gLeads };
       } else {
@@ -5674,22 +5701,28 @@ const selectProject = async (client, project) => {
             </VitasPresentation>)
           }
 
-          // BMBY CRM (existing behavior — unchanged)
+          // BMBY CRM (existing behavior — unchanged). Fireberry נופל לכאן גם הוא, עם
+          // פחות תתי-טאבים — ראה FIREBERRY_CRM_VIEWS.
+          const _fbCrm = _vrCrmType === 'fireberry'
+          const _crmViews = _fbCrm ? FIREBERRY_CRM_VIEWS : BMBY_CRM_VIEWS
+          // תת-טאב שנשמר ממעבר קודם (למשל "יישובים" מפרויקט של ש.ברוך) ואינו קיים כאן
+          // — נופלים ל"מקורות הגעה" במקום להציג תת-טאב נסתר וריק.
+          const _sub = _crmViews.some(v => v.key === crmSubTab) ? crmSubTab : 'sources'
           return (<>
             {/* מובייל: בורר אחד במקום שורת תתי־הטאבים (Tovno-Mobile-Handoff). */}
             <ViewPicker
               title="תצוגות CRM"
-              value={crmSubTab}
+              value={_sub}
               onChange={setCrmSubTab}
-              options={BMBY_CRM_VIEWS}
+              options={_crmViews}
             />
             <div className={vrShell ? 'vcs-subtabs-row' : undefined}>
             <div className="client-tabs vpick-replaced" style={vrShell ? undefined : {marginBottom: 15}}>
-              <button className={`client-tab ${crmSubTab === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>{vrShell ? '' : '📂 '}מקורות הגעה</button>
-              <button className={`client-tab ${crmSubTab === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>{vrShell ? '' : '⏱️ '}זמני תגובה</button>
-              <button className={`client-tab ${crmSubTab === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>{vrShell ? '' : '🚫 '}התנגדויות</button>
-              <button className={`client-tab ${crmSubTab === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>{vrShell ? '' : '🏘️ '}יישובים</button>
-              <button className={`client-tab ${crmSubTab === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>{vrShell ? '' : '📅 '}פגישות שבוצעו</button>
+              <button className={`client-tab ${_sub === 'sources' ? 'active' : ''}`} onClick={() => setCrmSubTab('sources')}>{vrShell ? '' : '📂 '}מקורות הגעה</button>
+              {!_fbCrm && <button className={`client-tab ${_sub === 'response' ? 'active' : ''}`} onClick={() => setCrmSubTab('response')}>{vrShell ? '' : '⏱️ '}זמני תגובה</button>}
+              {!_fbCrm && <button className={`client-tab ${_sub === 'objections' ? 'active' : ''}`} onClick={() => setCrmSubTab('objections')}>{vrShell ? '' : '🚫 '}התנגדויות</button>}
+              {!_fbCrm && <button className={`client-tab ${_sub === 'reports' ? 'active' : ''}`} onClick={() => setCrmSubTab('reports')}>{vrShell ? '' : '🏘️ '}יישובים</button>}
+              <button className={`client-tab ${_sub === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>{vrShell ? '' : '📅 '}פגישות שבוצעו</button>
             </div>
             {vrShell && (
               <button type="button" className="vr-button vcs-refresh" onClick={refreshFromBmby} disabled={refreshingCrm} title="משיכה חיה מ-BMBY לתקופה שנבחרה">
@@ -5697,7 +5730,9 @@ const selectProject = async (client, project) => {
               </button>
             )}
             </div>
-            {crmSubTab === 'sources' ? (<>{renderCrmDashboard()}{renderCrmAdsDashboard()}</>) : crmSubTab === 'objections' ? renderCrmObjectionsDashboard() : crmSubTab === 'response' ? renderCrmResponseDashboard() : crmSubTab === 'meetings' ? renderCrmMeetingsDashboard() : renderCrmReportDashboard()}
+            {/* "עלות לתוצאה לפי מודעה" מוסתרת בפיירברי (ויטלי, 28.9): טבלת "נתונים לפי
+                מקור הגעה" כבר נפתחת עד רמת המודעה, עם הלידים והפגישות מה-CRM עצמו. */}
+            {_sub === 'sources' ? (<>{renderCrmDashboard()}{!_fbCrm && renderCrmAdsDashboard()}</>) : _sub === 'objections' ? renderCrmObjectionsDashboard() : _sub === 'response' ? renderCrmResponseDashboard() : _sub === 'meetings' ? renderCrmMeetingsDashboard() : renderCrmReportDashboard()}
           </>)
         })() : (displayReports.length === 0 && dashTab !== 'all') ? (
           <div className="welcome-center" style={{padding:'60px 20px',textAlign:'center'}}>
