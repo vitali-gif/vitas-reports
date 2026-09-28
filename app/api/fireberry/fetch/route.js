@@ -13,7 +13,7 @@ import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { OBJ, queryAll, isConfigured, listLeadNoteIds, getNote, pool } from '../../../../lib/crm/fireberry-api.js'
 import { computeFireberrySummary, toReportRow, filterLeads, fireberryConfigFor } from '../../../../lib/crm/fireberry-summary.js'
-import { upsertRawRecords, rebuildCompactIfChanged, loadRawRecords } from '../../../../lib/crm/raw-store.js'
+import { upsertRawRecords, rebuildCompactIfChanged, loadRawRecords, loadCompactSnapshot } from '../../../../lib/crm/raw-store.js'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -132,6 +132,43 @@ async function runSync(opts = {}) {
   const targets = (projects || []).filter(p => fireberryConfigFor(p.name) && (!opts.projectId || p.id === opts.projectId))
   if (targets.length === 0) return { status: 200, body: { ok: false, message: 'No Fireberry project found in Supabase.' } }
 
+  // ── fromSnapshot: חישוב מהנתונים השמורים, בלי אף קריאה לפיירברי ─────────────
+  //
+  // ⚠️ עד 28.9 כל אחד מ-13 חלונות הקרון (3 חודשים + 10 טווחים) שלף מחדש את *כל*
+  //    הלידים של אלפא — אותם נתונים 13 פעם, כדי לחשב טווח תאריכים שונה. ב-607 לידים
+  //    זה ~40 קריאות לריצה. אבל בספטמבר לבד נכנסו 508 לידים; ב-5,000 לידים כל שליפה
+  //    היא ~11 קריאות, והקרון היה שולח ~130 קריאות בתוך דקה — מעל תקרת ה-100 של
+  //    פיירברי. זה היה חוסם גם אותנו וגם את האינטגרציות של אלפא על אותו טוקן.
+  //
+  // עכשיו prefetch-crm שולף חי רק בחלון החודש הנוכחי (שגם מרענן את התמונה), וכל
+  // שאר החלונות מחושבים מ-crm_compact. הדשבורד (כפתור רענן) עדיין שולף חי.
+  let fromSnap = null
+  if (opts.fromSnapshot) {
+    fromSnap = new Map()
+    for (const proj of targets) {
+      try {
+        const s = await loadCompactSnapshot(supabase, proj.id, 'fireberry')
+        if (s?.entities?.leads?.length) fromSnap.set(proj.id, s.entities)
+      } catch {}
+    }
+    // פרויקט בלי תמונה שמורה (ריצה ראשונה) — נופלים לשליפה חיה, רק בשבילו.
+    if (fromSnap.size === targets.length) {
+      const results = []
+      for (const proj of targets) {
+        const e = fromSnap.get(proj.id)
+        const R = computeFireberrySummary({ leads: e.leads || [], meetings: e.meetings || [], notes: e.notes || [] }, { since, until })
+        const row = toReportRow(R)
+        const { error } = await supabase.from('reports').upsert({
+          project_id: proj.id, source: 'crm', month: monthKey,
+          data: row.data, summary: row.summary, file_name: 'Fireberry snapshot (computed)', row_count: row.row_count,
+        }, { onConflict: 'project_id,source,month' })
+        results.push(error ? { project: proj.name, ok: false, error: error.message }
+          : { project: proj.name, ok: true, fromSnapshot: true, counts: { leads: R.totals.totalLeads, meetingsScheduled: R.totals.meetingsScheduled } })
+      }
+      return { status: 200, body: { ok: results.every(r => r.ok), month: monthKey, since, until, fromSnapshot: true, projects: results } }
+    }
+  }
+
   // המשיכה עצמה נעשית פעם אחת לכל הריצה ולא לכל פרויקט: כל הפרויקטים של אלפא יושבים
   // באותו חשבון Fireberry, והסינון הוא מקומי. שני פרויקטים = עדיין שתי בקשות רשת.
   let rawLeads, rawMeetings, truncated = false
@@ -238,6 +275,8 @@ export async function POST(request) {
       snapshot: gate.admin && body.snapshot === false ? false : undefined,
       // סנכרון ההערות יקר (מאות קריאות) — אדמין וקרון בלבד, לא לקוח.
       notesSync: gate.admin && body.notesSync === true,
+      // חישוב מהתמונה השמורה בלבד — זול, בלי פנייה לפיירברי. לקרון (ראה prefetch-crm).
+      fromSnapshot: gate.admin && body.fromSnapshot === true,
       budgetMs: gate.admin ? Math.min(Number(body.budgetMs) || 45000, 240000) : undefined,
     })
     return Response.json(res, { status })
