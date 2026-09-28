@@ -633,6 +633,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       callList.push({ key: 'crm',  url: '/api/bmby/fetch' });
       callList.push({ key: 'zoho', url: '/api/zoho/fetch' });
       callList.push({ key: 'salesforce', url: '/api/salesforce/fetch' });
+      // כל route של CRM מדלג בעצמו על פרויקט שאינו שלו (פיירברי: FIREBERRY_PROJECTS),
+      // ולכן אין סכנה לשלוח את כולם עם ה-projectId הפתוח. בלי השורה הזאת "רענן" על
+      // אקספו חיפה לא נגע ב-CRM בכלל, והנתונים התעדכנו רק בקרון.
+      callList.push({ key: 'fireberry', url: '/api/fireberry/fetch' });
     }
     if (callList.length === 0) {
       if (!isBackground) setRefreshing(false);
@@ -651,6 +655,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
         if (c.key === 'gg')  googleOk = ok;
         if (c.key === 'crm') crmOk = ok;
         if (c.key === 'zoho') crmOk = crmOk || ok;
+        if (c.key === 'fireberry') crmOk = crmOk || ok;
       });
       if (metaOk) setLastMetaSync(new Date());
       if (googleOk) setLastGoogleSync(new Date());
