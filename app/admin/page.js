@@ -4992,8 +4992,8 @@ const selectProject = async (client, project) => {
                           <td style={{color:'var(--violet)',fontWeight:600}}>{oConv}%</td>
                           <td className="sub">{oTop || '—'}</td>
                         </tr>
-                        {open && (<tr className="vr-kloss-row-open"><td colSpan={9} style={{background:'#f8fafc',padding:'18px 20px'}}>
-                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:20,width:'100%'}}>
+                        {open && (<tr className="vr-kloss-row-open"><td colSpan={9} className="vr-kloss-detail-cell" style={{background:'#f8fafc',padding:'18px 20px'}}>
+                          <div className="vr-kloss-detail" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(340px,100%),1fr))',gap:20,width:'100%'}}>
                             <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'16px 18px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אנשי מכירות</div>
                               {_sm.length === 0 ? <div className="sub">—</div> : (
