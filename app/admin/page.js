@@ -6216,14 +6216,14 @@ const selectProject = async (client, project) => {
                   <span style={{display:'inline-block', width:'18px', color:'#64748b', marginInlineEnd:'4px'}}>
                     {hasChildren ? (vrAds ? (isExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />) : (isExpanded ? '\u25bc' : '\u25c0')) : ''}
                   </span>
-                  <bdi>{name}</bdi>
+                  <bdi>{name === 'PERFORMANCE_MAX' ? 'Performance Max' : name}</bdi>
                 </td>
                 <td style={{fontSize, whiteSpace:'nowrap'}}>
                   {level === 0 && data.source ? (vrAds
                     ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
                     : <span className={`platform-tag${data.source.includes('google')?' google':''}`}>{data.source.includes('google')?'GOOGLE':'FACEBOOK'}</span>) : <span style={{color:'#cbd5e1'}}>-</span>}
                 </td>
-                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : 'rgba(226,75,74,0.12)'; const col = isActive ? '#059669' : '#c0322f'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; // סטטוס ריק פירושו קמפיין שאינו פעיל — עד היום הוא הוצג כמקף אפור ונקרא כמו
+                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; if (!st && name === 'PERFORMANCE_MAX') return <span style={{color:'#cbd5e1'}}>-</span>; /* קבוצה סינתטית של PMax — אין לה סטטוס משלה, ו'מכובה' היה שקר */ const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED' || /_PAUSED$/.test(st); const bg = isActive ? 'rgba(16,185,129,0.12)' : 'rgba(226,75,74,0.12)'; const col = isActive ? '#059669' : '#c0322f'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : ({ WITH_ISSUES: 'בעיה', DISAPPROVED: 'נדחתה', PENDING_REVIEW: 'בבדיקה', IN_PROCESS: 'בבדיקה', PREAPPROVED: 'בבדיקה', PENDING_BILLING_INFO: 'חסר אמצעי תשלום' }[st] || st || '-'); // ערכי effective_status של Meta (למשל CAMPAIGN_PAUSED) הוצגו גולמיים ונחתכו במובייל (ויטלי, 28.9) // סטטוס ריק פירושו קמפיין שאינו פעיל — עד היום הוא הוצג כמקף אפור ונקרא כמו
                   // "אין נתון". עכשיו "מכובה" באדום (ויטלי, 21.9).
                   if (vrAds) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status off"><i aria-hidden="true" />מכובה</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{background:'rgba(226,75,74,0.12)',color:'#c0322f',borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>מכובה</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
@@ -6284,14 +6284,17 @@ const selectProject = async (client, project) => {
                     {campaignNames.flatMap(cName => {
                       const cData = tree[cName];
                       const isCExpanded = expandedCampaigns.has(cName);
-                      const adSetNames = Object.keys(cData.adSets).sort((a,b) => treeCmp(a, b, n => cData.adSets[n]));
+                      // קבוצות ומודעות בלי שום פעילות (₪0, 0 חשיפות, 0 קליקים, 0 לידים) — בעיקר ה"קבוצת
+                      // מודעות 1" / "Ad …" הריקים ש-PMax מחזיר — מוסתרות, כמו קמפיינים ריקים (ויטלי, 28.9).
+                      const _alive = (d) => _hasActivity(d) || ((d && d.leads) || 0) > 0;
+                      const adSetNames = Object.keys(cData.adSets).filter(n => _alive(cData.adSets[n])).sort((a,b) => treeCmp(a, b, n => cData.adSets[n]));
                       const rows = [renderRow(cName, cData, 0, isCExpanded, adSetNames.length > 0, () => toggleCampaign(cName), `c-${cName}`)];
                       if (isCExpanded) {
                         adSetNames.forEach(aName => {
                           const aData = cData.adSets[aName];
                           const asKey = `${cName}|${aName}`;
                           const isAExpanded = expandedAdSets.has(asKey);
-                          const adNames = Object.keys(aData.ads).sort((x,y) => treeCmp(x, y, n => aData.ads[n]));
+                          const adNames = Object.keys(aData.ads).filter(n => _alive(aData.ads[n])).sort((x,y) => treeCmp(x, y, n => aData.ads[n]));
                           rows.push(renderRow(aName, aData, 1, isAExpanded, adNames.length > 0, () => toggleAdSet(asKey), `as-${asKey}`));
                           if (isAExpanded) {
                             adNames.forEach(adName => { rows.push(renderRow(adName, aData.ads[adName], 2, false, false, null, `ad-${asKey}|${adName}`)); });

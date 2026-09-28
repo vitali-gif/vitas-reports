@@ -3996,6 +3996,12 @@ body.drp-no-scroll { overflow: hidden; }
     white-space: normal;
   }
   .data-table thead th:first-child { z-index: 3; background: #EEF3FC; }
+  /* כותרת העמודה הדביקה נשברת לשורות (הכותרת 'קמפיין / קבוצה / מודעה' יושבת עם
+     nowrap inline, ולכן גלשה מעל 'פלטפורמה'), ומילה ארוכה בלי רווחים — כמו
+     PERFORMANCE_MAX — נשברת בתוך התא במקום לגלוש לעמודה הבאה (ויטלי, 28.9). */
+  .data-table thead th:first-child { white-space: normal !important; }
+  .data-table thead th:first-child,
+  .data-table tbody td:first-child { overflow-wrap: anywhere; }
   .data-table tbody tr:nth-child(even) td:first-child { background: var(--tv-surface-subtle, #F5F7FB); }
 
   /* חיווי שאפשר לגלול. אין hover בנייד, ובלי סימן אין שום דרך לדעת
