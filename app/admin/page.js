@@ -1482,7 +1482,9 @@ const selectProject = async (client, project) => {
     // לשתי שורות — ככה שם כמו "P-max | Ongoing | New Client" נקרא במלואו, במקום
     // להיחתך ל-"P-max | Ongoing…" שנראה זהה ל"P-max | Ongoing | General".
     const wrap = (n) => {
-      const t = String(n || '').trim().replace(/\s*\|\s*/g, ' | ');
+      // סימני כיוון בלתי נראים (U+200E/U+200F…) — ב-KLOSS יש שמות קמפיין עם עשרות כאלה בהתחלה,
+      // והם "תפסו" את השורה הראשונה של התווית, כך שעל הציר הופיע רק "…" (ויטלי, 28.9).
+      const t = String(n || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim().replace(/\s*\|\s*/g, ' | ');
       if (t.length <= Math.ceil(max / 2)) return [t];
       const words = t.split(' ');
       const lines = ['', ''];
@@ -4068,7 +4070,25 @@ const selectProject = async (client, project) => {
             tooltip: { callbacks: { label: (ctx) => ' ' + ctx.label + ': ' + formatCurrency(ctx.parsed || 0) } },
           } },
         });
-        const _shortCamp = shortenLabels(campNames2);
+        // בטלפון (ויטלי, 28.9) הקיצור הרגיל (שתי שורות של ~17 תווים) רחב מהעמודה, והשמות עלו זה
+        // על זה. שם נשבר לעד שלוש שורות ברוחב העמודה, ומילה ארוכה בלי רווחים נחתכת לחלקים.
+        // התחלת השם נשמרת תמיד (היא מה שמבדיל בין קמפיינים); השם המלא ב-tooltip.
+        const _campNarrow = typeof window !== 'undefined' && window.innerWidth < 640;
+        const _narrowLabels = (names) => {
+          const per = Math.max(6, Math.floor((window.innerWidth - 120) / Math.max(1, names.length) / 7));
+          return names.map(n => {
+            const toks = String(n || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').split(/\s+/).filter(w => w && w !== '|')
+              .flatMap(w => w.length <= per ? [w] : (w.match(new RegExp('.{1,' + per + '}', 'g')) || [w]));
+            const lines = [];
+            for (const w of toks) {
+              const last = lines[lines.length - 1];
+              if (last != null && (last + ' ' + w).length <= per) lines[lines.length - 1] = last + ' ' + w; else lines.push(w);
+            }
+            if (lines.length > 3) { lines.length = 3; lines[2] = lines[2].slice(0, per - 1) + '\u2026'; }
+            return lines;
+          });
+        };
+        const _shortCamp = _campNarrow ? _narrowLabels(campNames2) : shortenLabels(campNames2);
         createChart('campLeads', 'bar', _shortCamp, [
           { label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: campNames2.map(n => data.campaigns[n].leads),
             backgroundColor: '#10B981', maxBarThickness: 80, yAxisID: 'y', order: 2 },
@@ -4079,7 +4099,7 @@ const selectProject = async (client, project) => {
             pointBackgroundColor: '#F43F5E', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
             yAxisID: 'y1', order: 1 }
         ], {
-          x: { grid: { display: false }, ticks: { font: { size: cfs(10.5), weight: '700' }, autoSkip: false, maxRotation: 0, minRotation: 0 } },
+          x: { grid: { display: false }, ticks: { font: { size: cfs(_campNarrow ? 9.5 : 10.5), weight: '700' }, autoSkip: false, maxRotation: 0, minRotation: 0 } },
           y: { position: 'right', beginAtZero: true, grid: { color: '#F2F4F8' },
                title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
           y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false },
