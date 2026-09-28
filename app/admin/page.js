@@ -282,6 +282,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // setState שם, בלי שמירה, היה מפעיל רינדור → timeout חדש → setState → לולאה
   // אינסופית. הרף מחזיק את המקרא האחרון שנכתב, וכותבים רק כשהוא באמת השתנה.
   const campLegendRef = useRef('')
+  // עותק של campHidden שבניית הגרף (בתוך setTimeout) קוראת — הגרף נבנה מחדש בכל רינדור,
+  // ובלי זה פלח שהוסתר במקרא היה חוזר להופיע בלחיצה הבאה על כל דבר.
+  const campHiddenRef = useRef(new Set())
   const _applyCampLegend = (next) => {
     const key = JSON.stringify(next)
     if (campLegendRef.current === key) return
@@ -289,6 +292,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     setCampLegend(next)
     // תקופה חדשה = פלחים חדשים. בלי האיפוס, קמפיין שהוסתר היה נשאר מסומן כמוסתר
     // במקרא בזמן שהפלח שלו מצויר — כלומר המקרא משקר על מצב הגרף.
+    campHiddenRef.current = new Set()
     setCampHidden(new Set())
   }
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
@@ -4090,6 +4094,11 @@ const selectProject = async (client, project) => {
             tooltip: { callbacks: { label: (ctx) => ' ' + ctx.label + ': ' + formatCurrency(ctx.parsed || 0) } },
           } },
         });
+        // פלחים שהוסתרו במקרא נשארים מוסתרים גם אחרי בנייה מחדש של הגרף.
+        if (campHiddenRef.current.size) {
+          const _spendChart = chartsRef.current.find(c => c?.canvas?.id === 'campSpend');
+          if (_spendChart) { campNames2.forEach((n, i) => { if (campHiddenRef.current.has(n) && _spendChart.getDataVisibility(i)) _spendChart.toggleDataVisibility(i); }); _spendChart.update(); }
+        }
         // בטלפון (ויטלי, 28.9) הקיצור הרגיל (שתי שורות של ~17 תווים) רחב מהעמודה, והשמות עלו זה
         // על זה. שם נשבר לעד שלוש שורות ברוחב העמודה, ומילה ארוכה בלי רווחים נחתכת לחלקים.
         // התחלת השם נשמרת תמיד (היא מה שמבדיל בין קמפיינים); השם המלא ב-tooltip.
@@ -6156,7 +6165,9 @@ const selectProject = async (client, project) => {
                           // הלחיצה נוגעת ישירות במופע הגרף ולא מרנדרת אותו מחדש.
                           const chart = chartsRef.current.find(c => c?.canvas?.id === 'campSpend');
                           if (chart) { chart.toggleDataVisibility(i); chart.update(); }
-                          setCampHidden(prev => { const n = new Set(prev); if (n.has(it.name)) n.delete(it.name); else n.add(it.name); return n; });
+                          const n = new Set(campHiddenRef.current); if (n.has(it.name)) n.delete(it.name); else n.add(it.name);
+                          campHiddenRef.current = n;
+                          setCampHidden(n);
                         }}>
                         <span className="vr-camp-dot" style={{background: it.color}} aria-hidden="true" />
                         <span className="vr-camp-name">{it.name}</span>
@@ -6778,7 +6789,7 @@ const selectProject = async (client, project) => {
         </div>)}
       </>
     );
-  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedCrmAds, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
+  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, campLegend, campHidden, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedCrmAds, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
     // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
     // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
     // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.
