@@ -3953,7 +3953,11 @@ body.drp-no-scroll { overflow: hidden; }
   .perf,
   .pmax-body,
   .card .data-table-scroll,
-  .card-body .data-table-scroll {
+  .card-body .data-table-scroll,
+  /* טבלאות שיושבות ישר בתוך .chart-card (זמני תגובה לפי איש מכירות / מקור,
+     התנגדויות). בלי זה הן נחתכו בקצה המסך בלי גלילה (ויטלי, 28.9). :has ולא
+     כל .chart-card — overflow היה חותך חלוניות מידע בכרטיסי הגרפים. */
+  .chart-card:has(> .data-table) {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-inline: contain;
@@ -3965,6 +3969,7 @@ body.drp-no-scroll { overflow: hidden; }
      השאר. בלי זה הדפדפן דוחס עמודות עד שהמספרים נשברים לשתי שורות. */
   .tbl-wrap .data-table,
   .table-wrapper .data-table,
+  .chart-card > .data-table,
   .demo-grid .data-table,
   .card .data-table,
   .card-body .data-table {
