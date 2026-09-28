@@ -3258,6 +3258,26 @@ const selectProject = async (client, project) => {
 
     const ct = crmData.totals;
     const cp = prevCrmData?.totals;
+    // "פגישות עתידיות" לא נשמרות בשורות לפי מקור (ש-aggregateCrmRows סוכם) אלא בסיכום של הדוח,
+    // ולכן בטאב ה-CRM הכרטיס הציג 0 אצל כל הלקוחות, בזמן שטאב "הכל" (שקורא מהסיכום) הציג את
+    // המספר האמיתי — HI PARK 1, ONCE 2, אקספו חיפה 18 בספטמבר (נמצא ב-28.9).
+    const _upcomingFrom = (reps) => {
+      const sums = reps.map(r => r.summary || {});
+      if (!sums.some(x => x.meetingsUpcoming != null)) return null;
+      const splits = sums.map(x => x.meetingsUpcomingSplit).filter(Boolean);
+      return {
+        total: sums.reduce((a, x) => a + (Number(x.meetingsUpcoming) || 0), 0),
+        split: splits.length ? { fromNewLeads: splits.reduce((a, x) => a + (Number(x.fromNewLeads) || 0), 0), fromOldLeads: splits.reduce((a, x) => a + (Number(x.fromOldLeads) || 0), 0) } : null,
+      };
+    };
+    if (ct.meetingsUpcoming == null) {
+      const u = _upcomingFrom(crmReports);
+      if (u) { ct.meetingsUpcoming = u.total; if (u.split) ct.meetingsUpcomingSplit = u.split; }
+    }
+    if (cp && cp.meetingsUpcoming == null) {
+      const u = _upcomingFrom(reports.filter(r => r.month === comparisonPeriodKey(selectedMonth) && r.source === 'crm'));
+      if (u) cp.meetingsUpcoming = u.total;
+    }
 
     const crmKpi = (label, value, color, current, prev, isCost, tip, namesArr, subNote) => {
       const ch = (prev != null && prev !== 0) ? changePercent(current, prev, isCost)
