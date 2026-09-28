@@ -66,8 +66,16 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   eq(R.sources['גוגל'].totalLeads, 1, 'פילוח מקור: גוגל')
   eq(R.adBreakdown.length, 2, 'פילוח מודעות: שתי מודעות שונות')
   eq(R.hourlyLeadStats[10], 2, 'שעת כניסת הליד נספרת')
-  eq(R.xlsxRows.length, 3, 'שורות ה-Excel = הלידים בטווח')
-  ok(!('טלפון' in R.xlsxRows[0]), 'אין טלפון בשורות ה-Excel')
+  // שורות הדוח: אחת לכל מקור, בצורה ש-aggregateCrmRows ב-lib/helpers.js קורא.
+  // עד 28.9 היו כאן שורות לכל ליד, ומסך "מקורות הגעה" קרא מהן אפס בכל עמודה.
+  const { aggregateCrmRows } = await import('../../lib/helpers.js')
+  eq(R.sourceRows.length, 2, 'שורות הדוח: שורה לכל מקור')
+  const agg = aggregateCrmRows(R.sourceRows)
+  eq(agg.totals.totalLeads, 3, 'aggregateCrmRows קורא את סך הלידים מהשורות')
+  eq(agg.totals.relevantLeads, 2, 'aggregateCrmRows קורא רלוונטיים')
+  eq(agg.totals.irrelevantLeads, 1, 'aggregateCrmRows קורא לא רלוונטיים')
+  eq(agg.sources['פייסבוק'].leads.length, 2, 'הלידים של כל מקור זמינים לתצוגה בלחיצה')
+  ok(!('phone' in agg.sources['פייסבוק'].leads[0]), 'אין טלפון ברשימת הלידים של המקור')
 }
 
 // ── פגישות: תואמו לפי מועד התיאום, בוצעו לפי מועד הפגישה ────────────────────
