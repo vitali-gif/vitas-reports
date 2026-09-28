@@ -123,6 +123,31 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   eq(googleAgencyOf(g, { account: '9113178078', campaign: 'alphatech_search' }), null, 'גוגל: קמפיין אחר באותו חשבון אינו שייך')
 }
 
+// ── namedLeads: המשפך. בלעדיו כל התחנות מתחת לקליקים הציגו "אין נתון" ─────────
+{
+  const leads = [
+    lead('1', '2026-09-05T10:00:00', { statuscode: 'אין מענה' }),
+    lead('2', '2026-09-06T10:00:00', { statuscode: 'חזרה ללקוח' }),
+    lead('3', '2026-09-07T10:00:00', { statuscode: 'תואמה פגישה', originatingleadcode: 'גוגל' }),
+    lead('4', '2026-09-08T10:00:00', { statuscode: 'התקיימה פגישה' }),
+  ]
+  const meetings = [
+    meeting('m1', '3', '2026-09-09T11:00:00', '2026-09-20T09:00:00'),
+    meeting('m2', '3', '2026-09-10T11:00:00', '2026-09-21T09:00:00', 'בוטלה'),  // ליד עם שתי פגישות
+  ]
+  const R = computeFireberrySummary({ leads, meetings }, { since: '2026-09-01', until: '2026-09-30' })
+  const all = R.namedLeads.all
+  eq(all.allLeads.length, 4, 'משפך: כל הלידים בתקופה')
+  eq(all.noResponse.length, 1, 'משפך: "אין מענה" לא נוצר איתו קשר')
+  eq(all.meetingsScheduled.length, 2, 'משפך: ליד עם שתי פגישות נספר פעם אחת (קוהורט)')
+  eq(all.meetingsCompleted.length, 1, 'משפך: התקיימה לפי סטטוס הליד')
+  eq(all.meetingsCancelled.length, 1, 'משפך: בוטלה לפי סטטוס הפגישה')
+  eq(R.namedLeads.google.allLeads.length, 1, 'משפך: פיצול לגוגל')
+  eq(R.namedLeads.facebook.allLeads.length, 3, 'משפך: פיצול לפייסבוק')
+  ok(!('registrations' in all), 'אין רשימת הרשמות — "אין נתון" ולא אפס')
+  ok(!('phone' in all.allLeads[0]), 'אין טלפון ברשימות השמיות')
+}
+
 // ── מזהה יציב לכל רשומה בתמונת המצב ─────────────────────────────────────────
 // ב-28.9 כל 267 הלידים קיבלו אותו מזהה (גיבוב של שדות BMBY שכולם ריקים), ו-crm_raw
 // החזיק ליד אחד. הדוח החודשי נראה תקין, וכל טווח תאריכים אחר הציג 1.
