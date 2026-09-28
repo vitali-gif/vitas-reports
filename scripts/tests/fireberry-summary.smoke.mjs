@@ -123,5 +123,21 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   eq(googleAgencyOf(g, { account: '9113178078', campaign: 'alphatech_search' }), null, 'גוגל: קמפיין אחר באותו חשבון אינו שייך')
 }
 
+// ── מזהה יציב לכל רשומה בתמונת המצב ─────────────────────────────────────────
+// ב-28.9 כל 267 הלידים קיבלו אותו מזהה (גיבוב של שדות BMBY שכולם ריקים), ו-crm_raw
+// החזיק ליד אחד. הדוח החודשי נראה תקין, וכל טווח תאריכים אחר הציג 1.
+{
+  const { extIdOf } = await import('../../lib/crm/raw-store.js')
+  const a = extIdOf('leads', lead('acc-1', '2026-09-05T10:00:00'))
+  const b = extIdOf('leads', lead('acc-2', '2026-09-06T10:00:00'))
+  eq(a.id, 'acc-1', 'ליד: המזהה הוא accountid')
+  ok(a.id !== b.id, 'שני לידים שונים מקבלים שני מזהים שונים')
+  eq(a.field, 'accountid', 'ליד: לא נפל לגיבוב')
+  const m = extIdOf('meetings', meeting('act-9', 'acc-1', '2026-09-10T11:00:00', '2026-09-12T09:00:00'))
+  eq(m.id, 'act-9', 'פגישה: המזהה הוא activityid')
+  // שלא נשבר דבר ל-Zoho: רשומה עם id ממשיכה להשתמש בו.
+  eq(extIdOf('leads', { id: 'z1', accountid: 'x' }).id, 'z1', 'Zoho: id עדיין קודם ל-accountid')
+}
+
 console.log(failures === 0 ? '\n✓ Fireberry: הגדרות הספירה והניתוב תקינות' : `\n✗ ${failures} בדיקות נכשלו`)
 process.exit(failures === 0 ? 0 : 1)

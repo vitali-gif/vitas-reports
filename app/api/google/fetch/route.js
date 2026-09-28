@@ -151,7 +151,18 @@ async function runSync(opts = {}) {
         AND campaign.status != 'REMOVED'
     `
     const campRows = await gaqlSearch(accessToken, customerId, campQuery, _gopts)
-    const seenCampaigns = new Set(allRows.map(r => r.campaign).filter(Boolean))
+    // "יש לקמפיין נתונים ברמת מודעה" = יש לו שורת מודעה *עם מדדים*, לא סתם שורה.
+    //
+    // ⚠️ הבאג (28.9, אקספו חיפה): קמפיין PMax החזיר שורת ad_group_ad אחת עם אפס בכל
+    //    המדדים. הבדיקה הישנה ראתה "הקמפיין כבר קיים ברמת מודעה" ודילגה על שורת
+    //    הקמפיין — שבה ישבו כל ה-₪15,193 וכל 57 ההמרות. הדוח החודשי הציג אפס, בזמן
+    //    שהעובדות היומיות (google-daily.js, שמפלח לפי יום ולכן לא מקבל שורות ריקות)
+    //    הראו את הסכום המלא.
+    //    לקמפיין Search שיש לו מודעות אמיתיות שום דבר לא משתנה: שורות המודעה שלו
+    //    נושאות מדדים, והוא עדיין מסומן כ"נראה".
+    const seenCampaigns = new Set(allRows
+      .filter(r => r.campaign && (r.spend > 0 || r.impressions > 0 || r.clicks > 0 || r.leads > 0))
+      .map(r => r.campaign))
     for (const r of campRows) {
       const cn = r.campaign?.name || ''
       if (!cn || seenCampaigns.has(cn)) continue  // already have ad-level data for this campaign
