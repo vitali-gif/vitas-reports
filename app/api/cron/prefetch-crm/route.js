@@ -116,6 +116,14 @@ export async function GET(request) {
     // aggregates, so quarters are fine (no record-count limit like Zoho).
     const sfPromise = fetch(`${base}/api/salesforce/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: bodyFor(job, 'salesforce') })
       .then(r => r.json()).catch(() => ({}))
+    // Fireberry (אלפא יזמות — אקספו חיפה) במקביל. הוא כותב רק לפרויקטים שמופיעים
+    // ב-FIREBERRY_PROJECTS, בדיוק כמו ש-Zoho כותב רק ל-BCureLaser.
+    //
+    // ⚠️ אין כאן דילוג על רבעונים כמו ב-Zoho: המשיכה היא של *כל* הרשומות בחשבון
+    //    (607 ב-28.9) והסינון לטווח מקומי, ולכן טווח ארוך לא עולה יותר מטווח קצר
+    //    ואין מגבלת רשומות שאפשר לחרוג ממנה.
+    const fbPromise = fetch(`${base}/api/fireberry/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: bodyFor(job, 'fireberry') })
+      .then(r => r.json()).catch(() => ({}))
     try {
       // cache:'no-store' — see prefetch-ads: without it these internal calls came back from
       // cache in milliseconds and no fresh data / heartbeat was written.
@@ -135,6 +143,12 @@ export async function GET(request) {
     try {
       const sfData = await sfPromise
       results.push({ kind: job.kind, label: job.label, source: 'salesforce', ok: sfData.ok ?? false, ms: Date.now()-t0, ..._slim(sfData) })
+    } catch {}
+    try {
+      const fbData = await fbPromise
+      // pending=true פירושו שאין FIREBERRY_TOKEN. זה מצב תצורה, לא כישלון משיכה —
+      // בלי ההבחנה הזאת כל ריצה לפני הגדרת המשתנה הייתה שולחת מייל התראה.
+      if (!fbData.pending) results.push({ kind: job.kind, label: job.label, source: 'fireberry', ok: fbData.ok ?? false, ms: Date.now()-t0, ..._slim(fbData) })
     } catch {}
   }
 

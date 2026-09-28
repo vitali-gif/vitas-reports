@@ -1,7 +1,7 @@
 # VITAS Reports
 
 דשבורד דוחות שיווק ללקוחות של סוכנות VITAS. פרודקשן: https://reports.vitas.co.il
-Next.js 14 (App Router) · Supabase · Vercel · אינטגרציות: Meta, Google Ads, BMBY, Zoho, Salesforce.
+Next.js 14 (App Router) · Supabase · Vercel · אינטגרציות: Meta, Google Ads, BMBY, Zoho, Salesforce, Fireberry.
 
 הפרויקט נערך משני מחשבים (נייד ונייח). **GitHub הוא המקום המשותף היחיד** — מה שלא נדחף, לא קיים במחשב השני.
 

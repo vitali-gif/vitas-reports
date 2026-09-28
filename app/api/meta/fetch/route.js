@@ -7,7 +7,7 @@ import { requireFetchAccess } from '../../../../lib/auth'
 // עזרי Meta והניתוב לפרויקטים עברו ל-lib/ads (שלב 2 של docs/daily-ranges-plan.md) — משותפים
 // לעובדות היומיות. הקוד זהה; רק המיקום השתנה.
 import { META_GRAPH_VERSION, num, extractLeads, metaFetchAll } from '../../../../lib/ads/meta-api.js'
-import { klossAgencyOf, subProjectMatcher } from '../../../../lib/ads/routing.js'
+import { klossAgencyOf, subProjectMatcher, metaSourcesForProject, metaAgencyOf } from '../../../../lib/ads/routing.js'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -353,15 +353,22 @@ async function runSync(opts = {}) {
     // בניין בשם אחר (שמי: HaZoarim / Shem Tov / Shabazi / Angel / Ben David).
     // כשהחשבון כולו שייך ללקוח אחד, `meta_account_id` על הפרויקט מנתב את כל שורותיו
     // אליו ומייתר את התאמת השמות. NULL = ההתנהגות הישנה, כך שאף פרויקט קיים לא מושפע.
+    // 2026-09-28 — כלל חשבון+מילת מפתח (META_PROJECT_SOURCES), לפרויקט שחולק חשבון
+    // עם פרויקט אחר ושמו לא מופיע בשם הקמפיין (אקספו חיפה מול אלפא טק). הוא קודם
+    // ל-meta_account_id כי הוא הצורה הצרה יותר. אותו סדר בדיוק ב-projectRowFilter,
+    // אחרת הדוח החודשי ושורות הטווח היומי יראו מספרים שונים לאותו לקוח.
+    const _metaRules = metaSourcesForProject(p.name)
     const _acct = (p.meta_account_id || '').toString().trim()
-    const belongs = _acct
-      ? (x) => String(x.account || '') === _acct
-      : isKloss
-        ? (x) => klossAgencyOf(x) !== null
-        : (x) => (x.campaign || '').toLowerCase().includes(needle)
+    const belongs = _metaRules
+      ? (x) => metaAgencyOf(_metaRules, x) !== null
+      : _acct
+        ? (x) => String(x.account || '') === _acct
+        : isKloss
+          ? (x) => klossAgencyOf(x) !== null
+          : (x) => (x.campaign || '').toLowerCase().includes(needle)
     const mine = allRows.filter(belongs)
     if (mine.length === 0) {
-      results.push({ project: p.name, skipped: true, reason: _acct ? `no rows for ad account ${_acct}` : 'no matching campaigns' })
+      results.push({ project: p.name, skipped: true, reason: _metaRules ? 'no rows matched META_PROJECT_SOURCES' : _acct ? `no rows for ad account ${_acct}` : 'no matching campaigns' })
       continue
     }
 
