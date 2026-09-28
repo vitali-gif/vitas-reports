@@ -46,6 +46,12 @@ const _slim = (d) => {
   }
   return out
 }
+
+/** שורת כישלון קריאה אחת: מי, מה, ולמה. אותו פורמט במייל ההתראה וב-job_log. */
+const _describe = (r) =>
+  [r.source, r.label, r.error || (r.status ? `HTTP ${r.status}` : '')]
+    .filter(Boolean).join(' · ').slice(0, 200)
+
 export async function GET(request) {
   const startedAt = Date.now()
   const auth = request.headers.get('authorization') || ''
@@ -126,8 +132,18 @@ export async function GET(request) {
   const deadline = startedAt + RUN_BUDGET_MS
   // תקרה למשיכה בודדת. ב-27.9 משיכת google/last14 נתקעה וגררה את כל הריצה ל-372
   // שניות — מעל ה-300 — והשער החזיר 504 על *הריצה*, לא על המשיכה. עם תקרה
-  // פרטנית משיכה תקועה נקטעת לבד, נרשמת ככישלון אחד, ושאר 25 המשימות ממשיכות.
-  const JOB_TIMEOUT_MS = 90_000
+  // פרטנית משיכה תקועה נקטעת לבד, נרשמת ככישלון אחד, ושאר המשימות ממשיכות.
+  //
+  // ⚠️ 90 שניות היה צר מדי (28.9). משיכת רבעון מלא היא הכבדה ביותר שיש כאן —
+  //    זו בדיוק הסיבה ש-maxDuration ב-meta/fetch ו-google/fetch הועלה בזמנו
+  //    מ-60 ל-300 ("full-quarter fetches (q1-q4) exceeded 60s"). התקרה הפכה
+  //    משיכות שהצליחו לכשלונות: meta/q1 ו-meta/q2 בריצת cold, ו-meta/q3 בכל
+  //    ריצת hot — התראה בכל שעתיים על משהו שלא היה שבור.
+  //
+  //    התקרה הזאת אינה ההגנה על הריצה כולה; ההגנה היא budgetLeft ב-run(),
+  //    שמקצר כל מד־זמן כך שאף משיכה לא חורגת מהדדליין. התפקיד היחיד של
+  //    המספר כאן הוא שמשיכה *תקועה* לא תחזיק מקום בתור עד סוף התקציב.
+  const JOB_TIMEOUT_MS = 180_000
 
   async function run(job) {
     const t0 = Date.now()
@@ -176,7 +192,7 @@ export async function GET(request) {
   const failed = results.filter(r => !r.ok)
   if (failed.length > 0) {
     const fmt = new Intl.DateTimeFormat('he-IL', { timeZone: 'Asia/Jerusalem', dateStyle: 'short', timeStyle: 'short' }).format(new Date())
-    const failList = failed.slice(0, 30).map(f => `<li>${f.source || ''} · ${f.label || ''} · ${f.error || ('HTTP ' + (f.status||''))}</li>`).join('')
+    const failList = failed.slice(0, 30).map(f => `<li>${_describe(f)}</li>`).join('')
     const html = `
       <div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
         <h2>⚠️ קרון מודעות (Meta/Google) — ${failed.length} משימות נכשלו</h2>
@@ -244,7 +260,14 @@ export async function GET(request) {
         timedOut: results.filter(r => r.timedOut).length,
         deferred: results.filter(r => r.deferred).length,
         skippedFuture: skipped.length ? skipped : undefined,
-        firstError: failed.length ? String(failed[0]?.error || failed[0]?.label || '').slice(0, 200) : null,
+        // ⚠️ עד 28.9 נרשם כאן `failed[0].error` בלבד, ולכן כל כישלון תקרה נראה
+        //    בלוג כ-"job timeout after 90s" בלי לומר *איזו* משיכה נתקעה — וזה
+        //    היה כל מה שהיה צריך כדי לאבחן. השדה מזהה עכשיו את המשימה.
+        firstError: failed.length ? _describe(failed[0]) : null,
+        failures: failed.length ? failed.slice(0, 8).map(_describe) : undefined,
+        // הזמנים של המשיכות הכבדות — כדי שהתקרה תיקבע לפי מדידה ולא לפי ניחוש.
+        slowest: results.slice().sort((a, b) => (b.ms || 0) - (a.ms || 0)).slice(0, 3)
+          .map(r => `${r.source} · ${r.label} · ${Math.round((r.ms || 0) / 1000)}s`),
       })
       // ⚠️ ה-heartbeat נכתב רק בריצה שכוללת את החלק החם. ריצת cold בלילה אינה
       //    עדות לכך שהמשיכות השוטפות עובדות, ואם היא תעדכן את ה-heartbeat —
