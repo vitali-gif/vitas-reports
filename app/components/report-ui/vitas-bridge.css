@@ -449,3 +449,22 @@
   }
   .header.header-vr { margin-inline-start: 0; }
 }
+
+/* ── מובייל: כותרות סקשן ישנות (.section-head) ─────────────────────────────
+   h2 ו-.sub יושבים באותה שורה flex, ובטלפון ה-.sub לקח חצי רוחב — הכותרת
+   "המודעות הכי מובילות ב-Facebook" נשברה לשלוש שורות לצד טקסט באפור (ויטלי, 28.9).
+   במסך צר ה-.sub יורד לשורה משלו מתחת לכותרת. */
+@media (max-width: 640px) {
+  .vr-ui .section-head { flex-wrap: wrap; row-gap: 4px; }
+  .vr-ui .section-head h2 { flex: 1 1 0; min-inline-size: 0; font-size: 20px; }
+  .vr-ui .section-head .sub { flex-basis: 100%; margin-inline-start: 0; font-size: 13px; line-height: 1.5; }
+}
+
+/* הסבר המשפך — מקופל בטלפון (ראה Funnel ב-VitasPresentation.jsx). */
+.vr-funnel-notes-narrow { display: none; }
+@media (max-width: 640px) {
+  .vr-funnel-notes-wide { display: none; }
+  .vr-funnel-notes-narrow { display: block; margin-block-end: 12px; }
+  .vr-funnel-notes-narrow summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--indigo, #5b5ef4); padding-block: 4px; }
+  .vr-funnel-notes-narrow .vr-caption { margin-block-start: 6px; font-size: 13px; }
+}
