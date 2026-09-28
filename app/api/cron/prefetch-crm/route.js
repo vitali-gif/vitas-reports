@@ -122,7 +122,14 @@ export async function GET(request) {
     // ⚠️ אין כאן דילוג על רבעונים כמו ב-Zoho: המשיכה היא של *כל* הרשומות בחשבון
     //    (607 ב-28.9) והסינון לטווח מקומי, ולכן טווח ארוך לא עולה יותר מטווח קצר
     //    ואין מגבלת רשומות שאפשר לחרוג ממנה.
-    const fbPromise = fetch(`${base}/api/fireberry/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: bodyFor(job, 'fireberry') })
+    //
+    // שליפה חיה אחת לריצה בלבד: חלון החודש הנוכחי שולף מפיירברי וכותב את התמונה, וכל
+    // שאר החלונות מחושבים ממנה (fromSnapshot). עד 28.9 כל 13 החלונות שלפו את כל הלידים
+    // מחדש — אותם נתונים, 13 פעם — וזה היה עובר את תקרת 100 הקריאות לדקה של פיירברי
+    // ברגע שיהיו לאלפא כמה אלפי לידים. ריצת only=ranges לא שולחת עכשיו אף קריאה.
+    const fbLive = job.kind === 'month' && job.payload.month === months[0]
+    const fbBody = JSON.stringify({ ...job.payload, ...(fbLive ? { snapshot: true } : { fromSnapshot: true }) })
+    const fbPromise = fetch(`${base}/api/fireberry/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: fbBody })
       .then(r => r.json()).catch(() => ({}))
     try {
       // cache:'no-store' — see prefetch-ads: without it these internal calls came back from
