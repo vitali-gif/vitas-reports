@@ -2876,11 +2876,14 @@ const selectProject = async (client, project) => {
           { key: 'reg',   label: 'הרשמות',           of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
           { key: 'deal',  label: 'חוזים',            of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
         ];
-        flowDesc = 'מחשיפה ועד חוזה';
+        // Fireberry (אלפא) לא מדווח הרשמות וחוזים — שתי תחנות של אפס היו נראות כנפילה של 100%.
+        const _noDeals = _crmType === 'fireberry';
+        if (_noDeals) STAGES = STAGES.filter(st => st.key !== 'reg' && st.key !== 'deal');
+        flowDesc = _noDeals ? 'מחשיפה ועד פגישה' : 'מחשיפה ועד חוזה';
         scopeNote = 'לידים שנכנסו בתקופה. ' + MEDIA_NOTE
           + ' "פגישות שהתבטלו" נמדד מהפגישות שנקבעו, כמו "הגיעו".';
         cohortCfg = {
-          stageKeys: ['lead', 'cont', 'sched', 'held', 'reg', 'deal'],
+          stageKeys: _noDeals ? ['lead', 'cont', 'sched', 'held'] : ['lead', 'cont', 'sched', 'held', 'reg', 'deal'],
           leak: { key: 'canc', parentStageId: 'sched', denomNoun: 'פגישות שנקבעו' },
           transitionNote: null, // ברירת המחדל של CohortFunnel
         };
@@ -3416,7 +3419,12 @@ const selectProject = async (client, project) => {
     const _vrRegNote = vrCrm && (ct.registrationValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(ct.registrationValue) : undefined;
     const _vrDealNote = vrCrm ? [(ct.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(ct.contractValue) : null, _vrCost(ct.contracts) ? 'עלות לחוזה ' + _vrCost(ct.contracts) : null].filter(Boolean).join(' · ') || undefined : undefined;
     // התפלגות לידים לפי מקור לגרף החדש — מערך יציב (memoAgg) כדי שהגרף לא ייבנה מחדש בכל רינדור
-    const _distItems = memoAgg(`crmDist|${selectedMonth}`, () => sourceEntries.map(([name, d]) => ({ id: name, label: name, value: Number.isFinite(d.totalLeads) ? d.totalLeads : null })));
+    // בורר לידים/פגישות לדונאט (ויטלי, 28.9). פגישות = פגישות שתואמו, אותו מדד שבטבלה שמעל.
+    const _distMeet = srcMobileMetric === 'meetings';
+    const _distItems = memoAgg(`crmDist|${selectedMonth}|${_distMeet ? 'm' : 'l'}`, () => sourceEntries
+      // אותו סדר (לפי לידים) בשני המצבים: הצבע נקבע לפי המיקום, ומקור שמחליף צבע בין לידים לפגישות מבלבל.
+      .map(([name, d]) => { const v = _distMeet ? (d.meetingsScheduled ?? 0) : d.totalLeads; return { id: name, label: name, value: Number.isFinite(v) ? v : null }; }));
+    const _distTotal = _distItems.reduce((a, it) => a + (it.value || 0), 0);
     return (
       <div className={vrCrm ? 'vcs-root' : undefined}>
         {!vrCrm && <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
@@ -3433,8 +3441,9 @@ const selectProject = async (client, project) => {
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה — רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, [(ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null), _vrHeldNote].filter(Boolean).join(' · ') || undefined)}
           {crmKpi('פגישות עתידיות', formatNum(ct.meetingsUpcoming||0), 'cyan', ct.meetingsUpcoming||0, cp?.meetingsUpcoming, false, 'עתידיות = פגישות שנקבעו וטרם התקיימו.\nמועד הפגישה עתידי (אחרי היום) והיא עדיין פתוחה. כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsUpcoming, (ct.meetingsUpcomingSplit && (ct.meetingsUpcomingSplit.fromNewLeads+ct.meetingsUpcomingSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsUpcomingSplit.fromNewLeads+' · קודמים '+ct.meetingsUpcomingSplit.fromOldLeads) : null))}
           {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled||0), 'red', ct.meetingsCancelled||0, cp?.meetingsCancelled, false, 'בוטלו = פגישות שנקבעו החודש ובוטלו.\nנספר לפי תאריך התיאום, כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsCancelled, (ct.meetingsCancelledSplit && (ct.meetingsCancelledSplit.fromNewLeads+ct.meetingsCancelledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCancelledSplit.fromNewLeads+' · קודמים '+ct.meetingsCancelledSplit.fromOldLeads) : null))}
-          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations, _vrRegNote)}
-          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts, _vrDealNote)}
+          {/* Fireberry לא מדווח הרשמות וחוזים — כרטיסי אפס קבועים רק מבלבלים. */}
+          {!_crmIsFireberry && crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations, _vrRegNote)}
+          {!_crmIsFireberry && crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts, _vrDealNote)}
           {!vrCrm && _platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
           {!vrCrm && ct.totalLeads > 0 && _platformSpend > 0 ? crmKpi('עלות לליד', formatCurrency(_platformSpend / ct.totalLeads), 'purple', _platformSpend / ct.totalLeads, null, true) : null}
           {!vrCrm && ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
@@ -3631,8 +3640,14 @@ const selectProject = async (client, project) => {
 
         {/* CRM Charts — במצב העיצוב המחודש: דונאט + רשימת ערכים (SourceDistribution), מופע Chart.js משלו */}
         {vrCrm ? (
-          <ReportSection title="התפלגות לידים לפי מקור" description={formatNum(ct.totalLeads) + ' לידים בתקופה · לפי מקור ההגעה כפי שנרשם ב-CRM'}>
-            <div className="vcs-panel"><SourceDistribution items={_distItems} /></div>
+          <ReportSection title={_distMeet ? 'התפלגות פגישות לפי מקור' : 'התפלגות לידים לפי מקור'}
+            description={formatNum(_distMeet ? _distTotal : ct.totalLeads) + (_distMeet ? ' פגישות שתואמו בתקופה' : ' לידים בתקופה') + ' · לפי מקור ההגעה כפי שנרשם ב-CRM'}
+            actions={<div className="vcs-segmented" role="group" aria-label="מה להציג בהתפלגות">
+              {[['leads', 'לידים'], ['meetings', 'פגישות']].map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={srcMobileMetric === k} onClick={() => setSrcMobileMetric(k)}>{l}</button>
+              ))}
+            </div>}>
+            <div className="vcs-panel"><SourceDistribution items={_distItems} unit={_distMeet ? 'פגישות' : 'לידים'} /></div>
           </ReportSection>
         ) : (
         <div className="section">

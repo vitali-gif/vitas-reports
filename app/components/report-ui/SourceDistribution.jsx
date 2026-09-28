@@ -33,7 +33,8 @@ const sliceLabels = {
   },
 };
 
-export default function SourceDistribution({ items }) {
+// unit — מה נספר ('לידים' כברירת מחדל, 'פגישות' בבורר של טאב ה-CRM).
+export default function SourceDistribution({ items, unit = 'לידים' }) {
   const canvas = useRef(null);
   const [failed, setFailed] = useState(false);
   const complete = items.every(item => typeof item.value === 'number' && Number.isFinite(item.value) && item.value >= 0);
@@ -56,9 +57,9 @@ export default function SourceDistribution({ items }) {
     return () => { disposed = true; chart?.destroy(); };
   }, [items, complete, total]);
   if (!complete) return <p className="vr-caption">אין נתונים מלאים להצגת ההתפלגות</p>;
-  if (!total) return <p className="vr-caption">אין לידים לתקופה שנבחרה</p>;
+  if (!total) return <p className="vr-caption">{'אין ' + unit + ' לתקופה שנבחרה'}</p>;
   return <div className="vcs-distribution">
-    <div className="vcs-chart-wrap">{failed ? <p role="status">התרשים אינו זמין; הנתונים מופיעים ברשימה</p> : <><canvas ref={canvas} aria-hidden="true" /><div className="vcs-chart-center" aria-hidden="true"><strong>{total.toLocaleString('he-IL')}</strong><span>סה״כ לידים</span></div></>}</div>
-    <ul className="vcs-legend" aria-label="התפלגות לידים לפי מקור">{items.map((item, i) => <li key={item.id}><span className={`vcs-dot vcs-color-${i % 7}`} aria-hidden="true" /><span className="vcs-legend-label">{item.label}</span><strong><bdi>{item.value.toLocaleString('he-IL')}</bdi> <em>({Math.round(item.value / total * 100)}%)</em></strong></li>)}</ul>
+    <div className="vcs-chart-wrap">{failed ? <p role="status">התרשים אינו זמין; הנתונים מופיעים ברשימה</p> : <><canvas ref={canvas} aria-hidden="true" /><div className="vcs-chart-center" aria-hidden="true"><strong>{total.toLocaleString('he-IL')}</strong><span>{'סה״כ ' + unit}</span></div></>}</div>
+    <ul className="vcs-legend" aria-label={'התפלגות ' + unit + ' לפי מקור'}>{items.map((item, i) => <li key={item.id}><span className={`vcs-dot vcs-color-${i % 7}`} aria-hidden="true" /><span className="vcs-legend-label">{item.label}</span><strong><bdi>{item.value.toLocaleString('he-IL')}</bdi> <em>({Math.round(item.value / total * 100)}%)</em></strong></li>)}</ul>
   </div>;
 }
