@@ -212,7 +212,7 @@ const downloadXlsx = async (rows, filename, sheetName = 'נתונים') => {
   }
 };
 
-export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null, onLogout = null }) {
+export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null, onLogout = null, onHelp = null }) {
   // שמות הדמו מגיעים מה-DB (הפרויקט/הלקוח שסומנו is_demo) ולא מקודדים בקוד,
   // אחרת הכותרת והסיידבר מציגים שני שמות שונים.
   const [session, setSession] = useState(null)
@@ -555,6 +555,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // תוכן הדשבורד עטוף ב-.vr-ui, כרטיסי ה-KPI והמשפך מוצגים ברכיבי report-ui, ושאר
   // הסקשנים מקבלים את המידות מ-vitas-bridge.css. הלוגיקה, החישובים וההרשאות לא משתנים.
   const _vrCrmType = reports.find(r => r.month === selectedMonth && r.source === 'crm')?.summary?.crmType || null
+  // שם מערכת ה-CRM בטקסטים שעל המסך. פריסת הנדל"ן נבנתה ל-BMBY, ופיירברי (אלפא) משתמש
+  // בה — בלי זה הלקוח ראה "BMBY" בהסברים ובכפתורים (ויטלי, 28.9).
+  const _vrCrmName = _vrCrmType === 'fireberry' ? 'Fireberry' : 'BMBY'
+  const _vrIsFb = _vrCrmType === 'fireberry'
   // vrShell — המעטפת (סיידבר, header, כותרת, תקציב) בעיצוב החדש בכל הטאבים של פרויקט נדל"ן, כדי שהמסך לא
   // יקפוץ בין שני עיצובים במעבר טאב. vrMode — תוכן הטאב "הכל" בלבד (הפיילוט).
   const _vrOwnCrm = ['zoho', 'salesforce'].includes(_vrCrmType)
@@ -811,11 +815,11 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
 
   const refreshFromBmby = async () => {
     if (refreshingCrm) return;
-    // "\u05e8\u05e2\u05e0\u05d5\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd" \u05d1\u05d8\u05d0\u05d1 CRM \u05de\u05e9\u05de\u05e9 \u05d0\u05ea \u05db\u05dc \u05e4\u05e8\u05d9\u05e1\u05ea \u05d4\u05e0\u05d3\u05dc"\u05df, \u05d5\u05e4\u05d9\u05d9\u05e8\u05d1\u05e8\u05d9 \u05e0\u05d5\u05e4\u05dc \u05dc\u05d0\u05d5\u05ea\u05d4 \u05e4\u05e8\u05d9\u05e1\u05d4.
-    // \u05d1\u05dc\u05d9 \u05d4\u05d4\u05e4\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d0\u05ea \u05d4\u05db\u05e4\u05ea\u05d5\u05e8 \u05d0\u05e6\u05dc \u05d0\u05dc\u05e4\u05d0 \u05de\u05e9\u05da \u05de-BMBY, \u05e9\u05d3\u05d9\u05dc\u05d2 \u05e2\u05dc \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 (\u05d0\u05d9\u05df \u05dc\u05d5 \u05de\u05d9\u05e4\u05d5\u05d9)
-    // \u05d5\u05d4\u05e6\u05d9\u05d2 "\u05e2\u05d5\u05d3\u05db\u05e0\u05d5 0 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd" \u2014 \u05db\u05d0\u05d9\u05dc\u05d5 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05e2\u05d1\u05d3.
-    const _isFb = _vrCrmType === 'fireberry';
-    const _crmLabel = _isFb ? 'Fireberry' : 'BMBY';
+    // "רענון נתונים" בטאב CRM משמש את כל פריסת הנדל"ן, ופיירברי נופל לאותה פריסה.
+    // בלי ההפניה הזאת הכפתור אצל אלפא משך מ-BMBY, שדילג על הפרויקט (אין לו מיפוי)
+    // והציג "עודכנו 0 פרויקטים" — כאילו הרענון עבד.
+    const _isFb = _vrIsFb;
+    const _crmLabel = _vrCrmName;
     setRefreshingCrm(true);
     showToast('\u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de-' + _crmLabel + '...');
     try {
@@ -2147,11 +2151,14 @@ const selectProject = async (client, project) => {
 
     // עיצוב מחודש: ההסבר העסקי + 4 כרטיסי report-ui עם אותן הגדרות (ה-InfoTip הקיים → "הסבר המדד").
     // חציון אינו זמין: הדוחות שומרים סיכומים (ממוצעים ודליים), לא זמן תגובה לכל ליד — לכן נשמרו המדדים הקיימים.
-    const _vrRespTips = ['כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות.', 'לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב.'];
+    // פיירברי: המענה נמדד מההערה האנושית הראשונה על הליד (lib/crm/fireberry-summary.js), לא מפעולות.
+    const _vrRespTips = _vrIsFb
+      ? ['כמות הלידים החדשים שנכנסו ל-Fireberry בתקופה הנבחרת.', 'לידים שאיש מכירות כתב עליהם הערה ב-Fireberry. הערות אוטומטיות (שם הליד או מספר טלפון בלבד) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות לכתוב הערה ראשונה על ליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שעדיין אין עליהם אף הערה של איש מכירות. דורש מעקב.']
+      : ['כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות.', 'לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב.'];
     return (
       <div className={vrResp ? 'vrt-root' : undefined}>
         {vrResp ? (<>
-          <p className="vrt-explanation"><Info size={18} aria-hidden="true" />זמן המענה נמדד מכניסת הליד ל-BMBY ועד הפעולה הראשונה של איש מכירות אנושי, בשעות העסקים בלבד. לידים שטרם קיבלו מענה מוצגים בנפרד ואינם נכללים בממוצע.</p>
+          <p className="vrt-explanation"><Info size={18} aria-hidden="true" />{_vrIsFb ? 'זמן המענה נמדד מכניסת הליד ל-Fireberry ועד ההערה הראשונה של איש מכירות על הליד, בשעות העסקים בלבד.' : 'זמן המענה נמדד מכניסת הליד ל-BMBY ועד הפעולה הראשונה של איש מכירות אנושי, בשעות העסקים בלבד.'} לידים שטרם קיבלו מענה מוצגים בנפרד ואינם נכללים בממוצע.</p>
           <p className="vr-caption vcs-metric-scope">{formatNum(totalLids)} לידים שנכנסו בתקופה · {formatNum(respondedCount)} מהם עם מענה אנושי</p>
           <div className="vr-metric-grid">
             <MetricCard label={'סה"כ לידים'} value={formatNum(totalLids)} tone="indigo" icon={Users} details={_vrRespTips[0]}
@@ -2170,14 +2177,14 @@ const selectProject = async (client, project) => {
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
             </div>
-            <div className="lbl">סה"כ לידים <InfoTip text="כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות." /></div>
+            <div className="lbl">סה"כ לידים <InfoTip text={_vrRespTips[0]} /></div>
             <div className="val">{totalLids}</div>
           </div>
           <div className="kpi-c emerald">
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
             </div>
-            <div className="lbl">קיבלו מענה <InfoTip text="לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות." /></div>
+            <div className="lbl">קיבלו מענה <InfoTip text={_vrRespTips[1]} /></div>
             <div className="val">{respondedCount}</div>
           </div>
           <div className="kpi-c terra">
@@ -2191,7 +2198,7 @@ const selectProject = async (client, project) => {
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
             </div>
-            <div className="lbl">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div>
+            <div className="lbl">בלי מענה <InfoTip text={_vrRespTips[3]} /></div>
             <div className="val">{noResponseCount}</div>
           </div>
         </div>)}
@@ -3061,14 +3068,14 @@ const selectProject = async (client, project) => {
           <div className="icon" style={{fontSize:'3em',marginBottom:'10px'}}>{refreshingCrm ? '⏳' : '💭'}</div>
           {refreshingCrm ? (
             <>
-              <h3>{'מושך נתוני CRM מ- BMBY...'}</h3>
+              <h3>{'מושך נתוני CRM מ-' + _vrCrmName + '...'}</h3>
               <p style={{color:'#64748b',marginTop:'8px'}}>{'זה לוקח כ-25 שניות לטווח התאריכים הזה'}</p>
             </>
           ) : (
             <>
               <h3>{'אין נתוני CRM לתקופה זו'}</h3>
               <p style={{color:'#64748b',marginTop:'8px'}}>{isCustomRange ? 'טווח מותאם אישי דורש משיכת נתונים חדשה' : 'לחץ על הכפתור כדי למשוך נתונים'}</p>
-              <button className="btn btn-primary" style={{marginTop:'16px'}} onClick={refreshFromBmby}>{'🔄 משוך נתונים מ-BMBY'}</button>
+              <button className="btn btn-primary" style={{marginTop:'16px'}} onClick={refreshFromBmby}>{'🔄 משוך נתונים מ-' + _vrCrmName}</button>
             </>
           )}
         </div>
@@ -5725,7 +5732,7 @@ const selectProject = async (client, project) => {
               <button className={`client-tab ${_sub === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>{vrShell ? '' : '📅 '}פגישות שבוצעו</button>
             </div>
             {vrShell && (
-              <button type="button" className="vr-button vcs-refresh" onClick={refreshFromBmby} disabled={refreshingCrm} title="משיכה חיה מ-BMBY לתקופה שנבחרה">
+              <button type="button" className="vr-button vcs-refresh" onClick={refreshFromBmby} disabled={refreshingCrm} title={'משיכה חיה מ-' + _vrCrmName + ' לתקופה שנבחרה'}>
                 <RefreshCw size={16} aria-hidden="true" />{refreshingCrm ? 'מרענן נתונים…' : 'רענון נתונים'}
               </button>
             )}
@@ -6783,6 +6790,7 @@ const selectProject = async (client, project) => {
         // או את מסך הכניסה. handleLogout של האדמין רק מנקה את ה-state של הרכיב הזה, והדף שמעליו
         // לא ידע שהמשתמש התנתק — הכפתור "לא עשה כלום" (ויטלי, 23.9).
         onLogout={onLogout || handleLogout}
+        onHelp={onHelp || undefined}
         loadingIndicator={(refreshing || refreshingCrm) ? (
           <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'6px 12px',background:'rgba(99,102,241,0.1)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:13}}>
             <span style={{display:'inline-block',width:12,height:12,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>

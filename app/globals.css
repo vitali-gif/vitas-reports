@@ -2685,7 +2685,8 @@
     height: 34px; padding: 0 8px;
     border-color: transparent;
   }
-  .h-actions .btn:not(.btn-logout):not(.btn-kebab) { display: none; }
+  .h-actions .btn:not(.btn-logout):not(.btn-kebab):not(.h-help) { display: none; }
+  .h-help { width: 34px; padding: 0 !important; justify-content: center; }
   .h-kebab {
     display: inline-flex !important;
     width: 34px; padding: 0;
@@ -4196,12 +4197,13 @@ textarea:focus-visible,
 }
 
 /* ── כפתור חזרה לראש העמוד (app/components/BackToTop.jsx) ──────────────────────
-   צף בפינה התחתונה. inset-inline-start ולא left: בעמוד RTL הפינה ה"התחלתית"
-   היא הימנית, והכפתור צריך לשבת בצד ההפוך לתוכן שהעין קוראת — כלומר משמאל. */
+   צף בפינה התחתונה. inset-inline-end ולא left: בעמוד RTL הפינה ה"סופית" היא
+   השמאלית, והכפתור צריך לשבת בצד ההפוך לתוכן שהעין קוראת — כלומר משמאל.
+   (עד 28.9 כאן היה inset-inline-start, שב-RTL הוא ימין — בניגוד להערה הזו.) */
 .back-to-top {
   position: fixed;
   inset-block-end: 22px;
-  inset-inline-start: 22px;
+  inset-inline-end: 22px;
   z-index: 900;
   inline-size: 46px;
   block-size: 46px;
@@ -4221,7 +4223,7 @@ textarea:focus-visible,
 @media (prefers-reduced-motion: reduce) { .back-to-top { transition: none; } .back-to-top:hover { transform: none; } }
 
 /* במובייל הכפתור יושב מעט גבוה יותר, שלא יתנגש בסרגל הדפדפן. */
-@media (max-width: 640px) { .back-to-top { inset-block-end: 16px; inset-inline-start: 16px; inline-size: 42px; block-size: 42px; } }
+@media (max-width: 640px) { .back-to-top { inset-block-end: 16px; inset-inline-end: 16px; inline-size: 42px; block-size: 42px; } }
 
 /* ============================================================================
    Tovno by Vitas — מיתוג: רכיבים

@@ -470,28 +470,7 @@ export default function ClientPage() {
 
   return (
     <>
-      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} onLogout={logout} />
-
-      {/* כפתור עזרה קבוע — מחליף את המודאל שחזר עשר פעמים. */}
-      {!showOnboarding && (
-        <button
-          type="button"
-          onClick={() => setShowOnboarding(true)}
-          aria-label="פתח מדריך שימוש"
-          title="מדריך שימוש"
-          style={{
-            position: 'fixed', bottom: 20, insetInlineStart: 20, zIndex: 9997,
-            width: 42, height: 42, borderRadius: '50%',
-            background: 'var(--card, #fff)', color: 'var(--indigo, #5B5EF4)',
-            border: '1px solid var(--border, #DDE2EC)', cursor: 'pointer',
-            fontSize: 18, fontWeight: 700, lineHeight: 1,
-            fontFamily: 'var(--font, Heebo, sans-serif)',
-            boxShadow: '0 4px 14px rgba(11,15,30,0.12)',
-          }}
-        >
-          ?
-        </button>
-      )}
+      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} onLogout={logout} onHelp={() => setShowOnboarding(true)} />
 
       {installPrompt && (
         <div style={{
@@ -524,10 +503,24 @@ export default function ClientPage() {
         }}>
           <div style={{
             background: '#fff', borderRadius: 20, maxWidth: 520, width: '100%',
-            padding: '36px 32px 28px', direction: 'rtl', textAlign: 'right',
+            direction: 'rtl', textAlign: 'right',
             boxShadow: '0 24px 60px rgba(11,15,30,0.3)',
-            maxHeight: '90vh', overflowY: 'auto',
+            maxHeight: '90vh', position: 'relative', display: 'flex', flexDirection: 'column',
           }}>
+            {/* סגירה. עד 28.9 היה רק "הבנתי" בתחתית, ובמובייל צריך היה לגלול עד אליו.
+                ה-X יושב מחוץ לאזור הגלילה, כך שהוא נשאר במקום גם כשגוללים. */}
+            <button
+              type="button"
+              onClick={dismissOnboarding}
+              aria-label="סגור את המדריך"
+              style={{
+                position: 'absolute', top: 12, left: 12, zIndex: 1,
+                width: 36, height: 36, borderRadius: '50%', border: 'none',
+                background: '#F1F3F9', color: '#5E6478', cursor: 'pointer',
+                fontSize: 22, lineHeight: 1, fontFamily: 'inherit',
+              }}
+            >×</button>
+          <div style={{ padding: '36px clamp(18px, 5vw, 32px) 28px', overflowY: 'auto' }}>
 
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: 28 }}>
@@ -576,7 +569,7 @@ export default function ClientPage() {
             </div>
 
             <p style={{ margin: '0 0 12px', textAlign: 'center', fontSize: 12.5, color: '#98A0B2' }}>
-              אפשר לפתוח את המדריך שוב בכל רגע מכפתור העזרה בפינה.
+              אפשר לפתוח את המדריך שוב בכל רגע מכפתור העזרה (?) בראש העמוד.
             </p>
 
             {/* CTA */}
@@ -592,7 +585,7 @@ export default function ClientPage() {
               הבנתי, קדימה! →
             </button>
 
-
+          </div>
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 'use client'
-import { LogOut, Users, Link2, FileSpreadsheet } from 'lucide-react'
+import { LogOut, Users, Link2, FileSpreadsheet, HelpCircle } from 'lucide-react'
 
 // VITAS v2 Header — design-v2-playbook classes (h-brand / h-actions / btn)
 // Mobile: hamburger ☰ (right, RTL) · Tovno logo (center) · kebab ⋮ + logout (left)
@@ -10,9 +10,11 @@ import { LogOut, Users, Link2, FileSpreadsheet } from 'lucide-react'
 //   onExport         — Export button handler
 //   onClientAccess   — Client-Access button handler
 //   onLogout         — Logout button handler
+//   onHelp           — optional: opens the usage guide (client view). When given, a help
+//                      button replaces the mobile kebab, which is still a no-op placeholder.
 //   loadingIndicator — optional JSX (spinner while fetching)
 
-export default function Header({ onMenuOpen, onExport, onClientAccess, onSessionLogs, onLogout, loadingIndicator = null, className = '' }) {
+export default function Header({ onMenuOpen, onExport, onClientAccess, onSessionLogs, onLogout, onHelp, loadingIndicator = null, className = '' }) {
   // עיצוב מחודש (header-vr): אייקוני lucide במקום אימוג'י, כפתורים בהירים אחידים
   const vr = className.includes('header-vr')
   return (
@@ -66,8 +68,16 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onSession
           </button>
         )}
 
+        {/* עזרה — פותח את מדריך השימוש. יושב בכותרת ולא צף מעל הדוח: הכפתור הצף
+            התנגש בכפתור "חזרה למעלה" והסתיר תוכן במובייל (ויטלי, 28.9). */}
+        {onHelp && (
+          <button type="button" className="btn h-help" onClick={onHelp} aria-label="מדריך שימוש" title="מדריך שימוש">
+            <HelpCircle size={16} aria-hidden="true" className="h-ico" />
+          </button>
+        )}
+
         {/* MOBILE ONLY: kebab — placeholder for future overflow menu */}
-        <button
+        {!onHelp && <button
           type="button"
           className="btn h-kebab btn-kebab"
           onClick={() => {}}
@@ -78,7 +88,7 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onSession
             <circle cx="12" cy="12" r="1.5"/>
             <circle cx="12" cy="19" r="1.5"/>
           </svg>
-        </button>
+        </button>}
 
         {/* Logout — visible on both desktop and mobile */}
         {onLogout && (
