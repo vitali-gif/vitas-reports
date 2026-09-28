@@ -11,9 +11,9 @@
  */
 import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
-import { OBJ, queryAll, isConfigured } from '../../../../lib/crm/fireberry-api.js'
+import { OBJ, queryAll, isConfigured, listLeadNoteIds, getNote, pool } from '../../../../lib/crm/fireberry-api.js'
 import { computeFireberrySummary, toReportRow, filterLeads, fireberryConfigFor } from '../../../../lib/crm/fireberry-summary.js'
-import { upsertRawRecords, rebuildCompactIfChanged } from '../../../../lib/crm/raw-store.js'
+import { upsertRawRecords, rebuildCompactIfChanged, loadRawRecords } from '../../../../lib/crm/raw-store.js'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -24,6 +24,87 @@ function currentMonth() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
 }
 const isValidDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
+
+/**
+ * סנכרון הערות מצטבר, לפרויקט אחד. רץ מ-prefetch-daily ולא מכל חלון של prefetch-crm:
+ * הוא יקר (קריאה לכל הערה — ראה lib/crm/fireberry-api.js), וחלונות הטווחים רצים
+ * עשרה במקביל.
+ *
+ * אילו לידים נבדקים:
+ *   • ליד שמעולם לא נבדק — תמיד. זו השליפה הראשונה (~1,200 הערות לאקספו), שנפרשת
+ *     על כמה ריצות לפי budgetMs. החדשים ביותר קודם, כי זמני התגובה שלהם הכי רלוונטיים.
+ *   • ליד מ-windowDays האחרונים שנבדק לפני יותר מ-50 דקות — אצלו עוד נכתבות הערות.
+ * ליד ישן שכבר נבדק לא נבדק שוב. הערה חדשה עליו תיכנס רק אם הוא בחלון; זה המחיר
+ * של לא לעבור על כל הלידים בכל שעה, ולזמני תגובה הוא לא משנה — שם קובעת ההערה
+ * הראשונה.
+ *
+ * ליד נרשם ב-note_index רק אם *כל* ההערות שלו נשלפו. ליד שחלק מההערות שלו נכשלו
+ * (או שהתקציב נגמר באמצע) לא נרשם, ולכן ייבדק שוב בריצה הבאה.
+ */
+// windowDays=7 ו-recheck של 6 שעות: בקצב של 60 קריאות לדקה (lib/crm/fireberry-api.js)
+// כל ריצה עושה ~45 קריאות. בדיקה חוזרת של לידי 45 הימים האחרונים כל שעה הייתה
+// ~270 קריאות לשעה רק על רשימות, בלי לשלוף אף הערה חדשה.
+async function syncNotes(supabase, proj, leads, { budgetMs = 45000, windowDays = 7, recheckHours = 6, concurrency = 2 } = {}) {
+  const t0 = Date.now()
+  const deadline = t0 + budgetMs
+  const stop = () => Date.now() > deadline
+  const snap = await loadRawRecords(supabase, proj.id, 'fireberry')
+  const known = new Set((snap.entities?.notes || []).map(n => String(n.noteid)))
+  const index = new Map((snap.entities?.note_index || []).map(r => [String(r.accountid), r]))
+  const cutoff = Date.now() - windowDays * 86400000
+  const ts = (s) => new Date(String(s || '').replace(' ', 'T')).getTime()
+
+  const todo = leads.filter(l => {
+    const id = String(l.accountid || '')
+    if (!id) return false
+    const ix = index.get(id)
+    if (!ix) return true
+    return ts(l.createdon) >= cutoff && (Date.now() - ts(ix.checkedAt)) > recheckHours * 3600000
+  }).sort((a, b) =>
+    (index.has(String(a.accountid)) - index.has(String(b.accountid))) ||
+    String(b.createdon).localeCompare(String(a.createdon)))
+
+  // רשימות והערות מתחלפות ליד-ליד ולא "כל הרשימות ואז כל ההערות": אחרת ריצה
+  // שנגמר לה התקציב אחרי הרשימות לא הייתה משלימה אף ליד, ואף ליד לא היה נרשם.
+  const listed = [], fetched = []
+  let rateLimited = false
+  for (const l of todo) {
+    if (stop() || rateLimited) break
+    const [lr] = await pool([l], 1, async (x) => ({ id: String(x.accountid), ids: await listLeadNoteIds(x.accountid) }))
+    listed.push(lr)
+    if (!lr?.ok) { if (/429/.test(lr?.error || '')) rateLimited = true; continue }
+    const fresh = lr.value.ids.filter(id => !known.has(id))
+    const fr = await pool(fresh, concurrency, (id) => getNote(id), stop)
+    fetched.push(...fr.filter(Boolean))
+    if (fr.rateLimited) rateLimited = true
+  }
+  const done = listed.filter(x => x?.ok).map(x => x.value)
+  const notes = fetched.filter(x => x?.ok).map(x => x.value)
+
+  const nowKnown = new Set([...known, ...notes.map(n => n.noteid)])
+  const checkedAt = new Date().toISOString()
+  const indexRows = done.filter(d => d.ids.every(id => nowKnown.has(id)))
+    .map(d => ({ accountid: d.id, noteCount: d.ids.length, checkedAt }))
+
+  const [nu, iu] = await Promise.all([
+    notes.length ? upsertRawRecords(supabase, proj.id, 'fireberry', 'notes', notes) : { count: 0, changed: false },
+    indexRows.length ? upsertRawRecords(supabase, proj.id, 'fireberry', 'note_index', indexRows) : { count: 0, changed: false },
+  ])
+  let compact = null
+  if (nu.changed || iu.changed) {
+    try { compact = await rebuildCompactIfChanged(supabase, proj.id, 'fireberry', [nu, iu]) }
+    catch (e) { compact = { error: String(e?.message || e) } }
+  }
+  const indexedNow = new Set([...index.keys(), ...indexRows.map(r => r.accountid)])
+  const firstErr = [...listed, ...fetched].find(x => x && !x.ok)?.error || null
+  return {
+    project: proj.name, ok: true, ms: Date.now() - t0,
+    leadsToCheck: todo.length, leadsListed: done.length,
+    newNotes: notes.length, notesKnown: nowKnown.size, indexed: indexRows.length,
+    remainingNeverChecked: leads.filter(l => !indexedNow.has(String(l.accountid))).length,
+    budgetHit: stop(), rateLimited, firstError: firstErr, compact,
+  }
+}
 
 async function runSync(opts = {}) {
   if (!isConfigured()) {
@@ -64,6 +145,31 @@ async function runSync(opts = {}) {
     return { status: 502, body: { error: 'Fireberry fetch failed: ' + String(err?.message || err).slice(0, 300) } }
   }
 
+  // ── מצב סנכרון הערות (prefetch-daily): לא כותב דוחות, רק ממלא את crm_raw ──────
+  if (opts.notesSync) {
+    const perProjectBudget = Math.max(10000, Math.floor((Number(opts.budgetMs) || 45000) / targets.length))
+    const out = []
+    for (const proj of targets) {
+      try { out.push(await syncNotes(supabase, proj, filterLeads(rawLeads, fireberryConfigFor(proj.name)), { budgetMs: perProjectBudget })) }
+      catch (err) { out.push({ project: proj.name, ok: false, error: String(err?.message || err).slice(0, 300) }) }
+    }
+    return { status: 200, body: { ok: out.every(r => r.ok), mode: 'notes', projects: out } }
+  }
+
+  // ההערות השמורות — מהן זמני התגובה. נקראות מ-crm_raw ולא מ-Fireberry: השליפה שלהן
+  // יקרה ורצה בנפרד (syncNotes), וכל חלון של הקרון רק קורא את מה שכבר נאסף.
+  const loadNotes = async (projectId) => {
+    const out = []
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from('crm_raw').select('payload')
+        .eq('project_id', projectId).eq('crm_type', 'fireberry').eq('entity', 'notes')
+        .order('ext_id').range(from, from + 999)
+      if (error) throw new Error('notes load: ' + error.message)
+      for (const r of (data || [])) out.push(r.payload)
+      if (!data || data.length < 1000) return out
+    }
+  }
+
   const results = []
   for (const proj of targets) {
     const cfg = fireberryConfigFor(proj.name)
@@ -72,8 +178,10 @@ async function runSync(opts = {}) {
       const leads = filterLeads(rawLeads, cfg)
       const leadIds = new Set(leads.map(l => String(l.accountid || '')))
       const meetings = rawMeetings.filter(m => leadIds.has(String(m?.objectid || '')))
+      // כישלון בטעינת ההערות לא מפיל את הדוח — הוא רק משאיר את זמני התגובה ריקים.
+      const notes = await loadNotes(proj.id).catch(() => [])
 
-      const R = computeFireberrySummary({ leads, meetings }, { since, until })
+      const R = computeFireberrySummary({ leads, meetings, notes }, { since, until })
       const row = toReportRow(R)
 
       // תמונת מצב גולמית — ממנה מחושב כל טווח תאריכים בלי לפנות שוב ל-Fireberry.
@@ -104,7 +212,7 @@ async function runSync(opts = {}) {
       results.push({
         project: proj.name, ok: true, ms: Date.now() - t0,
         counts: { leads: R.totals.totalLeads, relevant: R.totals.relevantLeads, meetingsScheduled: R.totals.meetingsScheduled, meetingsCompleted: R.totals.meetingsCompleted },
-        pool: { leadsInCrm: rawLeads.length, leadsForProject: leads.length, meetingsForProject: meetings.length },
+        pool: { leadsInCrm: rawLeads.length, leadsForProject: leads.length, meetingsForProject: meetings.length, notesStored: notes.length },
         snapshot,
       })
     } catch (err) {
@@ -128,6 +236,9 @@ export async function POST(request) {
     const { status, body: res } = await runSync({
       month: body.month, since: body.since, until: body.until, projectId: body.projectId,
       snapshot: gate.admin && body.snapshot === false ? false : undefined,
+      // סנכרון ההערות יקר (מאות קריאות) — אדמין וקרון בלבד, לא לקוח.
+      notesSync: gate.admin && body.notesSync === true,
+      budgetMs: gate.admin ? Math.min(Number(body.budgetMs) || 45000, 240000) : undefined,
     })
     return Response.json(res, { status })
   } catch (err) {
