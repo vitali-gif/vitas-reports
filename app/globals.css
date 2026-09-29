@@ -3962,6 +3962,11 @@ body.drp-no-scroll { overflow: hidden; }
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-inline: contain;
     min-inline-size: 0;
+    /* מיכל ההתייחסות של צאצאים absolute (למשל ‎.vr-sr-only‎ — תוויות לקורא מסך בתאי
+       הטבלה של אריקה). בלי זה הם "בורחים" מאזור הגלילה, והעמוד כולו מתרחב: ב-BCureLaser
+       ‎644px במסך של 412, הטלפון נותן לגרור את העמוד הצידה, ולחיצה על טאבים מחטיאה.
+       זה הכשל של בדיקת ה-E2E במובייל מאז 22.9 (נמצא ב-29.9). */
+    position: relative;
   }
   .app-layout, .main-content, .section, .card, .card-body { min-inline-size: 0; }
 
