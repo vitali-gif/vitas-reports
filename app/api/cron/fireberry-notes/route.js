@@ -10,7 +10,10 @@
  * הערות חדשות ונגמרת תוך שניות.
  *
  * העבודה עצמה ב-/api/fireberry/fetch (notesSync) — כאן רק ההפעלה והרישום ל-job_log.
- * מתוזמן מ-.github/workflows/vitas-cron.yml.
+ *
+ * מ-29.9 זה נתיב ידני, למילוי הראשוני של פרויקט חדש: vitas-cron.yml → Run workflow →
+ * fireberry-notes. הסנכרון השוטף רץ כל שעה בתוך prefetch-daily (cron-job.org) עם 40 שניות —
+ * התזמון של GitHub דילג על רוב הריצות בלילה (3 ריצות ב-12 שעות).
  */
 import { createClient } from '@supabase/supabase-js'
 import { logJob } from '../../../../lib/job-log.js'
