@@ -21,6 +21,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { runDailySync } from '../../../../lib/ads/daily-sync.js'
 import { pruneJobLog, logJob, lastRuns } from '../../../../lib/job-log.js'
+import { runCron } from '../../../../lib/cron-background'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -31,7 +32,12 @@ const HARD_MS = 280000
 /** תקרה לקריאה פנימית אחת (zoho/salesforce fetch) — הנתיב ממשיך לרוץ בצד שלו גם אם ננתק. */
 const INTERNAL_TIMEOUT_MS = 60000
 
+// B16: cron-job.org מנתק אחרי 30 שניות — עונים מיד וממשיכים ברקע. ?wait=1 = להמתין לתוצאה.
 export async function GET(request) {
+  return runCron(request, 'prefetch-daily', handle)
+}
+
+async function handle(request) {
   const startedAt = Date.now()
   const left = () => HARD_MS - (Date.now() - startedAt)
   const auth = request.headers.get('authorization') || ''

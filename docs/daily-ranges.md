@@ -61,6 +61,10 @@ app/api/cron/prefetch-daily/route.js   קרון שעתי (cron-job.org, דקה 2
 | `prefetch-daily` | כל שעה, דקה 25 | ad_daily (7 ימים אחורה + צעד backfill), Zoho deals שהשתנו + backfill חודשי, Salesforce שהשתנה |
 | `health` | כל שעה, דקה 15 | מייל בריאות; כולל עכשיו את 'תשתית · טווחי תאריכים' |
 
+`prefetch-ads`, `prefetch-crm` ו-`prefetch-daily` **עונים מיד וממשיכים ברקע** (`lib/cron-background.js`), כי cron-job.org
+מנתק כל בקשה אחרי 30 שניות. התשובה המיידית אומרת רק שהריצה התחילה — התוצאה ב-job_log. `?wait=1` ממתין לתוצאה
+המלאה (GitHub Actions משתמש בזה).
+
 ## ביצועים (HI PARK, הפרויקט הכבד)
 
 שרת קר, טווח חדש ≈ 3 שניות (טעינת 1.7MB + חישוב 0.2). שרת חם, טווח חדש ≈ 0.7. צפייה חוזרת ≈ 0.5, כולה רשת.

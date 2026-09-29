@@ -3138,11 +3138,11 @@ const selectProject = async (client, project) => {
         const src = ((a.source || '').toString().trim()) || 'ללא מקור';
         // מודעות בלי שם (למשל לידים שהגיעו בלי תיוג מלא) מקובצות תחת הקמפיין שלהן,
         // ורק אם גם הוא חסר — תחת תווית מפורשת. מחיקה שקטה שלהן הייתה מסתירה לידים.
-        // מזהה בלי שם אחרי ההשלמה מ-Meta (lib/crm/meta-ad-names.js) = מודעה שלא נמצאה ב-ad_daily —
+        // מזהה בלי שם אחרי ההשלמה מ-Meta (lib/crm/meta-ad-names.js) — לא נמצא ב-ad_daily, או שמיגרציה 022 עוד לא רצה —
         // מוצגת לפי המזהה ולא נבלעת ב"ללא שם מודעה", כדי שיהיה אפשר לאתר אותה.
         const adName = ((a.ad || '').toString().trim())
           || ((a.campaign || '').toString().trim())
-          || (a.adId ? 'מודעה ' + String(a.adId).trim() + ' (לא נמצאה ב-Meta)' : '')
+          || (a.adId ? 'מודעה ' + String(a.adId).trim() + ' (שם לא ידוע)' : '')
           || 'ללא שם מודעה';
         if (!_adsBySource.has(src)) _adsBySource.set(src, new Map());
         const byAd = _adsBySource.get(src);

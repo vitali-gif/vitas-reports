@@ -6,6 +6,7 @@
  */
 import { sendAlert } from '../../../../lib/alert'
 import { createClient } from '@supabase/supabase-js'
+import { runCron } from '../../../../lib/cron-background'
 
 export const dynamic = 'force-dynamic'
 // force-no-store: supabase-js + internal calls go through fetch, which Next caches by
@@ -44,7 +45,12 @@ const _slim = (d) => {
   }
   return out
 }
+// B16: cron-job.org מנתק אחרי 30 שניות — עונים מיד וממשיכים ברקע. ?wait=1 = להמתין לתוצאה.
 export async function GET(request) {
+  return runCron(request, 'prefetch-crm', handle)
+}
+
+async function handle(request) {
   const startedAt = Date.now()
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '').trim()
