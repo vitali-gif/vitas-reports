@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "@vercel/functions": "^2.2.13",
     "chart.js": "^4.4.1",
     "jose": "^5.10.0",
     "lucide-react": "^1.16.0",
