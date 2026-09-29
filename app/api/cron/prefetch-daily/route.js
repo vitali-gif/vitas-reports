@@ -10,6 +10,8 @@
  * הרשאה: Authorization: Bearer <CRON_SECRET> (כמו שאר הקרונים; cron-job.org).
  * מומלץ לתזמן כל שעה בדקה 25 — לא מתנגש עם prefetch-ads (:07) / prefetch-crm (:37) / health (:15).
  *
+ * שלב CRM כולל גם את סנכרון ההערות של Fireberry (אלפא) — ראה בגוף הקובץ.
+ *
  * תקציב הזמן (18.9.2026): הפונקציה נהרגת ב-300s בלי אזהרה, וכל מה שאחרי — job_log של ה-backfill,
  * שלבי Zoho/Salesforce, ה-heartbeat — פשוט לא קורה. כך זה היה כמעט בכל ריצה (ב-7 ימים: recent נרשם
  * 37 פעמים, backfill 3, Zoho/Salesforce 0), והשומר התריע "קרון נתקע" בזמן שהקרון דווקא רץ.
@@ -67,11 +69,22 @@ export async function GET(request) {
       return { ok: false, ms: Date.now() - t0, data: {}, error: String(err?.name === 'TimeoutError' ? `timeout after ${INTERNAL_TIMEOUT_MS}ms` : (err?.message || err)).slice(0, 200) }
     }
   }
+  // Fireberry (אלפא): סנכרון ההערות על לידים, שמהן מחושבים זמני התגובה. עד 29.9 רץ מ-GitHub
+  // Actions (52 * * * *), אבל GitHub דילג על רוב הריצות בלילה — 3 ריצות ב-12 שעות, וזמני התגובה
+  // פיגרו בשעות. כאן הוא רץ כל שעה מ-cron-job.org, במקביל ל-Zoho/Salesforce (בלי זמן נוסף).
+  // 40 שניות עבודה בתוך תקרת ה-60 של callInternal: מרווח לטעינת התמונה השמורה ולכתיבה.
+  // המילוי הראשוני של פרויקט חדש (מאות לידים) — ידנית דרך /api/cron/fireberry-notes (240 שניות).
   if (left() > INTERNAL_TIMEOUT_MS + 90000) {
-    const [z, s] = await Promise.all([
+    const [z, s, fb] = await Promise.all([
       callInternal('/api/zoho/fetch', { dealsRefreshDays: 3 }),
       callInternal('/api/salesforce/fetch', { modifiedRefreshDays: 3 }),
+      callInternal('/api/fireberry/fetch', { notesSync: true, budgetMs: 40000 }),
     ])
+    // pending = אין FIREBERRY_TOKEN. מצב תצורה ולא כישלון — לא נרשם, כדי לא להתריע.
+    if (!fb.data.pending) {
+      out.fireberryNotes = { ok: fb.ok, ms: fb.ms, error: fb.error || fb.data.error, projects: fb.data.projects }
+      await logJob(sb, 'fireberry-notes', fb.ok, fb.ms, { via: 'prefetch-daily', error: out.fireberryNotes.error || null, projects: fb.data.projects })
+    }
     out.zohoDeals = { ok: z.ok, ms: z.ms, error: z.error, projects: (z.data.projects || []).map(p => ({ project: p.project, ok: p.ok, deals: p.deals, error: p.error })) }
     await logJob(sb, 'prefetch-daily:zoho-deals', z.ok, z.ms, out.zohoDeals)
     out.sfModified = { ok: s.ok, ms: s.ms, counts: s.data.counts, error: s.error || s.data.error }
@@ -79,6 +92,7 @@ export async function GET(request) {
   } else {
     out.zohoDeals = { skipped: 'time budget' }
     out.sfModified = { skipped: 'time budget' }
+    out.fireberryNotes = { skipped: 'time budget' }
   }
 
   // ── 3. backfill של ad_daily — צעד אחד (חודש לכל חשבון), עם מה שנשאר מהתקציב ─────────
