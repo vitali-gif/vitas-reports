@@ -54,4 +54,27 @@ eq('meetingDayOfWeek has 7 days', Object.keys(R.meetingDayOfWeek).length, 7)
 const R2 = computeBmbySummary({ clients, tasks, prices: [], contracts }, { since: '2026-09-08', until: '2026-09-15', monthKey: '2026-09-08_2026-09-15', now })
 eq('deterministic output', JSON.stringify(R.totals) + JSON.stringify(R.namedLeads), JSON.stringify(R2.totals) + JSON.stringify(R2.namedLeads))
 
+// ── שם מודעה לפי מזהה (ש.ברוך, 29.9) ─────────────────────────────────────────
+// מ-14.8 BMBY מקבל "מזהה מודעה" בלי "שם מודעה". (1) בלי מפה: שני מזהים שונים הם שני צמתים
+// ולא צומת אחד עם המזהה של הראשון. (2) עם מפה מ-ad_daily: השם, הסדרה והקמפיין מושלמים.
+// (3) שם שהגיע מ-BMBY גובר על המפה.
+{
+  const cl = [
+    { client_id: '11', relevant: '1', _cf: { 'מזהה מודעה': '901' } },
+    { client_id: '12', relevant: '1', _cf: { 'מזהה מודעה': '902' } },
+    { client_id: '13', relevant: '1', _cf: { 'מזהה מודעה': '901' } },
+    { client_id: '14', relevant: '1', _cf: { 'שם מודעה': 'שם מ-BMBY', 'מזהה מודעה': '903' } },
+  ]
+  const tk = ['11', '12', '13', '14'].map((cid, i) => ({ client_id: cid, type: 'lid', media_title: 'hi park | פייסבוק', create_date: `2026-09-1${i} 10:00:00`, start_date: `2026-09-1${i} 10:00:00` }))
+  const opts = { since: '2026-09-08', until: '2026-09-15', monthKey: 'x', now }
+  const plain = computeBmbySummary({ clients: cl, tasks: tk, prices: [], contracts: [] }, opts).adBreakdown
+  eq('id-only leads: one node per ad id, not one shared node', plain.filter(a => !a.ad).map(a => [a.adId, a.leads]).sort(), [['901', 2], ['902', 1]])
+  const names = new Map([['901', { ad: 'מודעה א', adset: 'סדרה א', campaign: 'קמפיין א' }], ['903', { ad: 'לא אמור לגבור', adset: '', campaign: '' }]])
+  const named = computeBmbySummary({ clients: cl, tasks: tk, prices: [], contracts: [] }, { ...opts, adNames: names }).adBreakdown
+  const a901 = named.find(a => a.adId === '901')
+  eq('adNames fills ad/adset/campaign by id', [a901?.ad, a901?.adset, a901?.campaign, a901?.leads], ['מודעה א', 'סדרה א', 'קמפיין א', 2])
+  eq('id not in adNames stays nameless, own node', named.filter(a => a.adId === '902').map(a => [a.ad, a.leads]), [['', 1]])
+  eq('BMBY ad name wins over adNames', named.find(a => a.adId === '903')?.ad, 'שם מ-BMBY')
+}
+
 if (process.exitCode) { console.error('\nבדיקת העשן נכשלה'); } else { console.log('\n✓ בדיקת העשן עברה') }

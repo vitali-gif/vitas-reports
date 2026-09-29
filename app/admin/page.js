@@ -3138,8 +3138,11 @@ const selectProject = async (client, project) => {
         const src = ((a.source || '').toString().trim()) || 'ללא מקור';
         // מודעות בלי שם (למשל לידים שהגיעו בלי תיוג מלא) מקובצות תחת הקמפיין שלהן,
         // ורק אם גם הוא חסר — תחת תווית מפורשת. מחיקה שקטה שלהן הייתה מסתירה לידים.
+        // מזהה בלי שם אחרי ההשלמה מ-Meta (lib/crm/meta-ad-names.js) = מודעה שלא נמצאה ב-ad_daily —
+        // מוצגת לפי המזהה ולא נבלעת ב"ללא שם מודעה", כדי שיהיה אפשר לאתר אותה.
         const adName = ((a.ad || '').toString().trim())
           || ((a.campaign || '').toString().trim())
+          || (a.adId ? 'מודעה ' + String(a.adId).trim() + ' (לא נמצאה ב-Meta)' : '')
           || 'ללא שם מודעה';
         if (!_adsBySource.has(src)) _adsBySource.set(src, new Map());
         const byAd = _adsBySource.get(src);
@@ -3170,6 +3173,9 @@ const selectProject = async (client, project) => {
     // שורות המודעה. מוגדר כאן ולא בתוך ה-JSX כי הוא משמש בשני מקומות: מתחת לקמפיין
     // (פייסבוק/גוגל, שם הרמה השנייה היא מחרוזת המקור של BMBY) ומתחת למקור שאין לו
     // קמפיינים כלל (yad2, מקורבים, אתר החברה).
+    // אחוז מסך הלידים של התקופה (ויטלי, 29.9 — ש.ברוך): כמה מכלל הלידים הגיעו מהמקור /
+    // הקמפיין / המודעה. המכנה הוא סה"כ הלידים בשורת הסיכום של אותה טבלה.
+    const _share = (n) => { const t = crmData?.totals?.totalLeads || 0; return t > 0 ? ((n || 0) / t * 100).toFixed(1) + '%' : '—'; };
     const _renderAdRows = (srcName, padStart) => _adsFor(srcName).map(ad => {
       const _s = ad.totalLeads > 0 ? (ad.meetingsScheduled / ad.totalLeads * 100).toFixed(1) : '0.0';
       const _c = ad.totalLeads > 0 ? (ad.meetingsCompleted / ad.totalLeads * 100).toFixed(1) : '0.0';
@@ -3180,6 +3186,7 @@ const selectProject = async (client, project) => {
           </td>
           <td><SourceMark name={srcName} /></td>
           <td>{formatNum(ad.totalLeads)}</td>
+          <td>{_share(ad.totalLeads)}</td>
           <td>{formatNum(ad.relevantLeads)}</td>
           <td>{formatNum(Math.max(0, ad.totalLeads - ad.relevantLeads))}</td>
           <td>{formatNum(ad.meetingsScheduled)}</td>
@@ -3489,7 +3496,7 @@ const selectProject = async (client, project) => {
             const _allOpen = _parents.length > 0 && _parents.every(n => expandedCrmSources.has(n));
             const _row = (level, src, d) => ({
               'רמה': level, 'מקור': src,
-              'סה"כ לידים': d.totalLeads || 0, 'רלוונטיים': d.relevantLeads || 0, 'לא רלוונטיים': d.irrelevantLeads || 0,
+              'סה"כ לידים': d.totalLeads || 0, '% מהלידים': _share(d.totalLeads), 'רלוונטיים': d.relevantLeads || 0, 'לא רלוונטיים': d.irrelevantLeads || 0,
               'תואמו': d.meetingsScheduled || 0,
               '% תיאום': (d.totalLeads > 0 ? Math.round(d.meetingsScheduled / d.totalLeads * 1000) / 10 : 0),
               'בוצעו': d.meetingsCompleted || 0,
@@ -3508,7 +3515,7 @@ const selectProject = async (client, project) => {
                 // רוצה את הכל, ולא צילום של מצב התצוגה.
                 const _adRow = (ad) => ({
                   'רמה': 'מודעה', 'מקור': ad.name,
-                  'סה"כ לידים': ad.totalLeads || 0, 'רלוונטיים': ad.relevantLeads || 0,
+                  'סה"כ לידים': ad.totalLeads || 0, '% מהלידים': _share(ad.totalLeads), 'רלוונטיים': ad.relevantLeads || 0,
                   'לא רלוונטיים': Math.max(0, (ad.totalLeads || 0) - (ad.relevantLeads || 0)),
                   'תואמו': ad.meetingsScheduled || 0,
                   '% תיאום': (ad.totalLeads > 0 ? Math.round(ad.meetingsScheduled / ad.totalLeads * 1000) / 10 : 0),
@@ -3535,6 +3542,7 @@ const selectProject = async (client, project) => {
                     ודחף את הטקסט, ובשורות הבן הוא לא הופיע כלל. */}
                 <th>{'\u05e1\u05d5\u05d2'}</th>
                 <th>{'\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd'}</th>
+                <th>{'% מהלידים'}</th>
                 <th>{'\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</th>
                 <th>{'\u05dc\u05d0 \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd'}</th>
                 <th>{'\u05ea\u05d5\u05d0\u05de\u05d5'}</th>
@@ -3572,6 +3580,7 @@ const selectProject = async (client, project) => {
                       </td>
                       <td><SourceMark name={name} /></td>
                       <td style={(d.leads && d.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(d.leads && d.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: name, leads: d.leads}); } : undefined}>{formatNum(d.totalLeads)}</td>
+                      <td>{_share(d.totalLeads)}</td>
                       <td>{formatNum(d.relevantLeads)}</td>
                       <td>{formatNum(d.irrelevantLeads)}</td>
                       <td>{formatNum(d.meetingsScheduled)}</td>
@@ -3602,6 +3611,7 @@ const selectProject = async (client, project) => {
                           </td>
                           <td><SourceMark name={name} /></td>
                           <td style={(ch.leads && ch.leads.length) ? {cursor:'pointer',color:'var(--indigo,#6366f1)',fontWeight:600,textDecoration:'underline dotted'} : undefined} onClick={(ch.leads && ch.leads.length) ? (e) => { e.stopPropagation(); setLeadsFilter('all'); setLeadsModal({title: ch.name, leads: ch.leads}); } : undefined}>{formatNum(ch.totalLeads)}</td>
+                          <td>{_share(ch.totalLeads)}</td>
                           <td>{formatNum(ch.relevantLeads)}</td>
                           <td>{formatNum(ch.irrelevantLeads)}</td>
                           <td>{formatNum(ch.meetingsScheduled)}</td>
@@ -3626,6 +3636,7 @@ const selectProject = async (client, project) => {
                   <td>{'\u05e1\u05d4"\u05db'}</td>
                   <td />
                   <td>{formatNum(ct.totalLeads)}</td>
+                  <td>{ct.totalLeads > 0 ? '100%' : '—'}</td>
                   <td>{formatNum(ct.relevantLeads)}</td>
                   <td>{formatNum(ct.irrelevantLeads)}</td>
                   <td>{formatNum(ct.meetingsScheduled)}</td>
