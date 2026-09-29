@@ -17,6 +17,13 @@ const supabaseAdmin = new Proxy({}, {
   },
 })
 
+// משתמשי בדיקה — לא נרשמים בלוג ולא מוצגים בו. qa@vitas.co.il הוא משתמש ה-E2E: הוא נכנס
+// בכל פריסת preview ובכל בוקר, צבר 2,121 כניסות, ומילא את 100 השורות שהלוג מציג — כך
+// שכניסות של לקוחות אמיתיים לא נראו (ויטלי, 29.9). כתובות נוספות: CLIENT_LOG_IGNORE ב-Vercel,
+// מופרדות בפסיק.
+const LOG_IGNORED = new Set(['qa@vitas.co.il', ...String(process.env.CLIENT_LOG_IGNORE || '').split(',')]
+  .map(e => e.toLowerCase().trim()).filter(Boolean))
+
 // POST â log session events from client dashboard
 export async function POST(req) {
   const body = await req.json().catch(() => ({}))
@@ -29,6 +36,8 @@ export async function POST(req) {
 
   if (event === 'login') {
     if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 })
+    // בלי sessionId ה-heartbeat וה-project_select שאחריו לא נוגעים בטבלה.
+    if (LOG_IGNORED.has(email.toLowerCase().trim())) return NextResponse.json({ ok: true, sessionId: null })
     const { data, error } = await supabaseAdmin
       .from('client_sessions')
       .insert({
@@ -110,9 +119,12 @@ export async function GET(req) {
   const gate = await requireAdmin(req)
   if (!gate.ok) return gate.res
 
-  const { data, error } = await supabaseAdmin
+  // השורות הישנות של משתמשי הבדיקה נשארות בטבלה — מסננים אותן כאן, לפני תקרת ה-100.
+  let q = supabaseAdmin
     .from('client_sessions')
     .select('*')
+  if (LOG_IGNORED.size) q = q.not('email', 'in', `(${[...LOG_IGNORED].map(e => `"${e.replace(/"/g, '')}"`).join(',')})`)
+  const { data, error } = await q
     .order('logged_in_at', { ascending: false })
     .limit(100)
 

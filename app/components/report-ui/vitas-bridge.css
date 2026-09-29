@@ -448,6 +448,11 @@
     margin-inline-start: 0;
   }
   .header.header-vr { margin-inline-start: 0; }
+  /* 48px כמו ה-header הקומפקטי של המובייל (globals.css §2). ה-64px של הדסקטופ (למעלה) גבר
+     עליו בספציפיות, ושורת הטאבים — שנדבקת ב-top: 48px — נכנסה 16px מתחת ל-header: אחרי
+     גלילה החלק העליון של הטאבים היה מוסתר, ולחיצה על מרכז טאב נפלה על ה-header.
+     זה הכישלון של בדיקת ה-E2E במובייל ("header-vr … intercepts pointer events") מאז 22.9. */
+  .header.header-vr { height: 48px; padding-inline: 10px; }
 }
 
 /* ── מובייל: כותרות סקשן ישנות (.section-head) ─────────────────────────────
