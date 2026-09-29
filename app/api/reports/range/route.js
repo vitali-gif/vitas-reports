@@ -20,6 +20,7 @@ import { NextResponse } from 'next/server'
 import { adminClient, requireProjectAccess, monitorTokenOf } from '../../../../lib/auth'
 import { loadRawRecords, loadCompactSnapshot, loadCompactMeta, detectCrmType, loadSalesforceSlice } from '../../../../lib/crm/raw-store.js'
 import { computeCrmRow, totalKeysFor, getPath } from '../../../../lib/crm/compute.js'
+import { adNamesForBmby } from '../../../../lib/crm/meta-ad-names.js'
 import { buildAdsRangeRows } from '../../../../lib/ads/range-rows.js'
 
 export const dynamic = 'force-dynamic'
@@ -127,7 +128,9 @@ export async function GET(request) {
   if (!timing.crmCache) timing.crmCache = 'n/a'
   if (hasCrm && !shaped) {
     const t1 = Date.now()
-    shaped = computeCrmRow(raw.crmType, raw, { since, until, key })
+    // BMBY: שם מודעה לפי מזהה ללידים שהגיעו בלי שם (ש.ברוך מ-14.8) — lib/crm/meta-ad-names.js.
+    const adNames = raw.crmType === 'bmby' ? await adNamesForBmby(sb, raw.entities?.clients) : undefined
+    shaped = computeCrmRow(raw.crmType, raw, { since, until, key, adNames })
     timing.computeMs = Date.now() - t1
     if (cacheKey) cacheSet(cacheKey, shaped)
   }

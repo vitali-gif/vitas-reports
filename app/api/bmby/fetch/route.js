@@ -18,6 +18,7 @@
 import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { computeBmbySummary, toReportRow } from '../../../../lib/crm/bmby-summary.js'
+import { adNamesForBmby } from '../../../../lib/crm/meta-ad-names.js'
 import { upsertRawRecords, rebuildCompactIfChanged, ENTITIES } from '../../../../lib/crm/raw-store.js'
 import { CRM_SCHEMA_VERSION } from '../../../../lib/crm/schema-version.js'
 
@@ -420,7 +421,9 @@ async function runSync(opts = {}) {
 
     // חישוב הסיכום — פונקציה טהורה ב-lib/crm/bmby-summary.js (שלב 0 של docs/daily-ranges-plan.md).
     // ה-route נשאר אחראי על המשיכה מ-BMBY ועל הכתיבה לבסיס הנתונים בלבד.
-    const R = computeBmbySummary({ clients, tasks, prices, contracts }, { since, until, monthKey: m })
+    // שם מודעה לפי מזהה ללידים שהגיעו בלי שם (ש.ברוך מ-14.8) — lib/crm/meta-ad-names.js.
+    const adNames = await adNamesForBmby(supabase, clients)
+    const R = computeBmbySummary({ clients, tasks, prices, contracts }, { since, until, monthKey: m, adNames })
     const { _allRecentContracts, _apptByCoord, _apptByDate, _aprilLidStatusCounts, _completedMeetings, _contractAttribDebug, _meetRecs, _noRespAnyTask, _noRespInclUpdate, _noResponseCids, _skippedBroken, adBreakdown, apptStatusDebug, aprilLids, clientApptList, clientProfileSamples, clientRelevant, clientsWithAppt, clientsWithCancelledAppt, clientsWithDoneAppt, completedMeetingSamples, contractsSignedInRange, crmReportRows, dayOfWeekStats, hourlyApptStats, hourlyContactMeeting, hourlyContactStats, hourlyLeadStats, meetingDayOfWeek, namedLeads, noAnswerContactHour, pricesInRange, registrationsInRange, responseTimeStats, sources, tasksByClient, totals, xlsxRows } = R
     if (_skippedBroken) {
       errors.push(`SKIPPED broken write for ${p.name} [${m}]: 0 leads but registrations/contracts/meetings present (likely failed fetch)`)
