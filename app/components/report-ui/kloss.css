@@ -187,3 +187,28 @@
 .vr-ui .vr-bcmp-val { font-size: 13.5px; font-weight: 700; color: var(--text, #142044); text-align: start; font-variant-numeric: tabular-nums; }
 .vr-ui .vr-bcmp-step { font-size: 11px; color: var(--text-secondary, #98a0b2); text-align: start; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .vr-ui .vr-bcmp-fill { transition: none; } }
+
+/* ── פירוט סניף פתוח במובייל (ויטלי, 28.9: "הטבלה חתוכה") ────────────────────
+   הפירוט יושב בתוך תא colSpan של הטבלה הגוללת, ולכן היה ברוחב כל הטבלה (720px)
+   ונגלל הצידה יחד איתה — השמות ברחו מהמסך והטבלאות הפנימיות נחתכו. כאן הפירוט
+   נצמד לרוחב החלק הנראה של המיכל (100cqi), וכל טבלה פנימית גוללת בתוך הכרטיס
+   שלה. container-type על המיכל בלבד: רוחבו נקבע מההורה ממילא, לא מהתוכן. */
+@media (max-width: 768px) {
+  .vr-ui.vr-kloss-branches .table-wrapper { container-type: inline-size; }
+  .vr-ui .data-table tbody td.vr-kloss-detail-cell {
+    position: static;
+    max-inline-size: none;
+    padding: 12px 0 !important;
+    box-shadow: none;
+    background: #f8fafc;
+  }
+  .vr-ui .vr-kloss-detail {
+    position: sticky;
+    inset-inline-start: 0;
+    inline-size: 100cqi !important;
+    box-sizing: border-box;
+    padding-inline: 10px;
+    gap: 12px !important;
+  }
+  .vr-ui .vr-kloss-detail > div { min-inline-size: 0; padding: 12px !important; }
+}

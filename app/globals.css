@@ -2685,7 +2685,8 @@
     height: 34px; padding: 0 8px;
     border-color: transparent;
   }
-  .h-actions .btn:not(.btn-logout):not(.btn-kebab) { display: none; }
+  .h-actions .btn:not(.btn-logout):not(.btn-kebab):not(.h-help) { display: none; }
+  .h-help { width: 34px; padding: 0 !important; justify-content: center; }
   .h-kebab {
     display: inline-flex !important;
     width: 34px; padding: 0;
@@ -3952,7 +3953,11 @@ body.drp-no-scroll { overflow: hidden; }
   .perf,
   .pmax-body,
   .card .data-table-scroll,
-  .card-body .data-table-scroll {
+  .card-body .data-table-scroll,
+  /* טבלאות שיושבות ישר בתוך .chart-card (זמני תגובה לפי איש מכירות / מקור,
+     התנגדויות). בלי זה הן נחתכו בקצה המסך בלי גלילה (ויטלי, 28.9). :has ולא
+     כל .chart-card — overflow היה חותך חלוניות מידע בכרטיסי הגרפים. */
+  .chart-card:has(> .data-table) {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-inline: contain;
@@ -3964,6 +3969,7 @@ body.drp-no-scroll { overflow: hidden; }
      השאר. בלי זה הדפדפן דוחס עמודות עד שהמספרים נשברים לשתי שורות. */
   .tbl-wrap .data-table,
   .table-wrapper .data-table,
+  .chart-card > .data-table,
   .demo-grid .data-table,
   .card .data-table,
   .card-body .data-table {
@@ -3990,6 +3996,12 @@ body.drp-no-scroll { overflow: hidden; }
     white-space: normal;
   }
   .data-table thead th:first-child { z-index: 3; background: #EEF3FC; }
+  /* כותרת העמודה הדביקה נשברת לשורות (הכותרת 'קמפיין / קבוצה / מודעה' יושבת עם
+     nowrap inline, ולכן גלשה מעל 'פלטפורמה'), ומילה ארוכה בלי רווחים — כמו
+     PERFORMANCE_MAX — נשברת בתוך התא במקום לגלוש לעמודה הבאה (ויטלי, 28.9). */
+  .data-table thead th:first-child { white-space: normal !important; }
+  .data-table thead th:first-child,
+  .data-table tbody td:first-child { overflow-wrap: anywhere; }
   .data-table tbody tr:nth-child(even) td:first-child { background: var(--tv-surface-subtle, #F5F7FB); }
 
   /* חיווי שאפשר לגלול. אין hover בנייד, ובלי סימן אין שום דרך לדעת
@@ -4196,12 +4208,13 @@ textarea:focus-visible,
 }
 
 /* ── כפתור חזרה לראש העמוד (app/components/BackToTop.jsx) ──────────────────────
-   צף בפינה התחתונה. inset-inline-start ולא left: בעמוד RTL הפינה ה"התחלתית"
-   היא הימנית, והכפתור צריך לשבת בצד ההפוך לתוכן שהעין קוראת — כלומר משמאל. */
+   צף בפינה התחתונה. inset-inline-end ולא left: בעמוד RTL הפינה ה"סופית" היא
+   השמאלית, והכפתור צריך לשבת בצד ההפוך לתוכן שהעין קוראת — כלומר משמאל.
+   (עד 28.9 כאן היה inset-inline-start, שב-RTL הוא ימין — בניגוד להערה הזו.) */
 .back-to-top {
   position: fixed;
   inset-block-end: 22px;
-  inset-inline-start: 22px;
+  inset-inline-end: 22px;
   z-index: 900;
   inline-size: 46px;
   block-size: 46px;
@@ -4221,7 +4234,7 @@ textarea:focus-visible,
 @media (prefers-reduced-motion: reduce) { .back-to-top { transition: none; } .back-to-top:hover { transform: none; } }
 
 /* במובייל הכפתור יושב מעט גבוה יותר, שלא יתנגש בסרגל הדפדפן. */
-@media (max-width: 640px) { .back-to-top { inset-block-end: 16px; inset-inline-start: 16px; inline-size: 42px; block-size: 42px; } }
+@media (max-width: 640px) { .back-to-top { inset-block-end: 16px; inset-inline-end: 16px; inline-size: 42px; block-size: 42px; } }
 
 /* ============================================================================
    Tovno by Vitas — מיתוג: רכיבים

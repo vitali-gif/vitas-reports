@@ -199,8 +199,12 @@ async function runSync(opts = {}) {
   await Promise.all([...videoIdsSet].map(async (vid) => {
     try {
       // thumbnails{...}: התמונות המלאות של הסרטון (המועדפת או הרחבה ביותר) — לפוסטר חד בכרטיס המודעה
-      const vu = `https://graph.facebook.com/${META_GRAPH_VERSION}/${vid}?fields=source,permalink_url,picture,thumbnails{uri,width,height,is_preferred}&access_token=${encodeURIComponent(token)}`
-      const vres = await fetch(vu)
+      const vu = (fields) => `https://graph.facebook.com/${META_GRAPH_VERSION}/${vid}?fields=${fields}&access_token=${encodeURIComponent(token)}`
+      let vres = await fetch(vu('source,permalink_url,picture,thumbnails{uri,width,height,is_preferred}'))
+      // סרטון של עמוד הפייסבוק (ולא של חשבון המודעות) — Meta לא מוסר לאפליקציה את הקובץ, ואז
+      // כל הבקשה נכשלת בגלל השדה source. בלי source עדיין מקבלים פוסטר וקישור, והכרטיס מציג
+      // כפתור "צפייה בפייסבוק" במקום תמונה סטטית בלי שום סימן שזה סרטון (ויטלי, 28.9).
+      if (!vres.ok) vres = await fetch(vu('permalink_url,picture,thumbnails{uri,width,height,is_preferred}'))
       if (vres.ok) {
         const vjson = await vres.json()
         const thumbs = (vjson.thumbnails && vjson.thumbnails.data) || []

@@ -81,7 +81,10 @@ export function Funnel({ items, description }) {
     return { ...it, col: Math.max(1, col) };
   });
   return <div className="vr-funnel-panel">
-    {description && <p className="vr-caption">{description}</p>}
+    {/* בטלפון ההסבר (שלוש-ארבע שורות על מכנים) דחף את המשפך אל מתחת למסך — שם הוא
+        מקופל תחת "איך לקרוא את המשפך" (ויטלי, 28.9). בדסקטופ הוא גלוי כמו קודם. */}
+    {description && <p className="vr-caption vr-funnel-notes-wide">{description}</p>}
+    {description && <details className="vr-funnel-notes-narrow"><summary>איך לקרוא את המשפך</summary><p className="vr-caption">{description}</p></details>}
     <ol className="vr-funnel" style={{ '--vr-funnel-cols': mains.length }}>
       {placed.map(({ id, label, value, rate, denominatorLabel, tone, leak, col: gridCol, icon: Icon }) =>
         <li key={id} className={`vr-funnel-step ${toneClass(tone)}${leak ? ' vr-funnel-leak' : ''}`}

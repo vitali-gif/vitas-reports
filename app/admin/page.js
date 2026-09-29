@@ -212,7 +212,7 @@ const downloadXlsx = async (rows, filename, sheetName = 'נתונים') => {
   }
 };
 
-export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null, onLogout = null }) {
+export default function AdminPage({ isClientView = false, allowedProjectIds = null, initialClients = null, initialProjectId = null, onLogout = null, onHelp = null }) {
   // שמות הדמו מגיעים מה-DB (הפרויקט/הלקוח שסומנו is_demo) ולא מקודדים בקוד,
   // אחרת הכותרת והסיידבר מציגים שני שמות שונים.
   const [session, setSession] = useState(null)
@@ -282,6 +282,9 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // setState שם, בלי שמירה, היה מפעיל רינדור → timeout חדש → setState → לולאה
   // אינסופית. הרף מחזיק את המקרא האחרון שנכתב, וכותבים רק כשהוא באמת השתנה.
   const campLegendRef = useRef('')
+  // עותק של campHidden שבניית הגרף (בתוך setTimeout) קוראת — הגרף נבנה מחדש בכל רינדור,
+  // ובלי זה פלח שהוסתר במקרא היה חוזר להופיע בלחיצה הבאה על כל דבר.
+  const campHiddenRef = useRef(new Set())
   const _applyCampLegend = (next) => {
     const key = JSON.stringify(next)
     if (campLegendRef.current === key) return
@@ -289,6 +292,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     setCampLegend(next)
     // תקופה חדשה = פלחים חדשים. בלי האיפוס, קמפיין שהוסתר היה נשאר מסומן כמוסתר
     // במקרא בזמן שהפלח שלו מצויר — כלומר המקרא משקר על מצב הגרף.
+    campHiddenRef.current = new Set()
     setCampHidden(new Set())
   }
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
@@ -555,6 +559,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // תוכן הדשבורד עטוף ב-.vr-ui, כרטיסי ה-KPI והמשפך מוצגים ברכיבי report-ui, ושאר
   // הסקשנים מקבלים את המידות מ-vitas-bridge.css. הלוגיקה, החישובים וההרשאות לא משתנים.
   const _vrCrmType = reports.find(r => r.month === selectedMonth && r.source === 'crm')?.summary?.crmType || null
+  // שם מערכת ה-CRM בטקסטים שעל המסך. פריסת הנדל"ן נבנתה ל-BMBY, ופיירברי (אלפא) משתמש
+  // בה — בלי זה הלקוח ראה "BMBY" בהסברים ובכפתורים (ויטלי, 28.9).
+  const _vrCrmName = _vrCrmType === 'fireberry' ? 'Fireberry' : 'BMBY'
+  const _vrIsFb = _vrCrmType === 'fireberry'
   // vrShell — המעטפת (סיידבר, header, כותרת, תקציב) בעיצוב החדש בכל הטאבים של פרויקט נדל"ן, כדי שהמסך לא
   // יקפוץ בין שני עיצובים במעבר טאב. vrMode — תוכן הטאב "הכל" בלבד (הפיילוט).
   const _vrOwnCrm = ['zoho', 'salesforce'].includes(_vrCrmType)
@@ -811,11 +819,11 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
 
   const refreshFromBmby = async () => {
     if (refreshingCrm) return;
-    // "\u05e8\u05e2\u05e0\u05d5\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd" \u05d1\u05d8\u05d0\u05d1 CRM \u05de\u05e9\u05de\u05e9 \u05d0\u05ea \u05db\u05dc \u05e4\u05e8\u05d9\u05e1\u05ea \u05d4\u05e0\u05d3\u05dc"\u05df, \u05d5\u05e4\u05d9\u05d9\u05e8\u05d1\u05e8\u05d9 \u05e0\u05d5\u05e4\u05dc \u05dc\u05d0\u05d5\u05ea\u05d4 \u05e4\u05e8\u05d9\u05e1\u05d4.
-    // \u05d1\u05dc\u05d9 \u05d4\u05d4\u05e4\u05e0\u05d9\u05d4 \u05d4\u05d6\u05d0\u05ea \u05d4\u05db\u05e4\u05ea\u05d5\u05e8 \u05d0\u05e6\u05dc \u05d0\u05dc\u05e4\u05d0 \u05de\u05e9\u05da \u05de-BMBY, \u05e9\u05d3\u05d9\u05dc\u05d2 \u05e2\u05dc \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 (\u05d0\u05d9\u05df \u05dc\u05d5 \u05de\u05d9\u05e4\u05d5\u05d9)
-    // \u05d5\u05d4\u05e6\u05d9\u05d2 "\u05e2\u05d5\u05d3\u05db\u05e0\u05d5 0 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd" \u2014 \u05db\u05d0\u05d9\u05dc\u05d5 \u05d4\u05e8\u05e2\u05e0\u05d5\u05df \u05e2\u05d1\u05d3.
-    const _isFb = _vrCrmType === 'fireberry';
-    const _crmLabel = _isFb ? 'Fireberry' : 'BMBY';
+    // "רענון נתונים" בטאב CRM משמש את כל פריסת הנדל"ן, ופיירברי נופל לאותה פריסה.
+    // בלי ההפניה הזאת הכפתור אצל אלפא משך מ-BMBY, שדילג על הפרויקט (אין לו מיפוי)
+    // והציג "עודכנו 0 פרויקטים" — כאילו הרענון עבד.
+    const _isFb = _vrIsFb;
+    const _crmLabel = _vrCrmName;
     setRefreshingCrm(true);
     showToast('\u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de-' + _crmLabel + '...');
     try {
@@ -1478,7 +1486,9 @@ const selectProject = async (client, project) => {
     // לשתי שורות — ככה שם כמו "P-max | Ongoing | New Client" נקרא במלואו, במקום
     // להיחתך ל-"P-max | Ongoing…" שנראה זהה ל"P-max | Ongoing | General".
     const wrap = (n) => {
-      const t = String(n || '').trim().replace(/\s*\|\s*/g, ' | ');
+      // סימני כיוון בלתי נראים (U+200E/U+200F…) — ב-KLOSS יש שמות קמפיין עם עשרות כאלה בהתחלה,
+      // והם "תפסו" את השורה הראשונה של התווית, כך שעל הציר הופיע רק "…" (ויטלי, 28.9).
+      const t = String(n || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim().replace(/\s*\|\s*/g, ' | ');
       if (t.length <= Math.ceil(max / 2)) return [t];
       const words = t.split(' ');
       const lines = ['', ''];
@@ -2147,11 +2157,14 @@ const selectProject = async (client, project) => {
 
     // עיצוב מחודש: ההסבר העסקי + 4 כרטיסי report-ui עם אותן הגדרות (ה-InfoTip הקיים → "הסבר המדד").
     // חציון אינו זמין: הדוחות שומרים סיכומים (ממוצעים ודליים), לא זמן תגובה לכל ליד — לכן נשמרו המדדים הקיימים.
-    const _vrRespTips = ['כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות.', 'לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב.'];
+    // פיירברי: המענה נמדד מההערה האנושית הראשונה על הליד (lib/crm/fireberry-summary.js), לא מפעולות.
+    const _vrRespTips = _vrIsFb
+      ? ['כמות הלידים החדשים שנכנסו ל-Fireberry בתקופה הנבחרת.', 'לידים שאיש מכירות כתב עליהם הערה ב-Fireberry. הערות אוטומטיות (שם הליד או מספר טלפון בלבד) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות לכתוב הערה ראשונה על ליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שעדיין אין עליהם אף הערה של איש מכירות. דורש מעקב.']
+      : ['כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות.', 'לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב.'];
     return (
       <div className={vrResp ? 'vrt-root' : undefined}>
         {vrResp ? (<>
-          <p className="vrt-explanation"><Info size={18} aria-hidden="true" />זמן המענה נמדד מכניסת הליד ל-BMBY ועד הפעולה הראשונה של איש מכירות אנושי, בשעות העסקים בלבד. לידים שטרם קיבלו מענה מוצגים בנפרד ואינם נכללים בממוצע.</p>
+          <p className="vrt-explanation"><Info size={18} aria-hidden="true" />{_vrIsFb ? 'זמן המענה נמדד מכניסת הליד ל-Fireberry ועד ההערה הראשונה של איש מכירות על הליד, בשעות העסקים בלבד.' : 'זמן המענה נמדד מכניסת הליד ל-BMBY ועד הפעולה הראשונה של איש מכירות אנושי, בשעות העסקים בלבד.'} לידים שטרם קיבלו מענה מוצגים בנפרד ואינם נכללים בממוצע.</p>
           <p className="vr-caption vcs-metric-scope">{formatNum(totalLids)} לידים שנכנסו בתקופה · {formatNum(respondedCount)} מהם עם מענה אנושי</p>
           <div className="vr-metric-grid">
             <MetricCard label={'סה"כ לידים'} value={formatNum(totalLids)} tone="indigo" icon={Users} details={_vrRespTips[0]}
@@ -2170,14 +2183,14 @@ const selectProject = async (client, project) => {
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
             </div>
-            <div className="lbl">סה"כ לידים <InfoTip text="כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות." /></div>
+            <div className="lbl">סה"כ לידים <InfoTip text={_vrRespTips[0]} /></div>
             <div className="val">{totalLids}</div>
           </div>
           <div className="kpi-c emerald">
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
             </div>
-            <div className="lbl">קיבלו מענה <InfoTip text="לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות." /></div>
+            <div className="lbl">קיבלו מענה <InfoTip text={_vrRespTips[1]} /></div>
             <div className="val">{respondedCount}</div>
           </div>
           <div className="kpi-c terra">
@@ -2191,7 +2204,7 @@ const selectProject = async (client, project) => {
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
             </div>
-            <div className="lbl">בלי מענה <InfoTip text="לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב." /></div>
+            <div className="lbl">בלי מענה <InfoTip text={_vrRespTips[3]} /></div>
             <div className="val">{noResponseCount}</div>
           </div>
         </div>)}
@@ -2869,11 +2882,14 @@ const selectProject = async (client, project) => {
           { key: 'reg',   label: 'הרשמות',           of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
           { key: 'deal',  label: 'חוזים',            of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
         ];
-        flowDesc = 'מחשיפה ועד חוזה';
+        // Fireberry (אלפא) לא מדווח הרשמות וחוזים — שתי תחנות של אפס היו נראות כנפילה של 100%.
+        const _noDeals = _crmType === 'fireberry';
+        if (_noDeals) STAGES = STAGES.filter(st => st.key !== 'reg' && st.key !== 'deal');
+        flowDesc = _noDeals ? 'מחשיפה ועד פגישה' : 'מחשיפה ועד חוזה';
         scopeNote = 'לידים שנכנסו בתקופה. ' + MEDIA_NOTE
           + ' "פגישות שהתבטלו" נמדד מהפגישות שנקבעו, כמו "הגיעו".';
         cohortCfg = {
-          stageKeys: ['lead', 'cont', 'sched', 'held', 'reg', 'deal'],
+          stageKeys: _noDeals ? ['lead', 'cont', 'sched', 'held'] : ['lead', 'cont', 'sched', 'held', 'reg', 'deal'],
           leak: { key: 'canc', parentStageId: 'sched', denomNoun: 'פגישות שנקבעו' },
           transitionNote: null, // ברירת המחדל של CohortFunnel
         };
@@ -3061,14 +3077,14 @@ const selectProject = async (client, project) => {
           <div className="icon" style={{fontSize:'3em',marginBottom:'10px'}}>{refreshingCrm ? '⏳' : '💭'}</div>
           {refreshingCrm ? (
             <>
-              <h3>{'מושך נתוני CRM מ- BMBY...'}</h3>
+              <h3>{'מושך נתוני CRM מ-' + _vrCrmName + '...'}</h3>
               <p style={{color:'#64748b',marginTop:'8px'}}>{'זה לוקח כ-25 שניות לטווח התאריכים הזה'}</p>
             </>
           ) : (
             <>
               <h3>{'אין נתוני CRM לתקופה זו'}</h3>
               <p style={{color:'#64748b',marginTop:'8px'}}>{isCustomRange ? 'טווח מותאם אישי דורש משיכת נתונים חדשה' : 'לחץ על הכפתור כדי למשוך נתונים'}</p>
-              <button className="btn btn-primary" style={{marginTop:'16px'}} onClick={refreshFromBmby}>{'🔄 משוך נתונים מ-BMBY'}</button>
+              <button className="btn btn-primary" style={{marginTop:'16px'}} onClick={refreshFromBmby}>{'🔄 משוך נתונים מ-' + _vrCrmName}</button>
             </>
           )}
         </div>
@@ -3246,6 +3262,26 @@ const selectProject = async (client, project) => {
 
     const ct = crmData.totals;
     const cp = prevCrmData?.totals;
+    // "פגישות עתידיות" לא נשמרות בשורות לפי מקור (ש-aggregateCrmRows סוכם) אלא בסיכום של הדוח,
+    // ולכן בטאב ה-CRM הכרטיס הציג 0 אצל כל הלקוחות, בזמן שטאב "הכל" (שקורא מהסיכום) הציג את
+    // המספר האמיתי — HI PARK 1, ONCE 2, אקספו חיפה 18 בספטמבר (נמצא ב-28.9).
+    const _upcomingFrom = (reps) => {
+      const sums = reps.map(r => r.summary || {});
+      if (!sums.some(x => x.meetingsUpcoming != null)) return null;
+      const splits = sums.map(x => x.meetingsUpcomingSplit).filter(Boolean);
+      return {
+        total: sums.reduce((a, x) => a + (Number(x.meetingsUpcoming) || 0), 0),
+        split: splits.length ? { fromNewLeads: splits.reduce((a, x) => a + (Number(x.fromNewLeads) || 0), 0), fromOldLeads: splits.reduce((a, x) => a + (Number(x.fromOldLeads) || 0), 0) } : null,
+      };
+    };
+    if (ct.meetingsUpcoming == null) {
+      const u = _upcomingFrom(crmReports);
+      if (u) { ct.meetingsUpcoming = u.total; if (u.split) ct.meetingsUpcomingSplit = u.split; }
+    }
+    if (cp && cp.meetingsUpcoming == null) {
+      const u = _upcomingFrom(reports.filter(r => r.month === comparisonPeriodKey(selectedMonth) && r.source === 'crm'));
+      if (u) cp.meetingsUpcoming = u.total;
+    }
 
     const crmKpi = (label, value, color, current, prev, isCost, tip, namesArr, subNote) => {
       const ch = (prev != null && prev !== 0) ? changePercent(current, prev, isCost)
@@ -3409,7 +3445,12 @@ const selectProject = async (client, project) => {
     const _vrRegNote = vrCrm && (ct.registrationValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(ct.registrationValue) : undefined;
     const _vrDealNote = vrCrm ? [(ct.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(ct.contractValue) : null, _vrCost(ct.contracts) ? 'עלות לחוזה ' + _vrCost(ct.contracts) : null].filter(Boolean).join(' · ') || undefined : undefined;
     // התפלגות לידים לפי מקור לגרף החדש — מערך יציב (memoAgg) כדי שהגרף לא ייבנה מחדש בכל רינדור
-    const _distItems = memoAgg(`crmDist|${selectedMonth}`, () => sourceEntries.map(([name, d]) => ({ id: name, label: name, value: Number.isFinite(d.totalLeads) ? d.totalLeads : null })));
+    // בורר לידים/פגישות לדונאט (ויטלי, 28.9). פגישות = פגישות שתואמו, אותו מדד שבטבלה שמעל.
+    const _distMeet = srcMobileMetric === 'meetings';
+    const _distItems = memoAgg(`crmDist|${selectedMonth}|${_distMeet ? 'm' : 'l'}`, () => sourceEntries
+      // אותו סדר (לפי לידים) בשני המצבים: הצבע נקבע לפי המיקום, ומקור שמחליף צבע בין לידים לפגישות מבלבל.
+      .map(([name, d]) => { const v = _distMeet ? (d.meetingsScheduled ?? 0) : d.totalLeads; return { id: name, label: name, value: Number.isFinite(v) ? v : null }; }));
+    const _distTotal = _distItems.reduce((a, it) => a + (it.value || 0), 0);
     return (
       <div className={vrCrm ? 'vcs-root' : undefined}>
         {!vrCrm && <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
@@ -3426,8 +3467,9 @@ const selectProject = async (client, project) => {
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה — רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, [(ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null), _vrHeldNote].filter(Boolean).join(' · ') || undefined)}
           {crmKpi('פגישות עתידיות', formatNum(ct.meetingsUpcoming||0), 'cyan', ct.meetingsUpcoming||0, cp?.meetingsUpcoming, false, 'עתידיות = פגישות שנקבעו וטרם התקיימו.\nמועד הפגישה עתידי (אחרי היום) והיא עדיין פתוחה. כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsUpcoming, (ct.meetingsUpcomingSplit && (ct.meetingsUpcomingSplit.fromNewLeads+ct.meetingsUpcomingSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsUpcomingSplit.fromNewLeads+' · קודמים '+ct.meetingsUpcomingSplit.fromOldLeads) : null))}
           {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled||0), 'red', ct.meetingsCancelled||0, cp?.meetingsCancelled, false, 'בוטלו = פגישות שנקבעו החודש ובוטלו.\nנספר לפי תאריך התיאום, כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsCancelled, (ct.meetingsCancelledSplit && (ct.meetingsCancelledSplit.fromNewLeads+ct.meetingsCancelledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCancelledSplit.fromNewLeads+' · קודמים '+ct.meetingsCancelledSplit.fromOldLeads) : null))}
-          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations, _vrRegNote)}
-          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts, _vrDealNote)}
+          {/* Fireberry לא מדווח הרשמות וחוזים — כרטיסי אפס קבועים רק מבלבלים. */}
+          {!_crmIsFireberry && crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations, _vrRegNote)}
+          {!_crmIsFireberry && crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts, _vrDealNote)}
           {!vrCrm && _platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
           {!vrCrm && ct.totalLeads > 0 && _platformSpend > 0 ? crmKpi('עלות לליד', formatCurrency(_platformSpend / ct.totalLeads), 'purple', _platformSpend / ct.totalLeads, null, true) : null}
           {!vrCrm && ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
@@ -3624,8 +3666,14 @@ const selectProject = async (client, project) => {
 
         {/* CRM Charts — במצב העיצוב המחודש: דונאט + רשימת ערכים (SourceDistribution), מופע Chart.js משלו */}
         {vrCrm ? (
-          <ReportSection title="התפלגות לידים לפי מקור" description={formatNum(ct.totalLeads) + ' לידים בתקופה · לפי מקור ההגעה כפי שנרשם ב-CRM'}>
-            <div className="vcs-panel"><SourceDistribution items={_distItems} /></div>
+          <ReportSection title={_distMeet ? 'התפלגות פגישות לפי מקור' : 'התפלגות לידים לפי מקור'}
+            description={formatNum(_distMeet ? _distTotal : ct.totalLeads) + (_distMeet ? ' פגישות שתואמו בתקופה' : ' לידים בתקופה') + ' · לפי מקור ההגעה כפי שנרשם ב-CRM'}
+            actions={<div className="vcs-segmented" role="group" aria-label="מה להציג בהתפלגות">
+              {[['leads', 'לידים'], ['meetings', 'פגישות']].map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={srcMobileMetric === k} onClick={() => setSrcMobileMetric(k)}>{l}</button>
+              ))}
+            </div>}>
+            <div className="vcs-panel"><SourceDistribution items={_distItems} unit={_distMeet ? 'פגישות' : 'לידים'} /></div>
           </ReportSection>
         ) : (
         <div className="section">
@@ -4046,7 +4094,30 @@ const selectProject = async (client, project) => {
             tooltip: { callbacks: { label: (ctx) => ' ' + ctx.label + ': ' + formatCurrency(ctx.parsed || 0) } },
           } },
         });
-        const _shortCamp = shortenLabels(campNames2);
+        // פלחים שהוסתרו במקרא נשארים מוסתרים גם אחרי בנייה מחדש של הגרף.
+        if (campHiddenRef.current.size) {
+          const _spendChart = chartsRef.current.find(c => c?.canvas?.id === 'campSpend');
+          if (_spendChart) { campNames2.forEach((n, i) => { if (campHiddenRef.current.has(n) && _spendChart.getDataVisibility(i)) _spendChart.toggleDataVisibility(i); }); _spendChart.update(); }
+        }
+        // בטלפון (ויטלי, 28.9) הקיצור הרגיל (שתי שורות של ~17 תווים) רחב מהעמודה, והשמות עלו זה
+        // על זה. שם נשבר לעד שלוש שורות ברוחב העמודה, ומילה ארוכה בלי רווחים נחתכת לחלקים.
+        // התחלת השם נשמרת תמיד (היא מה שמבדיל בין קמפיינים); השם המלא ב-tooltip.
+        const _campNarrow = typeof window !== 'undefined' && window.innerWidth < 640;
+        const _narrowLabels = (names) => {
+          const per = Math.max(6, Math.floor((window.innerWidth - 120) / Math.max(1, names.length) / 7));
+          return names.map(n => {
+            const toks = String(n || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').split(/\s+/).filter(w => w && w !== '|')
+              .flatMap(w => w.length <= per ? [w] : (w.match(new RegExp('.{1,' + per + '}', 'g')) || [w]));
+            const lines = [];
+            for (const w of toks) {
+              const last = lines[lines.length - 1];
+              if (last != null && (last + ' ' + w).length <= per) lines[lines.length - 1] = last + ' ' + w; else lines.push(w);
+            }
+            if (lines.length > 3) { lines.length = 3; lines[2] = lines[2].slice(0, per - 1) + '\u2026'; }
+            return lines;
+          });
+        };
+        const _shortCamp = _campNarrow ? _narrowLabels(campNames2) : shortenLabels(campNames2);
         createChart('campLeads', 'bar', _shortCamp, [
           { label: '\u05dc\u05d9\u05d3\u05d9\u05dd', data: campNames2.map(n => data.campaigns[n].leads),
             backgroundColor: '#10B981', maxBarThickness: 80, yAxisID: 'y', order: 2 },
@@ -4057,7 +4128,7 @@ const selectProject = async (client, project) => {
             pointBackgroundColor: '#F43F5E', pointBorderColor: '#FFFFFF', pointBorderWidth: 2,
             yAxisID: 'y1', order: 1 }
         ], {
-          x: { grid: { display: false }, ticks: { font: { size: cfs(10.5), weight: '700' }, autoSkip: false, maxRotation: 0, minRotation: 0 } },
+          x: { grid: { display: false }, ticks: { font: { size: cfs(_campNarrow ? 9.5 : 10.5), weight: '700' }, autoSkip: false, maxRotation: 0, minRotation: 0 } },
           y: { position: 'right', beginAtZero: true, grid: { color: '#F2F4F8' },
                title: { display: true, text: '\u05dc\u05d9\u05d3\u05d9\u05dd', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
           y1: { position: 'left', beginAtZero: true, grid: { drawOnChartArea: false },
@@ -4985,8 +5056,8 @@ const selectProject = async (client, project) => {
                           <td style={{color:'var(--violet)',fontWeight:600}}>{oConv}%</td>
                           <td className="sub">{oTop || '—'}</td>
                         </tr>
-                        {open && (<tr className="vr-kloss-row-open"><td colSpan={9} style={{background:'#f8fafc',padding:'18px 20px'}}>
-                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:20,width:'100%'}}>
+                        {open && (<tr className="vr-kloss-row-open"><td colSpan={9} className="vr-kloss-detail-cell" style={{background:'#f8fafc',padding:'18px 20px'}}>
+                          <div className="vr-kloss-detail" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(340px,100%),1fr))',gap:20,width:'100%'}}>
                             <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'16px 18px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אנשי מכירות</div>
                               {_sm.length === 0 ? <div className="sub">—</div> : (
@@ -5725,7 +5796,7 @@ const selectProject = async (client, project) => {
               <button className={`client-tab ${_sub === 'meetings' ? 'active' : ''}`} onClick={() => setCrmSubTab('meetings')}>{vrShell ? '' : '📅 '}פגישות שבוצעו</button>
             </div>
             {vrShell && (
-              <button type="button" className="vr-button vcs-refresh" onClick={refreshFromBmby} disabled={refreshingCrm} title="משיכה חיה מ-BMBY לתקופה שנבחרה">
+              <button type="button" className="vr-button vcs-refresh" onClick={refreshFromBmby} disabled={refreshingCrm} title={'משיכה חיה מ-' + _vrCrmName + ' לתקופה שנבחרה'}>
                 <RefreshCw size={16} aria-hidden="true" />{refreshingCrm ? 'מרענן נתונים…' : 'רענון נתונים'}
               </button>
             )}
@@ -6094,7 +6165,9 @@ const selectProject = async (client, project) => {
                           // הלחיצה נוגעת ישירות במופע הגרף ולא מרנדרת אותו מחדש.
                           const chart = chartsRef.current.find(c => c?.canvas?.id === 'campSpend');
                           if (chart) { chart.toggleDataVisibility(i); chart.update(); }
-                          setCampHidden(prev => { const n = new Set(prev); if (n.has(it.name)) n.delete(it.name); else n.add(it.name); return n; });
+                          const n = new Set(campHiddenRef.current); if (n.has(it.name)) n.delete(it.name); else n.add(it.name);
+                          campHiddenRef.current = n;
+                          setCampHidden(n);
                         }}>
                         <span className="vr-camp-dot" style={{background: it.color}} aria-hidden="true" />
                         <span className="vr-camp-name">{it.name}</span>
@@ -6194,14 +6267,14 @@ const selectProject = async (client, project) => {
                   <span style={{display:'inline-block', width:'18px', color:'#64748b', marginInlineEnd:'4px'}}>
                     {hasChildren ? (vrAds ? (isExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />) : (isExpanded ? '\u25bc' : '\u25c0')) : ''}
                   </span>
-                  <bdi>{name}</bdi>
+                  <bdi>{name === 'PERFORMANCE_MAX' ? 'Performance Max' : name}</bdi>
                 </td>
                 <td style={{fontSize, whiteSpace:'nowrap'}}>
                   {level === 0 && data.source ? (vrAds
                     ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
                     : <span className={`platform-tag${data.source.includes('google')?' google':''}`}>{data.source.includes('google')?'GOOGLE':'FACEBOOK'}</span>) : <span style={{color:'#cbd5e1'}}>-</span>}
                 </td>
-                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED'; const bg = isActive ? 'rgba(16,185,129,0.12)' : 'rgba(226,75,74,0.12)'; const col = isActive ? '#059669' : '#c0322f'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : st || '-'; // סטטוס ריק פירושו קמפיין שאינו פעיל — עד היום הוא הוצג כמקף אפור ונקרא כמו
+                <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; if (!st && name === 'PERFORMANCE_MAX') return <span style={{color:'#cbd5e1'}}>-</span>; /* קבוצה סינתטית של PMax — אין לה סטטוס משלה, ו'מכובה' היה שקר */ const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED' || /_PAUSED$/.test(st); const bg = isActive ? 'rgba(16,185,129,0.12)' : 'rgba(226,75,74,0.12)'; const col = isActive ? '#059669' : '#c0322f'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : ({ WITH_ISSUES: 'בעיה', DISAPPROVED: 'נדחתה', PENDING_REVIEW: 'בבדיקה', IN_PROCESS: 'בבדיקה', PREAPPROVED: 'בבדיקה', PENDING_BILLING_INFO: 'חסר אמצעי תשלום' }[st] || st || '-'); // ערכי effective_status של Meta (למשל CAMPAIGN_PAUSED) הוצגו גולמיים ונחתכו במובייל (ויטלי, 28.9) // סטטוס ריק פירושו קמפיין שאינו פעיל — עד היום הוא הוצג כמקף אפור ונקרא כמו
                   // "אין נתון". עכשיו "מכובה" באדום (ויטלי, 21.9).
                   if (vrAds) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status off"><i aria-hidden="true" />מכובה</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{background:'rgba(226,75,74,0.12)',color:'#c0322f',borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>מכובה</span>; })()}</td>
                 <td style={{fontSize}}>{formatNum(data.clicks)}</td>
@@ -6262,14 +6335,17 @@ const selectProject = async (client, project) => {
                     {campaignNames.flatMap(cName => {
                       const cData = tree[cName];
                       const isCExpanded = expandedCampaigns.has(cName);
-                      const adSetNames = Object.keys(cData.adSets).sort((a,b) => treeCmp(a, b, n => cData.adSets[n]));
+                      // קבוצות ומודעות בלי שום פעילות (₪0, 0 חשיפות, 0 קליקים, 0 לידים) — בעיקר ה"קבוצת
+                      // מודעות 1" / "Ad …" הריקים ש-PMax מחזיר — מוסתרות, כמו קמפיינים ריקים (ויטלי, 28.9).
+                      const _alive = (d) => _hasActivity(d) || ((d && d.leads) || 0) > 0;
+                      const adSetNames = Object.keys(cData.adSets).filter(n => _alive(cData.adSets[n])).sort((a,b) => treeCmp(a, b, n => cData.adSets[n]));
                       const rows = [renderRow(cName, cData, 0, isCExpanded, adSetNames.length > 0, () => toggleCampaign(cName), `c-${cName}`)];
                       if (isCExpanded) {
                         adSetNames.forEach(aName => {
                           const aData = cData.adSets[aName];
                           const asKey = `${cName}|${aName}`;
                           const isAExpanded = expandedAdSets.has(asKey);
-                          const adNames = Object.keys(aData.ads).sort((x,y) => treeCmp(x, y, n => aData.ads[n]));
+                          const adNames = Object.keys(aData.ads).filter(n => _alive(aData.ads[n])).sort((x,y) => treeCmp(x, y, n => aData.ads[n]));
                           rows.push(renderRow(aName, aData, 1, isAExpanded, adNames.length > 0, () => toggleAdSet(asKey), `as-${asKey}`));
                           if (isAExpanded) {
                             adNames.forEach(adName => { rows.push(renderRow(adName, aData.ads[adName], 2, false, false, null, `ad-${asKey}|${adName}`)); });
@@ -6447,6 +6523,11 @@ const selectProject = async (client, project) => {
                   const metrics = ad.metrics || {};
                   const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
                   const hasVideo = Boolean(ad.videoUrl);
+                  // סרטון בלי קובץ שאפשר לנגן (סרטון של עמוד הפייסבוק — Meta לא מוסר את ה-source לאפליקציה):
+                  // הפוסטר עם כפתור הפעלה שפותח את הסרטון בפייסבוק, במקום תמונה בלי שום סימן שזה סרטון.
+                  const fbVideoLink = !hasVideo && ad.videoId
+                    ? (ad.videoPermalink ? (String(ad.videoPermalink).startsWith('http') ? ad.videoPermalink : 'https://www.facebook.com' + ad.videoPermalink) : 'https://www.facebook.com/watch/?v=' + encodeURIComponent(ad.videoId))
+                    : null;
                   const previewImg = ad.imageUrl || ad.thumbnailUrl;
                   // קריאייטיב מקומי של הדמו (/demo/...) מוצג חד; כל מקור חיצוני מטושטש.
                   const demoBlur = (isDemoProject && !String(previewImg || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined;
@@ -6463,6 +6544,15 @@ const selectProject = async (client, project) => {
                             preload="metadata"
                             style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrAds ? 'transparent' : '#000'}}
                           />
+                        ) : fbVideoLink ? (
+                          <a href={fbVideoLink} target="_blank" rel="noopener noreferrer" className="vr-ad-fbvideo" aria-label={'צפייה בסרטון בפייסבוק: ' + (ad.name || '')}
+                            style={{position:'relative',display:'block',width:'100%',height:'100%',background: vrAds ? 'transparent' : '#000'}}>
+                            {previewImg && <img src={previewImg} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} style={{width:'100%',height:'100%',objectFit:'contain',display:'block',...(demoBlur || {})}} />}
+                            <span aria-hidden="true" style={{position:'absolute',inset:0,margin:'auto',width:64,height:64,borderRadius:'50%',background:'rgba(11,15,30,0.62)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+                            </span>
+                            <span style={{position:'absolute',insetInlineStart:10,bottom:10,background:'rgba(11,15,30,0.72)',color:'#fff',fontSize:12,fontWeight:700,padding:'4px 10px',borderRadius:999}}>צפייה בפייסבוק ↗</span>
+                          </a>
                         ) : previewImg ? (
                           <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrAds ? 'transparent' : '#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
                         ) : (
@@ -6699,7 +6789,7 @@ const selectProject = async (client, project) => {
         </div>)}
       </>
     );
-  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedCrmAds, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
+  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, campLegend, campHidden, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedCrmAds, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
     // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
     // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
     // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.
@@ -6783,6 +6873,7 @@ const selectProject = async (client, project) => {
         // או את מסך הכניסה. handleLogout של האדמין רק מנקה את ה-state של הרכיב הזה, והדף שמעליו
         // לא ידע שהמשתמש התנתק — הכפתור "לא עשה כלום" (ויטלי, 23.9).
         onLogout={onLogout || handleLogout}
+        onHelp={onHelp || undefined}
         loadingIndicator={(refreshing || refreshingCrm) ? (
           <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'6px 12px',background:'rgba(99,102,241,0.1)',borderRadius:20,color:'var(--accent)',fontWeight:600,fontSize:13}}>
             <span style={{display:'inline-block',width:12,height:12,border:'2px solid currentColor',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>

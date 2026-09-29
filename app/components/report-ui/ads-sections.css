@@ -17,11 +17,12 @@
   gap: 18px;
   container-type: inline-size;
 }
-@container (max-width: 920px) { .vr-ui .vr-agency-grid { grid-template-columns: minmax(0, 1fr); } }
-/* נפילה אחורה לדפדפן בלי container queries. */
-@supports not (container-type: inline-size) {
-  @media (max-width: 1180px) { .vr-ui .vr-agency-grid { grid-template-columns: minmax(0, 1fr); } }
-}
+/* ⚠️ @container בודק את מיכל-האב הקרוב, לא את האלמנט עצמו — ו-.vr-agency-grid הוא
+   המיכל של עצמו. לכן הכלל שהיה כאן (‎@container (max-width: 920px)‎ על ה-grid) לא
+   הופעל אף פעם, ובטלפון נשארו שני כרטיסים צרים בשורה: "VITAS" אות-אות, והמספרים
+   נשברו (ויטלי, 28.9). media query לפי רוחב החלון: 1180px ≈ 920px תוכן + 224px סיידבר,
+   בדיוק הסף של הנפילה-אחורה הקודמת. */
+@media (max-width: 1180px) { .vr-ui .vr-agency-grid { grid-template-columns: minmax(0, 1fr); } }
 
 .vr-ui .vr-agency-card {
   background: var(--card, #fff);
@@ -140,9 +141,8 @@
 }
 .vr-ui .vr-camp-pct { flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-@container (max-width: 700px) { .vr-ui .vr-camp-chart { grid-template-columns: minmax(0, 1fr); } .vr-ui .vr-camp-legend { max-block-size: 190px; } }
-@supports not (container-type: inline-size) {
-  @media (max-width: 900px) { .vr-ui .vr-camp-chart { grid-template-columns: minmax(0, 1fr); } }
-}
+/* אותה בעיה כמו ב-.vr-agency-grid: .vr-camp-chart הוא המיכל של עצמו, ולכן כלל ה-@container
+   על ה-grid שלו לא הופעל, ובטלפון הדונאט נדחס לצד מקרא של 230px — הטקסט עלה על הטבעת. */
+@media (max-width: 900px) { .vr-ui .vr-camp-chart { grid-template-columns: minmax(0, 1fr); } .vr-ui .vr-camp-legend { max-block-size: 190px; } }
 
 @media (prefers-reduced-motion: reduce) { .vr-ui .vr-agency-fill { transition: none; } }
