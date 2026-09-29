@@ -34,6 +34,7 @@ const _slim = (d) => {
   if (d.ok !== undefined) out.ok = d.ok
   if (d.error) out.error = String(d.error).slice(0, 200)
   if (typeof d.totalRows === 'number') out.totalRows = d.totalRows
+  if (Array.isArray(d.assetGroupErrors) && d.assetGroupErrors.length) out.assetGroupErrors = d.assetGroupErrors.slice(0, 3)
   if (Array.isArray(d.projects)) {
     out.projects = d.projects.map(p => {
       const r = { project: p.project }
@@ -265,6 +266,9 @@ export async function GET(request) {
         //    היה כל מה שהיה צריך כדי לאבחן. השדה מזהה עכשיו את המשימה.
         firstError: failed.length ? _describe(failed[0]) : null,
         failures: failed.length ? failed.slice(0, 8).map(_describe) : undefined,
+        // B2: קריאייטיב PMax שלא נמשך. המשיכה עצמה הצליחה והגלריה הקודמת נשמרה, ולכן זה
+        //    לא כישלון — אבל עד היום זה לא הופיע בשום מקום, וכך הגלריה התרוקנה בשקט.
+        assetGroupErrors: (() => { const e = [...new Set(results.flatMap(r => r.assetGroupErrors || []))]; return e.length ? e.slice(0, 5) : undefined })(),
         // הזמנים של המשיכות הכבדות — כדי שהתקרה תיקבע לפי מדידה ולא לפי ניחוש.
         slowest: results.slice().sort((a, b) => (b.ms || 0) - (a.ms || 0)).slice(0, 3)
           .map(r => `${r.source} · ${r.label} · ${Math.round((r.ms || 0) / 1000)}s`),

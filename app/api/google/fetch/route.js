@@ -71,6 +71,8 @@ async function runSync(opts = {}) {
   const _allRowsMerged = []
   const _assetGroupsMerged = {}
   const _custDiag = []
+  // שאילתת קבוצות הנכסים נכשלה בחשבון כלשהו בריצה הזו. ראו B2 בהמשך.
+  const _agErrors = []
   for (const customerId of customerIds) {
 
   // אישורי הגישה של החשבון הזה. ברירת מחדל = החיבור הראשי; אם הוגדרו משתנים עם
@@ -193,6 +195,11 @@ async function runSync(opts = {}) {
 
   // ===== Query active Asset Groups (Performance Max) + their assets =====
   let assetGroupsByCampaign = {}  // map: lowerCaseCampaignName -> [ {id, name, campaign, assets:[{type,text,imageUrl}]} ]
+  // ⚠️ B2 (21.9–24.9): כשהמכסה של גוגל נגמרה, שתי השאילתות כאן נכשלו, הכשל נבלע
+  //    ב-console בלבד, והדוח נכתב עם assetGroups ריק — מעל הגלריה שהייתה. כך נמחק
+  //    הקריאייטיב של KLOSS ביולי ובספטמבר בלי שום סימן בלוג הקרונים. עכשיו הכשל
+  //    נרשם, ובשמירה נשמרות קבוצות הנכסים מהמשיכה הקודמת במקום רשימה ריקה.
+  let _agError = null
   try {
     // 1. asset groups with per-date-range metrics (PMax only)
     const agQuery = `
@@ -215,6 +222,7 @@ async function runSync(opts = {}) {
       console.log('[asset_group] rows returned:', agRows.length, agRows[0] ? JSON.stringify(agRows[0]).slice(0,300) : 'none')
     } catch (agErr) {
       console.log('[asset_group] metrics query failed:', agErr.message || agErr)
+      _agError = 'asset_group: ' + (agErr.message || String(agErr))
     }
 
     const agById = {}
@@ -253,7 +261,15 @@ async function runSync(opts = {}) {
         FROM asset_group_asset
         WHERE asset_group_asset.status = 'ENABLED'
       `
-      const assetRows = await gaqlSearch(accessToken, customerId, assetQuery, _gopts)
+      // כשל כאן לא מפיל את הקבוצות עצמן: המדדים שלהן כבר נמשכו, והנכסים ישוחזרו
+      // מהמשיכה הקודמת בשלב השמירה.
+      let assetRows = []
+      try {
+        assetRows = await gaqlSearch(accessToken, customerId, assetQuery, _gopts)
+      } catch (asErr) {
+        console.log('[asset_group_asset] query failed:', asErr.message || asErr)
+        _agError = 'asset_group_asset: ' + (asErr.message || String(asErr))
+      }
       for (const ar of assetRows) {
         const agId = ar.assetGroup?.id
         if (!agId || !agById[agId]) continue
@@ -280,7 +296,9 @@ async function runSync(opts = {}) {
   } catch (err) {
     // non-fatal: if asset group query fails (e.g. permissions), continue without them
     console.log('asset_group query failed:', err.message || err)
+    _agError = 'asset_group: ' + (err.message || String(err))
   }
+  if (_agError) _agErrors.push(`${customerId} · ${String(_agError).slice(0, 200)}`)
 
     // accumulate this customer's results into the merged set, then close the per-customer loop
     for (const r of allRows) { r.account = customerId; _allRowsMerged.push(r) }
@@ -296,6 +314,7 @@ async function runSync(opts = {}) {
       rows: allRows.length,
       assetGroups: Object.values(assetGroupsByCampaign).reduce((a, arr) => a + arr.length, 0),
       assetGroupCampaigns: Object.keys(assetGroupsByCampaign).length,
+      ...(_agError ? { assetGroupError: String(_agError).slice(0, 300) } : {}),
       ...(_creds.isOverride ? { credsOverride: true, login: _creds.loginCustomerId || null } : {}),
     })
   } // ===== end per-customer loop =====
@@ -352,6 +371,26 @@ async function runSync(opts = {}) {
       if (mineCampaigns.has(_campKey(campLower)) || campLower.includes(needle)) projectAssetGroups.push(...groups)
     }
 
+    // B2: השאילתה נכשלה — לא דורסים את הגלריה הקיימת ברשימה ריקה. קבוצה שחזרה בלי
+    // נכסים מקבלת את הנכסים מהמשיכה הקודמת, ואם לא חזרה אף קבוצה — נשמרות הקודמות
+    // כמו שהן (עם המדדים של אז), ומסומנות assetGroupsStale.
+    let _agStale = false
+    if (_agErrors.length > 0) {
+      const { data: _prev } = await supabase.from('reports').select('summary')
+        .eq('project_id', p.id).eq('source', 'google').eq('month', m).maybeSingle()
+      const _prevAG = Array.isArray(_prev?.summary?.assetGroups) ? _prev.summary.assetGroups : []
+      if (projectAssetGroups.length === 0 && _prevAG.length > 0) {
+        projectAssetGroups.push(..._prevAG)
+        _agStale = true
+      } else if (_prevAG.length > 0) {
+        const _prevById = new Map(_prevAG.map(g => [String(g.id), g]))
+        for (const g of projectAssetGroups) {
+          const pg = _prevById.get(String(g.id))
+          if ((!g.assets || g.assets.length === 0) && pg?.assets?.length) { g.assets = pg.assets; _agStale = true }
+        }
+      }
+    }
+
     let byAgency = null
     if (_srcRules) {
       byAgency = {}
@@ -362,7 +401,7 @@ async function runSync(opts = {}) {
       }
       for (const ag of Object.keys(byAgency)) { const o = byAgency[ag]; o.cpl = o.leads>0?o.spend/o.leads:0; o.cpc = o.clicks>0?o.spend/o.clicks:0; o.ctr = o.impressions>0?(o.clicks/o.impressions)*100:0 }
     }
-    const summaryWithAssetGroups = { ...pt, ...(byAgency ? { byAgency } : {}), assetGroups: projectAssetGroups }
+    const summaryWithAssetGroups = { ...pt, ...(byAgency ? { byAgency } : {}), assetGroups: projectAssetGroups, ...(_agStale ? { assetGroupsStale: true } : {}) }
 
     const { error: upsertErr } = await supabase.from('reports').upsert({
       project_id: p.id,
@@ -389,6 +428,7 @@ async function runSync(opts = {}) {
       totalRows: allRows.length,
       customersQueried: customerIds,
       customers: _custDiag,
+      ...(_agErrors.length ? { assetGroupErrors: _agErrors } : {}),
       totals,
       projects: results,
     },
