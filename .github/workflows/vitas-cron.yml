@@ -13,11 +13,12 @@ name: VITAS cron (external scheduler)
 # Schedules are UTC. 04:30-18:30 UTC == 07:30-21:30 Israel time (same as vercel.json).
 
 on:
+  # 30.9: prefetch-ads ו-prefetch-crm הוסרו מכאן. cron-job.org מריץ אותם באותן שעות, וה"גיבוי"
+  # כאן רץ בנוסף ולא במקומו — job_log הראה כל ריצת CRM פעמיים (13:18+13:34, 13:39+13:43),
+  # כלומר כל המשיכות מ-BMBY/Zoho/Salesforce והכתיבות לבסיס הנתונים כפולות. אם cron-job.org
+  # מפסיק, שומר הקרונים (health, למטה — נשאר כאן בכוונה, כמתזמן בלתי תלוי) מתריע אחרי
+  # 3 שעות, ואפשר להריץ ידנית מ-Run workflow. להחזרה: להחזיר את ארבע השורות מההיסטוריה.
   schedule:
-    - cron: '7 4,6,8,10,12,14,16,18 * * *'    # prefetch-ads HOT (odd minute: GH delays :00/:30 heavily)
-    - cron: '27 3 * * *'                      # prefetch-ads COLD — רבעונים וחודשים סגורים, פעם ביום
-    - cron: '17 4,6,8,10,12,14,16,18 * * *'   # prefetch-crm (months — fast, critical)
-    - cron: '37 4,6,8,10,12,14,16,18 * * *'   # prefetch-crm (ranges — own 300s budget)
     - cron: '47 * * * *'                      # health watchdog
   workflow_dispatch:
     inputs:
