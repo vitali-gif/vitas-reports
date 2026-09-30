@@ -7,6 +7,7 @@
 import { sendAlert } from '../../../../lib/alert'
 import { createClient } from '@supabase/supabase-js'
 import { runCron } from '../../../../lib/cron-background'
+import { logJob } from '../../../../lib/job-log'
 
 export const dynamic = 'force-dynamic'
 // force-no-store: supabase-js + internal calls go through fetch, which Next caches by
@@ -40,6 +41,12 @@ const _slim = (d) => {
       if (n !== undefined && n !== null) r.leads = n
       if (p.ok === false) r.ok = false
       if (p.error) r.error = String(p.error).slice(0, 120)
+      // תוצאת התמונה (crm_raw + crm_compact) — בלעדיה כשל בבנייה נבלע בשקט (T4, 30.9: ONCE לא
+      // נבנתה 12 שעות ואף לוג לא אמר למה).
+      const sn = p.snapshot
+      if (sn) r.snapshot = sn.error ? { error: String(sn.error).slice(0, 160) }
+        : sn.compact?.error ? { error: String(sn.compact.error).slice(0, 160) }
+        : sn.compact?.skipped ? 'unchanged' : sn.compact ? 'rebuilt' : 'written'
       return r
     })
   }
@@ -97,8 +104,18 @@ async function handle(request) {
   // מדולגים אצלו). שאר החלונות כותבים רק את הדוח השמור שלהם. הרבעונים רצים ראשונים כדי
   // שתקציב הזמן לא יחתוך אותם.
   const QUARTERS = ['q1', 'q2', 'q3', 'q4']
-  jobs = [...jobs.filter(j => QUARTERS.includes(j.rangeId)), ...jobs.filter(j => !QUARTERS.includes(j.rangeId))]
-  const snapshotFor = (job, source) => source === 'zoho' ? job.kind === 'month' : QUARTERS.includes(job.rangeId)
+  // q4 ראשון: הוא היחיד שכותב את תמונת BMBY, ולכן הוא לא יכול להיות זה שנחתך בתקציב הזמן.
+  const _qOrder = (j) => j.rangeId === 'q4' ? 0 : QUARTERS.includes(j.rangeId) ? 1 : 2
+  jobs = jobs.slice().sort((a, b) => _qOrder(a) - _qOrder(b))
+  // T4 (30.9): BMBY כותב את התמונה רק ברבעון האחרון (q4), לא בארבעתם. המשיכה מ-BMBY היא
+  // מ-UniqID 1 ועד שהרשומות עוברות את ToDate (callBmbyGetAllJsonPaginated), ולכן כל רבעון מושך
+  // מתחילת הנתונים — q4 מושך את כל מה ששלושת האחרים מושכים ועוד. עד היום ארבעתם כתבו את אותן
+  // ~30 אלף רשומות לארבעה פרויקטים, ארבע פעמים בריצה. q1–q3 ממשיכים לכתוב את הדוח השמור שלהם.
+  // Salesforce לא משתנה: אצלו הרבעונים הם חלונות זרים, וכל אחד כותב את החלק שלו.
+  const BMBY_SNAPSHOT_QUARTER = 'q4'
+  const snapshotFor = (job, source) => source === 'zoho' ? job.kind === 'month'
+    : source === 'bmby' ? job.rangeId === BMBY_SNAPSHOT_QUARTER
+    : QUARTERS.includes(job.rangeId)
   const bodyFor = (job, source) => JSON.stringify({ ...job.payload, snapshot: snapshotFor(job, source) })
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
@@ -222,6 +239,17 @@ async function handle(request) {
     if (_su && _sk) {
       const _hb = createClient(_su, _sk, { auth: { persistSession: false } })
       await _hb.from('cron_heartbeat').upsert({ job: 'prefetch-crm', last_run: new Date().toISOString() }, { onConflict: 'job' })
+      // רישום הריצה ל-job_log, כמו prefetch-ads. עד 30.9 קרון ה-CRM היה היחיד שלא נרשם, ולכן
+      // ריצה שלא עשתה כלום (07:37, 30.9) נראתה זהה לריצה תקינה.
+      const snaps = []
+      for (const r of results) for (const pr of (r.projects || [])) if (pr.snapshot) snaps.push({ project: pr.project, source: r.source, label: r.label, snapshot: pr.snapshot })
+      await logJob(_hb, only ? `prefetch-crm:${only}` : 'prefetch-crm', failed.length === 0 && !snaps.some(x => x.snapshot?.error), Date.now() - startedAt, {
+        totalJobs: jobs.length, completed: results.length, failed: failed.length, deferred: deferredCount, deadlineHit,
+        brokenSkipped: brokenProjects.length || undefined,
+        failures: failed.length ? failed.slice(0, 8).map(f => `${f.source || ''} · ${f.label || ''} · ${f.error || ('HTTP ' + (f.status || ''))}`.slice(0, 200)) : undefined,
+        snapshots: snaps.length ? snaps.map(x => `${x.source} · ${x.project} · ${typeof x.snapshot === 'string' ? x.snapshot : 'ERROR ' + x.snapshot.error}`) : undefined,
+        slowest: results.slice().sort((a, b) => (b.ms || 0) - (a.ms || 0)).slice(0, 3).map(r => `${r.source} · ${r.label} · ${Math.round((r.ms || 0) / 1000)}s`),
+      })
     }
   } catch {}
   return Response.json({ ok: failed.length === 0 && brokenProjects.length === 0, summary: { totalJobs: jobs.length, completed: results.length, failed: failed.length, brokenSkipped: brokenProjects.length, deferred: deferredCount, deadlineHit, elapsedMs: Date.now()-startedAt }, brokenProjects, results })

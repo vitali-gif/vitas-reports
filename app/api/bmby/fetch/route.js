@@ -245,6 +245,16 @@ async function callBmbyGetAllJsonPaginated(service, params, maxPages = 10, useGe
   }
 }
 
+// T4 (30.9): הפרויקטים נמשכים במקביל (Promise.all), ולכן שלוש הבניות של crm_compact רצו יחד —
+// 27–46 שניות כל אחת, על אותו בסיס נתונים, באותה דקה. הבנייה רצה כולה בתוך Postgres, כך שמקביליות
+// לא מקצרת אותה, רק מעמיסה. המשיכה מ-BMBY נשארת במקביל; רק הבנייה עוברת בתור.
+let _rebuildChain = Promise.resolve()
+function oneRebuildAtATime(fn) {
+  const run = _rebuildChain.then(fn, fn)
+  _rebuildChain = run.catch(() => {})
+  return run
+}
+
 // ===== source detection =====
 // Map a raw BMBY source/entry-channel string to a canonical bucket used in the dashboard.
 const SOURCE_BUCKETS = [
@@ -391,7 +401,7 @@ async function runSync(opts = {}) {
         )
         snapshot = Object.fromEntries(parts.map((r, i) => [ENTITIES[i], r]))
         // תמונה דחוסה לחישוב מהיר (מיגרציה 009) — נבנית בתוך ה-DB, קריאה אחת זולה.
-        try { snapshot.compact = await rebuildCompactIfChanged(supabase, p.id, 'bmby', parts) }
+        try { snapshot.compact = await oneRebuildAtATime(() => rebuildCompactIfChanged(supabase, p.id, 'bmby', parts)) }
         catch (e) { snapshot.compact = { error: String(e?.message || e) } }
       } catch (e) {
         // לא נכנס ל-errors: הדוח השמור נכתב כרגיל, ואין סיבה למייל התראה. מדווח בשדה snapshot.
