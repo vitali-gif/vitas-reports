@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js'
 import { OBJ, queryAll, isConfigured, listLeadNoteIds, getNote, pool } from '../../../../lib/crm/fireberry-api.js'
 import { computeFireberrySummary, toReportRow, filterLeads, fireberryConfigFor } from '../../../../lib/crm/fireberry-summary.js'
 import { upsertRawRecords, rebuildCompactIfChanged, loadRawRecords, loadCompactSnapshot } from '../../../../lib/crm/raw-store.js'
+import { planNoteChecks } from '../../../../lib/crm/fireberry-notes-plan.js'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -30,39 +31,21 @@ const isValidDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v
  * הוא יקר (קריאה לכל הערה — ראה lib/crm/fireberry-api.js), וחלונות הטווחים רצים
  * עשרה במקביל.
  *
- * אילו לידים נבדקים:
- *   • ליד שמעולם לא נבדק — תמיד. זו השליפה הראשונה (~1,200 הערות לאקספו), שנפרשת
- *     על כמה ריצות לפי budgetMs. החדשים ביותר קודם, כי זמני התגובה שלהם הכי רלוונטיים.
- *   • ליד מ-windowDays האחרונים שנבדק לפני יותר מ-50 דקות — אצלו עוד נכתבות הערות.
- * ליד ישן שכבר נבדק לא נבדק שוב. הערה חדשה עליו תיכנס רק אם הוא בחלון; זה המחיר
- * של לא לעבור על כל הלידים בכל שעה, ולזמני תגובה הוא לא משנה — שם קובעת ההערה
- * הראשונה.
+ * אילו לידים נבדקים ובאיזה סדר — lib/crm/fireberry-notes-plan.js (T9, 1.10): ליד שמעולם
+ * לא נבדק תמיד קודם (השליפה הראשונה נפרשת על כמה ריצות לפי budgetMs), ואחריו כל ליד
+ * שהגיע תורו לפי גילו — מכל 4 שעות ליד מהיום ועד פעם בחודש לליד ישן — הכי מאחר קודם.
  *
  * ליד נרשם ב-note_index רק אם *כל* ההערות שלו נשלפו. ליד שחלק מההערות שלו נכשלו
  * (או שהתקציב נגמר באמצע) לא נרשם, ולכן ייבדק שוב בריצה הבאה.
  */
-// windowDays=7 ו-recheck של 6 שעות: בקצב של 60 קריאות לדקה (lib/crm/fireberry-api.js)
-// כל ריצה עושה ~45 קריאות. בדיקה חוזרת של לידי 45 הימים האחרונים כל שעה הייתה
-// ~270 קריאות לשעה רק על רשימות, בלי לשלוף אף הערה חדשה.
-async function syncNotes(supabase, proj, leads, { budgetMs = 45000, windowDays = 7, recheckHours = 6, concurrency = 2 } = {}) {
+async function syncNotes(supabase, proj, leads, { budgetMs = 45000, concurrency = 2 } = {}) {
   const t0 = Date.now()
   const deadline = t0 + budgetMs
   const stop = () => Date.now() > deadline
   const snap = await loadRawRecords(supabase, proj.id, 'fireberry')
   const known = new Set((snap.entities?.notes || []).map(n => String(n.noteid)))
   const index = new Map((snap.entities?.note_index || []).map(r => [String(r.accountid), r]))
-  const cutoff = Date.now() - windowDays * 86400000
-  const ts = (s) => new Date(String(s || '').replace(' ', 'T')).getTime()
-
-  const todo = leads.filter(l => {
-    const id = String(l.accountid || '')
-    if (!id) return false
-    const ix = index.get(id)
-    if (!ix) return true
-    return ts(l.createdon) >= cutoff && (Date.now() - ts(ix.checkedAt)) > recheckHours * 3600000
-  }).sort((a, b) =>
-    (index.has(String(a.accountid)) - index.has(String(b.accountid))) ||
-    String(b.createdon).localeCompare(String(a.createdon)))
+  const { todo, stats: plan } = planNoteChecks(leads, index)
 
   // רשימות והערות מתחלפות ליד-ליד ולא "כל הרשימות ואז כל ההערות": אחרת ריצה
   // שנגמר לה התקציב אחרי הרשימות לא הייתה משלימה אף ליד, ואף ליד לא היה נרשם.
@@ -99,7 +82,7 @@ async function syncNotes(supabase, proj, leads, { budgetMs = 45000, windowDays =
   const firstErr = [...listed, ...fetched].find(x => x && !x.ok)?.error || null
   return {
     project: proj.name, ok: true, ms: Date.now() - t0,
-    leadsToCheck: todo.length, leadsListed: done.length,
+    leadsToCheck: todo.length, dueByAge: plan.due, leadsListed: done.length,
     newNotes: notes.length, notesKnown: nowKnown.size, indexed: indexRows.length,
     remainingNeverChecked: leads.filter(l => !indexedNow.has(String(l.accountid))).length,
     budgetHit: stop(), rateLimited, firstError: firstErr, compact,
