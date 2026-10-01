@@ -31,6 +31,13 @@ export const maxDuration = 60
 const J = (b, s = 200) => NextResponse.json(b, { status: s, headers: { 'Cache-Control': 'no-store, max-age=0' } })
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(v).getTime())
 const MAX_SPAN_DAYS = 400
+// מרווח מתוך ה-60 של maxDuration: טעינת ה-CRM רצה במקביל, ואחריה עוד חישוב ותשובה.
+const ADS_BUDGET_MS = 40000
+const withDeadline = (p, ms, what) => {
+  let t
+  const timeout = new Promise((_, reject) => { t = setTimeout(() => reject(new Error(`${what} timeout after ${ms}ms`)), ms) })
+  return Promise.race([p, timeout]).finally(() => clearTimeout(t))
+}
 
 // שדות הסכום שמשווים ב-compare — מספריים בלבד, בלי שמות/טלפונים.
 // מטמון תוצאות בזיכרון ה-lambda: (project, key, built_at של התמונה הדחוסה) → שורת CRM מחושבת.
@@ -108,9 +115,12 @@ export async function GET(request) {
   // CRM מתמונת המצב (שלב 1) ומודעות מהעובדות היומיות (שלב 2) — במקביל, כל אחד אופציונלי.
   const timing = {}
   const t0 = Date.now()
+  // 1.10 (אריקה כרמל, רבעון 3): המודעות לקחו יותר מ-60 שניות, תקרת הפונקציה, והתשובה
+  // כולה נפלה — גם ה-CRM שכבר חושב. עכשיו למודעות יש תקרה משלהן; אם עברו אותה, ה-CRM
+  // חוזר לבד והמודעות מסומנות חסרות (problems.ads). מיגרציה 023 מקצרת אותן לשניות.
   const [rawRes, adsRes] = await Promise.allSettled([
     loadCrmForRange(sb, projectId, key, timing),
-    compare ? Promise.resolve(null) : buildAdsRangeRows(sb, project, since, until),
+    compare ? Promise.resolve(null) : withDeadline(buildAdsRangeRows(sb, project, since, until), ADS_BUDGET_MS, 'ads'),
   ])
   timing.loadMs = Date.now() - t0
   const crmLoad = rawRes.status === 'fulfilled' ? rawRes.value : null
