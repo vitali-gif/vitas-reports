@@ -962,7 +962,8 @@ const loadClients = async () => {
       // Merge fresh summaries but PRESERVE any heavy `data` already loaded (avoid flicker on revalidate).
       setReports(prev => {
         const byId = new Map((prev || []).map(r => [r.id, r]));
-        const merged = data.map(fr => { const old = byId.get(fr.id); return (old && old.data != null) ? { ...fr, data: old.data } : fr; });
+        // T2: שורה ישנה מגיעה מקוצצת (summaryLite). אם כבר יש לנו את הסיכום המלא שלה — שומרים אותו.
+        const merged = data.map(fr => { const old = byId.get(fr.id); if (!old) return fr; const keepFull = fr.summaryLite && !old.summaryLite && old.summary; const base = keepFull ? { ...fr, summary: old.summary, summaryLite: false } : fr; return old.data != null ? { ...base, data: old.data } : base; });
         // שורות סינתטיות (מ-/api/reports/range) לא קיימות ב-by-project — משאירים אותן, אלא אם
         // בינתיים נכתב דוח שמור לאותו מקור+מפתח (הוא גובר).
         const storedKeys = new Set(data.map(r => r.source + '|' + r.month));
@@ -992,8 +993,17 @@ const loadClients = async () => {
       if (!Array.isArray(rows)) return;
       const dataById = {};
       for (const r of rows) if (r.data != null) dataById[r.id] = r.data;
-      if (!Object.keys(dataById).length) return;   // no heavy rows yet — retry later (don't get stuck on detailPending)
-      setReports(prev => prev.map(r => (dataById[r.id] !== undefined ? { ...r, data: dataById[r.id] } : r)));
+      // T2: השורות הכבדות מביאות גם את הסיכום המלא — משלימים אותו לשורות שהגיעו מקוצצות.
+      const fullSummaryById = {};
+      for (const r of rows) if (r.summary) fullSummaryById[r.id] = r.summary;
+      const hadLite = Object.keys(fullSummaryById).length > 0;
+      if (!Object.keys(dataById).length && !hadLite) return;   // no heavy rows yet — retry later (don't get stuck on detailPending)
+      setReports(prev => prev.map(r => {
+        let out = r;
+        if (dataById[r.id] !== undefined) out = { ...out, data: dataById[r.id] };
+        if (r.summaryLite && fullSummaryById[r.id]) out = { ...out, summary: fullSummaryById[r.id], summaryLite: false };
+        return out;
+      }));
       // Only NOW mark as loaded (a prior attempt that raced/failed must be retryable).
       monthKeys.forEach(m => monthDataLoaded.current.add(m));
     } finally {
@@ -1010,7 +1020,7 @@ const loadClients = async () => {
     // data that isn't displayed — making tables/breakdowns appear late and switching slow.
     if (dashTab === 'recommendations') { try { getRecommendationsWindowMonths(60).forEach(m => needed.add(m)); } catch {} }
     if (compareEnabled && selectedMonth) { const pm = comparisonPeriodKey(selectedMonth); if (pm) needed.add(pm); }
-    const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && !monthDataInFlight.current.has(m) && reports.some(r => r.month === m && r.data == null));
+    const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && !monthDataInFlight.current.has(m) && reports.some(r => r.month === m && (r.data == null || r.summaryLite)));
     if (!toLoad.length) return;
     loadMonthsData(selectedProject.id, toLoad);   // marks monthDataLoaded only on SUCCESS (inside)
   }, [selectedProject, selectedMonth, compareEnabled, reports, dashTab]);

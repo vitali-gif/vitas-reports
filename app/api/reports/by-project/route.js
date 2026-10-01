@@ -13,6 +13,7 @@
  */
 import { NextResponse } from 'next/server'
 import { adminClient, requireProjectAccess } from '../../../../lib/auth'
+import { liteSummary, recentKeyTest } from '../../../../lib/reports-lite.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // heavy per-month `data` (facebook age×gender rows) can be ~25MB → needs >60s
@@ -72,6 +73,7 @@ export async function GET(request) {
   if (!lite || lite.length === 0) return NextResponse.json([], { headers: NO_STORE })
 
   // No dataForMonths ⇒ pure light index (the heavy path returned above).
-  const out = lite.map(r => ({ ...r, data: null }))
+  const recent = recentKeyTest()
+  const out = lite.map(r => recent(r.month) ? { ...r, data: null } : { ...r, summary: liteSummary(r.summary), summaryLite: true, data: null })
   return NextResponse.json(out, { headers: NO_STORE })
 }
