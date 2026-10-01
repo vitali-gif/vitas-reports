@@ -1,7 +1,7 @@
 // scripts/tests/ads-range.smoke.mjs — בדיקת עשן לניתוב ולצורת השורות היומיות (שלב 2).
 // הרצה:  node scripts/tests/ads-range.smoke.mjs
 import { projectRowFilter, klossAgencyOf, subProjectMatcher, computeTotals, isSlimProject } from '../../lib/ads/routing.js'
-import { normalizeDailyRow, rowKey } from '../../lib/ads/daily-store.js'
+import { normalizeDailyRow, rowKey, aggregateRange } from '../../lib/ads/daily-store.js'
 
 const fail = (m) => { console.error('✗ ' + m); process.exitCode = 1 }
 const eq = (label, a, b) => (JSON.stringify(a) === JSON.stringify(b) ? console.log('✓ ' + label) : fail(`${label}: got ${JSON.stringify(a)}, expected ${JSON.stringify(b)}`))
@@ -28,5 +28,30 @@ const d1 = normalizeDailyRow({ source: 'facebook', account: '111', day: '2026-09
 eq('normalizeDailyRow types', [typeof d1.spend, d1.impressions, d1.row_key.length], ['number', 100, 32])
 eq('rowKey ignores metrics, depends on identity', rowKey({ ...d1, spend: 999 }) === d1.row_key && rowKey({ ...d1, gender: 'male' }) !== d1.row_key, true)
 eq('missing fields become empty strings', normalizeDailyRow({ source: 'google', account: '1', day: '2026-09-15' }).age, '')
+
+
+// aggregateRange (1.10, מיגרציה 023): קודם הפונקציה המהירה; חסרה → העמודים הישנים; שגיאה אחרת → זורק.
+{
+  const agg = { account: '111', campaign: 'C', ad: 'A', spend: '12.5', impressions: 100, leads: '1', days: 3, last_day: '2026-09-30', ad_status: 'ACTIVE' }
+  const fakeSb = (fast) => {
+    const calls = []
+    return { calls, rpc(name) {
+      calls.push(name)
+      if (name === 'ad_daily_aggregate_all') return Promise.resolve(fast)
+      const page = (from) => Promise.resolve({ data: from === 0 ? [agg] : [], error: null })
+      return { range: (from) => page(from) }
+    } }
+  }
+  const sb1 = fakeSb({ data: [agg], error: null })
+  const r1 = await aggregateRange(sb1, 'facebook', '2026-07-01', '2026-09-30')
+  eq('fast path: one call, same row shape', [sb1.calls, r1[0].spend, r1[0].adName, r1[0].adStatus, r1[0].lastDay], [['ad_daily_aggregate_all'], 12.5, 'A', 'ACTIVE', '2026-09-30'])
+  const sb2 = fakeSb({ data: null, error: { code: 'PGRST202', message: 'Could not find the function' } })
+  const r2 = await aggregateRange(sb2, 'facebook', '2026-07-01', '2026-09-30')
+  eq('missing function → old paged RPC', [sb2.calls, r2.length, r2[0].spend], [['ad_daily_aggregate_all', 'ad_daily_aggregate'], 1, 12.5])
+  const sb3 = fakeSb({ data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } })
+  let thrown = null
+  try { await aggregateRange(sb3, 'facebook', '2026-07-01', '2026-09-30') } catch (e) { thrown = e.message }
+  eq('other errors are not hidden by the fallback', /statement timeout/.test(thrown || ''), true)
+}
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')

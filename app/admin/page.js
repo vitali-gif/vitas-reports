@@ -561,7 +561,11 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const _vrCrmType = reports.find(r => r.month === selectedMonth && r.source === 'crm')?.summary?.crmType || null
   // שם מערכת ה-CRM בטקסטים שעל המסך. פריסת הנדל"ן נבנתה ל-BMBY, ופיירברי (אלפא) משתמש
   // בה — בלי זה הלקוח ראה "BMBY" בהסברים ובכפתורים (ויטלי, 28.9).
-  const _vrCrmName = _vrCrmType === 'fireberry' ? 'Fireberry' : 'BMBY'
+  // 1.10 (ויטלי, אריקה כרמל): בתקופה שאין לה שורת CRM, _vrCrmType ריק — והמסך הריק אמר
+  // "משוך נתונים מ-BMBY" גם בזוהו ובסיילספורס, והכפתור באמת משך מ-BMBY. לשם ולכפתור לוקחים
+  // את סוג ה-CRM של הפרויקט מכל שורת CRM שלו. הפריסה עצמה ממשיכה לפי התקופה (_vrCrmType).
+  const _projCrmType = _vrCrmType || reports.find(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType)?.summary?.crmType || null
+  const _vrCrmName = ({ fireberry: 'Fireberry', zoho: 'Zoho', salesforce: 'Salesforce' })[_projCrmType] || 'BMBY'
   const _vrIsFb = _vrCrmType === 'fireberry'
   // vrShell — המעטפת (סיידבר, header, כותרת, תקציב) בעיצוב החדש בכל הטאבים של פרויקט נדל"ן, כדי שהמסך לא
   // יקפוץ בין שני עיצובים במעבר טאב. vrMode — תוכן הטאב "הכל" בלבד (הפיילוט).
@@ -822,7 +826,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     // "רענון נתונים" בטאב CRM משמש את כל פריסת הנדל"ן, ופיירברי נופל לאותה פריסה.
     // בלי ההפניה הזאת הכפתור אצל אלפא משך מ-BMBY, שדילג על הפרויקט (אין לו מיפוי)
     // והציג "עודכנו 0 פרויקטים" — כאילו הרענון עבד.
-    const _isFb = _vrIsFb;
+    // סיילספורס — לפונקציה שלו (הודעת הסיום שונה). זוהו ופיירברי — ל-route שלהם; אחרת BMBY.
+    if (_projCrmType === 'salesforce') return refreshFromSalesforce();
+    const _isFb = _projCrmType === 'fireberry';
+    const _isZoho = _projCrmType === 'zoho';
     const _crmLabel = _vrCrmName;
     setRefreshingCrm(true);
     showToast('\u05de\u05d5\u05e9\u05da \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05de-' + _crmLabel + '...');
@@ -833,7 +840,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
           ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] }
           : {};
       if (selectedProject) payload = { ...payload, projectId: selectedProject.id };
-      const res = await apiFetch(_isFb ? '/api/fireberry/fetch' : '/api/bmby/fetch', {
+      const res = await apiFetch(_isFb ? '/api/fireberry/fetch' : _isZoho ? '/api/zoho/fetch' : '/api/bmby/fetch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -841,10 +848,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       const json = await res.json();
       if (json.pending) {
         showToast('\u26a0\ufe0f ' + _crmLabel + ': ' + (json.message || 'credentials not configured'));
-      } else if (!res.ok || (_isFb && json.ok === false)) {
+      } else if (!res.ok || ((_isFb || _isZoho) && json.ok === false)) {
         showToast('\u05e9\u05d2\u05d9\u05d0\u05d4: ' + (json.error || json.message || 'unknown'));
       } else {
-        const okProjects = (json.projects || []).filter(p => !p.skipped && (!_isFb || p.ok !== false)).length;
+        const okProjects = (json.projects || []).filter(p => !p.skipped && (!(_isFb || _isZoho) || p.ok !== false)).length;
         showToast(`\u2713 ${_crmLabel}: \u05e2\u05d5\u05d3\u05db\u05e0\u05d5 ${okProjects} \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8\u05d9\u05dd`);
       }
       await loadClients();
