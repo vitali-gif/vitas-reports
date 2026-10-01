@@ -6678,9 +6678,14 @@ const selectProject = async (client, project) => {
           const _agCap = dashTab === 'all' ? 2 : _agAll.length;
           const groups = _agAll.slice(0, _agCap);
           if (groups.length === 0) return null;
+          // B2 (1.10): לקבוצות נכסים אין נתונים יומיים. בטווח מותאם המדדים מגיעים מהתקופה השמורה
+          // הקרובה (lib/ads/range-rows.js) — וכשהיא שונה מהטווח שנבחר, אומרים את זה במפורש.
+          const _agPeriod = (gReports.find(r => r.summary && r.summary.assetGroupsPeriod) || {}).summary?.assetGroupsPeriod;
+          const _agPeriodLabel = (() => { if (!_agPeriod || gReports.some(r => r.month === _agPeriod)) return null; const f = (d) => d.slice(8, 10) + '.' + d.slice(5, 7); if (/^\d{4}-\d{2}$/.test(_agPeriod)) return _agPeriod.slice(5, 7) + '/' + _agPeriod.slice(0, 4); const [a, b] = _agPeriod.split('_'); return a && b ? f(a) + '–' + f(b) : null; })();
           return (
             <div className="section section-asset-gallery">
               <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קריאייטיב Google PMax</h2><span className="sub">{dashTab === 'all' ? ('Top ' + groups.length + ' \u00b7 \u05d3\u05d9\u05e8\u05d5\u05d2 \u05dc\u05e4\u05d9 \u05dc\u05d9\u05d3\u05d9\u05dd \u00b7 \u05db\u05dc \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d4\u05e0\u05db\u05e1\u05d9\u05dd \u05d1\u05d8\u05d0\u05d1 Google') : ('\u05db\u05dc \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d4\u05e0\u05db\u05e1\u05d9\u05dd \u05e9\u05d4\u05d5\u05e6\u05d9\u05d0\u05d5 \u05d1\u05ea\u05e7\u05d5\u05e4\u05d4 (' + groups.length + ')')}</span></div>
+              {_agPeriodLabel && <div className="vr-note" style={{fontSize:12,color:'var(--text-secondary)',margin:'-4px 0 10px'}}>{'מדדי קבוצות הנכסים לתקופה ' + _agPeriodLabel + ' — לגוגל אין פירוט יומי ברמת קבוצת נכסים'}</div>}
               <div className={vrAds ? 'vr-ad-grid' : undefined} style={vrAds ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
                   // Handle both old field names (imageUrl, type) and new GAQL names (image_url, field_type)
