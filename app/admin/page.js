@@ -421,7 +421,47 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     setSessionLogs(Array.isArray(data) ? data : [])
     setLogsLoading(false)
   }
-  const handleExport = () => { alert('ייצוא לאקסל יהיה זמין בקרוב'); };
+  // D19 (ויטלי, 4.10): "ייצוא דוח" — דוח PDF על התקופה שעל המסך, מול תקופת ההשוואה של
+  // הדשבורד. אדמין בלבד (הכפתור לא מוצג ללקוח). הבנייה והעיצוב ב-lib/report-pdf.js; כאן רק
+  // איסוף השורות: מה שכבר טעון, ומה שחסר — מאותם routes שהדשבורד משתמש בהם.
+  const handleExport = async () => {
+    if (!selectedProject || !selectedMonth) { showToast('בחר פרויקט ותקופה'); return; }
+    // החלון נפתח מיד, בתוך הלחיצה: אחרי await חוסם החלונות הקופצים היה עוצר אותו.
+    const w = window.open('', '_blank');
+    if (!w) { showToast('הדפדפן חסם את חלון הדוח. אפשר חלונות קופצים לאתר ונסה שוב.'); return; }
+    w.document.write('<!doctype html><html dir="rtl"><body style="font-family:Arial,sans-serif;padding:48px;text-align:center;color:#56636f">מכין את הדוח…</body></html>');
+    const pid = selectedProject.id;
+    const getJson = async (url) => { const res = await apiFetch(url, { headers: {} }).catch(() => null); return res && res.ok ? res.json().catch(() => null) : null; };
+    const rowsFor = async (key, { heavy }) => {
+      let rows = reports.filter(r => r.month === key);
+      // הקמפיינים המובילים צריכים את הנתונים המפורטים; בדרך כלל הם כבר טעונים לתקופה שעל המסך.
+      if (heavy && rows.some(r => !r.synthetic && r.source !== 'crm' && r.data == null)) {
+        const full = await getJson(`/api/reports/by-project?projectId=${pid}&dataForMonths=${encodeURIComponent(key)}`);
+        if (Array.isArray(full)) { const byId = new Map(full.map(r => [r.id, r])); rows = rows.map(r => byId.get(r.id) || r); }
+      }
+      // טווח: מה שאין לו דוח שמור — מהעובדות היומיות ותמונת ה-CRM (כמו loadRangeRows). הדוח השמור גובר.
+      if (key.includes('_') && !(rows.some(r => r.source === 'crm') && rows.some(r => r.source === 'facebook' || (r.source || '').startsWith('google')))) {
+        const [since, until] = key.split('_');
+        const body = await getJson(`/api/reports/range?projectId=${pid}&since=${since}&until=${until}`);
+        const have = new Set(rows.map(r => r.source));
+        if (Array.isArray(body?.rows)) rows = [...rows, ...body.rows.filter(r => !have.has(r.source))];
+      }
+      return rows;
+    };
+    try {
+      const prevKey = comparisonPeriodKey(selectedMonth);
+      const [rows, prevRows] = await Promise.all([rowsFor(selectedMonth, { heavy: true }), prevKey ? rowsFor(prevKey, { heavy: false }) : []]);
+      const { buildReportModel, renderReportHtml } = await import('../../lib/report-pdf.js');
+      const html = renderReportHtml(buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows }));
+      w.document.open(); w.document.write(html); w.document.close();
+      // דיאלוג ההדפסה אחרי שהגופן נטען, אחרת העברית יוצאת בגופן ברירת המחדל.
+      const go = () => { try { w.focus(); w.print(); } catch {} };
+      (w.document.fonts?.ready || Promise.resolve()).then(() => setTimeout(go, 150), go);
+    } catch (err) {
+      try { w.close(); } catch {}
+      showToast('שגיאה בהפקת הדוח: ' + (err?.message || err));
+    }
+  };
 
   const loadClientAccess = async () => {
     const res = await apiFetch('/api/client-access', { headers: {} })

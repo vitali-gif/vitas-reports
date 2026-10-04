@@ -147,7 +147,7 @@ export default function Sidebar({
           <div className="side-mobile-actions">
             {onExport && (
               <button className="btn" onClick={() => { onExport(); onClose?.(); }}>
-                📤 ייצוא לאקסל
+                📤 ייצוא דוח
               </button>
             )}
             {onClientAccess && (
