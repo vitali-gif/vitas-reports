@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
 import { adminClient } from '../../../../../../lib/auth'
 import { CLIENTS } from '../../../../../../lib/apiClients'
+import { onePeriodPerSource } from '../../../../../../lib/reports-period.js'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -104,11 +105,16 @@ export async function GET(request, ctx) {
   const fullMonth = from.endsWith('-01') && from.slice(0, 7) === to.slice(0, 7) && Number(to.slice(8)) === lastDayOfMonth(to.slice(0, 7))
   const candidates = fullMonth ? [rangeKey, from.slice(0, 7)] : [rangeKey]
 
+  // ⚠️ 4.10 (סשן HI PARK): לחודש מלא שמורים לרוב *שני* דוחות זהים — "2026-09" (קרון החודשים)
+  // ו-"2026-09-01_2026-09-30" (קרון הטווחים). עד היום שניהם נכנסו, והשורות שלהם חוברו:
+  // הוצאת ספטמבר של HI PARK יצאה ₪41,405 במקום ₪20,703. עכשיו לכל מקור — מפתח אחד בלבד,
+  // לפי סדר ההעדפה: החודש הקלנדרי קודם (המפתח הקנוני של הדשבורד), אחריו הטווח.
+  const preferred = fullMonth ? [from.slice(0, 7), rangeKey] : [rangeKey]
   const readReports = async () => {
     const { data } = await supabaseAdmin
       .from('reports').select('source, month, summary, data')
       .eq('project_id', projectId).in('month', candidates)
-    return data || []
+    return onePeriodPerSource(data || [], preferred)
   }
   let reps = await readReports()
   let crm = reps.find(r => r.source === 'crm' && r.summary && Array.isArray(r.summary.adBreakdown))
