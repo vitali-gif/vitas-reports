@@ -1,5 +1,5 @@
 'use client'
-import { LogOut, Users, Link2, FileSpreadsheet, HelpCircle } from 'lucide-react'
+import { LogOut, Users, Link2, FileText, HelpCircle } from 'lucide-react'
 
 // VITAS v2 Header — design-v2-playbook classes (h-brand / h-actions / btn)
 // Mobile: hamburger ☰ (right, RTL) · Tovno logo (center) · kebab ⋮ + logout (left)
@@ -49,8 +49,8 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onSession
       <div className="h-actions">
         {/* Export — hidden on mobile, surfaces in drawer */}
         {onExport && (
-          <button className="btn btn-export" onClick={onExport} title="ייצוא לאקסל">
-            {vr ? <FileSpreadsheet size={16} aria-hidden="true" className="h-ico h-ico-excel" /> : '📤'} ייצוא לאקסל
+          <button className="btn btn-export" onClick={onExport} title="דוח PDF לתקופה שעל המסך, מול התקופה הקודמת">
+            {vr ? <FileText size={16} aria-hidden="true" className="h-ico h-ico-excel" /> : '📤'} ייצוא דוח
           </button>
         )}
 
