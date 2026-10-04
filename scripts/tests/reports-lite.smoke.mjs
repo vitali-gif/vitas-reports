@@ -33,3 +33,18 @@ eq('המקור לא משתנה', 'namedLeads' in full && full.assetGroups[0].ass
 eq('סיכום ריק לא נשבר', liteSummary(null), null)
 
 if (!process.exitCode) console.log('\n✓ קיצוץ האינדקס הקל תקין')
+
+// ── onePeriodPerSource (4.10, הוצאה כפולה ב-API של HI PARK) ──
+{
+  const { onePeriodPerSource } = await import('../../lib/reports-period.js')
+  const rows = [
+    { source: 'facebook', month: '2026-09', spend: 20702 }, { source: 'facebook', month: '2026-09-01_2026-09-30', spend: 20703 },
+    { source: 'google', month: '2026-09-01_2026-09-30', spend: 3946 },   // רק טווח — נשאר
+    { source: 'crm', month: '2026-09', x: 1 }, { source: 'crm', month: '2026-09-01_2026-09-30', x: 2 },
+  ]
+  const out = onePeriodPerSource(rows, ['2026-09', '2026-09-01_2026-09-30'])
+  const sum = out.filter(r => r.source === 'facebook').reduce((s, r) => s + r.spend, 0)
+  const ok = sum === 20702 && out.length === 3 && out.find(r => r.source === 'google') && out.find(r => r.source === 'crm').x === 1
+  console.log((ok ? '✓' : '✗') + ' one period per source — no double spend')
+  if (!ok) process.exitCode = 1
+}
