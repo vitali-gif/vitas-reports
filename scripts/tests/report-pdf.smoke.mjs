@@ -53,4 +53,39 @@ eq('html: rtl + escaped + no undefined/NaN', [html.includes('dir="rtl"'), html.i
 eq('kpi columns fill rows', [3, 8, 9, 10, 7].map(kpiColumns), [3, 4, 3, 5, 4])
 eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change: null }]), null)
 
+
+// ── טיפול בלידים ──
+{
+  const { leadHandling } = await import('../../lib/report-pdf.js')
+  // BMBY: responseTimeStats עם business; התנגדויות מ-crmRepRows
+  const b = leadHandling({ crmType: 'bmby', crm: {
+    responseTimeStats: { totalLids: 200, respondedCount: 160, noResponseCount: 40, medianMinutes: 900, noResponseByUser: { 'נציג א': 30, 'נציג ב': 10 },
+      buckets: { '0-15m': 1 }, business: { medianMinutes: 160, buckets: { '0-15m': 10, '15m-1h': 30, '1h-4h': 70, '4h-8h': 30, '8h-1d': 15, '1d-3d': 5, '3d+': 0 } } },
+    crmRepRows: [{ objections: 'מחיר' }, { objections: 'מחיר, מיקום' }, { objections: '' }] } })
+  eq('bmby handling: counts, business median, within 1h', [b.total, b.responded, b.noResponse, b.respondedPct, b.median, b.basis, b.within1h], [200, 160, 40, 80, 160, 'business', 25])
+  eq('bmby: 8h-1d bucket mapped, buckets sum to responded', [b.buckets.find(x => x.label === '8–24 שעות').count, b.buckets.reduce((a, x) => a + x.count, 0)], [15, 160])
+  eq('bmby: no-response by rep + objections', [b.byRep.map(r => [r.name, r.count]), b.reasons.length > 0, b.reasonsTitle], [[['נציג א', 30], ['נציג ב', 10]], true, 'התנגדויות'])
+  // פיירברי: אותו מבנה + byStatus
+  const fb = leadHandling({ crmType: 'fireberry', crm: { byStatus: { 'לא רלוונטי שפה': 130, 'לא רלוונטי': 112, 'אין מענה': 62, 'תואמה פגישה': 27 },
+    responseTimeStats: { totalLids: 344, respondedCount: 222, noResponseCount: 122, business: { medianMinutes: 110, buckets: { '0-15m': 5, '15m-1h': 21 } } } } })
+  eq('fireberry: statuses sorted', fb.statuses.map(x => x.name).slice(0, 2), ['לא רלוונטי שפה', 'לא רלוונטי'])
+  // זוהו: responseTime עם byAgent ו-8h-24h
+  const z = leadHandling({ crmType: 'zoho', crm: { byStatus: { 'חדש': 435, 'אין מענה': 39 }, objections: { 'יקר לי': 25 },
+    responseTime: { avgHours: 31.5, respondedWithin1h: 9, respondedCount: 255, noResponseCount: 800, buckets: { '8h-24h': 70, '3d+': 63 },
+      byAgent: [{ name: 'א', count: 185, noResponse: 157 }, { name: 'ב', count: 10, noResponse: 0 }] } } })
+  eq('zoho: totals, avg (not median), byAgent no-response', [z.total, z.median, z.medianLabel, z.within1h, z.byRep.map(r => [r.name, r.count, r.of])], [1055, 1890, 'זמן מענה ממוצע', 9, [['א', 157, 185]]])
+  eq('zoho: 8h-24h bucket', z.buckets.find(x => x.label === '8–24 שעות').count, 70)
+  // סיילספורס: רק חציון ואחוז תוך שעה
+  const sf = leadHandling({ crmType: 'salesforce', crm: { byStatus: { Unqualified: 490 }, responseTime: { medianHours: 5.5, within1h: 14, measured: 1054 }, unqualReasons: [{ reason: 'אחר', count: 261 }] } })
+  eq('salesforce: median, within1h, reasons, no noResponse', [sf.median, sf.within1h, sf.noResponse, sf.reasons[0].name, sf.reasonsTitle], [330, 14, null, 'אחר', 'סיבות לליד לא מתאים'])
+  eq('no crm → null', leadHandling({ crm: null }), null)
+  // בתוך הדוח: עם השוואה, ו-HTML בלי undefined
+  const mh = buildReportModel({ project: 'x', key: '2026-09', prevKey: '2026-08',
+    rows: [{ source: 'crm', summary: { totalLeads: 200, responseTimeStats: { totalLids: 200, respondedCount: 160, noResponseCount: 40, business: { medianMinutes: 160, buckets: { '0-15m': 40 } } } } }],
+    prevRows: [{ source: 'crm', summary: { totalLeads: 100, responseTimeStats: { totalLids: 100, respondedCount: 70, noResponseCount: 30, business: { medianMinutes: 300, buckets: { '0-15m': 7 } } } } }] })
+  eq('handling compared to previous period', [mh.handling.prev.respondedPct, mh.handling.prev.noResponse], [70, 30])
+  const hh = renderReportHtml(mh)
+  eq('handling html: section + percentage points, no undefined', [hh.includes('טיפול בלידים'), hh.includes('>+10</span> נק׳'), /undefined|NaN/.test(hh)], [true, true, false])
+}
+
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')

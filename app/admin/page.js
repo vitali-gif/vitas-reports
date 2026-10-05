@@ -435,7 +435,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const rowsFor = async (key, { heavy }) => {
       let rows = reports.filter(r => r.month === key);
       // הקמפיינים המובילים צריכים את הנתונים המפורטים; בדרך כלל הם כבר טעונים לתקופה שעל המסך.
-      if (heavy && rows.some(r => !r.synthetic && r.source !== 'crm' && r.data == null)) {
+      // וגם: שורה ישנה שהגיעה מקוצצת (summaryLite, T2) — בלי crmRepRows אין התנגדויות בסעיף "טיפול בלידים".
+      if (heavy && rows.some(r => !r.synthetic && (r.summaryLite || (r.source !== 'crm' && r.data == null)))) {
         const full = await getJson(`/api/reports/by-project?projectId=${pid}&dataForMonths=${encodeURIComponent(key)}`);
         if (Array.isArray(full)) { const byId = new Map(full.map(r => [r.id, r])); rows = rows.map(r => byId.get(r.id) || r); }
       }
