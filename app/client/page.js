@@ -254,7 +254,9 @@ export default function ClientPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: window.location.origin + '/client' },
+        // Microsoft (azure): בלי scope של email מיקרוסופט מבקשת רק openid, ובחשבונות רבים
+        // ה-ID token מגיע בלי מייל — ואז Supabase לא יודע מי נכנס ו-client_access לא נמצא.
+        options: { redirectTo: window.location.origin + '/client', ...(provider === 'azure' ? { scopes: 'email' } : {}) },
       })
       if (error) {
         setOauthBusy('')
