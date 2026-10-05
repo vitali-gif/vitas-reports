@@ -1,0 +1,16 @@
+{
+  "name": "tovno-video-lead-to-deal",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render LeadToDeal out/lead-to-deal-9x16.mp4"
+  },
+  "dependencies": {
+    "@fontsource/heebo": "^5.3.0",
+    "@remotion/cli": "^4.0.533",
+    "@remotion/media-utils": "^4.0.533",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.533"
+  }
+}
