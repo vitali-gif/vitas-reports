@@ -417,6 +417,13 @@ export default function ClientPage() {
             disabled={oauthBusy !== ''}
           />
         )}
+        {/* שגיאה בחלון של גוגל (למשל origin שלא הוגדר ב-Google Cloud) לא חוזרת לדף — אין callback.
+            לכן תמיד יש מוצא ידני לכפתור הישן, דרך Supabase. */}
+        {OAUTH_PROVIDERS.includes('google') && GOOGLE_CLIENT_ID && !gisFailed && (
+          <button type="button" className="vsign-gis-alt" onClick={() => setGisFailed(true)}>
+            לא מצליח להיכנס עם Google?
+          </button>
+        )}
         {OAUTH_PROVIDERS.includes('google') && (!GOOGLE_CLIENT_ID || gisFailed) && (
           <button type="button" className="vsign-provider" onClick={() => signInWithProvider('google')} disabled={oauthBusy !== ''}>
             <span>{oauthBusy === 'google' ? 'מעביר ל-Google…' : 'המשך עם Google'}</span>
