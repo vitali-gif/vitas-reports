@@ -40,6 +40,13 @@
 .vsign-provider:disabled { opacity: .55; cursor: not-allowed; }
 .vsign-provider svg { flex-shrink: 0; }
 
+/* הכפתור של גוגל (GIS) — גוגל מציירת אותו ב-iframe ברוחב שנמדד מכאן; רק ממרכזים ושומרים מקום
+   כדי שהכרטיס לא יקפוץ כשהכפתור נטען. */
+.vsign-gis {
+  display: flex; justify-content: center;
+  inline-size: 100%; min-block-size: 44px; margin-block-end: 12px;
+}
+
 .vsign-or { display: flex; align-items: center; gap: 14px; margin: 24px 0; color: var(--vs-muted); font-size: 14px; }
 .vsign-or::before, .vsign-or::after { content: ''; flex: 1; block-size: 1px; background: var(--vs-border); }
 
