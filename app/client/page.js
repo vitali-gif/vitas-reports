@@ -107,6 +107,23 @@ export default function ClientPage() {
     return () => { clearInterval(hb); window.removeEventListener('beforeunload', handleUnload) }
   }, [sessionId]) // eslint-disable-line
 
+  // ── חזרה מספק OAuth עם שגיאה ─────────────────────────────────────────────
+  // כש-Supabase נכשל ב-callback הוא מחזיר ל-/client עם ?error=…&error_description=… (או ב-hash).
+  // עד 6.10 זה נבלע: הלקוח חזר למסך הכניסה בלי שום הסבר, וחשב שהכפתור "לא עושה כלום".
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const desc = params.get('error_description') || hash.get('error_description')
+    if (!desc && !params.get('error') && !hash.get('error')) return
+    const noEmail = /email/i.test(desc || '')
+    setLoginError(noEmail
+      ? 'החשבון לא מסר כתובת מייל, ולכן לא ניתן לזהות אותך. אפשר להיכנס עם מייל וסיסמה, או לפנות ל-VITAS.'
+      : 'הכניסה דרך Google / Microsoft לא הושלמה. נסה שוב, או היכנס עם מייל וסיסמה.')
+    setShowPwForm(true)
+    try { window.history.replaceState(null, '', window.location.pathname) } catch {}
+  }, [])
+
   // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     let handled = false
