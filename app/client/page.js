@@ -107,6 +107,23 @@ export default function ClientPage() {
     return () => { clearInterval(hb); window.removeEventListener('beforeunload', handleUnload) }
   }, [sessionId]) // eslint-disable-line
 
+  // ── חזרה מספק OAuth עם שגיאה ─────────────────────────────────────────────
+  // כש-Supabase נכשל ב-callback הוא מחזיר ל-/client עם ?error=…&error_description=… (או ב-hash).
+  // עד 6.10 זה נבלע: הלקוח חזר למסך הכניסה בלי שום הסבר, וחשב שהכפתור "לא עושה כלום".
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const desc = params.get('error_description') || hash.get('error_description')
+    if (!desc && !params.get('error') && !hash.get('error')) return
+    const noEmail = /email/i.test(desc || '')
+    setLoginError(noEmail
+      ? 'החשבון לא מסר כתובת מייל, ולכן לא ניתן לזהות אותך. אפשר להיכנס עם מייל וסיסמה, או לפנות ל-VITAS.'
+      : 'הכניסה דרך Google / Microsoft לא הושלמה. נסה שוב, או היכנס עם מייל וסיסמה.')
+    setShowPwForm(true)
+    try { window.history.replaceState(null, '', window.location.pathname) } catch {}
+  }, [])
+
   // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     let handled = false
@@ -262,7 +279,13 @@ export default function ClientPage() {
         provider,
         // Microsoft (azure): בלי scope של email מיקרוסופט מבקשת רק openid, ובחשבונות רבים
         // ה-ID token מגיע בלי מייל — ואז Supabase לא יודע מי נכנס ו-client_access לא נמצא.
-        options: { redirectTo: window.location.origin + '/client', ...(provider === 'azure' ? { scopes: 'email' } : {}) },
+        // prompt=select_account: בלי זה הספק נכנס אוטומטית עם החשבון שכבר מחובר בדפדפן, ומי שיש
+        // לו כמה חשבונות (פרטי + עבודה) לא יכול לבחור את זה שיש לו גישה לדוח.
+        options: {
+          redirectTo: window.location.origin + '/client',
+          queryParams: { prompt: 'select_account' },
+          ...(provider === 'azure' ? { scopes: 'email' } : {}),
+        },
       })
       if (error) {
         setOauthBusy('')
@@ -361,7 +384,8 @@ export default function ClientPage() {
         >
           בקש גישה במייל
         </a>
-        <button onClick={() => setStep('login')} style={{padding:'10px 24px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)'}}>חזרה</button>
+        {/* מתנתק ולא רק חוזר למסך: אחרת הסשן של החשבון הלא-נכון נשאר, וכניסה חוזרת נוחתת שוב כאן. */}
+        <button onClick={logout} style={{padding:'10px 24px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)'}}>כניסה עם חשבון אחר</button>
       </div>
     </div>
   )
@@ -416,6 +440,13 @@ export default function ClientPage() {
             onUnavailable={() => setGisFailed(true)}
             disabled={oauthBusy !== ''}
           />
+        )}
+        {/* שגיאה בחלון של גוגל (למשל origin שלא הוגדר ב-Google Cloud) לא חוזרת לדף — אין callback.
+            לכן תמיד יש מוצא ידני לכפתור הישן, דרך Supabase. */}
+        {OAUTH_PROVIDERS.includes('google') && GOOGLE_CLIENT_ID && !gisFailed && (
+          <button type="button" className="vsign-gis-alt" onClick={() => setGisFailed(true)}>
+            לא מצליח להיכנס עם Google?
+          </button>
         )}
         {OAUTH_PROVIDERS.includes('google') && (!GOOGLE_CLIENT_ID || gisFailed) && (
           <button type="button" className="vsign-provider" onClick={() => signInWithProvider('google')} disabled={oauthBusy !== ''}>
