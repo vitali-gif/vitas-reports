@@ -54,6 +54,13 @@
 > סשן שצריך גוגל ישירות צריך את **ארבעת** הראשונים יחד. בלי `GOOGLE_ADS_LOGIN_CUSTOMER_ID` הקריאות
 > לחשבונות שמתחת ל-MCC נכשלות ב-"USER_PERMISSION_DENIED" גם כשכל השאר נכון.
 
+### כניסת לקוחות לדשבורד (Google / Microsoft)
+| מה | איפה |
+|---|---|
+| Google — OAuth client | `838146922500-r3pto…` — **בחשבון הפרטי vitalidisel@gmail.com**, Google Cloud, בשם המבלבל "BCureLaser Google Ads" (משמש גם ל-Google Ads של בי-קיור — לא למחוק). Authorized JavaScript origins: `https://reports.vitas.co.il` (ל-GIS); redirect: ה-callback של Supabase. ב-Vercel: `NEXT_PUBLIC_GOOGLE_CLIENT_ID`. |
+| Google — הפרויקט `vitas-reports` | Client אחר (`504988157237-…`, "VITAS Reports Web") — **לא** זה של הכניסה. |
+| Microsoft | Azure (Entra) "Default Directory" ← App registrations ← "Tovno by Vitas". סוד ב-Supabase, פג 10.2028. |
+
 ## 4. איפה כל ערך שמור
 
 | איפה | מה יש שם | קישור |
