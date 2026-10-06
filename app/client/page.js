@@ -279,7 +279,13 @@ export default function ClientPage() {
         provider,
         // Microsoft (azure): בלי scope של email מיקרוסופט מבקשת רק openid, ובחשבונות רבים
         // ה-ID token מגיע בלי מייל — ואז Supabase לא יודע מי נכנס ו-client_access לא נמצא.
-        options: { redirectTo: window.location.origin + '/client', ...(provider === 'azure' ? { scopes: 'email' } : {}) },
+        // prompt=select_account: בלי זה הספק נכנס אוטומטית עם החשבון שכבר מחובר בדפדפן, ומי שיש
+        // לו כמה חשבונות (פרטי + עבודה) לא יכול לבחור את זה שיש לו גישה לדוח.
+        options: {
+          redirectTo: window.location.origin + '/client',
+          queryParams: { prompt: 'select_account' },
+          ...(provider === 'azure' ? { scopes: 'email' } : {}),
+        },
       })
       if (error) {
         setOauthBusy('')
@@ -378,7 +384,8 @@ export default function ClientPage() {
         >
           בקש גישה במייל
         </a>
-        <button onClick={() => setStep('login')} style={{padding:'10px 24px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)'}}>חזרה</button>
+        {/* מתנתק ולא רק חוזר למסך: אחרת הסשן של החשבון הלא-נכון נשאר, וכניסה חוזרת נוחתת שוב כאן. */}
+        <button onClick={logout} style={{padding:'10px 24px',background:'var(--indigo,#5B5EF4)',color:'white',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'var(--font)'}}>כניסה עם חשבון אחר</button>
       </div>
     </div>
   )
