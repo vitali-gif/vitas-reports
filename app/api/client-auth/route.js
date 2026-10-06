@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { rateLimit, tooManyRequests } from '../../../lib/rate-limit'
 import { adminClient } from '../../../lib/auth'
+import { siteLoginLink } from '../../../lib/login-link'
 
 // לקוח service_role עצל. קודם הוא נוצר ברמת המודול עם נפילה חזרה למפתח
 // ה-anon — כלומר אם SUPABASE_SERVICE_ROLE_KEY חסר בסביבה, ה-route המשיך לעבוד
@@ -125,11 +126,12 @@ export async function POST(req) {
     options: { redirectTo: `${siteUrl}/client?setpw=1` }   // אחרי כניסה בקישור — הצעה לקבוע סיסמה
   })
 
-  if (linkError || !linkData?.properties?.action_link) {
+  // הקישור על reports.vitas.co.il ולא על הדומיין של Supabase — lib/login-link.js
+  const magicLink = siteLoginLink(linkData, siteUrl)
+  if (linkError || !magicLink) {
     return NextResponse.json({ error: linkError?.message || 'Failed to generate link' }, { status: 500 })
   }
 
-  const magicLink = linkData.properties.action_link
   const result = await sendMagicLinkEmail(cleanEmail, magicLink)
 
   if (!result.ok) {

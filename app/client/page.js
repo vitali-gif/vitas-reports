@@ -156,13 +156,33 @@ export default function ClientPage() {
       }
     })
 
-    // Step 3: existing session
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => finish(session?.user?.email || null))
-      .catch(() => finish(null))
+    // Step 3a: קישור כניסה במייל/וואטסאפ — ?th=<hashed_token> על הדומיין שלנו (lib/login-link.js).
+    // מאמתים את הקוד כאן במקום שהלקוח יעבור דרך הכתובת של Supabase. הפרמטר נמחק מה-URL מיד,
+    // כדי שרענון או שיתוף צילום מסך לא יחשפו אותו (הוא חד-פעמי בכל מקרה).
+    const th = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('th') : null
+    if (th) {
+      try { window.history.replaceState(null, '', window.location.pathname + (wantsSetPw.current ? '?setpw=1' : '')) } catch {}
+      supabase.auth.verifyOtp({ token_hash: th, type: 'magiclink' })
+        .then(({ data, error }) => {
+          if (error) {
+            wantsSetPw.current = false
+            setLoginError('קישור הכניסה כבר נוצל או שפג תוקפו. אפשר לבקש קישור חדש או להיכנס עם סיסמה.')
+            setShowPwForm(true)
+            finish(null)
+          } else {
+            finish(data?.session?.user?.email || data?.user?.email || null)
+          }
+        })
+        .catch(() => finish(null))
+    } else {
+      // Step 3b: existing session
+      supabase.auth.getSession()
+        .then(({ data: { session } }) => finish(session?.user?.email || null))
+        .catch(() => finish(null))
+    }
 
-    // Step 4: safety timeout
-    const safetyTimer = setTimeout(() => finish(null), 6000)
+    // Step 4: safety timeout — ארוך יותר כשמאמתים קישור, כדי לא לחתוך אימות איטי באמצע.
+    const safetyTimer = setTimeout(() => finish(null), th ? 15000 : 6000)
 
     return () => { subscription.unsubscribe(); clearTimeout(safetyTimer) }
   }, [])
