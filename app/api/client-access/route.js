@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin, getUser, isAdminEmail, unauthorized, adminClient, escapeHtml } from '../../../lib/auth'
 import { randomBytes } from 'crypto'
+import { siteLoginLink } from '../../../lib/login-link'
 import { createClient } from '@supabase/supabase-js'
 
 // לקוח service_role עצל. קודם הוא נוצר ברמת המודול עם נפילה חזרה למפתח
@@ -47,8 +48,9 @@ async function inviteLinkFor(email) {
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({
     type: 'magiclink', email, options: { redirectTo: `${siteUrl}/client?setpw=1` },
   })
-  if (error || !data?.properties?.action_link) return { ok: false, error: error?.message || 'Failed to generate link' }
-  return { ok: true, link: data.properties.action_link }
+  const link = siteLoginLink(data, siteUrl)
+  if (error || !link) return { ok: false, error: error?.message || 'Failed to generate link' }
+  return { ok: true, link }
 }
 
 async function sendInviteEmail(toEmail, link, clientName) {

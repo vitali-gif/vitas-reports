@@ -11,7 +11,7 @@
     "test:crm": "node scripts/tests/bmby-summary.smoke.mjs && node scripts/tests/raw-store.smoke.mjs && node scripts/tests/zoho-summary.smoke.mjs && node scripts/tests/salesforce-summary.smoke.mjs",
     "test:ads": "node scripts/tests/ads-range.smoke.mjs && node scripts/tests/account-staleness.smoke.mjs && node scripts/tests/asset-period.smoke.mjs",
     "test:meetings": "node scripts/tests/transcript-parse.smoke.mjs",
-    "test:plan": "node scripts/tests/plan-gate.smoke.mjs && node scripts/tests/reports-lite.smoke.mjs && node scripts/tests/report-pdf.smoke.mjs",
+    "test:plan": "node scripts/tests/login-link.smoke.mjs && node scripts/tests/plan-gate.smoke.mjs && node scripts/tests/reports-lite.smoke.mjs && node scripts/tests/report-pdf.smoke.mjs",
     "test:backfill": "node scripts/tests/backfill-gaps.smoke.mjs",
     "test:fireberry": "node scripts/tests/fireberry-summary.smoke.mjs && node scripts/tests/fireberry-health.smoke.mjs && node scripts/tests/fireberry-notes-plan.smoke.mjs",
     "test": "npm run test:crm && npm run test:ads && npm run test:meetings && npm run test:plan && npm run test:backfill && npm run test:fireberry",
