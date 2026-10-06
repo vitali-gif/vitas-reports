@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { apiFetch, accessToken } from '../../lib/api-fetch'
 import dynamic from 'next/dynamic'
 import { GoogleMark, MicrosoftMark } from '../components/auth/ProviderMarks'
+import GoogleGisButton from '../components/auth/GoogleGisButton'
 import TovnoLoader from '../components/TovnoLoader'
 
 const AdminPage = dynamic(() => import('../admin/page'), { ssr: false })
@@ -13,6 +14,9 @@ const AdminPage = dynamic(() => import('../admin/page'), { ssr: false })
 // הערכים הם שמות הספקים של supabase-js: 'google', 'azure' (זה שמו של Microsoft שם).
 const OAUTH_PROVIDERS = (process.env.NEXT_PUBLIC_OAUTH_PROVIDERS || '')
   .split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+// כש-NEXT_PUBLIC_GOOGLE_CLIENT_ID מוגדר, Google עובר דרך GIS ומסך ההסכמה מציג את reports.vitas.co.il
+// במקום הדומיין של Supabase (B7b, lib/google-gis.js). ריק = הכפתור הישן, דרך Supabase.
+const GOOGLE_CLIENT_ID = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '').trim()
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ClientPage — handles magic-link auth, then renders AdminPage (client view)
@@ -55,6 +59,8 @@ export default function ClientPage() {
   // טופס הסיסמה מוסתר כברירת מחדל כשיש ספקי OAuth, ונפתח בלחיצה על "כניסה עם סיסמה".
   const [showPwForm, setShowPwForm] = useState(OAUTH_PROVIDERS.length === 0)
   const [oauthBusy, setOauthBusy] = useState('')
+  // הכפתור של גוגל (GIS) לא נטען או שהטוקן נדחה — חוזרים לכפתור הישן, שתמיד עובד.
+  const [gisFailed, setGisFailed] = useState(false)
   const [initialProjectId, setInitialProjectId] = useState(null)
   const sessionStartRef = useRef(Date.now())
   const sessionStart = sessionStartRef.current
@@ -270,6 +276,26 @@ export default function ClientPage() {
     }
   }
 
+  // Google דרך GIS: גוגל מחזירה ID token לדף, Supabase מאמת אותו ופותח סשן. כמו בכניסה עם
+  // סיסמה, handleSessionReady נקרא ישירות — ה-listener של onAuthStateChange כבר סיים (handled).
+  const signInWithGoogleIdToken = async (idToken, rawNonce) => {
+    setLoginError(''); setOauthBusy('google')
+    try {
+      const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken, nonce: rawNonce })
+      if (error || !data?.user?.email) {
+        // לרוב: ה-Client ID לא מוגדר בספק Google ב-Supabase. הכפתור הישן עדיין עובד.
+        setGisFailed(true)
+        setLoginError('הכניסה עם Google לא הצליחה. נסה שוב בכפתור Google.')
+        return
+      }
+      await handleSessionReady(data.user.email)
+    } catch {
+      setLoginError('שגיאת רשת. בדוק את החיבור לאינטרנט ונסה שוב.')
+    } finally {
+      setOauthBusy('')
+    }
+  }
+
   const handlePasswordLogin = async () => {
     if (!emailInput.trim() || !passwordInput.trim()) return
     setLoading(true)
@@ -383,7 +409,15 @@ export default function ClientPage() {
         <h1>ברוכים הבאים</h1>
         <p>נכנסים לחשבון וממשיכים לפרויקטים שלכם.</p>
 
-        {OAUTH_PROVIDERS.includes('google') && (
+        {OAUTH_PROVIDERS.includes('google') && GOOGLE_CLIENT_ID && !gisFailed && (
+          <GoogleGisButton
+            clientId={GOOGLE_CLIENT_ID}
+            onCredential={signInWithGoogleIdToken}
+            onUnavailable={() => setGisFailed(true)}
+            disabled={oauthBusy !== ''}
+          />
+        )}
+        {OAUTH_PROVIDERS.includes('google') && (!GOOGLE_CLIENT_ID || gisFailed) && (
           <button type="button" className="vsign-provider" onClick={() => signInWithProvider('google')} disabled={oauthBusy !== ''}>
             <span>{oauthBusy === 'google' ? 'מעביר ל-Google…' : 'המשך עם Google'}</span>
             <GoogleMark />

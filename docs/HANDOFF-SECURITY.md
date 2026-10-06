@@ -148,7 +148,8 @@ CRON_SECRET או JWT, ולכן ראויה לתשומת לב מיוחדת.**
 ### ציבוריים (בבאנדל)
 
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_OAUTH_PROVIDERS`,
+`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_OAUTH_PROVIDERS`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+(ה-Client ID של Google — ציבורי מטבעו; מפעיל כניסה דרך GIS, ראה `lib/google-gis.js`),
 `NEXT_PUBLIC_MEETINGS_ENABLED`.
 
 לכל ספק Google Ads אפשר גם דריסה פר-חשבון בסיומת מזהה הלקוח
