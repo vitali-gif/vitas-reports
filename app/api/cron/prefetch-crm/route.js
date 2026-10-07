@@ -121,6 +121,7 @@ async function handle(request) {
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://reports.vitas.co.il'
   const internalKey = process.env.CRON_SECRET || ''   // קריאה פנימית שרת-לשרת
   const results = []
+  const fbSnapJobs = []   // חלונות פיירברי שמחושבים מהתמונה — נשלחים יחד בסוף (ראה run)
 
   // BCureLaser / Zoho doesn't use quarterly views, and a full quarter usually exceeds
   // Zoho's 2000-record search limit (LIMIT_REACHED) — which fails the job and triggers a
@@ -150,10 +151,14 @@ async function handle(request) {
     // שאר החלונות מחושבים ממנה (fromSnapshot). עד 28.9 כל 13 החלונות שלפו את כל הלידים
     // מחדש — אותם נתונים, 13 פעם — וזה היה עובר את תקרת 100 הקריאות לדקה של פיירברי
     // ברגע שיהיו לאלפא כמה אלפי לידים. ריצת only=ranges לא שולחת עכשיו אף קריאה.
+    //
+    // 7.10: חלונות ה-fromSnapshot לא נשלחים כאן אחד-אחד — הם נאספים ונשלחים בבקשה אחת בסוף
+    // הריצה (fbSnapJobs למטה). כל בקשה טענה את כל התמונה מחדש: 12 טעינות לריצה, 82 ביום.
     const fbLive = job.kind === 'month' && job.payload.month === months[0]
-    const fbBody = JSON.stringify({ ...job.payload, ...(fbLive ? { snapshot: true } : { fromSnapshot: true }) })
-    const fbPromise = fetch(`${base}/api/fireberry/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: fbBody })
-      .then(r => r.json()).catch(() => ({}))
+    if (!fbLive) fbSnapJobs.push(job)
+    const fbPromise = !fbLive ? null
+      : fetch(`${base}/api/fireberry/fetch`, { method: 'POST', cache: 'no-store', next: { revalidate: 0 }, headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey }, body: JSON.stringify({ ...job.payload, snapshot: true }) })
+          .then(r => r.json()).catch(() => ({}))
     try {
       // cache:'no-store' — see prefetch-ads: without it these internal calls came back from
       // cache in milliseconds and no fresh data / heartbeat was written.
@@ -174,7 +179,7 @@ async function handle(request) {
       const sfData = await sfPromise
       results.push({ kind: job.kind, label: job.label, source: 'salesforce', ok: sfData.ok ?? false, ms: Date.now()-t0, ..._slim(sfData) })
     } catch {}
-    try {
+    if (fbPromise) try {
       const fbData = await fbPromise
       // pending=true פירושו שאין FIREBERRY_TOKEN. זה מצב תצורה, לא כישלון משיכה —
       // בלי ההבחנה הזאת כל ריצה לפני הגדרת המשתנה הייתה שולחת מייל התראה.
@@ -208,6 +213,34 @@ async function handle(request) {
   let deadlineHit = false
   await Promise.race([loop, new Promise(r => setTimeout(() => { deadlineHit = true; r() }, DEADLINE_MS))])
   const deferredCount = queue.length + inFlight.size
+
+  // פיירברי: כל חלונות ה-fromSnapshot בבקשה אחת — התמונה נטענת פעם אחת. רץ אחרי הלולאה, ולכן
+  // מחשב מהתמונה שחלון החודש הנוכחי (השליפה החיה) בדיוק רענן. החישוב זול (שניות), אבל עדיין
+  // מוגבל בזמן שנשאר עד ה-maxDuration.
+  const fbLeftMs = 292000 - (Date.now() - startedAt)
+  if (fbSnapJobs.length && fbLeftMs > 5000) {
+    const t0 = Date.now()
+    try {
+      const r = await fetch(`${base}/api/fireberry/fetch`, {
+        method: 'POST', cache: 'no-store', next: { revalidate: 0 }, signal: AbortSignal.timeout(fbLeftMs),
+        headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey },
+        body: JSON.stringify({ fromSnapshot: true, windows: fbSnapJobs.map(j => j.payload) }),
+      })
+      const fb = await r.json().catch(() => ({}))
+      if (!fb.pending) {
+        if (Array.isArray(fb.windows)) {
+          fbSnapJobs.forEach((job, i) => {
+            const w = fb.windows[i] || {}
+            results.push({ kind: job.kind, label: job.label, source: 'fireberry', ok: w.ok ?? false, ms: Date.now() - t0, ..._slim(w) })
+          })
+        } else {
+          results.push({ kind: 'range', label: `${fbSnapJobs.length} windows`, source: 'fireberry', ok: false, status: r.status, ms: Date.now() - t0, ..._slim(fb) })
+        }
+      }
+    } catch (err) {
+      results.push({ kind: 'range', label: `${fbSnapJobs.length} windows`, source: 'fireberry', ok: false, ms: Date.now() - t0, error: String(err) })
+    }
+  }
 
   const failed = results.filter(r => !r.ok)
   // Collect projects whose CRM write was skipped because the fetch looked broken.
