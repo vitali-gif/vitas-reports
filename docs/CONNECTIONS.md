@@ -3,6 +3,10 @@
 > **המקום השמור:** הקובץ הזה, `docs/CONNECTIONS.md` במאגר vitas-reports.
 > קישור: https://github.com/vitali-gif/vitas-reports/blob/main/docs/CONNECTIONS.md
 >
+> **עותק בדרייב (7.10):** "VITAS — מפת חיבורים ומפתחות (בלי ערכים).txt" בדרייב של vitalidisel@gmail.com —
+> https://drive.google.com/file/d/1NyfHIdcMvlN9jq9L9yNmcaB6vo8N2qfn/view — גם הוא בלי ערכים. הערכים: מנהל הסיסמאות
+> (פתק "VITAS — Google Ads API") ו-Vercel.
+>
 > **בקובץ הזה אין אף סוד, ואסור שיהיה.** הוא אומר *איפה* כל ערך נמצא ו*איך* מתחברים.
 > הערכים עצמם — רק ב-Vercel, בהגדרות הסביבה של הסשן, ובמנהל הסיסמאות של ויטלי.
 > לא מדביקים טוקן או סיסמה בצ'אט ולא דוחפים ל-GitHub: כל סשן קורא את המאגר, וההיסטוריה נשמרת לתמיד.
@@ -60,6 +64,11 @@
 | Google — OAuth client | `838146922500-r3pto…` — **בחשבון הפרטי vitalidisel@gmail.com**, Google Cloud, בשם המבלבל "BCureLaser Google Ads" (משמש גם ל-Google Ads של בי-קיור — לא למחוק). Authorized JavaScript origins: `https://reports.vitas.co.il` (ל-GIS); redirect: ה-callback של Supabase. ב-Vercel: `NEXT_PUBLIC_GOOGLE_CLIENT_ID`. |
 | Google — הפרויקט `vitas-reports` | Client אחר (`504988157237-…`, "VITAS Reports Web") — **לא** זה של הכניסה. |
 | Microsoft | Azure (Entra) "Default Directory" ← App registrations ← "Tovno by Vitas". סוד ב-Supabase, פג 10.2028. |
+
+### Google Ads — שני ה-OAuth clients (7.10, מקור בלבול חוזר)
+- `504988157237-…` "VITAS Reports Web" — פרויקט `vitas-reports` בארגון vitas.co.il. כנראה ה-`GOOGLE_ADS_CLIENT_ID` של הדשבורד (בשימוש יומיומי) — לאמת ב-Vercel.
+- `838146922500-…` "BCureLaser Google Ads" — בחשבון הפרטי. זה של כניסת לקוחות עם Google (ראה למעלה).
+- כלי חיצוני (למשל SerpBear) שמתחבר ל-Google Ads: אותם Client ID / Secret / Developer Token / Login Customer ID, ו-redirect URI של הכלי נוסף ל-Client שתואם ל-`GOOGLE_ADS_CLIENT_ID`. Secret שמוגדר Sensitive ב-Vercel — יוצרים חדש ב-Google Cloud (Add secret) בלי למחוק את הישן.
 
 ## 4. איפה כל ערך שמור
 
