@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "studio": "remotion studio",
-    "render": "remotion render LeadToDeal out/lead-to-deal-9x16.mp4"
+    "render": "remotion render Meeting out/tovno-meeting-9x16.mp4",
+    "render:v2": "remotion render LeadToDeal out/tovno-lead-to-deal-9x16.mp4"
   },
   "dependencies": {
     "@fontsource/heebo": "^5.3.0",
