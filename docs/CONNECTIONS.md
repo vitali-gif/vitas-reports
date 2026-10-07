@@ -3,6 +3,8 @@
 > **המקום השמור:** הקובץ הזה, `docs/CONNECTIONS.md` במאגר vitas-reports.
 > קישור: https://github.com/vitali-gif/vitas-reports/blob/main/docs/CONNECTIONS.md
 >
+> **הקובץ המרוכז של ויטלי, עם הערכים (7.10): `G:\האחסון שלי\API.txt`.** כל מפתח חדש — נוסף לשם.
+>
 > **עותק בדרייב (7.10):** "VITAS — מפת חיבורים ומפתחות (בלי ערכים).txt" בדרייב של vitalidisel@gmail.com —
 > https://drive.google.com/file/d/1NyfHIdcMvlN9jq9L9yNmcaB6vo8N2qfn/view — גם הוא בלי ערכים. הערכים: מנהל הסיסמאות
 > (פתק "VITAS — Google Ads API") ו-Vercel.
