@@ -2,6 +2,8 @@
 // הרצה:  node scripts/tests/ads-range.smoke.mjs
 import { projectRowFilter, klossAgencyOf, subProjectMatcher, computeTotals, isSlimProject } from '../../lib/ads/routing.js'
 import { normalizeDailyRow, rowKey, aggregateRange } from '../../lib/ads/daily-store.js'
+import { buildAdsRangeRows } from '../../lib/ads/range-rows.js'
+import { focusFor, focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 
 const fail = (m) => { console.error('✗ ' + m); process.exitCode = 1 }
 const eq = (label, a, b) => (JSON.stringify(a) === JSON.stringify(b) ? console.log('✓ ' + label) : fail(`${label}: got ${JSON.stringify(a)}, expected ${JSON.stringify(b)}`))
@@ -52,6 +54,31 @@ eq('missing fields become empty strings', normalizeDailyRow({ source: 'google', 
   let thrown = null
   try { await aggregateRange(sb3, 'facebook', '2026-07-01', '2026-09-30') } catch (e) { thrown = e.message }
   eq('other errors are not hidden by the fallback', /statement timeout/.test(thrown || ''), true)
+}
+
+// D14: מיקוד KLOSS "רק באר שבע" — מודעות של VITAS בלבד, בשני הערוצים; מזהי שורות עם סיומת.
+{
+  eq('focus modes: only KLOSS', [focusModesFor('KLOSS').map(m => m.id), focusModesFor('HI PARK').length], [['beersheva'], 0])
+  eq('focusFor rejects other projects / unknown ids', [focusFor('kloss', 'beersheva')?.branch, focusFor('HI PARK', 'beersheva'), focusFor('KLOSS', 'x')], ['באר שבע', null, null])
+  const fb = [
+    { account: '143725504579407', campaign: 'Kloss-Beer Sheba | Ongoing LeadG', ad: 'A1', spend: '100', impressions: 1000, clicks: 10, leads: '5', days: 3 },
+    { account: '295378394595304', campaign: 'Sigawi LeadG', ad: 'A2', spend: '300', impressions: 3000, clicks: 30, leads: '6', days: 3 },
+  ]
+  const gg = [
+    { account: '4733225739', campaign: 'Kloss-6/2026-PMAX', ad: 'G1', spend: '50', impressions: 500, clicks: 5, leads: '1', days: 3 },
+    { account: '9483793370', campaign: 'Kloss Search', ad: 'G2', spend: '70', impressions: 700, clicks: 7, leads: '2', days: 3 },
+  ]
+  const nothing = { data: null, error: null }
+  const chain = { select: () => chain, eq: () => chain, order: () => chain, limit: () => chain, maybeSingle: () => Promise.resolve(nothing), then: (res) => res(nothing) }
+  const sb = { rpc: (name, a) => Promise.resolve({ data: a.p_source === 'facebook' ? fb : gg, error: null }), from: () => chain }
+  const all = await buildAdsRangeRows(sb, kloss, '2026-09-01', '2026-09-30', { withReach: false })
+  const foc = await buildAdsRangeRows(sb, kloss, '2026-09-01', '2026-09-30', { withReach: false, agency: 'VITAS', idSuffix: ':focus=beersheva' })
+  const by = (res, src) => res.rows.find(r => r.source === src)
+  eq('all: both agencies', [by(all, 'facebook').summary.spend, by(all, 'google').summary.spend], [400, 120])
+  eq('focus: VITAS only (fb + google)', [by(foc, 'facebook').summary.spend, by(foc, 'facebook').summary.leads, by(foc, 'google').summary.spend], [100, 5, 50])
+  eq('focus: byAgency has only VITAS', [Object.keys(by(foc, 'facebook').summary.byAgency), Object.keys(by(foc, 'google').summary.byAgency)], [['VITAS'], ['VITAS']])
+  eq('paid lead sources (KLOSS values 7.10)', ['פייסבוק טופס לידים', 'גוגל חיפוש', 'עמוד נחיתה דגמים חדשים 25% הנחה', 'ig', 'fb', 'אתר החברה', 'מוקד טלפוני', 'המלצת חבר', 'Chat_GPT'].map(isPaidLeadSource), [true, true, true, true, true, false, false, false, false])
+  eq('focus: row ids carry the suffix', by(foc, 'facebook').id, 'range:p3:facebook:2026-09-01_2026-09-30:focus=beersheva')
 }
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')

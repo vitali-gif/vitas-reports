@@ -70,4 +70,21 @@ eq('xlsxRows per source', R.xlsxRows.map(r => [r.source, r.totalLeads]).sort(), 
 eq('no error passthroughs', [S._srcFunnelErr, S._objNotesErr, S._cohortDrillErr, S.timing._err, S.responseTime.error], [null, null, null, null, undefined])
 eq('computeCrmRow(salesforce)', (() => { const r = computeCrmRow('salesforce', { entities: { leads, opportunities, line_items, lead_history } }, { since: '2026-09-01', until: '2026-09-30', key: '2026-09' }); return [r.row_count, r.summary.crmType, r.file_name] })(), [3, 'salesforce', 'Salesforce snapshot (computed)'])
 
+// D14: מיקוד בסניף — רק לידים והזדמנויות של הסניף; ליד שהומר נשאר בקוהורט גם אם ההזדמנות בסניף אחר.
+{
+  const ent = { leads, opportunities, line_items, lead_history }
+  const EB = emulateSalesforceQueries(ent, '2026-09-01', '2026-09-30', { branch: 'חיפה' })
+  eq('branch: lead counts only חיפה (L1, L2)', [EB.totalLeads, EB.convertedLeads, EB.meetingLeads], [2, 1, 2])
+  eq('branch: meetings in window only חיפה (L4 תל אביב out)', [EB.meetingPeriodCnt, EB.noShowPeriodCnt], [1, 0])
+  eq('branch: byBranch single key', EB.byBranchR.map(r => [r.k, r.c]), [['חיפה', 2]])
+  eq('branch: opp stages only חיפה (O1, O3)', EB.oppStageR.map(r => r.k).sort(), ['הזמנה - שולמה מקדמה', 'נסגר ללא הצלחה'])
+  eq('branch: history only חיפה leads (H4 of L4 dropped)', EB.bookDayR.map(r => r.b), ['חיפה'])
+  const ent2 = { leads: leads.map(l => l.Id === 'L1' ? { ...l, ConvertedOpportunityId: 'O2' } : l), opportunities, line_items, lead_history }
+  const EC = emulateSalesforceQueries(ent2, '2026-09-01', '2026-09-30', { branch: 'חיפה' })
+  eq('branch: converted lead keeps its opp from another branch (cohort)', EC.branchCohortR.map(r => r.ConvertedOpportunity?.StageName), ['קיבל הצעת מחיר'])
+  const RB = computeCrmRow('salesforce', { entities: ent }, { since: '2026-09-01', until: '2026-09-30', key: '2026-09', branch: 'חיפה' })
+  eq('branch: computeCrmRow passes branch', [RB.row_count, RB.summary.totalLeads], [2, 2])
+  eq('no branch = unchanged', emulateSalesforceQueries(ent, '2026-09-01', '2026-09-30', {}).totalLeads, 3)
+}
+
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
