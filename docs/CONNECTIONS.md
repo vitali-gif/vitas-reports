@@ -66,7 +66,7 @@
 | Microsoft | Azure (Entra) "Default Directory" ← App registrations ← "Tovno by Vitas". סוד ב-Supabase, פג 10.2028. |
 
 ### Google Ads — שני ה-OAuth clients (7.10, מקור בלבול חוזר)
-- `504988157237-…` "VITAS Reports Web" — פרויקט `vitas-reports` בארגון vitas.co.il. כנראה ה-`GOOGLE_ADS_CLIENT_ID` של הדשבורד (בשימוש יומיומי) — לאמת ב-Vercel.
+- `504988157237-…` "VITAS Reports Web" — פרויקט `vitas-reports` בארגון vitas.co.il. ה-`GOOGLE_ADS_CLIENT_ID` של הדשבורד: ב-Vercel הוא Sensitive (לא רואים ערך), אבל "Last used" ב-Google Cloud יומיומי (הקרון כל שעתיים) מול 21.9 של השני — 7.10.
 - `838146922500-…` "BCureLaser Google Ads" — בחשבון הפרטי. זה של כניסת לקוחות עם Google (ראה למעלה).
 - כלי חיצוני (למשל SerpBear) שמתחבר ל-Google Ads: אותם Client ID / Secret / Developer Token / Login Customer ID, ו-redirect URI של הכלי נוסף ל-Client שתואם ל-`GOOGLE_ADS_CLIENT_ID`. Secret שמוגדר Sensitive ב-Vercel — יוצרים חדש ב-Google Cloud (Add secret) בלי למחוק את הישן.
 
