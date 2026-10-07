@@ -66,7 +66,7 @@ async function loadCrmForRange(sb, projectId, key, timing, focusId = '') {
       const cacheKey = `${projectId}|${key}|${raw.fetchedAt}|${focusId}`
       const hit = cacheGet(cacheKey)
       timing.crmCache = hit ? 'hit' : 'miss'
-      timing.slice = raw.counts
+      if (!focusId) timing.slice = raw.counts   // במיקוד — ספירות של כל הסניפים, לא מחזירים
       return { raw, shaped: hit, cacheKey }
     }
     // עוד אין תמונה דחוסה — הרשומות הגולמיות (איטי, נדיר: רק לפני הריצה הראשונה של הקרון)
@@ -157,7 +157,8 @@ export async function GET(request) {
   timing.totalMs = Date.now() - t0
   timing.snapshot = raw ? (raw.compact ? 'compact' : 'raw') : null
   const stamp = (raw && raw.fetchedAt) || new Date().toISOString()
-  const snapshot = hasCrm ? { fetchedAt: raw.fetchedAt, counts: raw.counts } : null
+  // במיקוד — בלי counts: אלה ספירות הרשומות של כל הסניפים בפרוסה, ואסור שיזלגו לתצוגת סניף אחד.
+  const snapshot = hasCrm ? (focus ? { fetchedAt: raw.fetchedAt } : { fetchedAt: raw.fetchedAt, counts: raw.counts }) : null
 
   if (compare) {
     const TOTAL_KEYS = totalKeysFor(raw.crmType)

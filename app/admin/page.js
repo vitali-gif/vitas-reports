@@ -318,7 +318,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     // עד שהשורות של התקופה שעל המסך מגיעות — מציגים את הכל כרגיל (הכפתור מראה "טוען…")
     if (!Array.isArray(focusRows[`${selectedProject.id}|${focusMode}|${selectedMonth}`])) return reportsAll
     const keys = [...new Set([selectedMonth, comparisonPeriodKey(selectedMonth)].filter(Boolean))]
-    let out = reportsAll.filter(r => !keys.includes(r.month))
+    // אפס זליגה (ויטלי, 7.10): במצב מיקוד הדשבורד רואה *רק* את השורות הממוקדות. שורות של חודשים
+    // אחרים (גרף מגמה חודשי, פס התקציב, סטטוס קבוצות נכסים, חלון ההמלצות) מחושבות על כל הרשת
+    // ועל שתי הסוכנויות — ולכן לא נכנסות בכלל, גם במחיר גרף מגמה של חודש אחד.
+    let out = []
     for (const k of keys) {
       const rows = focusRows[`${selectedProject.id}|${focusMode}|${k}`]
       if (Array.isArray(rows)) out = out.concat(rows.map(r => ({ ...r, month: k })))
@@ -503,7 +506,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
         if (Array.isArray(full)) { const byId = new Map(full.map(r => [r.id, r])); rows = rows.map(r => byId.get(r.id) || r); }
       }
       // טווח: מה שאין לו דוח שמור — מהעובדות היומיות ותמונת ה-CRM (כמו loadRangeRows). הדוח השמור גובר.
-      if (key.includes('_') && !(rows.some(r => r.source === 'crm') && rows.some(r => r.source === 'facebook' || (r.source || '').startsWith('google')))) {
+      if (key.includes('_') && !rows.some(r => r.focus) && !(rows.some(r => r.source === 'crm') && rows.some(r => r.source === 'facebook' || (r.source || '').startsWith('google')))) {
         const [since, until] = key.split('_');
         const body = await getJson(`/api/reports/range?projectId=${pid}&since=${since}&until=${until}`);
         const have = new Set(rows.map(r => r.source));
