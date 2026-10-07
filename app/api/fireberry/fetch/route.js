@@ -89,6 +89,45 @@ async function syncNotes(supabase, proj, leads, { budgetMs = 45000, concurrency 
   }
 }
 
+/** חלון אחד: since/until מפורשים, או חודש (YYYY-MM, ברירת מחדל: החודש הנוכחי). */
+function windowOf(w = {}) {
+  if (w.since && w.until) return { since: w.since, until: w.until, monthKey: `${w.since}_${w.until}` }
+  const m = w.month || currentMonth()
+  const [y, mm] = m.split('-').map(Number)
+  const since = `${y}-${String(mm).padStart(2, '0')}-01`
+  const until = `${y}-${String(mm).padStart(2, '0')}-${String(new Date(y, mm, 0).getDate()).padStart(2, '0')}`
+  return { since, until, monthKey: m }
+}
+
+/** התמונות השמורות של הפרויקטים (רק מי שיש לו לידים). פרויקט שחסר — לא במפה. */
+async function loadSnapshots(supabase, targets) {
+  const snaps = new Map()
+  for (const proj of targets) {
+    try {
+      const s = await loadCompactSnapshot(supabase, proj.id, 'fireberry')
+      if (s?.entities?.leads?.length) snaps.set(proj.id, s.entities)
+    } catch {}
+  }
+  return snaps
+}
+
+/** מחשב חלון אחד מהתמונות השמורות וכותב את הדוח השמור שלו — בלי אף קריאה לפיירברי. */
+async function writeFromSnapshot(supabase, targets, snaps, { since, until, monthKey }) {
+  const results = []
+  for (const proj of targets) {
+    const e = snaps.get(proj.id)
+    const R = computeFireberrySummary({ leads: e.leads || [], meetings: e.meetings || [], notes: e.notes || [] }, { since, until })
+    const row = toReportRow(R)
+    const { error } = await supabase.from('reports').upsert({
+      project_id: proj.id, source: 'crm', month: monthKey,
+      data: row.data, summary: row.summary, file_name: 'Fireberry snapshot (computed)', row_count: row.row_count,
+    }, { onConflict: 'project_id,source,month' })
+    results.push(error ? { project: proj.name, ok: false, error: error.message }
+      : { project: proj.name, ok: true, fromSnapshot: true, counts: { leads: R.totals.totalLeads, meetingsScheduled: R.totals.meetingsScheduled } })
+  }
+  return { ok: results.every(r => r.ok), month: monthKey, since, until, fromSnapshot: true, projects: results }
+}
+
 async function runSync(opts = {}) {
   if (!isConfigured()) {
     return { status: 200, body: { ok: false, pending: true, message: 'FIREBERRY_TOKEN not configured.' } }
@@ -98,22 +137,33 @@ async function runSync(opts = {}) {
   if (!supabaseUrl || !supabaseKey) return { status: 500, body: { error: 'Missing Supabase credentials' } }
   const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 
-  let since, until, monthKey
-  if (opts.since && opts.until) {
-    since = opts.since; until = opts.until; monthKey = `${since}_${until}`
-  } else {
-    const m = opts.month || currentMonth()
-    const [y, mm] = m.split('-').map(Number)
-    since = `${y}-${String(mm).padStart(2, '0')}-01`
-    until = `${y}-${String(mm).padStart(2, '0')}-${String(new Date(y, mm, 0).getDate()).padStart(2, '0')}`
-    monthKey = m
-  }
+  const { since, until, monthKey } = windowOf(opts)
 
   const { data: projects, error: projectsError } = await supabase.from('projects').select('id, name, client_id')
   if (projectsError) return { status: 500, body: { error: 'Failed to load projects: ' + projectsError.message } }
 
   const targets = (projects || []).filter(p => fireberryConfigFor(p.name) && (!opts.projectId || p.id === opts.projectId))
   if (targets.length === 0) return { status: 200, body: { ok: false, message: 'No Fireberry project found in Supabase.' } }
+
+  // ── windows: כל חלונות ה-fromSnapshot של ריצת קרון בבקשה אחת ────────────────
+  // עד 7.10 prefetch-crm שלח בקשה נפרדת לכל אחד מ-12 החלונות, וכל אחת טענה מחדש את כל
+  // התמונה (1.4MB) — 82 טעינות ביום, ~115MB תעבורה מ-Supabase על אותם נתונים. עכשיו התמונה
+  // נטענת פעם אחת לריצה, וכל החלונות מחושבים ממנה.
+  if (opts.fromSnapshot && Array.isArray(opts.windows)) {
+    const snaps = await loadSnapshots(supabase, targets)
+    if (snaps.size === targets.length) {
+      const windows = []
+      for (const w of opts.windows) windows.push(await writeFromSnapshot(supabase, targets, snaps, windowOf(w)))
+      return { status: 200, body: { ok: windows.every(w => w.ok), fromSnapshot: true, windows } }
+    }
+    // פרויקט בלי תמונה (ריצה ראשונה): כל חלון בנפרד, עם הנפילה הרגילה לשליפה חיה.
+    const windows = []
+    for (const w of opts.windows) {
+      const r = await runSync({ ...opts, windows: undefined, month: w.month, since: w.since, until: w.until })
+      windows.push({ ...r.body, ...windowOf(w) })
+    }
+    return { status: 200, body: { ok: windows.every(w => w.ok), fromSnapshot: true, windows } }
+  }
 
   // ── fromSnapshot: חישוב מהנתונים השמורים, בלי אף קריאה לפיירברי ─────────────
   //
@@ -125,30 +175,11 @@ async function runSync(opts = {}) {
   //
   // עכשיו prefetch-crm שולף חי רק בחלון החודש הנוכחי (שגם מרענן את התמונה), וכל
   // שאר החלונות מחושבים מ-crm_compact. הדשבורד (כפתור רענן) עדיין שולף חי.
-  let fromSnap = null
   if (opts.fromSnapshot) {
-    fromSnap = new Map()
-    for (const proj of targets) {
-      try {
-        const s = await loadCompactSnapshot(supabase, proj.id, 'fireberry')
-        if (s?.entities?.leads?.length) fromSnap.set(proj.id, s.entities)
-      } catch {}
-    }
+    const snaps = await loadSnapshots(supabase, targets)
     // פרויקט בלי תמונה שמורה (ריצה ראשונה) — נופלים לשליפה חיה, רק בשבילו.
-    if (fromSnap.size === targets.length) {
-      const results = []
-      for (const proj of targets) {
-        const e = fromSnap.get(proj.id)
-        const R = computeFireberrySummary({ leads: e.leads || [], meetings: e.meetings || [], notes: e.notes || [] }, { since, until })
-        const row = toReportRow(R)
-        const { error } = await supabase.from('reports').upsert({
-          project_id: proj.id, source: 'crm', month: monthKey,
-          data: row.data, summary: row.summary, file_name: 'Fireberry snapshot (computed)', row_count: row.row_count,
-        }, { onConflict: 'project_id,source,month' })
-        results.push(error ? { project: proj.name, ok: false, error: error.message }
-          : { project: proj.name, ok: true, fromSnapshot: true, counts: { leads: R.totals.totalLeads, meetingsScheduled: R.totals.meetingsScheduled } })
-      }
-      return { status: 200, body: { ok: results.every(r => r.ok), month: monthKey, since, until, fromSnapshot: true, projects: results } }
+    if (snaps.size === targets.length) {
+      return { status: 200, body: await writeFromSnapshot(supabase, targets, snaps, { since, until, monthKey }) }
     }
   }
 
@@ -252,6 +283,14 @@ export async function POST(request) {
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) {
     return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
   }
+  // windows — רשימת חלונות לחישוב מהתמונה בבקשה אחת (הקרון). כל חלון: month או since+until.
+  let windows
+  if (body.windows !== undefined) {
+    const ok = gate.admin && Array.isArray(body.windows) && body.windows.length > 0 && body.windows.length <= 24 &&
+      body.windows.every(w => w && ((isValidDate(w.since) && isValidDate(w.until)) || (typeof w.month === 'string' && /^\d{4}-\d{2}$/.test(w.month))))
+    if (!ok) return Response.json({ error: 'invalid windows' }, { status: 400 })
+    windows = body.windows.map(w => w.month ? { month: w.month } : { since: w.since, until: w.until })
+  }
   try {
     const { status, body: res } = await runSync({
       month: body.month, since: body.since, until: body.until, projectId: body.projectId,
@@ -260,6 +299,7 @@ export async function POST(request) {
       notesSync: gate.admin && body.notesSync === true,
       // חישוב מהתמונה השמורה בלבד — זול, בלי פנייה לפיירברי. לקרון (ראה prefetch-crm).
       fromSnapshot: gate.admin && body.fromSnapshot === true,
+      windows,
       budgetMs: gate.admin ? Math.min(Number(body.budgetMs) || 45000, 240000) : undefined,
     })
     return Response.json(res, { status })
