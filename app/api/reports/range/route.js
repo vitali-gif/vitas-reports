@@ -9,6 +9,9 @@
  *   מזהה כל שורה קבוע — range:<project>:<source>:<since>_<until> — כי הדשבורד ממזג שורות לפי id.
  *   שורות המודעות מגיעות מהעובדות היומיות (lib/ads/range-rows.js, שלב 2); ה-CRM מתמונת המצב (שלב 1).
  *
+ * focus=<id>: מצב מיקוד (lib/focus.js) — למשל KLOSS "רק באר שבע": ה-CRM מחושב על הסניף בלבד
+ *   והמודעות על הסוכנות שלו בלבד. מזהי השורות מקבלים סיומת :focus=<id> כדי לא להתנגש בשורות הרגילות.
+ *
  * compare=1: השוואה מול הדוח השמור לאותו מפתח (אם קיים) — סכומים בלבד, בלי PII.
  *   מותר גם לטוקן הניטור ('*'), כדי שהסוכן היומי יוכל לאמת שהחישוב מהתמונה זהה
  *   למשיכה החיה. זו "השוואת הזהב" של השלב הזה, רצה בפרודקשן ולא פעם אחת.
@@ -22,6 +25,7 @@ import { loadRawRecords, loadCompactSnapshot, loadCompactMeta, detectCrmType, lo
 import { computeCrmRow, totalKeysFor, getPath } from '../../../../lib/crm/compute.js'
 import { adNamesForBmby } from '../../../../lib/crm/meta-ad-names.js'
 import { buildAdsRangeRows } from '../../../../lib/ads/range-rows.js'
+import { focusFor } from '../../../../lib/focus.js'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -50,7 +54,7 @@ const compactGet = (k) => COMPACT_CACHE.get(k) || null
 const compactSet = (k, v) => { COMPACT_CACHE.set(k, v); if (COMPACT_CACHE.size > 8) COMPACT_CACHE.delete(COMPACT_CACHE.keys().next().value) }
 
 // טעינת ה-CRM בשלוש מדרגות: (1) מטא זעיר → (2) תוצאה מוכנה במטמון / payload במטמון → (3) payload מה-DB.
-async function loadCrmForRange(sb, projectId, key, timing) {
+async function loadCrmForRange(sb, projectId, key, timing, focusId = '') {
   const meta = await loadCompactMeta(sb, projectId)   // bmby / zoho: תמונה דחוסה. salesforce: אין (פרוסה לטווח, מיגרציה 011)
   if (!meta) {
     const crmType = await detectCrmType(sb, projectId)
@@ -59,7 +63,7 @@ async function loadCrmForRange(sb, projectId, key, timing) {
       const [since, until] = key.split('_')
       const raw = await loadSalesforceSlice(sb, projectId, since, until)
       if (!raw || !raw.total) return { raw: null, shaped: null, cacheKey: null }
-      const cacheKey = `${projectId}|${key}|${raw.fetchedAt}`
+      const cacheKey = `${projectId}|${key}|${raw.fetchedAt}|${focusId}`
       const hit = cacheGet(cacheKey)
       timing.crmCache = hit ? 'hit' : 'miss'
       timing.slice = raw.counts
@@ -69,7 +73,7 @@ async function loadCrmForRange(sb, projectId, key, timing) {
     const raw = await loadRawRecords(sb, projectId, crmType)
     return { raw, shaped: null, cacheKey: null }
   }
-  const cacheKey = `${projectId}|${key}|${meta.built_at}`
+  const cacheKey = `${projectId}|${key}|${meta.built_at}|${focusId}`
   const hit = cacheGet(cacheKey)
   const stub = { counts: meta.counts, fetchedAt: meta.source_fetched_at || meta.built_at, builtAt: meta.built_at, total: Object.values(meta.counts || {}).reduce((x, y) => x + (Number(y) || 0), 0), compact: true, crmType: meta.crm_type }
   if (hit) { timing.crmCache = 'hit'; return { raw: stub, shaped: hit, cacheKey } }
@@ -92,6 +96,7 @@ export async function GET(request) {
   const projectId = searchParams.get('projectId')
   const since = searchParams.get('since'), until = searchParams.get('until')
   const compare = searchParams.get('compare') === '1'
+  const focusId = searchParams.get('focus') || ''
 
   if (!projectId) return J({ error: 'projectId required' }, 400)
   if (!isDate(since) || !isDate(until)) return J({ error: 'since/until must be YYYY-MM-DD' }, 400)
@@ -111,6 +116,9 @@ export async function GET(request) {
   const key = `${since}_${until}`
   const { data: project } = await sb.from('projects').select('id, name, meta_account_id, sub_projects, is_demo').eq('id', projectId).maybeSingle()
   if (!project) return J({ error: 'unknown_project' }, 404)
+  const focus = focusId ? focusFor(project.name, focusId) : null
+  if (focusId && (!focus || compare)) return J({ error: 'unknown_focus' }, 400)
+  const sfx = focus ? `:focus=${focus.id}` : ''
 
   // CRM מתמונת המצב (שלב 1) ומודעות מהעובדות היומיות (שלב 2) — במקביל, כל אחד אופציונלי.
   const timing = {}
@@ -119,8 +127,8 @@ export async function GET(request) {
   // כולה נפלה — גם ה-CRM שכבר חושב. עכשיו למודעות יש תקרה משלהן; אם עברו אותה, ה-CRM
   // חוזר לבד והמודעות מסומנות חסרות (problems.ads). מיגרציה 023 מקצרת אותן לשניות.
   const [rawRes, adsRes] = await Promise.allSettled([
-    loadCrmForRange(sb, projectId, key, timing),
-    compare ? Promise.resolve(null) : withDeadline(buildAdsRangeRows(sb, project, since, until), ADS_BUDGET_MS, 'ads'),
+    loadCrmForRange(sb, projectId, key, timing, focus ? focus.id : ''),
+    compare ? Promise.resolve(null) : withDeadline(buildAdsRangeRows(sb, project, since, until, focus ? { agency: focus.agency, idSuffix: sfx } : undefined), ADS_BUDGET_MS, 'ads'),
   ])
   timing.loadMs = Date.now() - t0
   const crmLoad = rawRes.status === 'fulfilled' ? rawRes.value : null
@@ -140,7 +148,8 @@ export async function GET(request) {
     const t1 = Date.now()
     // BMBY: שם מודעה לפי מזהה ללידים שהגיעו בלי שם (ש.ברוך מ-14.8) — lib/crm/meta-ad-names.js.
     const adNames = raw.crmType === 'bmby' ? await adNamesForBmby(sb, raw.entities?.clients) : undefined
-    shaped = computeCrmRow(raw.crmType, raw, { since, until, key, adNames })
+    // מיקוד בסניף — Salesforce בלבד (BMBY/Zoho לא מחזיקים סניף; focusFor מגביל ל-KLOSS ממילא)
+    shaped = computeCrmRow(raw.crmType, raw, { since, until, key, adNames, branch: focus && raw.crmType === 'salesforce' ? focus.branch : undefined })
     timing.computeMs = Date.now() - t1
     if (cacheKey) cacheSet(cacheKey, shaped)
   }
@@ -179,9 +188,10 @@ export async function GET(request) {
   }
 
   const rows = []
-  if (shaped) rows.push({ id: `range:${projectId}:crm:${key}`, project_id: projectId, source: 'crm', month: key, ...shaped, created_at: stamp, updated_at: stamp, synthetic: true })
+  if (shaped) rows.push({ id: `range:${projectId}:crm:${key}${sfx}`, project_id: projectId, source: 'crm', month: key, ...shaped, created_at: stamp, updated_at: stamp, synthetic: true, ...(focus ? { focus: focus.id } : {}) })
   if (ads) rows.push(...ads.rows)
   const missing = [...(hasCrm ? [] : ['crm']), ...(ads ? ads.missing : ['facebook', 'google'])]
   if (!rows.length) return J({ error: 'no_data', missing, problems, hint: 'no CRM snapshot and no daily ad facts for this project/range yet' }, 404)
-  return J({ rows, missing, snapshot, ads: ads ? { coverage: ads.coverage } : null, timing, ...(Object.keys(problems).length ? { problems } : {}) })
+  if (focus) for (const r of rows) r.focus = focus.id
+  return J({ rows, missing, snapshot, ads: ads ? { coverage: ads.coverage } : null, timing, ...(focus ? { focus: { id: focus.id, label: focus.label, branch: focus.branch, agency: focus.agency } } : {}), ...(Object.keys(problems).length ? { problems } : {}) })
 }

@@ -1,11 +1,12 @@
 'use client'
 // rebuild trigger
-import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { apiFetch } from '../../lib/api-fetch'
 import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, comparisonPeriodKey, comparisonPeriodLabel, COLORS, sourceColor, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections } from '../../lib/objection-normalize.js'
+import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
 import { CRM_SCHEMA_VERSION, GOOGLE_SCHEMA_VERSION } from '../../lib/crm/schema-version'
@@ -226,8 +227,15 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [selectedClient, setSelectedClient] = useState(null)
   const [selectedProject, setSelectedProject] = useState(null)
   const [view, setView] = useState('welcome')
-  const [reports, setReports] = useState([])
+  const [reportsAll, setReports] = useState([])
   const [selectedMonth, setSelectedMonth] = useState('')
+  // ── D14: מצב מיקוד (KLOSS "רק באר שבע", lib/focus.js) ─────────────────────
+  // לא נשמר: כל כניסה ומעבר פרויקט מתחילים ב"הכל" (ויטלי, 7.10). כשהוא פעיל, השורות של
+  // התקופה שעל המסך ושל תקופת ההשוואה מוחלפות בשורות ממוקדות מ-/api/reports/range?focus=…
+  // (CRM של הסניף בלבד + מודעות של הסוכנות שלו בלבד). כל שאר הדשבורד קורא את `reports`
+  // כרגיל — ולכן כל הכרטיסים, המשפך, הטבלאות וה-PDF מחושבים על אותה בחירה בשני הצדדים.
+  const [focusMode, setFocusMode] = useState('')
+  const [focusRows, setFocusRows] = useState({})   // `${pid}|${focus}|${key}` → rows (null = נכשל)
   const [customSince, setCustomSince] = useState('')
   const [customUntil, setCustomUntil] = useState('')
   const [compareEnabled, setCompareEnabled] = useState(false)
@@ -299,6 +307,54 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was SUCCESSFULLY lazy-loaded
   const monthDataInFlight = useRef(new Set())  // month-keys with a heavy-data fetch currently in flight (dedupe)
   const projectReportsCache = useRef(new Map())  // projectId -> light reports (stale-while-revalidate for instant project switching)
+
+  // D14: הדוחות שהדשבורד רואה. בלי מיקוד — בדיוק reportsAll. עם מיקוד — שורות התקופה שעל המסך
+  // ותקופת ההשוואה מוחלפות בשורות הממוקדות (month מיושר למפתח של המסך, כי שורת טווח של חודש
+  // מלא מגיעה כ-YYYY-MM-01_YYYY-MM-31). עד שהשורות הממוקדות מגיעות — התקופה ריקה ולא "הכל",
+  // כדי שאף פעם לא יוצגו מספרים של כל הרשת תחת הכותרת "רק באר שבע".
+  const focusModes = useMemo(() => focusModesFor(selectedProject?.name), [selectedProject?.name])
+  const focusActive = !!focusMode && focusModes.some(m => m.id === focusMode)
+  const reports = useMemo(() => {
+    if (!focusActive || !selectedProject || !selectedMonth) return reportsAll
+    const keys = [...new Set([selectedMonth, comparisonPeriodKey(selectedMonth)].filter(Boolean))]
+    let out = reportsAll.filter(r => !keys.includes(r.month))
+    for (const k of keys) {
+      const rows = focusRows[`${selectedProject.id}|${focusMode}|${k}`]
+      if (Array.isArray(rows)) out = out.concat(rows.map(r => ({ ...r, month: k })))
+    }
+    return out
+  }, [reportsAll, focusActive, focusMode, focusRows, selectedProject, selectedMonth])
+
+  // מיקוד מתאפס במעבר פרויקט (לא נשמר — ויטלי, 7.10)
+  useEffect(() => { setFocusMode(''); setFocusRows({}) }, [selectedProject?.id])
+  // טעינת השורות הממוקדות לתקופה שעל המסך ולתקופת ההשוואה (מה שעוד לא נטען)
+  useEffect(() => {
+    if (!focusActive || !selectedProject || !selectedMonth) return
+    const pid = selectedProject.id, f = focusMode
+    const keys = [...new Set([selectedMonth, comparisonPeriodKey(selectedMonth)].filter(Boolean))]
+    const todo = keys.filter(k => !(`${pid}|${f}|${k}` in focusRows))
+    if (!todo.length) return
+    const spanOf = (k) => {
+      if (k.includes('_')) return k.split('_')
+      const [y, m] = k.split('-').map(Number)
+      return [`${k}-01`, `${k}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`]
+    }
+    const withCurrent = todo.includes(selectedMonth)
+    if (withCurrent) setPeriodLoading(true)
+    Promise.all(todo.map(async (k) => {
+      const [since, until] = spanOf(k)
+      const res = await apiFetch(`/api/reports/range?projectId=${pid}&since=${since}&until=${until}&focus=${f}`, { headers: {} }).catch(() => null)
+      if (res && res.status === 404) return [k, []]   // אין נתונים לתקופה — ריק, לא כשל
+      const body = res && res.ok ? await res.json().catch(() => null) : null
+      return [k, Array.isArray(body?.rows) ? body.rows : null]
+    })).then((pairs) => {
+      setFocusRows(prev => { const n = { ...prev }; for (const [k, rows] of pairs) if (rows) n[`${pid}|${f}|${k}`] = rows; return n })   // כשל לא נשמר — ניסיון חוזר בהפעלה הבאה
+      if (pairs.some(([k, rows]) => k === selectedMonth && rows === null)) {
+        setFocusMode('')
+        showToast('לא הצלחנו לטעון את התצוגה הממוקדת. חוזרים ל"הכל".')
+      }
+    }).finally(() => { if (withCurrent) setPeriodLoading(false) })
+  }, [focusActive, focusMode, selectedProject?.id, selectedMonth]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── מטמון האגרגציות הכבדות ────────────────────────────────────────────────
   // aggregateRows/aggregateCrmRows רצות על השורות הגולמיות (עשרות אלפי רשומות
@@ -4061,11 +4117,13 @@ const selectProject = async (client, project) => {
     };
 
     // ===== KLOSS / Salesforce =====
-    const sfKpiCards = (fn, rt, spend, prevSpend) => {
+    const sfKpiCards = (fn, rt, spend, prevSpend, bySource) => {
       const leads = fn.leads || 0, opp = fn.opportunities || 0, quotes = fn.quotes || 0, paid = fn.paid || 0;
       const dealValue = fn.dealValue || 0, delivery = fn.deliveryValue || 0;
       const avgDeal = fn.avgDealValue || 0, conv = fn.conversionRate || 0;
-      const cpl = leads > 0 ? spend / leads : 0;
+      // D14: במצב מיקוד — עלות לליד ממומן (לידים מהמודעות בלבד), כמו בכרטיסי מסך הרשת.
+      const paidLeads = focusActive ? Object.entries(bySource || {}).reduce((a, [k, v]) => a + (isPaidLeadSource(k) ? (Number(v) || 0) : 0), 0) : 0;
+      const cpl = focusActive ? (paidLeads > 0 ? spend / paidLeads : 0) : (leads > 0 ? spend / leads : 0);
       const cpo = paid > 0 ? spend / paid : 0;
       const roas = spend > 0 ? (dealValue / 1.18) / spend : 0;
       return (<>
@@ -4079,7 +4137,7 @@ const selectProject = async (client, project) => {
         {kpi('שווי עסקאות', formatCurrencyCompact(dealValue), 'pink', dealValue, null)}
         {kpi('ערך ממוצע לעסקה', formatCurrency(avgDeal), '', avgDeal, null)}
         {kpi('הובלה והרכבה', formatCurrencyCompact(delivery), '', delivery, null)}
-        {spend > 0 ? kpi('עלות לליד', formatCurrency(cpl), 'purple', cpl, null, true) : null}
+        {spend > 0 ? kpi(focusActive ? 'עלות לליד ממומן' : 'עלות לליד', formatCurrency(cpl), 'purple', cpl, null, true) : null}
         {spend > 0 ? kpi('עלות להזמנה', formatCurrency(cpo), 'red', cpo, null, true) : null}
         {spend > 0 ? kpi('ROAS לא כולל מע"מ', roas.toFixed(2) + 'x', 'green', roas, null) : null}
         {rt && rt.measured ? kpi('זמן תגובה חציוני', (rt.medianHours || 0) + 'ש\u05f3', 'amber', rt.medianHours, null, true) : null}
@@ -4292,6 +4350,26 @@ const selectProject = async (client, project) => {
 
     return (
       <>
+        {/* D14: מיקוד (KLOSS "רק באר שבע") — לאדמין וללקוח, מתאפס בכל כניסה. */}
+        {focusModes.length > 0 && (
+          <div role="group" aria-label="היקף התצוגה" style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:12}}>
+            <div style={{display:'inline-flex',gap:4,border:'1px solid var(--border,#dce3f1)',borderRadius:8,padding:3,background:'var(--card,#fff)'}}>
+              {[{ id: '', label: 'כל הסניפים' }, ...focusModes].map(m => {
+                const on = m.id ? focusMode === m.id : !focusActive
+                return (
+                  <button key={m.id || 'all'} type="button" aria-pressed={on}
+                    onClick={() => { if (!m.id) setFocusRows({}); setFocusMode(m.id) }}
+                    style={{border:0,borderRadius:6,padding:'7px 14px',fontSize:13.5,fontWeight:600,fontFamily:'inherit',cursor:'pointer',background:on?'var(--indigo,#5B5EF4)':'transparent',color:on?'#fff':'var(--text,#303c66)'}}>
+                    {m.label}
+                  </button>
+                )
+              })}
+            </div>
+            {focusActive && (() => { const m = focusModes.find(x => x.id === focusMode); return (
+              <span style={{fontSize:12.5,color:'var(--text-secondary)'}}>{`לידים ומכירות של סניף ${m.branch} · מודעות מחשבונות ${m.agency} בלבד`}</span>
+            ) })()}
+          </div>
+        )}
         {/* Source Tabs */}
         <div className="client-tabs client-tabs-main">
           <button className={`client-tab ${dashTab === 'all' ? 'active' : ''}`} onClick={() => setDashTab('all')}>{'\u05d4\u05db\u05dc'}</button>
@@ -4899,6 +4977,9 @@ const selectProject = async (client, project) => {
             const _lost = _fcCards.lost || 0
             const _untreated = Object.entries(_s.byStatus || {}).reduce((a, [k, v]) => a + (/^(new|חדש)$/i.test(String(k).trim()) ? v : 0), 0)
             const _cpl = _leads > 0 ? _spend / _leads : 0
+            // D14: במצב מיקוד העלות לליד היא על הלידים הממומנים בלבד (מהמודעות), והסך הכללי לצידה.
+            const _paidLeads = Object.entries(_s.bySource || {}).reduce((a, [k, v]) => a + (isPaidLeadSource(k) ? (Number(v) || 0) : 0), 0)
+            const _cplPaid = _paidLeads > 0 ? _spend / _paidLeads : 0
             const _clicks = ((fbTotals && fbTotals.clicks) || 0) + ((gTotals && gTotals.clicks) || 0)
 
             // כרטיס מדד במסך רשת. עבר מ-kpi() + בועה מצוירת ביד ל-MetricCard המשותף
@@ -4925,7 +5006,9 @@ const selectProject = async (client, project) => {
                 <div className="vr-metric-grid">
                   {CARD('תקציב שנוצל', formatCurrency(_spend), 'indigo', Wallet, 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.')}
                   {CARD('סה"כ לידים', formatNum(_leads), 'emerald', Users, 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו. אחוז ההמרה מקליקים יוצג אוטומטית כשיחוברו חשבונות הפרסום.', _clicks > 0 ? pctOf(_leads, _clicks) + ' מהקליקים' : null)}
-                  {CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'violet', Tag, 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.')}
+                  {focusActive
+                    ? CARD('עלות לליד ממומן', _spend > 0 && _paidLeads > 0 ? formatCurrency(_cplPaid) : '—', 'violet', Tag, 'תקציב VITAS חלקי הלידים שהגיעו מהמודעות בלבד (פייסבוק, גוגל, עמודי נחיתה, אינסטגרם). לידים אורגניים — אתר החברה, מוקד טלפוני, המלצת חבר — לא נספרים, כדי שהעלות תשקף את הקמפיינים. השורה התחתונה: העלות על כל הלידים של הסניף.', `${formatNum(_paidLeads)} ממומנים · ${_spend > 0 ? formatCurrency(_cpl) : '—'} על כל הלידים`)
+                    : CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'violet', Tag, 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.')}
                   {CARD('טרם טופלו / חדשים', formatNum(_untreated), 'indigo', ClipboardList, 'לידים שסטטוסם עדיין "חדש" (New) ולא נגעו בהם.')}
                   {CARD('פגישות שנקבעו', formatNum(_meet), 'violet', CalendarCheck, 'סכום שלושת סטטוסי הפגישה: "תואמה פגישה בסניף" (טרם התקיימה) + "הומר" (הגיע) + "לא הגיעו לפגישה". נספר לפי סטטוס ולא לפי תאריך הפגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא. השורה התחתונה: אחוז מסך הלידים.', pctOf(_meet, _leads) + ' מהלידים')}
                   {CARD('פגישות עתידיות', formatNum(_sched), 'indigo', CalendarClock, 'לידים בסטטוס "תואמה פגישה בסניף" — הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.')}
@@ -5915,7 +5998,7 @@ const selectProject = async (client, project) => {
               conversionRate: _fcO.rateLeadToPaid || 0,
               avgDealValue: (_fcO.paid ? Math.round((_fcO.paidValue || 0) / _fcO.paid) : 0),
             };
-            return sfKpiCards(_cohortCards, _sr.responseTime || {}, activeT.spend || 0, activeP?.spend);
+            return sfKpiCards(_cohortCards, _sr.responseTime || {}, activeT.spend || 0, activeP?.spend, _sr.bySource);
           })() : null}
           {!['zoho','salesforce'].includes(crmReports[0]?.summary?.crmType) && (<>
           {kpi('\u05ea\u05e7\u05e6\u05d9\u05d1', formatCurrency(activeT.spend), '', activeT.spend, activeP?.spend, true)}
@@ -6863,7 +6946,7 @@ const selectProject = async (client, project) => {
         </div>)}
       </>
     );
-  }, [vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, campLegend, campHidden, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedCrmAds, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
+  }, [focusModes, focusActive, focusMode, vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, campLegend, campHidden, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedCrmAds, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
     // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
     // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
     // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.
