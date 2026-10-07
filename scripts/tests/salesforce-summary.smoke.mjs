@@ -81,7 +81,8 @@ eq('computeCrmRow(salesforce)', (() => { const r = computeCrmRow('salesforce', {
   eq('branch: history only חיפה leads (H4 of L4 dropped)', EB.bookDayR.map(r => r.b), ['חיפה'])
   const ent2 = { leads: leads.map(l => l.Id === 'L1' ? { ...l, ConvertedOpportunityId: 'O2' } : l), opportunities, line_items, lead_history }
   const EC = emulateSalesforceQueries(ent2, '2026-09-01', '2026-09-30', { branch: 'חיפה' })
-  eq('branch: converted lead keeps its opp from another branch (cohort)', EC.branchCohortR.map(r => r.ConvertedOpportunity?.StageName), ['קיבל הצעת מחיר'])
+  eq('branch: no leakage — converted lead\'s opp in another branch is not counted', EC.branchCohortR.map(r => r.ConvertedOpportunity?.StageName ?? null), [null])
+  eq('branch: no other-branch value anywhere', [EB.oppBranchR.map(r => r.k), EB.prodBranchR.map(r => r.k).filter((v, i, a) => a.indexOf(v) === i)], [['חיפה'], ['חיפה']])
   const RB = computeCrmRow('salesforce', { entities: ent }, { since: '2026-09-01', until: '2026-09-30', key: '2026-09', branch: 'חיפה' })
   eq('branch: computeCrmRow passes branch', [RB.row_count, RB.summary.totalLeads], [2, 2])
   eq('no branch = unchanged', emulateSalesforceQueries(ent, '2026-09-01', '2026-09-30', {}).totalLeads, 3)
