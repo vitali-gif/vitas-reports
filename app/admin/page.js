@@ -51,7 +51,7 @@ import Sidebar from '../components/shell/Sidebar'
 import TitleBar from '../components/shell/TitleBar'
 import Sparkline from '../components/Sparkline'
 import BackToTop from '../components/BackToTop'
-import TovnoLoader from '../components/TovnoLoader'
+import BrandLoader from '../components/BrandLoader'
 import ViewPicker from '../components/shell/ViewPicker'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
@@ -6964,13 +6964,13 @@ const selectProject = async (client, project) => {
     // בלעדיו לקוח PRO שעבר מלקוח basic (אדמין בסיידבר) היה נשאר עם המסך הנעול.
     meetingsOn, meetingsUnlocked, selectedProject?.id, isClientView]);
 
-  if (loading && !isClientView) return <div className="loading-page"><TovnoLoader hint={'\u05d8\u05d5\u05e2\u05df \u05d0\u05ea \u05d4\u05d3\u05e9\u05d1\u05d5\u05e8\u05d3\u2026'} /></div>;
+  if (loading && !isClientView) return <div className="loading-page"><BrandLoader hint={'\u05d8\u05d5\u05e2\u05df \u05d0\u05ea \u05d4\u05d3\u05e9\u05d1\u05d5\u05e8\u05d3\u2026'} /></div>;
 
   if (!session && !isClientView) {
     return (
       <div className="login-container">
         {/* \u05d4\u05de\u05d9\u05ea\u05d5\u05d2 \u05d4\u05d7\u05d3\u05e9: \u05d4\u05dc\u05d5\u05d2\u05d5 \u05d1\u05de\u05e7\u05d5\u05dd \u05d4-wordmark \u05d4\u05d8\u05e7\u05e1\u05d8\u05d5\u05d0\u05dc\u05d9 "VITAS" \u05e9\u05d4\u05d9\u05d4 \u05db\u05d0\u05df. */}
-        <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" style={{display:'block',margin:'0 auto 18px',inlineSize:150,blockSize:'auto'}} />
+        <img src="/brand/cluzo/cluzo-logo-light.svg" alt="Cluzo by Vitas" style={{display:'block',margin:'0 auto 18px',inlineSize:150,blockSize:'auto'}} />
         <p className="subtitle">{'\u05de\u05e2\u05e8\u05db\u05ea \u05d3\u05d5\u05d7\u05d5\u05ea \u05e9\u05d9\u05d5\u05d5\u05e7 \u05d3\u05d9\u05d2\u05d9\u05d8\u05dc\u05d9'}</p>
         <div className="card">
           <form onSubmit={handleAuth} method="post" action="#">
@@ -7057,8 +7057,8 @@ const selectProject = async (client, project) => {
           onSelectProject={(client, project) => { selectProject(client, project); setSidebarOpen(false); }}
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
-          footerText="Tovno by Vitas · v3.2"
-          brand={vrChrome ? { logo: '/brand/tovno/tovno-logo-white.svg' } : null}
+          footerText="Cluzo by Vitas · v3.2"
+          brand={vrChrome ? { logo: '/brand/cluzo/cluzo-logo-dark.svg' } : null}
           lockedProjects={[]}
           demoProjects={clients.flatMap(c=>(c.projects||[]).filter(p=>p.is_demo).map(p=>p.name))}
           isOpen={sidebarOpen}
@@ -7070,7 +7070,7 @@ const selectProject = async (client, project) => {
         <div className="main-content">
           {/* \u05d5\u05d9\u05d8\u05dc\u05d9, 21.9: \u05d4\u05d0\u05d9\u05de\u05d5\u05d2'\u05d9 \ud83d\udcca \u05d9\u05e8\u05d3 \u2014 \u05d4\u05d0\u05e0\u05d9\u05de\u05e6\u05d9\u05d4 \u05e9\u05dc Tovno \u05d9\u05d5\u05e9\u05d1\u05ea \u05db\u05d0\u05df \u05d1\u05de\u05e7\u05d5\u05de\u05d5.
               decorative, \u05db\u05d9 \u05d4\u05de\u05e1\u05da \u05d4\u05d6\u05d4 \u05dc\u05d0 \u05d8\u05d5\u05e2\u05df \u05db\u05dc\u05d5\u05dd: \u05d4\u05d5\u05d0 \u05e4\u05e9\u05d5\u05d8 \u05de\u05de\u05ea\u05d9\u05df \u05dc\u05d1\u05d7\u05d9\u05e8\u05ea \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8. */}
-          {view === 'welcome' && (<div className="welcome-center"><TovnoLoader decorative width={300} className="welcome-mark" /><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8/\u05d9 \u05d0\u05ea \u05e9\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7 \u05d5\u05dc\u05d0\u05d7\u05e8 \u05de\u05db\u05df \u05d0\u05ea \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d4\u05e8\u05e6\u05d5\u05d9.'}</p></div>)}
+          {view === 'welcome' && (<div className="welcome-center"><BrandLoader decorative width={300} className="welcome-mark" /><h2>{'\u05d1\u05e8\u05d5\u05db\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd'}</h2><p>{'\u05d1\u05d7\u05e8/\u05d9 \u05d0\u05ea \u05e9\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7 \u05d5\u05dc\u05d0\u05d7\u05e8 \u05de\u05db\u05df \u05d0\u05ea \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d4\u05e8\u05e6\u05d5\u05d9.'}</p></div>)}
 
           {view === 'dashboard' && selectedProject && (<>
                         {isDemoProject && (
@@ -7174,7 +7174,7 @@ const selectProject = async (client, project) => {
                 </div>
               );
             })()}
-            {isFetching && hasDataForPeriod ? (<div className="period-loading-overlay"><TovnoLoader width={220} label={'טוען את התקופה'} hint={'מעדכנים את התקופה שנבחרה…'} /></div>) : null}
+            {isFetching && hasDataForPeriod ? (<div className="period-loading-overlay"><BrandLoader width={220} label={'טוען את התקופה'} hint={'מעדכנים את התקופה שנבחרה…'} /></div>) : null}
             {reports.length === 0
               ? (isFetching
                   ? <SkeletonDashboard />

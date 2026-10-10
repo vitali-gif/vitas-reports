@@ -5,7 +5,7 @@ import { apiFetch, accessToken } from '../../lib/api-fetch'
 import dynamic from 'next/dynamic'
 import { GoogleMark, MicrosoftMark } from '../components/auth/ProviderMarks'
 import GoogleGisButton from '../components/auth/GoogleGisButton'
-import TovnoLoader from '../components/TovnoLoader'
+import BrandLoader from '../components/BrandLoader'
 
 const AdminPage = dynamic(() => import('../admin/page'), { ssr: false })
 
@@ -377,7 +377,7 @@ export default function ClientPage() {
   if (loading) return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)'}}>
       <div style={{textAlign:'center'}}>
-        <TovnoLoader hint="טוען את הדוח…" />
+        <BrandLoader hint="טוען את הדוח…" />
         <div id="vitas-stuck" style={{display:'none',marginTop:18}}>
           <p style={{color:'var(--text-3)',fontSize:13,margin:'0 0 10px'}}>הטעינה לוקחת יותר מהרגיל.</p>
           <button type="button" onClick={() => window.location.reload()}
@@ -399,7 +399,7 @@ export default function ClientPage() {
         <p style={{margin:'0 0 20px',fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>לכתובת המייל הזו אין גישה לאף פרויקט.</p>
         {/* קודם היה כתוב "צור קשר עם VITAS" בלי שום דרך ליצור קשר — מסך ללא מוצא. */}
         <a
-          href="mailto:vitali@vitas.co.il?subject=בקשת%20גישה%20לדוח%20Tovno"
+          href="mailto:vitali@vitas.co.il?subject=בקשת%20גישה%20לדוח%20Cluzo"
           style={{display:'block',marginBottom:12,padding:'10px 24px',background:'var(--indigo,#5B5EF4)',color:'#fff',borderRadius:8,fontSize:14,fontWeight:700,textDecoration:'none',fontFamily:'var(--font)'}}
         >
           בקש גישה במייל
@@ -414,7 +414,7 @@ export default function ClientPage() {
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg,#fff)',fontFamily:'var(--font)'}}>
       <div style={{maxWidth:380,width:'100%',padding:'0 24px'}}>
         <div style={{textAlign:'center',marginBottom:28}}>
-          <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" style={{height:30,marginBottom:24}} />
+          <img src="/brand/cluzo/cluzo-logo-light.svg" alt="Cluzo by Vitas" style={{height:42,marginBottom:20}} />
           <h2 style={{margin:'0 0 8px',fontSize:22,fontWeight:800,color:'var(--text)'}}>בחר סיסמה</h2>
           <p style={{margin:0,fontSize:14,color:'var(--text-3)',lineHeight:1.6}}>
             נכנסת בקישור. כדי להיכנס בפעם הבאה עם מייל וסיסמה, בחר סיסמה משלך.
@@ -449,7 +449,7 @@ export default function ClientPage() {
   if (step === 'login') return (
     <div className="vsign">
       <div className="vsign-card">
-        <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" />
+        <img src="/brand/cluzo/cluzo-logo-light.svg" alt="Cluzo by Vitas" />
         <h1>ברוכים הבאים</h1>
         <p>נכנסים לחשבון וממשיכים לפרויקטים שלכם.</p>
 
@@ -611,7 +611,7 @@ export default function ClientPage() {
 
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <img src="/brand/tovno/tovno-logo.svg" alt="Tovno by Vitas" style={{ height: 30, width: 'auto', marginBottom: 14 }} />
+              <img src="/brand/cluzo/cluzo-logo-light.svg" alt="Cluzo by Vitas" style={{ height: 42, width: 'auto', marginBottom: 12 }} />
               <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: '#0B0F1E', letterSpacing: '-0.02em' }}>
                 ברוכים הבאים לדוח הביצועים 👋
               </h2>

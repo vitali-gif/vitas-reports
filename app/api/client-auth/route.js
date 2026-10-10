@@ -33,7 +33,7 @@ async function sendMagicLinkEmail(toEmail, magicLink) {
 
         <!-- Header -->
         <tr><td style="background:#14243C;padding:28px 36px;text-align:right">
-          <span style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.03em">tovno</span>
+          <span style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.03em">cluzo</span>
           <span style="color:#7191FF;font-size:14px;font-weight:700"> by Vitas</span>
         </td></tr>
 
@@ -80,9 +80,9 @@ async function sendMagicLinkEmail(toEmail, magicLink) {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: 'Tovno by Vitas <noreply@vitas.co.il>',
+        from: 'Cluzo by Vitas <noreply@vitas.co.il>',
         to: [toEmail],
-        subject: 'קישור כניסה לדוח — Tovno by Vitas',
+        subject: 'קישור כניסה לדוח — Cluzo by Vitas',
         html,
       }),
     })

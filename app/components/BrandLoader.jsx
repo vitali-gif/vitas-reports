@@ -1,5 +1,9 @@
 /**
- * טוען Tovno — אנימציית המותג במקום הספינר הגנרי.
+ * טוען המותג (Cluzo) — אנימציית המותג במקום הספינר הגנרי.
+ *
+ * 10.10: טוען זמני — הלוגו של Cluzo, כשהסמל מסתובב חצי סיבוב והנקודה שב-o
+ * פועמת (public/brand/cluzo/cluzo-loader*.svg). ויטלי מכין טוען חדש; כשיגיע,
+ * מחליפים את ארבעת הקבצים ואת RATIO אם היחס שונה.
  *
  * ה-SVG מנפיש את עצמו: יש בתוכו <style> עם @keyframes, בלי ספריות, בלי גופנים
  * חיצוניים ובלי JS. לכן הוא נטען כ-<img> ולא מוזרק inline — כך ה-@keyframes שלו
@@ -11,18 +15,18 @@
  * תנועה מופחתת: לקובץ ה-SVG יש כלל prefers-reduced-motion משלו, אבל הוא לא
  * נכנס לתוקף כשהוא נטען כ-<img> — נמדד ב-Chromium: ההגדרה של המשתמש לא מגיעה
  * להקשר של התמונה והאנימציה המשיכה לרוץ. לכן יש כאן שני קבצים, מונפש ודומם,
- * וה-CSS (‎.tovno-loader ב-globals) מחליף ביניהם במדיה קוורי של העמוד עצמו.
+ * וה-CSS (‎.brand-loader ב-globals) מחליף ביניהם במדיה קוורי של העמוד עצמו.
  *
- * tone="dark" מחליף לעותק בצבעי רקע כהה (#EDF2FF / #7191FF) — לשימוש על
+ * tone="dark" מחליף לעותק בצבעי רקע כהה (טקסט לבן, כמו cluzo-logo-dark) — לשימוש על
  * --tv-sidebar ועל כל משטח כהה אחר.
  *
  * decorative — כשהאנימציה היא סימן מותג ולא חיווי טעינה (מסך "ברוכים הבאים",
  * שם לא נטען כלום ופשוט עוד לא נבחר פרויקט). אז אין role="status" ואין
  * aria-label: קורא מסך שיכריז "טוען" במסך שלא טוען כלום פשוט משקר.
  */
-const RATIO = 94 / 280  // היחס המקורי של הנכס (955×320)
+const RATIO = 280 / 800  // היחס המקורי של הנכס (viewBox 800×280)
 
-export default function TovnoLoader({
+export default function BrandLoader({
   label = 'טוען את הדשבורד',
   hint = null,
   width = 280,
@@ -30,20 +34,20 @@ export default function TovnoLoader({
   decorative = false,
   className = '',
 }) {
-  const base = tone === 'dark' ? '/brand/tovno/tovno-loader-dark' : '/brand/tovno/tovno-loader'
+  const base = tone === 'dark' ? '/brand/cluzo/cluzo-loader-dark' : '/brand/cluzo/cluzo-loader'
   const h = Math.round(width * RATIO)
 
   return (
     <div
-      className={['tovno-loader', className].filter(Boolean).join(' ')}
-      style={{ '--tovno-loader-w': `${width}px` }}
+      className={['brand-loader', className].filter(Boolean).join(' ')}
+      style={{ '--brand-loader-w': `${width}px` }}
       {...(decorative ? { 'aria-hidden': 'true' } : { role: 'status', 'aria-label': label })}
     >
       {/* alt ריק בכוונה: ה-aria-label על המעטפת הוא ההכרזה, ותמונה עם alt
           משלה הייתה גורמת לקורא מסך להקריא את המותג פעמיים. */}
-      <img className="tovno-loader-motion" src={`${base}.svg`} width={width} height={h} alt="" />
-      <img className="tovno-loader-still" src={`${base}-still.svg`} width={width} height={h} alt="" />
-      {hint ? <p className="tovno-loader-hint">{hint}</p> : null}
+      <img className="brand-loader-motion" src={`${base}.svg`} width={width} height={h} alt="" />
+      <img className="brand-loader-still" src={`${base}-still.svg`} width={width} height={h} alt="" />
+      {hint ? <p className="brand-loader-hint">{hint}</p> : null}
     </div>
   )
 }

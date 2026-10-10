@@ -1,19 +1,20 @@
 // עמוד הבית של reports.vitas.co.il הוא גם העמוד שגוגל בודקת באימות המותג
 // (Brand Verification) ובבקשה לרמת Basic של Google Ads API. לכן השם, הלוגו
-// ותיאור השימוש ב-API כאן חייבים להתאים למה שמוגדר ב-Google Cloud (Tovno by
-// Vitas + icon-512.png) ולמדיניות הפרטיות ב-vitas.co.il/privacy. שינוי באחד
-// מהם בלי השני = אי-התאמה שגוגל דוחה עליה.
+// ותיאור השימוש ב-API כאן חייבים להתאים למה שמוגדר ב-Google Cloud (Cluzo by
+// Vitas + /brand/cluzo/icon-512.png) ולמדיניות הפרטיות ב-vitas.co.il/privacy.
+// שינוי באחד מהם בלי השני = אי-התאמה שגוגל דוחה עליה. (10.10: השם הוחלף כאן
+// מ-Tovno ל-Cluzo; את מסך ההסכמה ב-Google Cloud ויטלי מעדכן אחרי הפריסה.)
 export const metadata = {
-  title: 'Tovno by Vitas - Marketing Performance Reports',
-  description: 'Tovno by Vitas is a unified marketing performance dashboard built by VITAS Digital Marketing. It consolidates Meta Ads and Google Ads data into a single reporting platform.',
+  title: 'Cluzo by Vitas - Marketing Performance Reports',
+  description: 'Cluzo by Vitas is a unified marketing performance dashboard built by VITAS Digital Marketing. It consolidates Meta Ads and Google Ads data into a single reporting platform.',
 }
 
 // הלוגו הלבן — אותו קובץ שבסיידבר של הדשבורד. הרקע כאן כהה.
 function Logo({ height = 90 }) {
   return (
     <img
-      src="/brand/tovno/tovno-logo-white.svg"
-      alt="Tovno by Vitas"
+      src="/brand/cluzo/cluzo-logo-dark.svg"
+      alt="Cluzo by Vitas"
       height={height}
       style={{ display: 'block', height, width: 'auto' }}
     />
@@ -57,7 +58,7 @@ export default function Home() {
           Unified Digital Marketing Reporting for Agencies and Advertisers
         </h1>
         <p style={{ fontSize: '1.15em', color: '#94a3b8', lineHeight: 1.7, margin: '0 0 26px', maxWidth: 820 }}>
-          Tovno by Vitas is a proprietary reporting dashboard built by VITAS Digital Marketing. It consolidates campaign performance data from multiple advertising platforms - including Meta Ads (Facebook / Instagram) and Google Ads - into a single, unified interface that agencies and advertisers use to track spend, leads, cost-per-lead, and ad creative performance across all their clients and projects in real time.
+          Cluzo by Vitas is a proprietary reporting dashboard built by VITAS Digital Marketing. It consolidates campaign performance data from multiple advertising platforms - including Meta Ads (Facebook / Instagram) and Google Ads - into a single, unified interface that agencies and advertisers use to track spend, leads, cost-per-lead, and ad creative performance across all their clients and projects in real time.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ background: 'rgba(59,130,246,0.15)', color: '#93c5fd', padding: '6px 14px', borderRadius: 20, fontSize: '0.85em', fontWeight: 600 }}>Meta Marketing API</span>
@@ -105,7 +106,7 @@ export default function Home() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <h2 style={{ fontSize: '1.9em', fontWeight: 800, marginTop: 0, marginBottom: 20 }}>How we use the Google Ads API</h2>
           <p style={{ color: '#94a3b8', lineHeight: 1.75, fontSize: '1em', maxWidth: 900 }}>
-            Tovno by Vitas uses the Google Ads API in <strong style={{ color: '#e2e8f0' }}>read-only mode</strong> to retrieve campaign, ad group, ad, and performance metrics for the Google Ads accounts that our MCC manages. Retrieved data is transformed into a common schema - identical to the schema used for Meta Ads data - and stored in a Supabase Postgres database. Users of the platform view the data through the web dashboard; the API itself is never exposed directly to end users or clients.
+            Cluzo by Vitas uses the Google Ads API in <strong style={{ color: '#e2e8f0' }}>read-only mode</strong> to retrieve campaign, ad group, ad, and performance metrics for the Google Ads accounts that our MCC manages. Retrieved data is transformed into a common schema - identical to the schema used for Meta Ads data - and stored in a Supabase Postgres database. Users of the platform view the data through the web dashboard; the API itself is never exposed directly to end users or clients.
           </p>
           <p style={{ color: '#94a3b8', lineHeight: 1.75, fontSize: '1em', maxWidth: 900, marginTop: 16 }}>
             The API is called either on demand by a logged-in agency employee (via a &quot;Refresh&quot; button) or automatically by scheduled jobs a few times a day, so that each client&apos;s report stays current. We do not create, modify, pause, or delete campaigns through the API - all campaign management is done by our team directly in the Google Ads UI. Refresh tokens are stored as encrypted environment variables in Vercel and are never written to source code or logs.
@@ -118,7 +119,7 @@ export default function Home() {
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
           <h2 style={{ fontSize: '1.9em', fontWeight: 800, marginTop: 0, marginBottom: 10, textAlign: 'center' }}>Get in touch</h2>
           <p style={{ color: '#94a3b8', textAlign: 'center', marginBottom: 36, fontSize: '1.02em', lineHeight: 1.6 }}>
-            Interested in Tovno by Vitas? Leave your details and we&apos;ll get back to you.
+            Interested in Cluzo by Vitas? Leave your details and we&apos;ll get back to you.
           </p>
 
           <form
@@ -188,7 +189,7 @@ export default function Home() {
       {/* Footer */}
       <footer style={{ background: '#080c14', padding: '26px 24px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', color: '#64748b', fontSize: '0.9em' }}>
-          <strong style={{ color: '#94a3b8' }}>Tovno by Vitas</strong> · Built by VITAS Digital Marketing · Contact: vitali@vitas.co.il
+          <strong style={{ color: '#94a3b8' }}>Cluzo by Vitas</strong> · Built by VITAS Digital Marketing · Contact: vitali@vitas.co.il
         </div>
         {/* גוגל דורשת קישור למדיניות הפרטיות ולתנאי השימוש מעמוד הבית של האפליקציה. */}
         <div style={{ maxWidth: 1100, margin: '10px auto 0', fontSize: '0.9em', display: 'flex', gap: 18, justifyContent: 'center', flexWrap: 'wrap' }}>
