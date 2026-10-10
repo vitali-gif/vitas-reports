@@ -12,13 +12,16 @@
 - טקסטים: כותרת הדף, manifest (שם האפליקציה בנייד), עמוד הבית, סיידבר, מיילים (שולח, נושא, כותרת), התראות.
 - נשאר כמו שהוא בכוונה: שמות מסמכי מפרט ישנים בהערות (Tovno-Mobile-Handoff, Tovno-Claude-Color-Spec).
 
-### מחוץ לקוד — אצל ויטלי
-1. מסך ההסכמה ב-Google Cloud: שם האפליקציה "Cluzo by Vitas" + לוגו `icon-512.png` (עמוד הבית כבר מציג Cluzo — חייבים להתאים).
-   באותו יום: מדיניות הפרטיות ב-vitas.co.il/privacy — "Tovno by Vitas" מופיע פעמיים (כותרת סעיף 4 והמשפט שאחריה).
+### מחוץ לקוד
+1. ✅ Google Cloud (10.10): שם "Cluzo by Vitas" + לוגו חדש — גוגל אישרה, ויטלי פרסם (Publish branding).
+2. ✅ מדיניות הפרטיות (10.10): vitas.co.il/privacy — מאגר vitas-website-v2, ענף fix/privacy-cluzo-name, מוזג ובאוויר.
    בתנאי השימוש (vitas.co.il/terms) השם לא מופיע.
-2. Azure (Entra) ← App registrations ← "Tovno by Vitas" ← Branding: שם "Cluzo by Vitas".
-3. Vercel: אם `ALERT_EMAIL_FROM` מוגדר עם "Tovno" — לעדכן.
-4. דומיין cluzo.co.il (+ getcluzo.com / cluzo.io) ובדיקת סימני מסחר.
+3. ✅ Azure (10.10): שם "Cluzo by Vitas", לוגו, כתובות (בית, תנאים, פרטיות), Publisher domain = vitas.co.il.
+   הווי הכחול (Publisher verification) — עדיין ממתין לאישור ה-MPN (בדיקה ביומן 11.10, הזנה ב-28.10).
+4. ✅ כותרות היומן "Tovno —" הוחלפו ל-"Cluzo —" (אירועים עתידיים).
+5. ⏳ Vercel: אם `ALERT_EMAIL_FROM` מוגדר עם "Tovno" — לעדכן (בלי הגדרה, הקוד כבר שולח כ-Cluzo by Vitas).
+6. ⏳ דומיין cluzo.co.il (+ getcluzo.com / cluzo.io) ובדיקת סימני מסחר.
+7. ⏳ אתר, לינקדאין, קמפיינים, ועדכון ללקוחות.
 cluzo.co.il ✅ · cluzo.io ✅ · cluzo.ai ✅ · getcluzo.com ✅ · cluzohq.com ✅ · cluzo.com ❌ (חנוי, בלי אתר).
 לפני רכישה ושימוש: בדיקת סימני מסחר בישראל (רשם סימני המסחר) — עוד לא נעשתה.
 

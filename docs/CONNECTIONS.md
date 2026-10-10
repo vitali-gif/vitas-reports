@@ -65,7 +65,7 @@
 |---|---|
 | Google — OAuth client | `838146922500-r3pto…` — **בחשבון הפרטי vitalidisel@gmail.com**, Google Cloud, בשם המבלבל "BCureLaser Google Ads" (משמש גם ל-Google Ads של בי-קיור — לא למחוק). Authorized JavaScript origins: `https://reports.vitas.co.il` (ל-GIS); redirect: ה-callback של Supabase. ב-Vercel: `NEXT_PUBLIC_GOOGLE_CLIENT_ID`. |
 | Google — הפרויקט `vitas-reports` | Client אחר (`504988157237-…`, "VITAS Reports Web") — **לא** זה של הכניסה. |
-| Microsoft | Azure (Entra) "Default Directory" ← App registrations ← "Tovno by Vitas" (לשנות ל-"Cluzo by Vitas", ראה `docs/NAMING.md`). סוד ב-Supabase, פג 10.2028. |
+| Microsoft | Azure (Entra) "Default Directory" ← App registrations ← "Cluzo by Vitas" (לשעבר Tovno by Vitas, שונה 10.10). סוד ב-Supabase, פג 10.2028. |
 
 ### Google Ads — שני ה-OAuth clients (7.10, מקור בלבול חוזר)
 - `504988157237-…` "VITAS Reports Web" — פרויקט `vitas-reports` בארגון vitas.co.il. ה-`GOOGLE_ADS_CLIENT_ID` של הדשבורד: ב-Vercel הוא Sensitive (לא רואים ערך), אבל "Last used" ב-Google Cloud יומיומי (הקרון כל שעתיים) מול 21.9 של השני — 7.10.
