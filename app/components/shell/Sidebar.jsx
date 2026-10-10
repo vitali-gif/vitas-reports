@@ -28,7 +28,7 @@ export default function Sidebar({
   onAddProject,
   lockedProjects = [],
   demoProjects = [],
-  footerText = 'Tovno by Vitas · v3.2',
+  footerText = 'Cluzo by Vitas · v3.2',
   isOpen = false,
   onClose,
   onExport,
@@ -56,7 +56,7 @@ export default function Sidebar({
       <div className="sidebar-inner" style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 60px)' }}>
         {vr && (
           <div className="side-brand">
-            <img src={brand.logo} alt="Tovno by Vitas" />
+            <img src={brand.logo} alt="Cluzo by Vitas" />
             {brand.tagline && <span className="side-tagline">{brand.tagline}</span>}
           </div>
         )}

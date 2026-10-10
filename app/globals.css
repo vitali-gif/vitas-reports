@@ -30,7 +30,7 @@
 
   :root {
     /* ══════════════════════════════════════════════════════════════════════
-       Tovno by Vitas — מיתוג (Tovno-Claude-Color-Spec.md, ויטלי 21.9)
+       Cluzo by Vitas — מיתוג (Tovno-Claude-Color-Spec.md, ויטלי 21.9)
        ══════════════════════════════════════════════════════════════════════
        המפרט מגדיר משתני --tv-*. הם מוגדרים כאן פעם אחת כמקור האמת, ומיד
        אחריהם הטוקנים הקיימים של המוצר (--bg, --surface, --side-bg…) מקבלים
@@ -1937,29 +1937,29 @@
   color: var(--text-3);
 }
 
-/* ── טוען Tovno (app/components/TovnoLoader.jsx) ─────────────────────────────
+/* ── טוען המותג (app/components/BrandLoader.jsx) ─────────────────────────────
    הנכס עצמו מנפיש את עצמו; כאן רק המסגרת והמידה. min() כדי שבמובייל
    הלוגו יצטמצם לרוחב המסך במקום לגלוש — היחס נשמר כי block-size הוא auto. */
-.tovno-loader {
+.brand-loader {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
 }
-.tovno-loader img {
+.brand-loader img {
   display: block;
-  inline-size: min(var(--tovno-loader-w, 280px), 72vw);
+  inline-size: min(var(--brand-loader-w, 280px), 72vw);
   block-size: auto;
 }
 /* מונפש או דומם. ה-SVG נטען כ-<img>, ולהעדפת "תנועה מופחתת" של המשתמש אין
    דרך להיכנס פנימה (נמדד ב-Chromium — הכלל שבתוך הקובץ לא נכנס לתוקף), ולכן
    ההחלפה נעשית כאן, במדיה קוורי של העמוד עצמו. */
-.tovno-loader .tovno-loader-still { display: none; }
+.brand-loader .brand-loader-still { display: none; }
 @media (prefers-reduced-motion: reduce) {
-  .tovno-loader .tovno-loader-motion { display: none; }
-  .tovno-loader .tovno-loader-still { display: block; }
+  .brand-loader .brand-loader-motion { display: none; }
+  .brand-loader .brand-loader-still { display: block; }
 }
-.tovno-loader-hint {
+.brand-loader-hint {
   margin: 0;
   font-size: 13.5px;
   color: var(--text-3);
@@ -1967,7 +1967,7 @@
 }
 /* במסך "ברוכים הבאים" האנימציה היא סימן המותג ולא חיווי — היא תופסת את
    מקומו של האימוג'י שהיה שם, ולכן צריכה את אותו מרווח שהיה ל-.icon. */
-.welcome-center .tovno-loader.welcome-mark { margin-bottom: 18px; }
+.welcome-center .brand-loader.welcome-mark { margin-bottom: 18px; }
 
 /* --- Recommendation cards (preserved from Stage 4 work) --- */
 .rec-card {
@@ -4204,7 +4204,7 @@ textarea:focus-visible,
     scroll-behavior: auto !important;
   }
   /* ספינרים הם חיווי שהמערכת עובדת — משאירים אותם, רק מאטים מאוד.
-     הטוען של Tovno לא ברשימה: הוא <img>, וה-CSS של העמוד לא נכנס לתוכו —
+     הטוען של המותג לא ברשימה: הוא <img>, וה-CSS של העמוד לא נכנס לתוכו —
      כלל prefers-reduced-motion משלו יושב בתוך קובץ ה-SVG. */
   .skel {
     animation-duration: 2.4s !important;
@@ -4242,7 +4242,7 @@ textarea:focus-visible,
 @media (max-width: 640px) { .back-to-top { inset-block-end: 16px; inset-inline-end: 16px; inline-size: 42px; block-size: 42px; } }
 
 /* ============================================================================
-   Tovno by Vitas — מיתוג: רכיבים
+   Cluzo by Vitas — מיתוג: רכיבים
    מקור: Tovno-Claude-Color-Spec.md (ויטלי, 21.9), סעיפים 4, 6, 7, 8, 9.
 
    ⚠️ סעיף 5 (כרטיסי KPI) לא מיושם בכוונה. ויטלי: "אני לא רוצה לגעת בצבעים

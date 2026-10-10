@@ -12,7 +12,7 @@ import './components/meetings/meetings.css';
 import './components/auth/signin.css';
 
 export const metadata = {
-  title: 'Tovno by Vitas — מערכת דוחות',
+  title: 'Cluzo by Vitas — מערכת דוחות',
   description: 'מערכת דוחות ללקוחות',
 };
 
@@ -31,8 +31,8 @@ export default function RootLayout({ children }) {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Tovno" />
-        {/* אייקוני Tovno (Tovno-Logo-Kit). קודם לא היה בעמוד שום <link rel="icon">,
+        <meta name="apple-mobile-web-app-title" content="Cluzo" />
+        {/* אייקוני Cluzo (חבילת המותג Cluzo-Brand-Kit, 10.10). קודם לא היה בעמוד שום <link rel="icon">,
             ולכן כל דפדפן ביקש /favicon.ico שלא היה קיים וקיבל 404 בכל טעינה. */}
         <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
