@@ -6,13 +6,16 @@
 - נכסים מחבילת המותג (Cluzo-Brand-Kit): `public/brand/cluzo/` — לוגו בהיר (`cluzo-logo-light.svg`, על רקע לבן),
   לוגו כהה (`cluzo-logo-dark.svg`, לסיידבר ולעמוד הבית), סמל, אייקון אפליקציה (`icon-192/512.png`, רקע כחול כהה),
   ובשורש `favicon.ico` / `favicon.svg` / `apple-touch-icon.png`. Tovno הוסר (`public/brand/tovno` נמחק).
-- טוען: `app/components/BrandLoader.jsx` (לשעבר TovnoLoader) עם **טוען זמני** — הלוגו, הסמל מסתובב חצי סיבוב.
-  ויטלי מכין טוען חדש: כשיגיע — מחליפים את `cluzo-loader*.svg` (4 קבצים: מונפש/דומם × בהיר/כהה).
+- טוען: `app/components/BrandLoader.jsx` (לשעבר TovnoLoader). ויטלי בחר (10.10) מתוך 5 סקיצות את **"ג · גל"**:
+  האותיות עולות אחת אחרי השנייה, הסמל מסתובב חצי סיבוב, הנקודה שב-o פועמת. קבצים: `cluzo-loader*.svg`
+  (מונפש/דומם × בהיר/כהה).
 - טקסטים: כותרת הדף, manifest (שם האפליקציה בנייד), עמוד הבית, סיידבר, מיילים (שולח, נושא, כותרת), התראות.
 - נשאר כמו שהוא בכוונה: שמות מסמכי מפרט ישנים בהערות (Tovno-Mobile-Handoff, Tovno-Claude-Color-Spec).
 
 ### מחוץ לקוד — אצל ויטלי
 1. מסך ההסכמה ב-Google Cloud: שם האפליקציה "Cluzo by Vitas" + לוגו `icon-512.png` (עמוד הבית כבר מציג Cluzo — חייבים להתאים).
+   באותו יום: מדיניות הפרטיות ב-vitas.co.il/privacy — "Tovno by Vitas" מופיע פעמיים (כותרת סעיף 4 והמשפט שאחריה).
+   בתנאי השימוש (vitas.co.il/terms) השם לא מופיע.
 2. Azure (Entra) ← App registrations ← "Tovno by Vitas" ← Branding: שם "Cluzo by Vitas".
 3. Vercel: אם `ALERT_EMAIL_FROM` מוגדר עם "Tovno" — לעדכן.
 4. דומיין cluzo.co.il (+ getcluzo.com / cluzo.io) ובדיקת סימני מסחר.
