@@ -313,10 +313,19 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // מלא מגיעה כ-YYYY-MM-01_YYYY-MM-31). ההחלפה קורית רק כשהשורות של התקופה שעל המסך הגיעו.
   const focusModes = useMemo(() => focusModesFor(selectedProject?.name), [selectedProject?.name])
   const focusActive = !!focusMode && focusModes.some(m => m.id === focusMode)
+  // רשת ביטחון (ש.ברוך, 11.10): הדשבורד רואה רק שורות של הפרויקט שנבחר. שורות טווח (synthetic)
+  // של פרויקט קודם נשארו ב-state במעבר בין פרויקטים — ONCE הציג את הלידים של HI PARK, והכרטיס
+  // "לידים" חיבר את שניהם. שורה בלי project_id (נוצרה בדפדפן) נשארת.
+  const selectedPid = selectedProject?.id || null
+  const selectedPidRef = useRef(null)
+  selectedPidRef.current = selectedPid
+  const reportsOfProject = useMemo(
+    () => (selectedPid ? reportsAll.filter(r => !r.project_id || r.project_id === selectedPid) : reportsAll),
+    [reportsAll, selectedPid])
   const reports = useMemo(() => {
-    if (!focusActive || !selectedProject || !selectedMonth) return reportsAll
+    if (!focusActive || !selectedProject || !selectedMonth) return reportsOfProject
     // עד שהשורות של התקופה שעל המסך מגיעות — מציגים את הכל כרגיל (הכפתור מראה "טוען…")
-    if (!Array.isArray(focusRows[`${selectedProject.id}|${focusMode}|${selectedMonth}`])) return reportsAll
+    if (!Array.isArray(focusRows[`${selectedProject.id}|${focusMode}|${selectedMonth}`])) return reportsOfProject
     const keys = [...new Set([selectedMonth, comparisonPeriodKey(selectedMonth)].filter(Boolean))]
     // אפס זליגה (ויטלי, 7.10): במצב מיקוד הדשבורד רואה *רק* את השורות הממוקדות. שורות של חודשים
     // אחרים (גרף מגמה חודשי, פס התקציב, סטטוס קבוצות נכסים, חלון ההמלצות) מחושבות על כל הרשת
@@ -327,7 +336,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       if (Array.isArray(rows)) out = out.concat(rows.map(r => ({ ...r, month: k })))
     }
     return out
-  }, [reportsAll, focusActive, focusMode, focusRows, selectedProject, selectedMonth])
+  }, [reportsOfProject, focusActive, focusMode, focusRows, selectedProject, selectedMonth])
 
   // focusApplied — השורות הממוקדות של התקופה שעל המסך כבר הגיעו והן אלה שמוצגות. עד אז המסך
   // נשאר על "כל הסניפים" (עם "טוען…" על הכפתור) ולא מתרוקן; הכותרות הממוקדות (עלות לליד ממומן)
@@ -815,6 +824,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     if (!res || !res.ok) return null;
     const body = await res.json().catch(() => null);
     if (!body || !Array.isArray(body.rows)) return null;
+    // התשובה הגיעה אחרי מעבר לפרויקט אחר — לא מכניסים אותה למסך של הפרויקט החדש.
+    if (selectedPidRef.current !== projectId) return body;
     if (body.rows.length) {
       setReports(prev => {
         const stored = new Set((prev || []).filter(r => !r.synthetic).map(r => r.source + '|' + r.month));
@@ -1079,8 +1090,9 @@ const loadClients = async () => {
         const merged = data.map(fr => { const old = byId.get(fr.id); if (!old) return fr; const keepFull = fr.summaryLite && !old.summaryLite && old.summary; const base = keepFull ? { ...fr, summary: old.summary, summaryLite: false } : fr; return old.data != null ? { ...base, data: old.data } : base; });
         // שורות סינתטיות (מ-/api/reports/range) לא קיימות ב-by-project — משאירים אותן, אלא אם
         // בינתיים נכתב דוח שמור לאותו מקור+מפתח (הוא גובר).
+        // רק של הפרויקט הזה: בכניסה ראשונה לפרויקט `prev` הוא עוד של הפרויקט הקודם (ש.ברוך, 11.10).
         const storedKeys = new Set(data.map(r => r.source + '|' + r.month));
-        const synthetic = (prev || []).filter(r => r.synthetic && !storedKeys.has(r.source + '|' + r.month));
+        const synthetic = (prev || []).filter(r => r.synthetic && r.project_id === projectId && !storedKeys.has(r.source + '|' + r.month));
         return synthetic.length ? [...merged, ...synthetic] : merged;
       });
       if (data.length > 0) {
