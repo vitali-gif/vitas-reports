@@ -4,6 +4,10 @@
 // Vitas + /brand/cluzo/icon-512.png) ולמדיניות הפרטיות ב-vitas.co.il/privacy.
 // שינוי באחד מהם בלי השני = אי-התאמה שגוגל דוחה עליה. (10.10: השם הוחלף כאן
 // מ-Tovno ל-Cluzo; את מסך ההסכמה ב-Google Cloud ויטלי מעדכן אחרי הפריסה.)
+//
+// ⚠️ העמוד עבר למאגר cluzo-site ומוגש משם (rewrite ב-next.config.js, משתנה
+// CLUZO_SITE_URL). העותק הזה הוא גיבוי בלבד — מוצג רק כשהמשתנה לא מוגדר.
+// שינויים בעמוד הבית עושים ב-cluzo-site, לא כאן.
 export const metadata = {
   title: 'Cluzo by Vitas - Marketing Performance Reports',
   description: 'Cluzo by Vitas is a unified marketing performance dashboard built by VITAS Digital Marketing. It consolidates Meta Ads and Google Ads data into a single reporting platform.',

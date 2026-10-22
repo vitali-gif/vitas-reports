@@ -52,6 +52,12 @@ Next.js 14 (App Router) · Supabase · Vercel · אינטגרציות: Meta, Goo
 ad_daily לפי חשבון, crm_sync), לעדכן את הקובץ במאגר, ולהעלות לתיקייה גרסה חדשה (כלי הדרייב לא עורך תוכן — יוצרים
 קובץ חדש ומעבירים את הישן לפח). לסמן גישה [אישי] מול [BM], וטוקנים שפגים.
 
+## עמוד הבית
+
+עמוד הבית (/) של reports.vitas.co.il מגיע מהמאגר **cluzo-site** (פרויקט Vercel נפרד), דרך rewrite
+ב-`next.config.js` כשמשתנה הסביבה `CLUZO_SITE_URL` מוגדר. `app/page.js` כאן הוא גיבוי בלבד —
+שינויים בעמוד הבית עושים ב-cluzo-site. `public/brand/cluzo/icon-512.png` נשאר כאן: גוגל מכירה אותו.
+
 ## טווחי תאריכים מיידיים
 
 כל טווח תאריכים נטען מ-`/api/reports/range` מתוך `ad_daily` (מודעות) ו-`crm_compact` (CRM), בלי לפנות לספקים

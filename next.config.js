@@ -22,8 +22,24 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
 ]
 
+// עמוד הבית (/) מוגש מהמאגר cluzo-site — פרויקט Vercel נפרד (Next.js multi-zones).
+// CLUZO_SITE_URL = הכתובת של הפרויקט הזה ב-Vercel, בלי / בסוף. כל הנכסים של האתר
+// יושבים תחת /site-assets (ראה cluzo-site/next.config.js), כדי לא להתנגש ב-/_next
+// של הדשבורד. כשהמשתנה לא מוגדר — app/page.js המקומי מוצג כמו קודם, כגיבוי,
+// כדי שהעמוד שגוגל בודקת לא ייעלם.
+const CLUZO_SITE_URL = (process.env.CLUZO_SITE_URL || '').replace(/\/+$/, '')
+
 const nextConfig = {
   reactStrictMode: true,
+  async rewrites() {
+    if (!CLUZO_SITE_URL) return []
+    return {
+      beforeFiles: [
+        { source: '/', destination: `${CLUZO_SITE_URL}/` },
+        { source: '/site-assets/:path+', destination: `${CLUZO_SITE_URL}/site-assets/:path+` },
+      ],
+    }
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },
