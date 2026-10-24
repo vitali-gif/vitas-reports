@@ -18,6 +18,28 @@ import Chart from 'chart.js/auto'
 // ולכן הרף נקבע כאן ומוחל כברירת מחדל גלובלית בכל בניית גרף.
 // ⚠️ קונפיגורציות שמגדירות font.size מפורשות (ticks של כמה גרפים, 10–11px)
 // עדיין גוברות על ברירת המחדל — נשאר מעבר ייעודי.
+/**
+ * מודעת Google Search רספונסיבית: adText הוא כל התיאורים מחוברים ב-" / " (lib/ads/google-api.js).
+ * מוצג קודם התיאור הראשון, והשאר מקופלים — קודם הכל הופיע כגוש טקסט אחד שלא היה ברור
+ * איפה נגמר תיאור ומתחיל הבא (ויטלי, 24.10). השם "Ad 822812352477" הוא מזהה פנימי — לא מוצג.
+ */
+function SearchAdText({ text, name }) {
+  const parts = String(text || '').split(' / ').map(t => t.trim()).filter(Boolean)
+  const showName = name && !/^Ad\s*\d+$/i.test(String(name).trim())
+  return (
+    <div className="gs-ad">
+      <div className="gs-ad-main" dir="auto">{parts[0] || '—'}</div>
+      {parts.length > 1 && (
+        <details className="gs-ad-more">
+          <summary>{'עוד ' + (parts.length - 1) + (parts.length === 2 ? ' תיאור' : ' תיאורים')}</summary>
+          <ul>{parts.slice(1).map((t, i) => <li key={i} dir="auto">{t}</li>)}</ul>
+        </details>
+      )}
+      {showName ? <div className="gs-ad-name">{name}</div> : null}
+    </div>
+  )
+}
+
 const isNarrowViewport = () =>
   typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
 
@@ -4258,8 +4280,20 @@ const selectProject = async (client, project) => {
         const _campNarrow = typeof window !== 'undefined' && window.innerWidth < 640;
         const _narrowLabels = (names) => {
           const per = Math.max(6, Math.floor((window.innerWidth - 120) / Math.max(1, names.length) / 7));
-          return names.map(n => {
-            const toks = String(n || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').split(/\s+/).filter(w => w && w !== '|')
+          // שמות כמו "Bcurelaser-Brand(Heb)-3/2026-Search" בלי רווחים נחתכו באמצע מילה ועלו זה על זה
+          // (ויטלי, 24.10). במסך צר: בלי הקידומת שמשותפת לכל הקמפיינים, בלי "3/2026", מקפים כרווחים.
+          // השם המלא נשאר בחלונית שנפתחת בלחיצה.
+          const _strip = (x) => String(x || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '');
+          const _clean = names.map(_strip);
+          let _pre = _clean.length > 1 ? _clean.reduce((a, b) => { let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++; return a.slice(0, i); }) : '';
+          _pre = _pre.slice(0, Math.max(0, _pre.search(/[-_|\s][^-_|\s]*$/) + 1));
+          const _readable = (x) => {
+            const t = x.slice(_pre.length).replace(/(^|[-_\s])\d{1,2}\/\d{4}(?=$|[-_\s])/g, ' ').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+            return t || x;
+          };
+          const _ltrMark = (line) => (/[\u0590-\u05FF]/.test(line) ? line : '\u200e' + line);
+          return _clean.map(_readable).map(n => {
+            const toks = n.split(/\s+/).filter(w => w && w !== '|')
               .flatMap(w => w.length <= per ? [w] : (w.match(new RegExp('.{1,' + per + '}', 'g')) || [w]));
             const lines = [];
             for (const w of toks) {
@@ -4267,7 +4301,7 @@ const selectProject = async (client, project) => {
               if (last != null && (last + ' ' + w).length <= per) lines[lines.length - 1] = last + ' ' + w; else lines.push(w);
             }
             if (lines.length > 3) { lines.length = 3; lines[2] = lines[2].slice(0, per - 1) + '\u2026'; }
-            return lines;
+            return lines.map(_ltrMark);
           });
         };
         const _shortCamp = _campNarrow ? _narrowLabels(campNames2) : shortenLabels(campNames2);
@@ -6560,7 +6594,10 @@ const selectProject = async (client, project) => {
               </div>
             </div>
           );
-          const sorted = [...allAGs].sort((a,b) => (b.spend || 0) - (a.spend || 0));
+          // רק קבוצות שפעלו בתקופה (ויטלי, 24.10): קבוצות מושהות או ריקות הופיעו כשורות של אפסים.
+          const _agActive = (ag) => (ag.spend || 0) > 0 || (ag.impressions || 0) > 0 || (ag.clicks || 0) > 0 || (ag.conversions || ag.leads || 0) > 0;
+          const sorted = allAGs.filter(_agActive).sort((a,b) => (b.spend || 0) - (a.spend || 0));
+          const _agHidden = allAGs.length - sorted.length;
           return (
             <div className="section">
               <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div><h2>קבוצות נכסים</h2><span className="sub">Performance Max Asset Groups</span></div>
@@ -6598,6 +6635,7 @@ const selectProject = async (client, project) => {
                     );
                   })}
                 </tbody></table>
+                {_agHidden > 0 && <p className="vr-caption" style={{margin:'10px 4px 0'}}>{_agHidden + ' קבוצות נכסים בלי פעילות בתקופה לא מוצגות'}</p>}
               </div>
             </div>
           );
@@ -6804,7 +6842,7 @@ const selectProject = async (client, project) => {
                   const ctr = a.impressions > 0 ? (a.clicks / a.impressions * 100) : 0;
                   const cpc = a.clicks > 0 ? a.spend / a.clicks : 0;
                   const cpl = a.leads > 0 ? a.spend / a.leads : 0;
-                  return (<tr key={i}><td style={{maxWidth:340,unicodeBidi:'plaintext'}}><div style={{fontWeight:600,fontSize:'0.85em',color:'#0f172a',whiteSpace:'normal'}}>{a.adText}</div>{a.adName ? <div style={{fontSize:'0.72em',color:'#94a3b8'}}>{a.adName}</div> : null}</td><td style={{fontSize:'0.78em',color:'#64748b',unicodeBidi:'plaintext'}}>{a.campaign}</td><td>{formatNum(a.clicks)}</td><td>{formatNum(a.impressions)}</td><td>{ctr.toFixed(2)}%</td><td>{formatCurrency(cpc)}</td><td>{formatNum(Math.round(a.leads))}</td><td>{formatCurrency(cpl)}</td><td>{formatCurrency(a.spend)}</td></tr>);
+                  return (<tr key={i}><td className="gs-ad-cell"><SearchAdText text={a.adText} name={a.adName} /></td><td style={{fontSize:'0.78em',color:'#64748b',unicodeBidi:'plaintext'}}>{a.campaign}</td><td>{formatNum(a.clicks)}</td><td>{formatNum(a.impressions)}</td><td>{ctr.toFixed(2)}%</td><td>{formatCurrency(cpc)}</td><td>{formatNum(Math.round(a.leads))}</td><td>{formatCurrency(cpl)}</td><td>{formatCurrency(a.spend)}</td></tr>);
                 })}
               </tbody></table></div>
             </div>
