@@ -4561,3 +4561,25 @@ textarea:focus-visible,
   .vrm-table td.vrm-desc { border: 0 !important; }
   .vrm-table td.vrm-desc { margin-block-start: 8px; font-size: 13.5px; line-height: 1.6; color: var(--text-2, #374151); }
 }
+
+/* ── סבב 24.10, אריקה כרמל: טבלאות צפופות יותר בכל הלקוחות ─────────────────────
+   כותרות העמודות ירשו letter-spacing של 0.1em (נועד לאותיות גדולות באנגלית) — בעברית
+   זה רק ריווח שמפרק מילים ושובר כותרות לשתי שורות. */
+.vr-ui .data-table thead th { letter-spacing: 0; text-transform: none; }
+
+/* מודעות Google Search: תיאור ראשי + שאר התיאורים מקופלים (SearchAdText ב-admin/page.js) */
+.data-table td.gs-ad-cell { min-inline-size: 220px; max-inline-size: 360px; white-space: normal; vertical-align: top; }
+.gs-ad-main { font-weight: 600; font-size: 13px; line-height: 1.55; color: var(--vr-text, #0f172a); }
+.gs-ad-more { margin-block-start: 4px; }
+.gs-ad-more summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--indigo, #4f46e5); list-style-position: inside; }
+.gs-ad-more ul { margin: 6px 0 0; padding-inline-start: 18px; font-size: 12px; line-height: 1.55; color: var(--text-2, #475569); }
+.gs-ad-more li + li { margin-block-start: 4px; }
+.gs-ad-name { margin-block-start: 4px; font-size: 11px; color: var(--text-3, #94a3b8); }
+
+@media (max-width: 767px) {
+  /* table/div בסלקטור: vitas-bridge נטען אחרי globals עם אותה ספציפיות (11px / 20px) */
+  .vr-ui table.data-table thead th { font-size: 12px; padding-block: 9px; padding-inline: 9px; }
+  .vr-ui table.data-table tbody td { font-size: 12.5px; padding-block: 8px; padding-inline: 9px; }
+  .vr-ui div.section-head h2 { font-size: 18px; }
+  .data-table tbody td.gs-ad-cell { max-inline-size: min(62vw, 250px); min-inline-size: 180px; white-space: normal !important; }
+}
