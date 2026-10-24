@@ -2198,13 +2198,18 @@ const selectProject = async (client, project) => {
           ];
           if (cmpHasData) _sets.push({ label: '% המרה · תקופה קודמת', data: _hours.map(h => cmpRate[h]),
             ..._line('#9AA3B5'), borderWidth: 2, borderDash: [2, 3], pointRadius: 0, spanGaps: true, yAxisID: 'y1' });
+          // מובייל (ויטלי, 24.10): השעות "12:0016:0020:00" נדבקו זו לזו, ושתי כותרות הצירים
+          // לקחו רוחב מהגרף. במסך צר: שעה עגולה בלי ":00", עד 7 תוויות, בלי כותרות צירים
+          // (הצבע של הציר השמאלי והמקרא כבר אומרים מה הוא).
+          const _narrow = isNarrowViewport();
           createChart('apptHourChart', 'line', _hours.map(h => h + ':00'), _sets, {
-            x: { grid: { display: false }, ticks: { font: { size: cfs(11), weight: '600' }, color: '#374151', maxRotation: 0 } },
+            x: { grid: { display: false }, ticks: { font: { size: cfs(11), weight: '600' }, color: '#374151', maxRotation: 0,
+                 ...(_narrow ? { autoSkip: true, maxTicksLimit: 7, autoSkipPadding: 12, callback: (_v, i) => String(_hours[i]) } : {}) } },
             y: { beginAtZero: true, position: 'right', grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' },
-                 title: { display: true, text: 'כמות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
+                 title: { display: !_narrow, text: 'כמות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
             y1: { beginAtZero: true, suggestedMax: 100, position: 'left', grid: { display: false },
                   ticks: { precision: 0, color: '#EF4444', callback: (v) => v + '%' },
-                  title: { display: true, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#EF4444' } },
+                  title: { display: !_narrow, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#EF4444' } },
           }, undefined, { options: { plugins: {
             legend: { position: 'top', align: 'center', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 18, font: { weight: '600', size: 12 }, color: '#374151' } },
             tooltip: { callbacks: { afterBody: (items) => {
@@ -6408,9 +6413,12 @@ const selectProject = async (client, project) => {
           // עמודת "פלטפורמה" נפרדת (ויטלי, 20.9): הלוגו ישב בתוך תא השם, ומכיוון ששמות
           // הקמפיינים מעורבים עברית/אנגלית הוא נדד ימינה או שמאלה לפי השם — עמודה משלו
           // מיישרת אותו בכל השורות. sort=false כי אין מה למיין לפיו ברמות 1 ו-2.
+          // בטאב Facebook / Google כל השורות מאותה פלטפורמה — העמודה רק לקחה רוחב, ובמובייל
+          // דחפה את המדדים מחוץ למסך (ויטלי, 24.10). נשארת רק ב"הכל".
+          const _showPlatform = dashTab === 'all';
           const cols = [
             { key:'name', label:'\u05e7\u05de\u05e4\u05d9\u05d9\u05df / \u05e7\u05d1\u05d5\u05e6\u05d4 / \u05de\u05d5\u05d3\u05e2\u05d4' },
-            { key:'platform', label:'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4', noSort: true },
+            ...(_showPlatform ? [{ key:'platform', label:'\u05e4\u05dc\u05d8\u05e4\u05d5\u05e8\u05de\u05d4', noSort: true }] : []),
             { key:'status', label:'\u05e1\u05d8\u05d0\u05d8\u05d5\u05e1' },
             { key:'clicks', label:'\u05e7\u05dc\u05d9\u05e7\u05d9\u05dd' },
             { key:'impressions', label:'\u05d7\u05e9\u05d9\u05e4\u05d5\u05ea' },
@@ -6436,17 +6444,19 @@ const selectProject = async (client, project) => {
                 {/* dir=rtl על התא + bdi סביב השם: החץ יושב תמיד בקצה הימני, והשם עצמו
                     עדיין מוצג בכיוון שלו (אנגלית LTR, עברית RTL). קודם התא כולו היה
                     unicodeBidi:'plaintext', ולכן שורה ששמה מתחיל באנגלית התהפכה כולה. */}
-                <td dir="rtl" style={{fontWeight: fontW, fontSize, paddingInlineStart: `${8 + indent}px`, textAlign: 'right'}}>
+                <td dir="rtl" className="camp-name-cell" style={{fontWeight: fontW, fontSize, paddingInlineStart: `${8 + indent}px`, textAlign: 'right'}}>
                   <span style={{display:'inline-block', width:'18px', color:'#64748b', marginInlineEnd:'4px'}}>
                     {hasChildren ? (vrAds ? (isExpanded ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronLeft size={15} aria-hidden="true" />) : (isExpanded ? '\u25bc' : '\u25c0')) : ''}
                   </span>
-                  <bdi>{name === 'PERFORMANCE_MAX' ? 'Performance Max' : name}</bdi>
+                  {/* שם שיש בו עברית מוצג מימין לשמאל גם כשהוא מתחיל באנגלית ("AD 4 - דירות גן"):
+                      ב-dir=auto הוא נקבע לפי האות הראשונה, והמקף נדד לתחילת השורה (ויטלי, 24.10). */}
+                  <bdi className="camp-name" dir={/[\u0590-\u05FF]/.test(name) ? 'rtl' : 'ltr'} title={name}>{name === 'PERFORMANCE_MAX' ? 'Performance Max' : name}</bdi>
                 </td>
-                <td style={{fontSize, whiteSpace:'nowrap'}}>
+                {_showPlatform && <td style={{fontSize, whiteSpace:'nowrap'}}>
                   {level === 0 && data.source ? (vrAds
                     ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
                     : <span className={`platform-tag${data.source.includes('google')?' google':''}`}>{data.source.includes('google')?'GOOGLE':'FACEBOOK'}</span>) : <span style={{color:'#cbd5e1'}}>-</span>}
-                </td>
+                </td>}
                 <td style={{fontSize,whiteSpace:'nowrap'}}>{(() => { const st = data.status || ''; if (!st && name === 'PERFORMANCE_MAX') return <span style={{color:'#cbd5e1'}}>-</span>; /* קבוצה סינתטית של PMax — אין לה סטטוס משלה, ו'מכובה' היה שקר */ const isActive = st === 'ENABLED' || st === 'ACTIVE'; const isPaused = st === 'PAUSED' || /_PAUSED$/.test(st); const bg = isActive ? 'rgba(16,185,129,0.12)' : 'rgba(226,75,74,0.12)'; const col = isActive ? '#059669' : '#c0322f'; const label = isActive ? '\u05e4\u05e2\u05d9\u05dc' : isPaused ? '\u05de\u05d5\u05e9\u05d4\u05d4' : (st === 'REMOVED' || st === 'DELETED' || st === 'ARCHIVED') ? '\u05d4\u05d5\u05e1\u05e8' : ({ WITH_ISSUES: 'בעיה', DISAPPROVED: 'נדחתה', PENDING_REVIEW: 'בבדיקה', IN_PROCESS: 'בבדיקה', PREAPPROVED: 'בבדיקה', PENDING_BILLING_INFO: 'חסר אמצעי תשלום' }[st] || st || '-'); // ערכי effective_status של Meta (למשל CAMPAIGN_PAUSED) הוצגו גולמיים ונחתכו במובייל (ויטלי, 28.9) // סטטוס ריק פירושו קמפיין שאינו פעיל — עד היום הוא הוצג כמקף אפור ונקרא כמו
                   // "אין נתון". עכשיו "מכובה" באדום (ויטלי, 21.9).
                   if (vrAds) return st ? <span className={`vr-status ${isActive ? 'on' : isPaused ? 'paused' : 'off'}`}><i aria-hidden="true" />{label}</span> : <span className="vr-status off"><i aria-hidden="true" />מכובה</span>; return st ? <span style={{background:bg,color:col,borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>{label}</span> : <span style={{background:'rgba(226,75,74,0.12)',color:'#c0322f',borderRadius:'999px',padding:'2px 8px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap',display:'inline-block'}}>מכובה</span>; })()}</td>

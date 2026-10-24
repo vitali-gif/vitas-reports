@@ -4497,3 +4497,67 @@ textarea:focus-visible,
     transition: transform .26s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s;
   }
 }
+
+/* ============================================================
+   Cluzo Mobile · סבב 24.10 (ש.ברוך, צילומים מהטלפון של ויטלי)
+   1. טבלת הקמפיינים: שמות של 4–5 שורות בעמודה צרה, הזחה של 56px למודעות.
+   2. כרטיסי "פעילות בתקופה": ערך גדול מדי לשני כרטיסים בשורה; "מקור מוביל" בשלוש שורות.
+   3. רשימת הפגישות: התיאור נחתך בקצה המסך — בנייד היא רשימת כרטיסים, לא טבלה.
+   ============================================================ */
+@media (max-width: 768px) {
+  /* 1 · שם הקמפיין: עמודה קצת רחבה יותר, גופן אחיד, עד 3 שורות (השם המלא ב-title ובייצוא). */
+  .data-table tbody td.camp-name-cell {
+    max-inline-size: min(46vw, 180px);
+    min-inline-size: 128px;
+    font-size: 12.5px !important;
+    line-height: 1.35;
+  }
+  .data-table td.camp-name-cell .camp-name {
+    display: -webkit-inline-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    vertical-align: top;
+    max-inline-size: calc(100% - 24px);
+  }
+  .vr-tree-row.vr-lvl-1 > td.camp-name-cell { padding-inline-start: 14px !important; }
+  .vr-tree-row.vr-lvl-2 > td.camp-name-cell { padding-inline-start: 22px !important; }
+
+  /* 2 · כרטיסי מדד: שניים בשורה צריכים ערך שנכנס ברוחב של חצי מסך. */
+  .vr-ui .vr-metric .vr-metric-value { font-size: 24px; }
+  /* ‎.vr-metric-grid‎ בסלקטור — אחרת הכלל של vitas-bridge (22px, נטען אחרי) גובר. */
+  .vr-ui .vr-metric-grid .vr-metric.vr-metric-text .vr-metric-value { font-size: 16px; line-height: 1.35; }
+
+  /* 3 · רשימת הפגישות שבוצעו: כרטיס לכל פגישה — שם, תאריך, מקור וטלפון בשורה, והתיאור המלא מתחת. */
+  .table-wrapper:has(> .vrm-table) { overflow: visible; }
+  .table-wrapper:has(> .vrm-table)::after { display: none; }
+  .vrm-table { min-inline-size: 0 !important; inline-size: 100%; }
+  .vrm-table thead { display: none; }
+  .vrm-table, .vrm-table tbody, .vrm-table tr, .vrm-table td { display: block; }
+  .vrm-table tbody tr {
+    border: 1px solid var(--border, #DDE2EC);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-block-end: 10px;
+    background: var(--card, #fff);
+  }
+  .vrm-table tbody td,
+  .vrm-table tbody td:first-child {
+    position: static;
+    max-inline-size: none;
+    box-shadow: none;
+    background: transparent !important;
+    border: 0;
+    padding: 2px 0 !important;
+    white-space: normal !important;
+  }
+  .vrm-table td.vrm-name { font-size: 15px; font-weight: 700; }
+  .vrm-table td.vrm-date,
+  .vrm-table td.vrm-source,
+  .vrm-table td.vrm-phone { display: inline-block; font-size: 12.5px; color: var(--text-3, #6B7280); border: 0 !important; }
+  .vrm-table td.vrm-source::before,
+  .vrm-table td.vrm-date::before { content: '·'; margin-inline: 7px; color: var(--text-3, #98A0B2); }
+  .vrm-table td.vrm-name,
+  .vrm-table td.vrm-desc { border: 0 !important; }
+  .vrm-table td.vrm-desc { margin-block-start: 8px; font-size: 13.5px; line-height: 1.6; color: var(--text-2, #374151); }
+}
