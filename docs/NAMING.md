@@ -12,6 +12,12 @@
 - טקסטים: כותרת הדף, manifest (שם האפליקציה בנייד), עמוד הבית, סיידבר, מיילים (שולח, נושא, כותרת), התראות.
 - נשאר כמו שהוא בכוונה: שמות מסמכי מפרט ישנים בהערות (Tovno-Mobile-Handoff, Tovno-Claude-Color-Spec).
 
+### כתובת הדשבורד (14.10) — נשארת reports.vitas.co.il בינתיים
+ויטלי: "נעשה את זה בהזדמנות". האפשרויות: cluzo.vitas.co.il או app.cluzo.co.il (אם נקנה cluzo.co.il) — לעשות פעם אחת בלבד.
+מה זה דורש: רשומת DNS + Vercel, Supabase (Site URL + redirects), Google Cloud (origin ל-GIS + עמוד הבית → אימות מיתוג מחדש),
+Azure (Home page URL), ו-42 הופעות בקוד (קישורי כניסה, מיילים, קרונים, GIS, workflows). הכתובת הישנה חייבת להמשיך לעבוד:
+סקריפט Google Ads בתוך החשבונות, הסוכן היומי (/api/v1) ואפליקציות שהותקנו בנייד פונים אליה. כל המשתמשים מתנתקים פעם אחת.
+
 ### מחוץ לקוד
 1. ✅ Google Cloud (10.10): שם "Cluzo by Vitas" + לוגו חדש — גוגל אישרה, ויטלי פרסם (Publish branding).
 2. ✅ מדיניות הפרטיות (10.10): vitas.co.il/privacy — מאגר vitas-website-v2, ענף fix/privacy-cluzo-name, מוזג ובאוויר.

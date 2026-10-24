@@ -323,7 +323,9 @@
   .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .vr-ui .vfb-root .vfb-tab-heading h2 { font-size: 24px; }
 }
-@media (max-width: 380px) { .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: minmax(0, 1fr); } }
+/* עמודה אחת רק במסך צר מאוד: ב-380 נפלו לעמודה אחת גם טלפונים רגילים (~360px), וכל כרטיס
+   תפס מסך שלם (ויטלי, 24.10). */
+@media (max-width: 329px) { .vr-ui .vfb-root .vr-metric-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* ── כרטיס קבוצת נכסים של Google PMax: קיפולים ותמונות ממוזערות ───────────────
    אחרי שכל הנכסים הוצגו (18 כותרות, 5 תיאורים, 14 תמונות, 6 סרטונים) הכרטיס
