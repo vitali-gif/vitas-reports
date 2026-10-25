@@ -114,4 +114,21 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   eq('no facebook → no ads section', render(build({ project: 'x', key: '2026-09', rows: [] })).includes('TOP ADS'), false)
 }
 
+
+// ויטלי, 25.10: הסדר החדש וסעיף "התנגדויות, יישובים, מצב דיור וסוג נכס" (HI PARK).
+{
+  const { leadProfile, buildReportModel: build, renderReportHtml: render } = await import('../../lib/report-pdf.js')
+  const rows = [
+    { address: 'תל אביב', livingStatus: 'שוכר', propertyType: 'דירת 3 חדרים,דירת 4 חדרים', objections: 'מחיר' },
+    { address: 'תל אביב', livingStatus: 'בעל דירה', propertyType: 'דירת 4 חדרים' },
+    { address: 'לא צוין', contractOnly: true, livingStatus: 'שוכר' },
+  ]
+  const pr = leadProfile({ crmRepRows: rows })
+  eq('lead profile: cities, living, multi-select property, contractOnly skipped', [pr.cities, pr.living.map(x => x.count), pr.property.map(x => [x.name, x.count])], [[{ name: 'תל אביב', count: 2 }], [1, 1], [['דירת 4 חדרים', 2], ['דירת 3 חדרים', 1]]])
+  const h = render(build({ project: 'HI PARK', client: 'ש.ברוך', key: '2026-09', prevKey: '2026-08', rows: [{ source: 'crm', summary: { totalLeads: 10, crmRepRows: rows } }], prevRows: [{ source: 'crm', summary: { totalLeads: 8 } }] }))
+  const at = (s) => h.indexOf(s)
+  eq('order: funnel → profile → what changed', [at('משפך לידים') > 0, at('משפך לידים') < at('מצב דיור'), at('מצב דיור') < at('מה השתנה מהחודש הקודם')], [true, true, true])
+  eq('client / project heading', h.includes('ש.ברוך<span class="sl">/</span>HI PARK'), true)
+}
+
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
