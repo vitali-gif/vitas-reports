@@ -88,7 +88,6 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   eq('handling html: section + percentage points, no undefined', [hh.includes('טיפול בלידים'), hh.includes('>+10</span> נק׳'), /undefined|NaN/.test(hh)], [true, true, false])
 }
 
-if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
 
 // ויטלי, 25.10: החודש שרץ מוצג כטווח הימים (כי מולו משווים לאותם ימים בחודש הקודם), ובלי מקף ארוך בדוח.
 {
@@ -97,3 +96,22 @@ if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else co
   const body = html.replace(/<style>[\s\S]*?<\/style>/, '')
   eq('no long dashes in the report text', /[—–]/.test(body), false)
 }
+
+// ויטלי, 25.10: המודעות המובילות בפייסבוק בדוח — כמו בגלריה בדשבורד: מאוחדות לפי שם, לפי לידים,
+// והמספרים מהנתונים המפורטים של התקופה כשהם טעונים.
+{
+  const { topFacebookAds, buildReportModel: build, renderReportHtml: render } = await import('../../lib/report-pdf.js')
+  const ad = (id, name, leads, spend, extra = {}) => ({ id, name, campaign: 'c', imageUrl: 'https://scontent.example/' + id + '.jpg', metrics: { leads, spend, clicks: 10, impressions: 1000 }, ...extra })
+  const fb = { source: 'facebook', summary: { spend: 900, leads: 30, activeAds: [ad('1', 'וילה', 5, 200), ad('2', 'וילה - עותק 2', 4, 100), ad('3', 'פנטהאוז', 7, 400, { videoId: 'v1' }), ad('4', 'שקט', 0, 0)] } }
+  const t = topFacebookAds([fb])
+  eq('top ads: merged by name, sorted by leads, idle ad dropped', t.map(a => [a.name, a.leads, a.spend, a.isVideo]), [['וילה', 9, 300, false], ['פנטהאוז', 7, 400, true]])
+  // טווח: המדדים מהנתונים המפורטים (activeAds הם תמונת מצב)
+  const withData = { ...fb, data: [{ adName: 'פנטהאוז', spend: 50, leads: 2, clicks: 1, impressions: 10 }, { adName: 'וילה #2', spend: 30, leads: 1 }] }
+  eq('top ads: metrics from period data', topFacebookAds([withData]).map(a => [a.name, a.leads, a.spend]), [['פנטהאוז', 2, 50], ['וילה', 1, 30]])
+  const h = render(build({ project: 'x', key: '2026-09', prevKey: '2026-08', rows: [fb], prevRows: [] }), { assetBase: 'https://r.example' })
+  eq('top ads html: section, image, video tag, no undefined', [h.includes('המודעות המובילות בפייסבוק'), h.includes('https://scontent.example/1.jpg'), h.includes('>VIDEO<'), /undefined|NaN/.test(h)], [true, true, true, false])
+  eq('top ads html: unsafe image url dropped', render(build({ project: 'x', key: '2026-09', rows: [{ source: 'facebook', summary: { activeAds: [ad('9', 'א', 3, 10, { imageUrl: 'javascript:alert(1)' })] } }] })).includes('javascript:'), false)
+  eq('no facebook → no ads section', render(build({ project: 'x', key: '2026-09', rows: [] })).includes('TOP ADS'), false)
+}
+
+if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')

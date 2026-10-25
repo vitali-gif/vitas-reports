@@ -551,9 +551,12 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       const { buildReportModel, renderReportHtml } = await import('../../lib/report-pdf.js');
       const html = renderReportHtml(buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows }), { assetBase: window.location.origin });
       w.document.open(); w.document.write(html); w.document.close();
-      // דיאלוג ההדפסה אחרי שהגופן נטען, אחרת העברית יוצאת בגופן ברירת המחדל.
+      // דיאלוג ההדפסה אחרי שהגופן והתמונות של המודעות נטענו, אחרת העברית יוצאת בגופן ברירת המחדל
+      // והמודעות ריקות. תמונה שלא נטענת לא מעכבת יותר מ-6 שניות.
       const go = () => { try { w.focus(); w.print(); } catch {} };
-      (w.document.fonts?.ready || Promise.resolve()).then(() => setTimeout(go, 150), go);
+      const imgs = Array.from(w.document.images || []).filter(i => !i.complete).map(i => new Promise(r => { i.addEventListener('load', r, { once: true }); i.addEventListener('error', r, { once: true }); }));
+      const wait = Promise.race([Promise.all([w.document.fonts?.ready || Promise.resolve(), ...imgs]), new Promise(r => setTimeout(r, 6000))]);
+      wait.then(() => setTimeout(go, 150), go);
     } catch (err) {
       try { w.close(); } catch {}
       showToast('שגיאה בהפקת הדוח: ' + (err?.message || err));
