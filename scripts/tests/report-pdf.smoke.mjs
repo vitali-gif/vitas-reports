@@ -7,7 +7,7 @@ const eq = (label, a, b) => (JSON.stringify(a) === JSON.stringify(b) ? console.l
 const r = (x) => Math.round(x)
 
 eq('period labels', [periodLabel('2026-09'), periodLabel('2026-09-01_2026-09-15'), periodLabel('2025-12-20_2026-01-10')],
-  ['ספטמבר 2026', '01.09–15.09.2026', '20.12.2025–10.01.2026'])
+  ['ספטמבר 2026', '01.09-15.09.2026', '20.12.2025-10.01.2026'])
 
 // נדל"ן (BMBY — בלי crmType בסיכום)
 const cur = [
@@ -63,7 +63,7 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
       buckets: { '0-15m': 1 }, business: { medianMinutes: 160, buckets: { '0-15m': 10, '15m-1h': 30, '1h-4h': 70, '4h-8h': 30, '8h-1d': 15, '1d-3d': 5, '3d+': 0 } } },
     crmRepRows: [{ objections: 'מחיר' }, { objections: 'מחיר, מיקום' }, { objections: '' }] } })
   eq('bmby handling: counts, business median, within 1h', [b.total, b.responded, b.noResponse, b.respondedPct, b.median, b.basis, b.within1h], [200, 160, 40, 80, 160, 'business', 25])
-  eq('bmby: 8h-1d bucket mapped, buckets sum to responded', [b.buckets.find(x => x.label === '8–24 שעות').count, b.buckets.reduce((a, x) => a + x.count, 0)], [15, 160])
+  eq('bmby: 8h-1d bucket mapped, buckets sum to responded', [b.buckets.find(x => x.label === '8-24 שעות').count, b.buckets.reduce((a, x) => a + x.count, 0)], [15, 160])
   eq('bmby: no-response by rep + objections', [b.byRep.map(r => [r.name, r.count]), b.reasons.length > 0, b.reasonsTitle], [[['נציג א', 30], ['נציג ב', 10]], true, 'התנגדויות'])
   // פיירברי: אותו מבנה + byStatus
   const fb = leadHandling({ crmType: 'fireberry', crm: { byStatus: { 'לא רלוונטי שפה': 130, 'לא רלוונטי': 112, 'אין מענה': 62, 'תואמה פגישה': 27 },
@@ -74,7 +74,7 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
     responseTime: { avgHours: 31.5, respondedWithin1h: 9, respondedCount: 255, noResponseCount: 800, buckets: { '8h-24h': 70, '3d+': 63 },
       byAgent: [{ name: 'א', count: 185, noResponse: 157 }, { name: 'ב', count: 10, noResponse: 0 }] } } })
   eq('zoho: totals, avg (not median), byAgent no-response', [z.total, z.median, z.medianLabel, z.within1h, z.byRep.map(r => [r.name, r.count, r.of])], [1055, 1890, 'זמן מענה ממוצע', 9, [['א', 157, 185]]])
-  eq('zoho: 8h-24h bucket', z.buckets.find(x => x.label === '8–24 שעות').count, 70)
+  eq('zoho: 8h-24h bucket', z.buckets.find(x => x.label === '8-24 שעות').count, 70)
   // סיילספורס: רק חציון ואחוז תוך שעה
   const sf = leadHandling({ crmType: 'salesforce', crm: { byStatus: { Unqualified: 490 }, responseTime: { medianHours: 5.5, within1h: 14, measured: 1054 }, unqualReasons: [{ reason: 'אחר', count: 261 }] } })
   eq('salesforce: median, within1h, reasons, no noResponse', [sf.median, sf.within1h, sf.noResponse, sf.reasons[0].name, sf.reasonsTitle], [330, 14, null, 'אחר', 'סיבות לליד לא מתאים'])
@@ -89,3 +89,11 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
 }
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
+
+// ויטלי, 25.10: החודש שרץ מוצג כטווח הימים (כי מולו משווים לאותם ימים בחודש הקודם), ובלי מקף ארוך בדוח.
+{
+  const { runningMonthLabel } = await import('../../lib/report-pdf.js')
+  eq('running month label', [runningMonthLabel('2026-10', new Date('2026-10-25T10:00:00Z')), runningMonthLabel('2026-09', new Date('2026-10-25T10:00:00Z')), runningMonthLabel('2026-10-01_2026-10-25')], ['01.10-25.10.2026', '', ''])
+  const body = html.replace(/<style>[\s\S]*?<\/style>/, '')
+  eq('no long dashes in the report text', /[—–]/.test(body), false)
+}
