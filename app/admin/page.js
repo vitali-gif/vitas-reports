@@ -549,7 +549,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       const prevKey = comparisonPeriodKey(selectedMonth);
       const [rows, prevRows] = await Promise.all([rowsFor(selectedMonth, { heavy: true }), prevKey ? rowsFor(prevKey, { heavy: false }) : []]);
       const { buildReportModel, renderReportHtml } = await import('../../lib/report-pdf.js');
-      const html = renderReportHtml(buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows }));
+      const html = renderReportHtml(buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows }), { assetBase: window.location.origin });
       w.document.open(); w.document.write(html); w.document.close();
       // דיאלוג ההדפסה אחרי שהגופן נטען, אחרת העברית יוצאת בגופן ברירת המחדל.
       const go = () => { try { w.focus(); w.print(); } catch {} };
