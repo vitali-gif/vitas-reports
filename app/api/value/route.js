@@ -44,6 +44,7 @@ export async function GET(req) {
   const since30 = Date.now() - 30 * 864e5
   const usage = {
     firstLogin: clientSessions[0]?.logged_in_at || null,
+    lastLogin: clientSessions[clientSessions.length - 1]?.logged_in_at || null,
     logins30d: clientSessions.filter(s => new Date(s.logged_in_at).getTime() >= since30).length,
     users: new Set(clientSessions.map(s => String(s.email).toLowerCase())).size,
   }

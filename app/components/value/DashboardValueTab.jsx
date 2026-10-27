@@ -80,7 +80,9 @@ export default function DashboardValueTab({ projectId, reports }) {
       <div className="dv-facts">
         <div><span>בדשבורד מאז</span><b>{info ? fmtDay(info.project.createdAt) : '…'}</b></div>
         <div><span>הלקוח נכנס לראשונה</span><b>{info ? (info.usage.firstLogin ? fmtDay(info.usage.firstLogin) : 'עוד לא נכנס') : '…'}</b></div>
-        <div><span>כניסות של הלקוח ב-30 יום</span><b>{info ? `${info.usage.logins30d}${info.usage.users ? ` (${info.usage.users} משתמשים)` : ''}` : '…'}</b></div>
+        {/* "0 (2 משתמשים)" נקרא כסתירה (ויטלי, 27.10): כניסה אחרונה + כמה ב-30 יום, ומספר המשתמשים מאז ההתחלה בשורה נפרדת */}
+        <div><span>כניסה אחרונה של הלקוח</span><b>{info ? (info.usage.lastLogin ? fmtDay(info.usage.lastLogin) : '-') : '…'}</b>
+          {info && info.usage.firstLogin ? <small>{info.usage.logins30d ? `${info.usage.logins30d} כניסות ב-30 הימים האחרונים` : 'לא נכנס ב-30 הימים האחרונים'} · {info.usage.users} {info.usage.users === 1 ? 'משתמש' : 'משתמשים'} מאז ההתחלה</small> : null}</div>
       </div>
       {err && <div className="dv-err">{err}</div>}
 
