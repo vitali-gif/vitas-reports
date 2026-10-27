@@ -4635,3 +4635,62 @@ textarea:focus-visible,
   .ai-run { flex-direction: column; align-items: stretch; }
   .ai-btn { justify-content: center; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ערך הדשבורד (D8, 27.10) — app/components/value/DashboardValueTab.jsx. אדמין בלבד.
+   ════════════════════════════════════════════════════════════════════════════ */
+.dv { color: #142044; direction: rtl; }
+.dv-head h2 { font-size: 23px; font-weight: 800; margin: 0; }
+.dv-head p { margin: 2px 0 0; color: #586581; font-size: 14px; }
+.dv-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0 6px; }
+.dv-facts > div { background: #fff; border: 1px solid #e3e8f5; border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px; }
+.dv-facts span { font-size: 12.5px; color: #586581; }
+.dv-facts b { font-size: 18px; font-weight: 800; }
+.dv-err { background: #fde8e8; color: #b3261e; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; margin: 8px 0; }
+.dv-sec { margin-top: 28px; }
+.dv-sec h3 { font-size: 18px; font-weight: 800; margin: 0 0 6px; }
+.dv-cap { color: #586581; font-size: 14px; margin: 0 0 12px; }
+.dv-cap b { color: #142044; }
+.dv-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.dv-card { background: #fff; border: 1px solid #e3e8f5; border-radius: 12px; padding: 13px 14px; display: grid; gap: 6px; align-content: start; }
+.dv-l { font-size: 13px; font-weight: 600; color: #586581; }
+.dv-v { display: flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; }
+.dv-v b { font-size: 24px; font-weight: 800; }
+.dv-b { font-size: 15px; color: #8a93a8; text-decoration: line-through; text-decoration-color: #c8cee0; }
+.dv-arrow { color: #8a93a8; }
+.dv-chg { justify-self: start; display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #edf0f8; color: #586581; }
+.dv-chg.good { background: #e3f6ef; color: #0f7a5c; }
+.dv-chg.bad { background: #fde8e8; color: #b3261e; }
+.dv-trends { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.dv-trend { margin: 0; background: #fff; border: 1px solid #e3e8f5; border-radius: 12px; padding: 10px 12px 4px; }
+.dv-trend figcaption { font-size: 13px; font-weight: 700; }
+.dv-trend svg { display: block; width: 100%; height: auto; }
+.dv-pt { font: 600 9.5px Heebo, sans-serif; fill: #142044; }
+.dv-ax { font: 500 9.5px Heebo, sans-serif; fill: #8a93a8; }
+.dv-start { stroke: #e6a72f; stroke-width: 1.5; stroke-dasharray: 4 3; }
+.dv-start-t { font: 700 9.5px Heebo, sans-serif; fill: #b07a12; }
+.dv-table-wrap { overflow-x: auto; margin-top: 12px; background: #fff; border: 1px solid #e3e8f5; border-radius: 12px; }
+.dv-table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.dv-table th { text-align: center; font-size: 12px; font-weight: 600; color: #586581; padding: 10px 10px 8px; border-bottom: 1px solid #e3e8f5; white-space: nowrap; }
+.dv-table th:first-child, .dv-table td:first-child { text-align: right; }
+.dv-table td { text-align: center; padding: 8px 10px; border-bottom: 1px solid #eef1f8; white-space: nowrap; }
+.dv-table tr:last-child td { border-bottom: 0; }
+.dv-table small { color: #8a93a8; }
+.dv-start-row td { background: #fffaf0; }
+.dv-tag { margin-inline-start: 6px; background: #fff1d6; color: #8a5a00 !important; border-radius: 999px; padding: 0 7px; font-weight: 700; }
+.dv-actions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.dv-actions li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; background: #fff; border: 1px solid #e3e8f5; border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.dv-actions p { margin: 2px 0 0; color: #586581; font-size: 13px; }
+.dv-actions time { font-size: 12px; color: #8a93a8; white-space: nowrap; }
+.dv-kind { font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; background: #edf0f8; color: #586581; }
+.dv-kind-ai { background: #eef0fd; color: #343aa1; }
+.dv-kind-task { background: #e3f6ef; color: #0f7a5c; }
+.dv-kind-meeting { background: #fff1d6; color: #8a5a00; }
+.dv-note { margin: 24px 0 0; font-size: 12.5px; color: #8a93a8; }
+@media (max-width: 900px) { .dv-trends { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .dv-facts { grid-template-columns: 1fr; }
+  .dv-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .dv-v b { font-size: 19px; }
+  .dv-actions li { grid-template-columns: 1fr; }
+}

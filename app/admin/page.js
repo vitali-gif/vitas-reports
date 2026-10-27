@@ -84,6 +84,7 @@ import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
 import AiAnalysisModal from '../components/ai/AiAnalysisModal'
+import DashboardValueTab from '../components/value/DashboardValueTab'
 import { ProBadge, MeetingsProLock } from '../components/ProGate'
 
 // טאב "המלצות חכמות" מוסתר בכל הלקוחות עד שהתוכן שלו ישופר (ויטלי, 21.9).
@@ -4489,9 +4490,13 @@ const selectProject = async (client, project) => {
             {/* "המלצות חכמות" מוסתר לכל הלקוחות עד שנשפר אותו (ויטלי, 21.9). הקוד של
                 הטאב נשאר במקומו — רק הכניסה אליו חסומה, כדי שהחזרה תהיה שינוי של שורה. */}
             {RECOMMENDATIONS_TAB_ON && hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
+            {/* D8 (27.10): "ערך הדשבורד" — אדמין בלבד, לא בפרויקט הדמו */}
+            {!isClientView && !isDemoProject && <button className={`client-tab ${dashTab === 'value' ? 'active' : ''}`} onClick={() => setDashTab('value')}>📈 ערך הדשבורד</button>}
         </div>
 
-        {dashTab === 'meetings' ? (
+        {dashTab === 'value' && !isClientView ? (
+          <DashboardValueTab projectId={selectedProject?.id} reports={reports} />
+        ) : dashTab === 'meetings' ? (
           meetingsUnlocked ? (
             <MeetingsTab projectId={selectedProject?.id} projectName={selectedProject?.name} isClientView={isClientView} />
           ) : (
