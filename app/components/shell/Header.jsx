@@ -1,5 +1,5 @@
 'use client'
-import { LogOut, Users, Link2, FileText, HelpCircle } from 'lucide-react'
+import { LogOut, Users, Link2, FileText, HelpCircle, Sparkles } from 'lucide-react'
 
 // VITAS v2 Header — design-v2-playbook classes (h-brand / h-actions / btn)
 // Mobile: hamburger ☰ (right, RTL) · Cluzo logo (center) · kebab ⋮ + logout (left)
@@ -8,13 +8,14 @@ import { LogOut, Users, Link2, FileText, HelpCircle } from 'lucide-react'
 // Props:
 //   onMenuOpen       — opens the mobile sidebar drawer
 //   onExport         — Export button handler
+//   onAiAnalysis     — optional: opens the AI analysis of the project on screen (admin only)
 //   onClientAccess   — Client-Access button handler
 //   onLogout         — Logout button handler
 //   onHelp           — optional: opens the usage guide (client view). When given, a help
 //                      button replaces the mobile kebab, which is still a no-op placeholder.
 //   loadingIndicator — optional JSX (spinner while fetching)
 
-export default function Header({ onMenuOpen, onExport, onClientAccess, onSessionLogs, onLogout, onHelp, loadingIndicator = null, className = '' }) {
+export default function Header({ onMenuOpen, onExport, onAiAnalysis, onClientAccess, onSessionLogs, onLogout, onHelp, loadingIndicator = null, className = '' }) {
   // עיצוב מחודש (header-vr): אייקוני lucide במקום אימוג'י, כפתורים בהירים אחידים
   const vr = className.includes('header-vr')
   return (
@@ -51,6 +52,13 @@ export default function Header({ onMenuOpen, onExport, onClientAccess, onSession
         {onExport && (
           <button className="btn btn-export" onClick={onExport} title="דוח PDF לתקופה שעל המסך, מול התקופה הקודמת">
             {vr ? <FileText size={16} aria-hidden="true" className="h-ico h-ico-excel" /> : '📤'} ייצוא דוח
+          </button>
+        )}
+
+        {/* ניתוח AI (27.10) — אדמין בלבד; במובייל דרך המגירה */}
+        {onAiAnalysis && (
+          <button className="btn btn-ai" onClick={onAiAnalysis} title="ניתוח AI של הפרויקט והתקופה שעל המסך">
+            {vr ? <Sparkles size={16} aria-hidden="true" className="h-ico" /> : '✨'} ניתוח AI
           </button>
         )}
 

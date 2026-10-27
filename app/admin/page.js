@@ -83,6 +83,7 @@ import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle
 // צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
+import AiAnalysisModal from '../components/ai/AiAnalysisModal'
 import { ProBadge, MeetingsProLock } from '../components/ProGate'
 
 // טאב "המלצות חכמות" מוסתר בכל הלקוחות עד שהתוכן שלו ישופר (ויטלי, 21.9).
@@ -520,12 +521,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // D19 (ויטלי, 4.10): "ייצוא דוח" — דוח PDF על התקופה שעל המסך, מול תקופת ההשוואה של
   // הדשבורד. אדמין בלבד (הכפתור לא מוצג ללקוח). הבנייה והעיצוב ב-lib/report-pdf.js; כאן רק
   // איסוף השורות: מה שכבר טעון, ומה שחסר — מאותם routes שהדשבורד משתמש בהם.
-  const handleExport = async () => {
-    if (!selectedProject || !selectedMonth) { showToast('בחר פרויקט ותקופה'); return; }
-    // החלון נפתח מיד, בתוך הלחיצה: אחרי await חוסם החלונות הקופצים היה עוצר אותו.
-    const w = window.open('', '_blank');
-    if (!w) { showToast('הדפדפן חסם את חלון הדוח. אפשר חלונות קופצים לאתר ונסה שוב.'); return; }
-    w.document.write('<!doctype html><html dir="rtl"><body style="font-family:Arial,sans-serif;padding:48px;text-align:center;color:#56636f">מכין את הדוח…</body></html>');
+  // המודל משמש גם את "ניתוח AI" (27.10), כך שהדוח והניתוח רואים בדיוק אותם מספרים.
+  const buildPeriodModel = async () => {
     const pid = selectedProject.id;
     const getJson = async (url) => { const res = await apiFetch(url, { headers: {} }).catch(() => null); return res && res.ok ? res.json().catch(() => null) : null; };
     const rowsFor = async (key, { heavy }) => {
@@ -545,11 +542,20 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       }
       return rows;
     };
+    const prevKey = comparisonPeriodKey(selectedMonth);
+    const [rows, prevRows] = await Promise.all([rowsFor(selectedMonth, { heavy: true }), prevKey ? rowsFor(prevKey, { heavy: false }) : []]);
+    const lib = await import('../../lib/report-pdf.js');
+    return { lib, prevKey, model: lib.buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows }) };
+  };
+  const handleExport = async () => {
+    if (!selectedProject || !selectedMonth) { showToast('בחר פרויקט ותקופה'); return; }
+    // החלון נפתח מיד, בתוך הלחיצה: אחרי await חוסם החלונות הקופצים היה עוצר אותו.
+    const w = window.open('', '_blank');
+    if (!w) { showToast('הדפדפן חסם את חלון הדוח. אפשר חלונות קופצים לאתר ונסה שוב.'); return; }
+    w.document.write('<!doctype html><html dir="rtl"><body style="font-family:Arial,sans-serif;padding:48px;text-align:center;color:#56636f">מכין את הדוח…</body></html>');
     try {
-      const prevKey = comparisonPeriodKey(selectedMonth);
-      const [rows, prevRows] = await Promise.all([rowsFor(selectedMonth, { heavy: true }), prevKey ? rowsFor(prevKey, { heavy: false }) : []]);
-      const { buildReportModel, renderReportHtml } = await import('../../lib/report-pdf.js');
-      const html = renderReportHtml(buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows }), { assetBase: window.location.origin });
+      const { lib, model } = await buildPeriodModel();
+      const html = lib.renderReportHtml(model, { assetBase: window.location.origin });
       w.document.open(); w.document.write(html); w.document.close();
       // דיאלוג ההדפסה אחרי שהגופן והתמונות של המודעות נטענו, אחרת העברית יוצאת בגופן ברירת המחדל
       // והמודעות ריקות. תמונה שלא נטענת לא מעכבת יותר מ-6 שניות.
@@ -560,6 +566,41 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     } catch (err) {
       try { w.close(); } catch {}
       showToast('שגיאה בהפקת הדוח: ' + (err?.message || err));
+    }
+  };
+
+  // ניתוח AI (ויטלי, 27.10): אדמין בלבד, בלחיצה. אותו מודל כמו הדוח נשלח ל-/api/ai/analyze,
+  // והשרת מעביר ל-Claude רק את השדות המוכרים (lib/ai-analysis.js). הניתוחים נשמרים ב-ai_analyses,
+  // יחד עם הניתוחים השבועיים של הקרון (/api/cron/ai-weekly).
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiState, setAiState] = useState({ loading: false, listLoading: false, error: '', list: [], current: null });
+  const openAiAnalysis = async () => {
+    if (!selectedProject) { showToast('בחר פרויקט'); return; }
+    setAiOpen(true);
+    setAiState(s => ({ ...s, listLoading: true, error: '', list: [], current: null }));
+    const res = await apiFetch(`/api/ai/analyze?projectId=${selectedProject.id}`, { headers: {} }).catch(() => null);
+    const body = res ? await res.json().catch(() => null) : null;
+    const list = body?.analyses || [];
+    setAiState(s => ({ ...s, listLoading: false, list, current: list.find(a => a.period_key === selectedMonth) || null,
+      error: res && res.ok ? '' : (body?.code === 'NO_TABLE' ? 'צריך להריץ את מיגרציה 024 (טבלת ai_analyses).' : (body?.error || 'טעינת הניתוחים נכשלה')) }));
+  };
+  const runAiAnalysis = async (force) => {
+    if (!selectedProject || !selectedMonth) return;
+    setAiState(s => ({ ...s, loading: true, error: '' }));
+    try {
+      const { prevKey, model } = await buildPeriodModel();
+      const res = await apiFetch('/api/ai/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: selectedProject.id, key: selectedMonth, prevKey, model, force: !!force }) });
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.analysis) {
+        const msg = body?.code === 'NO_KEY' ? 'חסר מפתח API של Claude ב-Vercel (ANTHROPIC_API_KEY).' : (body?.error || 'הניתוח נכשל');
+        setAiState(s => ({ ...s, loading: false, error: msg }));
+        return;
+      }
+      const a = body.analysis;
+      setAiState(s => ({ ...s, loading: false, current: a, list: a.id ? [a, ...s.list.filter(x => x.id !== a.id)] : s.list,
+        error: body.saved === false ? 'הניתוח לא נשמר: ' + (body.saveError || '') : '' }));
+    } catch (err) {
+      setAiState(s => ({ ...s, loading: false, error: 'הניתוח נכשל: ' + (err?.message || err) }));
     }
   };
 
@@ -7096,6 +7137,7 @@ const selectProject = async (client, project) => {
       <Header className={vrChrome ? 'header-vr' : ''}
         onMenuOpen={() => setSidebarOpen(true)}
         onExport={!isClientView && !isDemoProject ? handleExport : undefined}
+        onAiAnalysis={!isClientView && !isDemoProject && selectedProject ? openAiAnalysis : undefined}
         onClientAccess={!isClientView ? handleClientAccess : undefined}
         onSessionLogs={!isClientView ? handleSessionLogs : undefined}
         // בצד הלקוח ההתנתקות שייכת לדף /client, כי שם יושב המצב שמחליט אם להציג את הדשבורד
@@ -7127,6 +7169,7 @@ const selectProject = async (client, project) => {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           onExport={!isClientView && !isDemoProject ? handleExport : undefined}
+          onAiAnalysis={!isClientView && !isDemoProject && selectedProject ? openAiAnalysis : undefined}
           onClientAccess={!isClientView ? handleClientAccess : undefined}
         />
 
@@ -7484,6 +7527,17 @@ const selectProject = async (client, project) => {
       )}
 
       {/* ── Session Logs Modal ── */}
+      {aiOpen && !isClientView && (
+        <AiAnalysisModal
+          project={selectedProject?.name}
+          client={selectedClient?.name}
+          periodKey={selectedMonth}
+          state={aiState}
+          onRun={runAiAnalysis}
+          onSelect={(a) => setAiState(s => ({ ...s, current: a }))}
+          onClose={() => setAiOpen(false)}
+        />
+      )}
       {showSessionLogs && (
         <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setShowSessionLogs(false) }}>
           <div className="modal" style={{maxWidth:700,width:'100%',direction:'rtl',maxHeight:'80vh',overflow:'auto'}}>

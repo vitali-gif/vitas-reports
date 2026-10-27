@@ -2676,6 +2676,7 @@
 
   /* Hide desktop-only header actions */
   .h-actions .btn-export,
+  .h-actions .btn-ai,
   .h-actions .btn-client-access,
   .h-actions .h-search { display: none !important; }
 
@@ -4582,4 +4583,55 @@ textarea:focus-visible,
   .vr-ui table.data-table tbody td { font-size: 12.5px; padding-block: 8px; padding-inline: 9px; }
   .vr-ui div.section-head h2 { font-size: 18px; }
   .data-table tbody td.gs-ad-cell { max-inline-size: min(62vw, 250px); min-inline-size: 180px; white-space: normal !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ניתוח AI (27.10) — app/components/ai/AiAnalysisModal.jsx. אדמין בלבד.
+   ════════════════════════════════════════════════════════════════════════════ */
+.ai-modal { max-width: 760px; width: 100%; direction: rtl; max-height: 86vh; overflow: auto; color: #142044; }
+.ai-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ai-kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: #4559df; }
+.ai-top h2 { margin: 2px 0 0; font-size: 21px; font-weight: 800; }
+.ai-close { background: none; border: 0; cursor: pointer; color: #586581; padding: 4px; border-radius: 8px; }
+.ai-close:hover { background: #eef0fd; }
+.ai-run { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 0 12px; padding: 10px 12px; background: #f6f8ff; border: 1px solid #e3e8f5; border-radius: 12px; font-size: 13.5px; color: #586581; }
+.ai-run b { color: #142044; }
+.ai-btn { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 10px; padding: 8px 16px; background: #4559df; color: #fff; font: 700 13.5px Heebo, sans-serif; cursor: pointer; }
+.ai-btn:hover { background: #343aa1; }
+.ai-btn:disabled { opacity: .75; cursor: progress; }
+.ai-spin { animation: spin .9s linear infinite; }
+.ai-error { background: #fde8e8; color: #b3261e; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; margin-bottom: 10px; }
+.ai-empty { color: #586581; font-size: 14px; line-height: 1.6; padding: 18px 4px; }
+.ai-meta { font-size: 12px; color: #8a93a8; }
+.ai-headline { font-size: 18px; font-weight: 800; line-height: 1.4; margin: 4px 0 6px; }
+.ai-summary { font-size: 14.5px; line-height: 1.65; margin: 0 0 6px; }
+.ai-body section { margin-top: 16px; }
+.ai-body h4, .ai-history h4 { font-size: 14px; font-weight: 800; margin: 0 0 8px; }
+.ai-body h4 span { font-size: 11.5px; font-weight: 600; color: #8a93a8; margin-inline-start: 6px; }
+.ai-body ul, .ai-body ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ai-body li { display: flex; gap: 10px; border: 1px solid #e3e8f5; border-radius: 12px; padding: 10px 12px; font-size: 14px; line-height: 1.55; }
+.ai-body li p { margin: 2px 0 0; color: #3b4766; }
+.ai-ico { flex: none; width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #edf0f8; color: #586581; }
+.ai-dir-good .ai-ico { background: #e3f6ef; color: #0f7a5c; }
+.ai-dir-bad .ai-ico { background: #fde8e8; color: #b3261e; }
+.ai-conf, .ai-owner { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: #edf0f8; color: #586581; white-space: nowrap; }
+.ai-conf-high { background: #e3f6ef; color: #0f7a5c; }
+.ai-conf-low { background: #fff4dc; color: #8a5a00; }
+.ai-owner { background: #eef0fd; color: #343aa1; }
+.ai-actions { counter-reset: ai; }
+.ai-actions li::before { counter-increment: ai; content: counter(ai); flex: none; width: 26px; height: 26px; border-radius: 8px; background: #4559df; color: #fff; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+.ai-watch li { color: #3b4766; }
+.ai-history { margin-top: 20px; border-top: 1px solid #e3e8f5; padding-top: 14px; }
+.ai-history ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ai-history button { display: grid; gap: 1px; width: 100%; text-align: start; background: none; border: 1px solid transparent; border-radius: 10px; padding: 7px 10px; cursor: pointer; font: inherit; color: inherit; }
+.ai-history button:hover { background: #f6f8ff; }
+.ai-history button.on { background: #eef0fd; border-color: #d5daf9; }
+.ai-h-when { font-size: 11.5px; color: #8a93a8; }
+.ai-h-text { font-size: 13.5px; font-weight: 600; }
+.ai-note { font-size: 11.5px; color: #8a93a8; margin: 16px 0 0; }
+@media (max-width: 640px) {
+  .ai-modal { max-height: 92vh; padding: 18px 16px; }
+  .ai-top h2 { font-size: 18px; }
+  .ai-run { flex-direction: column; align-items: stretch; }
+  .ai-btn { justify-content: center; }
 }
