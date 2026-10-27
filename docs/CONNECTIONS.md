@@ -87,6 +87,7 @@
 - Supabase: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (ציבורי, לא סוד ולא הרשאה), `SUPABASE_SERVICE_ROLE_KEY`
 - CRM: `BMBY_LOGIN`, `BMBY_PASSWORD`, `BMBY_PROJECT_IDS` · `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN` · `SF_CLIENT_ID`, `SF_CLIENT_SECRET`, `SF_REFRESH_TOKEN` · `FIREBERRY_TOKEN`, `FIREBERRY_RATE_PER_MIN`
 - תשתית: `CRON_SECRET`, `RESEND_API_KEY`, `ALERT_EMAIL_TO`, `ALERT_EMAIL_FROM`
+- AI (27.10): `ANTHROPIC_API_KEY` — ניתוח AI באדמין (D20). מקור: platform.claude.com ← Settings ← API keys. בקובץ של ויטלי: "Claude API TOKEN - CLUZO". ב-Vercel כ-Sensitive. כדאי מגבלת הוצאה חודשית בקונסול.
 
 ## 5. כשמחליפים מפתח
 1. מחליפים ב-Vercel (ובמנהל הסיסמאות).

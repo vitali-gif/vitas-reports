@@ -7,7 +7,7 @@ const eq = (label, a, b) => (JSON.stringify(a) === JSON.stringify(b) ? console.l
 const r = (x) => Math.round(x)
 
 eq('period labels', [periodLabel('2026-09'), periodLabel('2026-09-01_2026-09-15'), periodLabel('2025-12-20_2026-01-10')],
-  ['ספטמבר 2026', '01.09–15.09.2026', '20.12.2025–10.01.2026'])
+  ['ספטמבר 2026', '01.09-15.09.2026', '20.12.2025-10.01.2026'])
 
 // נדל"ן (BMBY — בלי crmType בסיכום)
 const cur = [
@@ -63,7 +63,7 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
       buckets: { '0-15m': 1 }, business: { medianMinutes: 160, buckets: { '0-15m': 10, '15m-1h': 30, '1h-4h': 70, '4h-8h': 30, '8h-1d': 15, '1d-3d': 5, '3d+': 0 } } },
     crmRepRows: [{ objections: 'מחיר' }, { objections: 'מחיר, מיקום' }, { objections: '' }] } })
   eq('bmby handling: counts, business median, within 1h', [b.total, b.responded, b.noResponse, b.respondedPct, b.median, b.basis, b.within1h], [200, 160, 40, 80, 160, 'business', 25])
-  eq('bmby: 8h-1d bucket mapped, buckets sum to responded', [b.buckets.find(x => x.label === '8–24 שעות').count, b.buckets.reduce((a, x) => a + x.count, 0)], [15, 160])
+  eq('bmby: 8h-1d bucket mapped, buckets sum to responded', [b.buckets.find(x => x.label === '8-24 שעות').count, b.buckets.reduce((a, x) => a + x.count, 0)], [15, 160])
   eq('bmby: no-response by rep + objections', [b.byRep.map(r => [r.name, r.count]), b.reasons.length > 0, b.reasonsTitle], [[['נציג א', 30], ['נציג ב', 10]], true, 'התנגדויות'])
   // פיירברי: אותו מבנה + byStatus
   const fb = leadHandling({ crmType: 'fireberry', crm: { byStatus: { 'לא רלוונטי שפה': 130, 'לא רלוונטי': 112, 'אין מענה': 62, 'תואמה פגישה': 27 },
@@ -74,7 +74,7 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
     responseTime: { avgHours: 31.5, respondedWithin1h: 9, respondedCount: 255, noResponseCount: 800, buckets: { '8h-24h': 70, '3d+': 63 },
       byAgent: [{ name: 'א', count: 185, noResponse: 157 }, { name: 'ב', count: 10, noResponse: 0 }] } } })
   eq('zoho: totals, avg (not median), byAgent no-response', [z.total, z.median, z.medianLabel, z.within1h, z.byRep.map(r => [r.name, r.count, r.of])], [1055, 1890, 'זמן מענה ממוצע', 9, [['א', 157, 185]]])
-  eq('zoho: 8h-24h bucket', z.buckets.find(x => x.label === '8–24 שעות').count, 70)
+  eq('zoho: 8h-24h bucket', z.buckets.find(x => x.label === '8-24 שעות').count, 70)
   // סיילספורס: רק חציון ואחוז תוך שעה
   const sf = leadHandling({ crmType: 'salesforce', crm: { byStatus: { Unqualified: 490 }, responseTime: { medianHours: 5.5, within1h: 14, measured: 1054 }, unqualReasons: [{ reason: 'אחר', count: 261 }] } })
   eq('salesforce: median, within1h, reasons, no noResponse', [sf.median, sf.within1h, sf.noResponse, sf.reasons[0].name, sf.reasonsTitle], [330, 14, null, 'אחר', 'סיבות לליד לא מתאים'])
@@ -86,6 +86,49 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   eq('handling compared to previous period', [mh.handling.prev.respondedPct, mh.handling.prev.noResponse], [70, 30])
   const hh = renderReportHtml(mh)
   eq('handling html: section + percentage points, no undefined', [hh.includes('טיפול בלידים'), hh.includes('>+10</span> נק׳'), /undefined|NaN/.test(hh)], [true, true, false])
+}
+
+
+// ויטלי, 25.10: החודש שרץ מוצג כטווח הימים (כי מולו משווים לאותם ימים בחודש הקודם), ובלי מקף ארוך בדוח.
+{
+  const { runningMonthLabel } = await import('../../lib/report-pdf.js')
+  eq('running month label', [runningMonthLabel('2026-10', new Date('2026-10-25T10:00:00Z')), runningMonthLabel('2026-09', new Date('2026-10-25T10:00:00Z')), runningMonthLabel('2026-10-01_2026-10-25')], ['01.10-25.10.2026', '', ''])
+  const body = html.replace(/<style>[\s\S]*?<\/style>/, '')
+  eq('no long dashes in the report text', /[—–]/.test(body), false)
+}
+
+// ויטלי, 25.10: המודעות המובילות בפייסבוק בדוח — כמו בגלריה בדשבורד: מאוחדות לפי שם, לפי לידים,
+// והמספרים מהנתונים המפורטים של התקופה כשהם טעונים.
+{
+  const { topFacebookAds, buildReportModel: build, renderReportHtml: render } = await import('../../lib/report-pdf.js')
+  const ad = (id, name, leads, spend, extra = {}) => ({ id, name, campaign: 'c', imageUrl: 'https://scontent.example/' + id + '.jpg', metrics: { leads, spend, clicks: 10, impressions: 1000 }, ...extra })
+  const fb = { source: 'facebook', summary: { spend: 900, leads: 30, activeAds: [ad('1', 'וילה', 5, 200), ad('2', 'וילה - עותק 2', 4, 100), ad('3', 'פנטהאוז', 7, 400, { videoId: 'v1' }), ad('4', 'שקט', 0, 0)] } }
+  const t = topFacebookAds([fb])
+  eq('top ads: merged by name, sorted by leads, idle ad dropped', t.map(a => [a.name, a.leads, a.spend, a.isVideo]), [['וילה', 9, 300, false], ['פנטהאוז', 7, 400, true]])
+  // טווח: המדדים מהנתונים המפורטים (activeAds הם תמונת מצב)
+  const withData = { ...fb, data: [{ adName: 'פנטהאוז', spend: 50, leads: 2, clicks: 1, impressions: 10 }, { adName: 'וילה #2', spend: 30, leads: 1 }] }
+  eq('top ads: metrics from period data', topFacebookAds([withData]).map(a => [a.name, a.leads, a.spend]), [['פנטהאוז', 2, 50], ['וילה', 1, 30]])
+  const h = render(build({ project: 'x', key: '2026-09', prevKey: '2026-08', rows: [fb], prevRows: [] }), { assetBase: 'https://r.example' })
+  eq('top ads html: section, image, video tag, no undefined', [h.includes('המודעות המובילות בפייסבוק'), h.includes('https://scontent.example/1.jpg'), h.includes('>VIDEO<'), /undefined|NaN/.test(h)], [true, true, true, false])
+  eq('top ads html: unsafe image url dropped', render(build({ project: 'x', key: '2026-09', rows: [{ source: 'facebook', summary: { activeAds: [ad('9', 'א', 3, 10, { imageUrl: 'javascript:alert(1)' })] } }] })).includes('javascript:'), false)
+  eq('no facebook → no ads section', render(build({ project: 'x', key: '2026-09', rows: [] })).includes('TOP ADS'), false)
+}
+
+
+// ויטלי, 25.10: הסדר החדש וסעיף "התנגדויות, יישובים, מצב דיור וסוג נכס" (HI PARK).
+{
+  const { leadProfile, buildReportModel: build, renderReportHtml: render } = await import('../../lib/report-pdf.js')
+  const rows = [
+    { address: 'תל אביב', livingStatus: 'שוכר', propertyType: 'דירת 3 חדרים,דירת 4 חדרים', objections: 'מחיר' },
+    { address: 'תל אביב', livingStatus: 'בעל דירה', propertyType: 'דירת 4 חדרים' },
+    { address: 'לא צוין', contractOnly: true, livingStatus: 'שוכר' },
+  ]
+  const pr = leadProfile({ crmRepRows: rows })
+  eq('lead profile: cities, living, multi-select property, contractOnly skipped', [pr.cities, pr.living.map(x => x.count), pr.property.map(x => [x.name, x.count])], [[{ name: 'תל אביב', count: 2 }], [1, 1], [['דירת 4 חדרים', 2], ['דירת 3 חדרים', 1]]])
+  const h = render(build({ project: 'HI PARK', client: 'ש.ברוך', key: '2026-09', prevKey: '2026-08', rows: [{ source: 'crm', summary: { totalLeads: 10, crmRepRows: rows } }], prevRows: [{ source: 'crm', summary: { totalLeads: 8 } }] }))
+  const at = (s) => h.indexOf(s)
+  eq('order: funnel → profile → what changed', [at('משפך לידים') > 0, at('משפך לידים') < at('מצב דיור'), at('מצב דיור') < at('מה השתנה מהחודש הקודם')], [true, true, true])
+  eq('client / project heading', h.includes('ש.ברוך<span class="sl">/</span>HI PARK'), true)
 }
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
