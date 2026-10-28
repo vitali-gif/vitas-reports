@@ -4695,3 +4695,8 @@ textarea:focus-visible,
   .dv-v b { font-size: 19px; }
   .dv-actions li { grid-template-columns: 1fr; }
 }
+/* כפתור העתקת הניתוח (28.10) */
+.ai-meta-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ai-copy { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d5daf9; background: #fff; color: #343aa1; border-radius: 10px; padding: 6px 12px; font: 700 13px Heebo, sans-serif; cursor: pointer; }
+.ai-copy:hover { background: #eef0fd; }
+.ai-copy.ok { border-color: #a8e2cd; background: #e3f6ef; color: #0f7a5c; }

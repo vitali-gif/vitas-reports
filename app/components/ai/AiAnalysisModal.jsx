@@ -1,6 +1,8 @@
 'use client'
-import { Sparkles, X, RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { useState } from 'react'
+import { Sparkles, X, RefreshCw, TrendingUp, TrendingDown, Minus, Copy, Check } from 'lucide-react'
 import { periodLabel } from '../../../lib/report-pdf.js'
+import { analysisText } from '../../../lib/ai-analysis-text.js'
 
 // ניתוח AI לפרויקט (ויטלי, 27.10) — אדמין בלבד. המצב והקריאות ב-admin/page.js (openAiAnalysis /
 // runAiAnalysis); כאן רק התצוגה: הניתוח של התקופה שעל המסך, ורשימת הניתוחים הקודמים (בלחיצה ושבועיים).
@@ -11,11 +13,37 @@ const CONF = { high: 'סביר מאוד', medium: 'אפשרי', low: 'השערה
 const TRIGGER = { manual: 'בלחיצה', weekly: 'שבועי' }
 const fmtDate = (iso) => { try { return new Date(iso).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
 
-function Analysis({ a }) {
+// העתקה (28.10): הניתוח כטקסט פשוט, מוכן להדבקה בוואטסאפ או במייל. clipboard דורש https —
+// ובדפדפן ישן / הרשאה חסומה נופלים ל-textarea + execCommand.
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true } catch {}
+  try {
+    const t = document.createElement('textarea')
+    t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0'
+    document.body.appendChild(t); t.select()
+    const ok = document.execCommand('copy'); t.remove(); return ok
+  } catch { return false }
+}
+
+function CopyButton({ a, project, client }) {
+  const [state, setState] = useState('')   // '' | 'ok' | 'fail'
+  const onCopy = async () => {
+    const ok = await copyText(analysisText(a, { project, client }))
+    setState(ok ? 'ok' : 'fail')
+    setTimeout(() => setState(''), 2500)
+  }
+  return (
+    <button type="button" className={`ai-copy${state === 'ok' ? ' ok' : ''}`} onClick={onCopy} title="העתקת הניתוח כטקסט (מתאים לוואטסאפ)">
+      {state === 'ok' ? <><Check size={15} aria-hidden="true" /> הועתק</> : state === 'fail' ? 'ההעתקה נכשלה' : <><Copy size={15} aria-hidden="true" /> העתקת הטקסט</>}
+    </button>
+  )
+}
+
+function Analysis({ a, project, client }) {
   const r = a.result || {}
   return (
     <div className="ai-body">
-      <div className="ai-meta">{periodLabel(a.period_key)}{a.compare_key ? ` מול ${periodLabel(a.compare_key)}` : ''} · {TRIGGER[a.trigger] || a.trigger} · {fmtDate(a.created_at)}{a.usage?.costUsd != null ? ` · עלות ‎$${a.usage.costUsd}` : ''}</div>
+      <div className="ai-meta-row"><div className="ai-meta">{periodLabel(a.period_key)}{a.compare_key ? ` מול ${periodLabel(a.compare_key)}` : ''} · {TRIGGER[a.trigger] || a.trigger} · {fmtDate(a.created_at)}{a.usage?.costUsd != null ? ` · עלות ‎$${a.usage.costUsd}` : ''}</div><CopyButton a={a} project={project} client={client} /></div>
       <h3 className="ai-headline">{r.headline}</h3>
       {r.summary && <p className="ai-summary">{r.summary}</p>}
 
@@ -74,7 +102,7 @@ export default function AiAnalysisModal({ project, client, periodKey, state, onR
 
         {error && <div className="ai-error">{error}</div>}
         {listLoading ? <div className="ai-empty">טוען ניתוחים…</div>
-          : current ? <Analysis a={current} />
+          : current ? <Analysis a={current} project={project} client={client} />
           : !loading && <div className="ai-empty">עוד אין ניתוח לתקופה הזו. לחיצה על "נתח את התקופה" שולחת ל-Claude את אותם מספרים שבדוח ה-PDF (בלי פרטי לידים), ומחזירה מה השתנה, למה כנראה, ומה לעשות.</div>}
 
         {list.length > 0 && (

@@ -47,4 +47,14 @@ eq('week keys across month end', weekKeys(new Date('2026-11-01T05:20:00Z')), { k
 const mail = weeklyEmailHtml([{ project: 'HI <PARK>', client: 'ש.ברוך', period: '18.10-24.10.2026', comparedTo: '11.10-17.10.2026', result: answer }, { project: 'ONCE', error: 'range 500' }], { dashboardUrl: 'https://reports.vitas.co.il/admin' })
 eq('email: escaped, both projects, actions, no long dash', [mail.includes('HI &lt;PARK&gt;'), mail.includes('ONCE'), mail.includes('פ3'), mail.includes('הניתוח נכשל'), /[—–]/.test(mail)], [true, true, true, true, false])
 
+// העתקת הטקסט (28.10): כותרת עם לקוח/פרויקט/תקופה, סעיפים מסומנים, פעולות ממוספרות עם אחראי, בלי מקף ארוך
+{
+  const { analysisText } = await import('../../lib/ai-analysis-text.js')
+  const t = analysisText({ period_key: '2026-10', compare_key: '2026-09-01_2026-09-27', result: { ...answer, summary: 'סיכום — עם מקף ארוך', watch: ['לבדוק את הגדרת הליד הרלוונטי'] } }, { project: 'ONCE', client: 'ש.ברוך' })
+  const lines = t.split('\n')
+  eq('copy text: title line', lines[0], '*ש.ברוך / ONCE - אוקטובר 2026 מול 01.09-27.09.2026*')
+  eq('copy text: sections, numbered actions with owner, no long dash', [t.includes('*מה השתנה*'), t.includes('• עלות לליד - מ-₪138 ל-₪167'), t.includes('1. פ1 (סוכנות) - ד'), t.includes('3. פ3 (לקוח)'), t.includes('*מה לבדוק*'), /[—–]/.test(t)], [true, true, true, true, true, false])
+  eq('copy text: empty sections skipped', analysisText({ period_key: '2026-10', result: { headline: 'כותרת', changes: [], reasons: [], actions: [], watch: [] } }), '*אוקטובר 2026*\n\n*כותרת*')
+}
+
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
