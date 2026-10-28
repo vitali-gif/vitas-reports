@@ -23,7 +23,8 @@ Azure (Home page URL), ו-42 הופעות בקוד (קישורי כניסה, מ�
 2. ✅ מדיניות הפרטיות (10.10): vitas.co.il/privacy — מאגר vitas-website-v2, ענף fix/privacy-cluzo-name, מוזג ובאוויר.
    בתנאי השימוש (vitas.co.il/terms) השם לא מופיע.
 3. ✅ Azure (10.10): שם "Cluzo by Vitas", לוגו, כתובות (בית, תנאים, פרטיות), Publisher domain = vitas.co.il.
-   הווי הכחול (Publisher verification) — עדיין ממתין לאישור ה-MPN (בדיקה ביומן 11.10, הזנה ב-28.10).
+   ✅ הווי הכחול (Publisher verification) — 28.10: MPN ID 7170921 הוזן ב-Branding & properties, "successfully verified".
+   משתמשים מארגונים אחרים יכולים מעכשיו לאשר כניסה עם Microsoft (לפני כן Azure חסם הסכמה לאפליקציה לא מאומתת).
 4. ✅ כותרות היומן "Tovno —" הוחלפו ל-"Cluzo —" (אירועים עתידיים).
 5. ⏳ Vercel: אם `ALERT_EMAIL_FROM` מוגדר עם "Tovno" — לעדכן (בלי הגדרה, הקוד כבר שולח כ-Cluzo by Vitas).
 6. ⏳ דומיין cluzo.co.il (+ getcluzo.com / cluzo.io) ובדיקת סימני מסחר.
