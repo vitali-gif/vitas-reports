@@ -1,8 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { Sparkles, X, RefreshCw, TrendingUp, TrendingDown, Minus, Copy, Check } from 'lucide-react'
+import { Sparkles, X, RefreshCw, TrendingUp, TrendingDown, Minus, Copy, Check, AlertTriangle, MessageCircle } from 'lucide-react'
 import { periodLabel } from '../../../lib/report-pdf.js'
-import { analysisText } from '../../../lib/ai-analysis-text.js'
+import { analysisText, clientText, qualityOf } from '../../../lib/ai-analysis-text.js'
 
 // ניתוח AI לפרויקט (ויטלי, 27.10) — אדמין בלבד. המצב והקריאות ב-admin/page.js (openAiAnalysis /
 // runAiAnalysis); כאן רק התצוגה: הניתוח של התקופה שעל המסך, ורשימת הניתוחים הקודמים (בלחיצה ושבועיים).
@@ -25,17 +25,30 @@ async function copyText(text) {
   } catch { return false }
 }
 
-function CopyButton({ a, project, client }) {
+// שני כפתורים (28.10): הניתוח הפנימי כטקסט נקי, וההודעה ללקוח — שתי הודעות שונות לשני קהלים.
+function CopyButton({ getText, label, title, primary }) {
   const [state, setState] = useState('')   // '' | 'ok' | 'fail'
   const onCopy = async () => {
-    const ok = await copyText(analysisText(a, { project, client }))
+    const ok = await copyText(getText())
     setState(ok ? 'ok' : 'fail')
     setTimeout(() => setState(''), 2500)
   }
   return (
-    <button type="button" className={`ai-copy${state === 'ok' ? ' ok' : ''}`} onClick={onCopy} title="העתקת הניתוח כטקסט (מתאים לוואטסאפ)">
-      {state === 'ok' ? <><Check size={15} aria-hidden="true" /> הועתק</> : state === 'fail' ? 'ההעתקה נכשלה' : <><Copy size={15} aria-hidden="true" /> העתקת הטקסט</>}
+    <button type="button" className={`ai-copy${primary ? ' primary' : ''}${state === 'ok' ? ' ok' : ''}`} onClick={onCopy} title={title}>
+      {state === 'ok' ? <><Check size={15} aria-hidden="true" /> הועתק</> : state === 'fail' ? 'ההעתקה נכשלה' : <><Copy size={15} aria-hidden="true" /> {label}</>}
     </button>
+  )
+}
+
+/** איכות הנתונים — קודם לכל (ויטלי, 28.10: "אם חסרים נתונים - שיאמר את זה קודם, ורק אז ינתח"). */
+function Quality({ r }) {
+  const q = qualityOf(r)
+  if (!q || (q.level === 'good' && !q.notes.length)) return null
+  return (
+    <div className={`ai-quality ai-q-${q.level}`}>
+      <div className="ai-q-head"><AlertTriangle size={16} aria-hidden="true" /> {q.label}</div>
+      {!!q.notes.length && <ul>{q.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+    </div>
   )
 }
 
@@ -43,7 +56,11 @@ function Analysis({ a, project, client }) {
   const r = a.result || {}
   return (
     <div className="ai-body">
-      <div className="ai-meta-row"><div className="ai-meta">{periodLabel(a.period_key)}{a.compare_key ? ` מול ${periodLabel(a.compare_key)}` : ''} · {TRIGGER[a.trigger] || a.trigger} · {fmtDate(a.created_at)}{a.usage?.costUsd != null ? ` · עלות ‎$${a.usage.costUsd}` : ''}</div><CopyButton a={a} project={project} client={client} /></div>
+      <div className="ai-meta-row"><div className="ai-meta">{periodLabel(a.period_key)}{a.compare_key ? ` מול ${periodLabel(a.compare_key)}` : ''} · {TRIGGER[a.trigger] || a.trigger} · {fmtDate(a.created_at)}{a.usage?.costUsd != null ? ` · עלות ‎$${a.usage.costUsd}` : ''}</div><div className="ai-copies">
+        {r.clientMessage && <CopyButton primary getText={() => clientText(a, { project })} label="העתקת הודעה ללקוח" title="הודעה קצרה בשפה של לקוח, לקבוצת הוואטסאפ" />}
+        <CopyButton getText={() => analysisText(a, { project, client })} label="העתקת הניתוח" title="הניתוח הפנימי המלא, כטקסט נקי" />
+      </div></div>
+      <Quality r={r} />
       <h3 className="ai-headline">{r.headline}</h3>
       {r.summary && <p className="ai-summary">{r.summary}</p>}
 
@@ -74,6 +91,11 @@ function Analysis({ a, project, client }) {
       {!!r.watch?.length && (<section>
         <h4>מה לבדוק</h4>
         <ul className="ai-watch">{r.watch.map((w, i) => <li key={i}>{w}</li>)}</ul>
+      </section>)}
+
+      {r.clientMessage && (<section>
+        <h4><MessageCircle size={15} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> הודעה ללקוח <span>לקבוצת הוואטסאפ - לקרוא לפני ששולחים</span></h4>
+        <pre className="ai-client-msg">{clientText(a, { project })}</pre>
       </section>)}
     </div>
   )
