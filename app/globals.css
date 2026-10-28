@@ -4700,3 +4700,17 @@ textarea:focus-visible,
 .ai-copy { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d5daf9; background: #fff; color: #343aa1; border-radius: 10px; padding: 6px 12px; font: 700 13px Heebo, sans-serif; cursor: pointer; }
 .ai-copy:hover { background: #eef0fd; }
 .ai-copy.ok { border-color: #a8e2cd; background: #e3f6ef; color: #0f7a5c; }
+/* ניתוח AI — איכות נתונים, שני כפתורי העתקה, הודעה ללקוח (28.10) */
+.ai-copies { display: flex; gap: 6px; flex-wrap: wrap; }
+.ai-copy.primary { background: #4559df; border-color: #4559df; color: #fff; }
+.ai-copy.primary:hover { background: #343aa1; }
+.ai-copy.primary.ok { background: #e3f6ef; border-color: #a8e2cd; color: #0f7a5c; }
+.ai-quality { border-radius: 12px; padding: 10px 14px; margin: 10px 0 6px; font-size: 13.5px; line-height: 1.55; }
+.ai-quality ul { margin: 4px 0 0; padding-inline-start: 18px; }
+.ai-q-head { display: flex; align-items: center; gap: 6px; font-weight: 800; }
+.ai-q-partial { background: #fff4dc; color: #6b4600; }
+.ai-q-insufficient { background: #fde8e8; color: #8f1d17; }
+.ai-q-good { background: #edf0f8; color: #3b4766; }
+.ai-client-msg { white-space: pre-wrap; font: 500 14px/1.65 Heebo, sans-serif; background: #f2fbf6; border: 1px solid #c9ead9; border-radius: 12px; padding: 12px 14px; margin: 0; color: #142044; direction: rtl; }
+.ai-body .ai-quality ul { display: block; list-style: disc; padding-inline-start: 18px; }
+.ai-body .ai-quality li { display: list-item; border: 0; border-radius: 0; padding: 1px 0; font-size: 13.5px; }
