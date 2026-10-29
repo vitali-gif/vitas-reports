@@ -312,3 +312,5 @@ th:hover .sort-ind { opacity: .8; }
 /* ── 19. זמני תגובה: "שעות טיפול בלידים ותיאום פגישות" בשורה משלו, ברוחב מלא, ראשון ── */
 .vr-ui .vrt-root .vrt-patterns > .vrt-wide { grid-column: 1 / -1; order: -1; }
 .vr-ui .vrt-root .vrt-patterns > .vrt-wide .section-head .sub { display: block; max-inline-size: 760px; }
+/* תיבת "איך לקרוא" מתחת לכותרת הגרף, לפני הגרף */
+.vr-ui .vrt-root .vrt-chart-note { margin: 0 0 14px; }

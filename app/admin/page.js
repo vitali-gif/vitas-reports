@@ -2497,7 +2497,9 @@ const selectProject = async (client, project) => {
 
         {hourHasData && (
           <div className={vrResp ? 'section vrt-wide' : 'section'}>
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות טיפול בלידים ותיאום פגישות</h2><span className="sub">לכל שעה ביום (שעון ישראל) שלוש עמודות: כמה לידים נכנסו, בכמה טיפלו בפועל, ומתוכם כמה קיבלו פגישה. הקו הוא אחוז ההמרה לפגישה מתוך מי שטופל באותה שעה - כך רואים באילו שעות טיפול מביא הכי הרבה פגישות.</span></div>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות טיפול בלידים ותיאום פגישות</h2>{!vrResp && <span className="sub">לכל שעה ביום (שעון ישראל) שלוש עמודות: כמה לידים נכנסו, בכמה טיפלו בפועל, ומתוכם כמה קיבלו פגישה. הקו הוא אחוז ההמרה לפגישה מתוך מי שטופל באותה שעה - כך רואים באילו שעות טיפול מביא הכי הרבה פגישות.</span>}</div>
+            {/* ויטלי (29.10): ההסבר ליד הכותרת "לא יושב טוב" — בעיצוב החדש הוא תיבת הסבר מתחת לכותרת */}
+            {vrResp && <p className="cz-note vrt-chart-note"><span className="cz-note-label">איך לקרוא</span><span>לכל שעה ביום (שעון ישראל) שלוש עמודות: כמה לידים נכנסו, בכמה טיפלו בפועל, ומתוכם כמה קיבלו פגישה. הקו הוא אחוז ההמרה לפגישה מתוך מי שטופל באותה שעה - כך רואים באילו שעות טיפול מביא הכי הרבה פגישות.</span></p>}
             <div className="chart-card"><div className="chart-container" style={{height: vrResp ? 400 : 320}}><canvas id="apptHourChart"></canvas></div></div>
           </div>
         )}
