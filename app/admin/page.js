@@ -613,6 +613,14 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     setAiState(s => ({ ...s, listLoading: false, list, current: list.find(a => a.period_key === selectedMonth) || null,
       error: res && res.ok ? '' : (body?.code === 'NO_TABLE' ? 'צריך להריץ את מיגרציה 024 (טבלת ai_analyses).' : (body?.error || 'טעינת הניתוחים נכשלה')) }));
   };
+  // מה השרת רואה כשהמפתח "חסר" (29.10) — בלי הערך עצמו: לא קיים / ריק / שם דומה / באיזו פריסה.
+  const keyDiagText = (d) => {
+    if (!d) return '';
+    const what = !d.present ? 'בשרת אין משתנה בשם הזה' : d.empty ? 'המשתנה קיים בשרת אבל הערך שלו ריק' : `המשתנה קיים (${d.length} תווים)`;
+    const similar = d.similarNames?.length ? ` · נמצאו משתנים בשם דומה: ${d.similarNames.join(', ')}` : '';
+    const where = [d.vercelEnv && `סביבה: ${d.vercelEnv}`, d.deployment && `פריסה: ${d.deployment}`, d.commit && `גרסה: ${d.commit}`].filter(Boolean).join(' · ');
+    return `${what}${similar}.${where ? ' ' + where : ''}`;
+  };
   const runAiAnalysis = async (force) => {
     if (!selectedProject || !selectedMonth) return;
     setAiState(s => ({ ...s, loading: true, error: '' }));
@@ -621,7 +629,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       const res = await apiFetch('/api/ai/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: selectedProject.id, key: selectedMonth, prevKey, model, force: !!force }) });
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.analysis) {
-        const msg = body?.code === 'NO_KEY' ? 'חסר מפתח API של Claude ב-Vercel (ANTHROPIC_API_KEY).' : (body?.error || 'הניתוח נכשל');
+        const msg = body?.code === 'NO_KEY' ? 'חסר מפתח API של Claude ב-Vercel (ANTHROPIC_API_KEY). ' + keyDiagText(body.diag) : (body?.error || 'הניתוח נכשל');
         setAiState(s => ({ ...s, loading: false, error: msg }));
         return;
       }

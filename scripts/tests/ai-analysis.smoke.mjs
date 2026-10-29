@@ -1,7 +1,7 @@
 // scripts/tests/ai-analysis.smoke.mjs — ניתוח ה-AI (27.10): מה נשלח ל-Claude, מה חוזר, ומה קורה בשגיאה.
 // בלי קריאה אמיתית ל-API: runAnalysis מקבל לקוח מדומה.
 // הרצה:  node scripts/tests/ai-analysis.smoke.mjs
-import { analysisInput, runAnalysis, weeklyEmailHtml, weekKeys, AI_MODEL, ANALYSIS_SCHEMA } from '../../lib/ai-analysis.js'
+import { analysisInput, runAnalysis, weeklyEmailHtml, weekKeys, keyDiagnosis, AI_MODEL, ANALYSIS_SCHEMA } from '../../lib/ai-analysis.js'
 import { buildReportModel } from '../../lib/report-pdf.js'
 
 const fail = (m) => { console.error('✗ ' + m); process.exitCode = 1 }
@@ -86,6 +86,16 @@ eq('email: escaped, both projects, actions, no long dash', [mail.includes('HI &l
   eq('no CRM → insufficient, "blind" said first, no decision metric', [noCrm.level, noCrm.notes[0].includes('בעיוורון'), noCrm.decisionMetric], ['insufficient', true, null])
   const inp = analysisInput(buildReportModel({ project: 'x', key: '2026-09', prevKey: '2026-08', rows: [crm(140, 30), fb(20000, 120)], prevRows: [crm(160, 26), fb(18000, 130)] }), { now })
   eq('analysis input carries the data check', [inp.dataCheck.decisionMetric.name, inp.dataCheck.decisionMetric.n], ['עלות לפגישה שבוצעה', 28])
+}
+
+// אבחון המפתח (29.10): בלי הערך, עם ריק / חסר / שם דומה / פריסה
+{
+  const d = (env) => { const x = keyDiagnosis(env); return [x.present, x.empty, x.length, x.looksValid, x.trimmed, x.similarNames] }
+  eq('key diag: missing, with a look-alike name', d({ CLAUDE_API_KEY: 'x', ANTHROPIC_KEY: 'y' }), [false, false, 0, false, false, ['CLAUDE_API_KEY', 'ANTHROPIC_KEY']])
+  eq('key diag: present but empty', d({ ANTHROPIC_API_KEY: '  \n' }), [true, true, 0, false, true, []])
+  eq('key diag: valid with a trailing newline', d({ ANTHROPIC_API_KEY: 'sk-ant-abc\n' }), [true, false, 10, true, true, []])
+  eq('key diag: never carries the value', JSON.stringify(keyDiagnosis({ ANTHROPIC_API_KEY: 'sk-ant-SECRET', VERCEL_ENV: 'production', VERCEL_GIT_COMMIT_SHA: 'abcdef123' })).includes('SECRET'), false)
+  eq('key diag: deployment', [keyDiagnosis({ VERCEL_ENV: 'production', VERCEL_GIT_COMMIT_SHA: 'abcdef123' }).commit], ['abcdef1'])
 }
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')

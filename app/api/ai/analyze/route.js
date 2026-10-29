@@ -10,7 +10,7 @@
  */
 import { NextResponse } from 'next/server'
 import { adminClient, requireAdmin } from '../../../../lib/auth'
-import { analysisInput, runAnalysis } from '../../../../lib/ai-analysis.js'
+import { analysisInput, runAnalysis, checkKey } from '../../../../lib/ai-analysis.js'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -23,7 +23,10 @@ const COLS = 'id, project_id, period_key, compare_key, trigger, model, result, u
 export async function GET(req) {
   const gate = await requireAdmin(req)
   if (!gate.ok) return gate.res
-  const projectId = new URL(req.url).searchParams.get('projectId')
+  const sp = new URL(req.url).searchParams
+  // ?status=1 — בדיקת המפתח (קיים? Claude מקבל אותו? באיזו פריסה?), בלי הערך עצמו.
+  if (sp.get('status') === '1') return J({ key: await checkKey() })
+  const projectId = sp.get('projectId')
   if (!projectId) return J({ error: 'projectId required' }, 400)
   const { data, error } = await adminClient().from('ai_analyses').select(COLS)
     .eq('project_id', projectId).order('created_at', { ascending: false }).limit(12)
@@ -59,7 +62,7 @@ export async function POST(req) {
     out = await runAnalysis(input)
   } catch (e) {
     const status = e.code === 'NO_KEY' ? 503 : 502
-    return J({ error: e.message || 'הניתוח נכשל', code: e.code || 'API_ERROR' }, status)
+    return J({ error: e.message || 'הניתוח נכשל', code: e.code || 'API_ERROR', diag: e.diag }, status)
   }
 
   const row = {
