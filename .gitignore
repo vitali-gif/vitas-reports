@@ -9,3 +9,4 @@ qa-screenshots/
 # Playwright (E2E)
 playwright-report/
 test-results/
+tour-shots/
