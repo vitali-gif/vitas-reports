@@ -1799,6 +1799,8 @@ const selectProject = async (client, project) => {
       plugins: [arcLabelsPlugin],
       options: {
         responsive: true, maintainAspectRatio: false,
+        // בלי אנימציה (29.10): דוח, לא מצגת — הגרף מופיע מיד, וגם צילום/הדפסה לא תופסים אותו באמצע תנועה.
+        animation: false,
         ...(isDoughnut && { cutout: '62%' }),
         plugins: { legend: legendCfg, tooltip: tooltipCfg },
       }
