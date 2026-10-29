@@ -31,6 +31,14 @@ const CLUZO_SITE_URL = (process.env.CLUZO_SITE_URL || '').replace(/\/+$/, '')
 
 const nextConfig = {
   reactStrictMode: true,
+  // דוח ה-PDF החודשי (app/api/cron/monthly-report): Chromium בשרת. החבילות לא נארזות ב-webpack,
+  // והקובץ הבינארי (bin/*.br, נקרא מהדיסק) נכלל במפורש בפונקציה — אחרת הוא לא מגיע ל-Vercel.
+  experimental: {
+    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
+    outputFileTracingIncludes: {
+      '/api/cron/monthly-report': ['./node_modules/@sparticuz/chromium/bin/**'],
+    },
+  },
   async rewrites() {
     if (!CLUZO_SITE_URL) return []
     return {
