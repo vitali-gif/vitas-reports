@@ -260,7 +260,11 @@ th:hover .sort-ind { opacity: .8; }
 /* ── 16. פילוח דמוגרפי: הטוב והחלש בכל עמודה ─────────────────────────────────────────
    קודם: גלולה ירוקה/אדומה זוהרת עם inline style על כל ערך קיצון — שורה שלמה הייתה
    צבעונית. עכשיו: good / bad של מערכת העיצוב, עדין, אותו גובה כמו הטקסט. */
+/* position: relative — חובה. בתוך הגלולה יש טקסט לקורא מסך (.vr-sr-only, position: absolute).
+   בלי עוגן הוא "בורח" מקופסת הגלילה של הטבלה ומרחיב את כל העמוד: בטלפון העמוד יצא
+   501px במסך של 412, הדפדפן הקטין את הכל, וחלון "ברוכים הבאים" זז מחוץ למסך (E2E, 29.10). */
 .cz-cell-pill {
+  position: relative;
   display: inline-block; white-space: nowrap; font-weight: 700;
   border-radius: 6px; padding: 1px 7px;
   font-variant-numeric: tabular-nums;
