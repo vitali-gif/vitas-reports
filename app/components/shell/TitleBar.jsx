@@ -85,8 +85,16 @@ export default function TitleBar({
           onSelectProject={onSelectProject}
         />
       )}
-      {/* Left: breadcrumb + title */}
-      <div>
+      {/* כותרת: שם הלקוח כשורה קטנה מעל, שם הפרויקט ככותרת בשורה אחת (שדרוג העיצוב, 29.10).
+          קודם: "סקירה / PROJECT" באותיות גדולות + "לקוח / פרויקט" ב-38px — שם לקוח ארוך נשבר
+          לשלוש שורות, והפרויקט הופיע פעמיים. בלי פרויקט — הפירורים והכותרת כמו קודם. */}
+      {client && project ? (
+        <div className="tb-title">
+          <div className="tb-eyebrow">{client}</div>
+          <h1 title={`${client} / ${project}`}><span className="brand" dir="auto">{project}</span></h1>
+        </div>
+      ) : (
+      <div className="tb-title">
         {crumb.filter(Boolean).length > 0 && (
           <div className="crumb">
             {crumb.filter(Boolean).map((part, i) => (
@@ -107,6 +115,7 @@ export default function TitleBar({
           )}
         </h1>
       </div>
+      )}
 
       {/* Right: date picker + comparison toggle */}
       <div className="controls">

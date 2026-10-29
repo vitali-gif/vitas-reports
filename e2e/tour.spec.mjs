@@ -103,6 +103,8 @@ test.describe('סיור צילומי מסך', () => {
         const name = (await item.innerText()).trim()
         await item.click()
         await toggleSidebar(page, false)
+        // הטאב נשאר מהפרויקט הקודם (לרוב האחרון, PRO) — חוזרים לטאב הפתיחה.
+        await page.locator('.client-tabs').first().locator('.client-tab').first().click().catch(() => {})
         await settle(page)
         const prefix = `${dev}-p${String(done + 1).padStart(2, '0')}-${slug(name)}`
         if (done < FULL_TABS_PROJECTS && (dev === 'd' || done === 0)) await shootTabs(page, prefix)

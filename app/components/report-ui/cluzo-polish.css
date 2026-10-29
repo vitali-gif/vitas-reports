@@ -1,0 +1,101 @@
+/* cluzo-polish.css — שדרוג העיצוב, סבב 1 (ויטלי, 29.10: "משהו שיראה יותר מקצועי").
+
+   הבסיס: Cluzo Design System (https://claude.ai/artifact/EFRmVdNgcUJqD3LGaZAmBu). נטען אחרון
+   ב-app/layout.js, ולכן גובר על globals.css ו-vitas-bridge.css בלי !important.
+
+   מה כאן: מסגרת המסך — כותרת, שורת הפעולות העליונה, טאבים, רשתות הכרטיסים, טבלאות.
+   מה לא כאן, בכוונה: צבעי כרטיסי ה-KPI הצבעוניים (ויטלי, 21.9: "אני לא רוצה לגעת בצבעים
+   באף לקוח של הקארדס הצבעוני"). --g-* ו---shadow-* לא נוגעים. */
+
+/* ── 1. כותרת המסך ─────────────────────────────────────────────────────────────
+   שם הלקוח בשורה קטנה מעל, הפרויקט בשורה אחת. שם ארוך נחתך עם … (המלא ב-title). */
+.titlebar { align-items: flex-end; gap: 20px; margin-bottom: 22px; }
+.titlebar .tb-title { min-inline-size: 0; flex: 1 1 auto; }
+.tb-eyebrow {
+  font-size: 13.5px; font-weight: 600; line-height: 1.4;
+  color: var(--tv-text-secondary);
+  margin-block-end: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.titlebar .tb-title h1 {
+  display: block;
+  font-size: 30px; font-weight: 800; line-height: 1.2; letter-spacing: -0.01em;
+  color: var(--tv-navy);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.titlebar .tb-title h1 .brand { letter-spacing: 0; }
+/* שני הפקדים באותו גובה ובאותו קו */
+.titlebar .controls { align-items: center; gap: 10px; }
+.titlebar .controls .switch-compare { min-block-size: 40px; padding-block: 0 !important; box-shadow: var(--shadow-xs); }
+
+@media (max-width: 768px) {
+  /* בטלפון בורר הפרויקט (.vproj) כבר מציג "לקוח / פרויקט" ולוחצים עליו — הכותרת כפולה
+     ותפסה שלוש שורות של 38px. נשארת רק כשאין בורר. */
+  .titlebar:has(.vproj) .tb-title { display: none; }
+  .titlebar .tb-title h1 { font-size: 21px; }
+  .tb-eyebrow { font-size: 12.5px; }
+}
+
+/* ── 2. שורת הפעולות העליונה ───────────────────────────────────────────────────
+   חלק מהעמוד ולא פס נפרד: רקע הקנבס, קו מפריד דק, גובה 56. */
+@media (min-width: 769px) {
+  .header.header-vr { height: 56px; background: var(--tv-canvas); border-block-end-color: var(--tv-divider); backdrop-filter: none; }
+}
+
+/* ── 3. טאבים ראשיים ───────────────────────────────────────────────────────────
+   פקד מקוטע: לבן, ההובר בגוון המותג, הנבחר בכחול עם קו תחתון. */
+.vr-ui .client-tabs-main { border-color: var(--tv-border); border-radius: var(--r-md); box-shadow: var(--tv-shadow); }
+.vr-ui .client-tabs-main .client-tab { background: var(--tv-surface); color: var(--tv-text-secondary); font-size: 14.5px; font-weight: 600; border-inline-start-color: var(--tv-divider); }
+.vr-ui .client-tabs-main .client-tab:hover { background: var(--tv-brand-soft); color: var(--tv-link); }
+.vr-ui .client-tabs-main .client-tab.active { background: var(--tv-brand-soft); color: var(--tv-brand); font-weight: 700; box-shadow: inset 0 -3px 0 var(--tv-brand); }
+
+/* ── 4. רשתות הכרטיסים: בלי כרטיס יתום בשורה האחרונה ─────────────────────────
+   בדסקטופ הרשת היא 5 עמודות, ו-11 כרטיסים (BCure) יצאו 5+5+1, ו-6 יצאו 5+1. מספר
+   העמודות נבחר לפי מספר הכרטיסים: 6 → 3, 7-8 → 4, 9-10 → 5, 11-12 → 4, 13-15 → 5.
+   רק בדסקטופ רחב; במסכים צרים הכללים הקיימים (2-3 עמודות) נשארים. */
+@media (min-width: 1200px) {
+  .kpi-grid:has(> :nth-child(6):last-child),
+  .vr-ui .vr-metric-grid:has(> :nth-child(6):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi-grid:has(> :nth-child(7):last-child),
+  .kpi-grid:has(> :nth-child(8):last-child),
+  .kpi-grid:has(> :nth-child(11):last-child),
+  .kpi-grid:has(> :nth-child(12):last-child),
+  .vr-ui .vr-metric-grid:has(> :nth-child(7):last-child),
+  .vr-ui .vr-metric-grid:has(> :nth-child(8):last-child),
+  .vr-ui .vr-metric-grid:has(> :nth-child(11):last-child),
+  .vr-ui .vr-metric-grid:has(> :nth-child(12):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .kpi-grid:has(> :nth-child(9):last-child),
+  .kpi-grid:has(> :nth-child(10):last-child),
+  .kpi-grid:has(> :nth-child(13):last-child),
+  .kpi-grid:has(> :nth-child(14):last-child),
+  .kpi-grid:has(> :nth-child(15):last-child) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+/* ── 5. טבלאות ─────────────────────────────────────────────────────────────────
+   חץ המיון ⇅ בכל כותרת עמודה הוסיף רעש; הוא נשאר (שיהיה ברור שאפשר למיין), אבל עמום,
+   ומתחזק בריחוף. עמודה ממוינת מציגה ▲/▼ בצבע מלא. */
+.sort-ind { opacity: .35; font-size: .9em; }
+th:hover .sort-ind { opacity: .8; }
+.vr-ui .data-table thead th, .data-table thead th { font-weight: 700; color: var(--tv-text); }
+
+/* טבלאות רחבות (קמפיינים: 12 עמודות) נחתכו בדסקטופ ונגללו הצידה. צפיפות אחידה מעט
+   גבוהה יותר — אותו גודל טקסט כמו במערכת העיצוב (table: 14px), פחות ריפוד — כדי שייכנסו. */
+@media (min-width: 768px) {
+  .vr-ui .data-table thead th { font-size: 12.5px; padding-block: 12px; padding-inline: 11px; }
+  .vr-ui .data-table tbody td { font-size: 13.5px; padding-block: 12px; padding-inline: 11px; }
+}
+
+/* הסבר מעל טבלה: אייקון info במקום 💡 */
+.vr-tbl-hint { display: flex; align-items: flex-start; gap: 6px; }
+.vr-tbl-hint .vr-tbl-hint-ico { flex-shrink: 0; margin-block-start: 2px; color: var(--tv-brand); }
+
+/* ── 6. משפך: עד 8 תחנות בשורה אחת בדסקטופ ──────────────────────────────────────
+   עם 7 תחנות (נדל"ן: חשיפות → חוזים) והמינימום הקודם של 145px, המשפך יצא מהמסך
+   ונגלל הצידה — התחנות האחרונות, החשובות, לא נראו. */
+@media (min-width: 1100px) {
+  .vr-ui .vr-funnel { grid-template-columns: repeat(var(--vr-funnel-cols, 6), minmax(0, 1fr)); gap: 10px; overflow-x: visible; }
+  .vr-ui .vr-funnel-step { padding: 14px; }
+  .vr-ui .vr-funnel-label h3 { font-size: 14px; line-height: 1.3; }
+  .vr-ui .vr-funnel-value { font-size: 25px; }
+  .vr-ui .vr-funnel .vr-caption { font-size: 12.5px; line-height: 1.5; }
+}
