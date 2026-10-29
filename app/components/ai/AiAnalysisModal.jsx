@@ -41,13 +41,23 @@ function CopyButton({ getText, label, title, primary }) {
 }
 
 /** איכות הנתונים — קודם לכל (ויטלי, 28.10: "אם חסרים נתונים - שיאמר את זה קודם, ורק אז ינתח"). */
+// 29.10 (ויטלי: "חלונית צהובה מוזרה"): רצועה לבנה עם תווית צבעונית, כמו תיבות ההסבר בדשבורד
+// (.cz-note), ו-3 ההערות הראשונות — השאר בלחיצה.
+const Q_SHOWN = 3
 function Quality({ r }) {
+  const [all, setAll] = useState(false)
   const q = qualityOf(r)
   if (!q || (q.level === 'good' && !q.notes.length)) return null
+  const notes = all ? q.notes : q.notes.slice(0, Q_SHOWN)
   return (
     <div className={`ai-quality ai-q-${q.level}`}>
-      <div className="ai-q-head"><AlertTriangle size={16} aria-hidden="true" /> {q.label}</div>
-      {!!q.notes.length && <ul>{q.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+      <div className="ai-q-head"><span className="ai-q-label"><AlertTriangle size={14} aria-hidden="true" /> {q.label}</span></div>
+      {!!notes.length && <ul>{notes.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+      {q.notes.length > Q_SHOWN && (
+        <button type="button" className="ai-q-more" onClick={() => setAll(v => !v)}>
+          {all ? 'פחות' : `עוד ${q.notes.length - Q_SHOWN} הערות`}
+        </button>
+      )}
     </div>
   )
 }
