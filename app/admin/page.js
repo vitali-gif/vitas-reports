@@ -79,7 +79,7 @@ import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../compone
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
-import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download } from 'lucide-react'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays } from 'lucide-react'
 // צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
@@ -4492,16 +4492,16 @@ const selectProject = async (client, project) => {
         )}
         {/* Source Tabs */}
         <div className="client-tabs client-tabs-main">
-          <button className={`client-tab ${dashTab === 'all' ? 'active' : ''}`} onClick={() => setDashTab('all')}>{'\u05d4\u05db\u05dc'}</button>
-          {hasCrm && <button className={`client-tab ${dashTab === 'crm' ? 'active' : ''}`} onClick={() => setDashTab('crm')}>CRM</button>}
-          {hasFb && <button className={`client-tab ${dashTab === 'facebook' ? 'active' : ''}`} onClick={() => setDashTab('facebook')}>Facebook</button>}
-          {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}>Google PMax</button>}
-            {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}>Google Search</button>}
-            {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}>Google</button>}
+          <button className={`client-tab ${dashTab === 'all' ? 'active' : ''}`} onClick={() => setDashTab('all')}><LayoutDashboard size={16} aria-hidden="true" className="tab-ico" />{'\u05d4\u05db\u05dc'}</button>
+          {hasCrm && <button className={`client-tab ${dashTab === 'crm' ? 'active' : ''}`} onClick={() => setDashTab('crm')}><Users size={16} aria-hidden="true" className="tab-ico" />CRM</button>}
+          {hasFb && <button className={`client-tab ${dashTab === 'facebook' ? 'active' : ''}`} onClick={() => setDashTab('facebook')}><span className="tab-ico"><MetaMark size={16} /></span>Facebook</button>}
+          {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}><span className="tab-ico"><GoogleMark size={15} /></span>Google PMax</button>}
+            {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}><span className="tab-ico"><GoogleMark size={15} /></span>Google Search</button>}
+            {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}><span className="tab-ico"><GoogleMark size={15} /></span>Google</button>}
             {/* הכפתור מוצג גם ללקוח שאינו PRO — התגית היא השילוט, והלחיצה מגיעה
                 למסך שדרוג ולא לתוכן. להסתיר אותו לגמרי היה משאיר את הלקוח בלי
                 לדעת שהפיצ'ר קיים. */}
-            {meetingsOn && <button className={`client-tab ${dashTab === 'meetings' ? 'active' : ''}`} onClick={() => setDashTab('meetings')}>ישיבות שיווק<ProBadge /></button>}
+            {meetingsOn && <button className={`client-tab ${dashTab === 'meetings' ? 'active' : ''}`} onClick={() => setDashTab('meetings')}><CalendarDays size={16} aria-hidden="true" className="tab-ico" />ישיבות שיווק<ProBadge /></button>}
             {/* "המלצות חכמות" מוסתר לכל הלקוחות עד שנשפר אותו (ויטלי, 21.9). הקוד של
                 הטאב נשאר במקומו — רק הכניסה אליו חסומה, כדי שהחזרה תהיה שינוי של שורה. */}
             {RECOMMENDATIONS_TAB_ON && hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
