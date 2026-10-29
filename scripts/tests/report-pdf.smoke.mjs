@@ -128,7 +128,8 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   const h = render(build({ project: 'HI PARK', client: 'ש.ברוך', key: '2026-09', prevKey: '2026-08', rows: [{ source: 'crm', summary: { totalLeads: 10, crmRepRows: rows } }], prevRows: [{ source: 'crm', summary: { totalLeads: 8 } }] }))
   const at = (s) => h.indexOf(s)
   eq('order: funnel → profile → what changed', [at('משפך לידים') > 0, at('משפך לידים') < at('מצב דיור'), at('מצב דיור') < at('מה השתנה מהחודש הקודם')], [true, true, true])
-  eq('client / project heading', h.includes('ש.ברוך<span class="sl">/</span>HI PARK'), true)
+  eq('cover: client eyebrow + project heading', [h.includes('<div class="cv-k" dir="auto">ש.ברוך</div>'), h.includes('<h1 dir="auto">HI PARK</h1>')], [true, true])
+  eq('cover: Cluzo logo, no VITAS logo', [h.includes('/brand/cluzo/cluzo-logo-light.svg'), h.includes('vitas-logo')], [true, false])
 }
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
