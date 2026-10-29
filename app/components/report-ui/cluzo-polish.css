@@ -99,3 +99,17 @@ th:hover .sort-ind { opacity: .8; }
   .vr-ui .vr-funnel-value { font-size: 25px; }
   .vr-ui .vr-funnel .vr-caption { font-size: 12.5px; line-height: 1.5; }
 }
+
+/* ── 7. כרטיסי מדד בטלפון: קומפקטיים ─────────────────────────────────────────────
+   שני כרטיסים בשורה בגובה 170px כל אחד — 11 כרטיסים תפסו ארבעה מסכים לפני שהגיע
+   משהו אחר. אותם צבעים ואותו תוכן, פחות ריפוד ואייקון קטן יותר. */
+@media (max-width: 767px) {
+  .vr-ui .vr-metric-grid { gap: 10px; }
+  .vr-ui .vr-metric { min-block-size: 0; padding: 14px 14px 12px; }
+  .vr-ui .vr-metric-top { gap: 8px; }
+  .vr-ui .vr-metric-top h3 { font-size: 14px; line-height: 1.35; }
+  .vr-ui .vr-metric-icon { padding: 5px; border-radius: 7px; }
+  .vr-ui .vr-metric-icon svg { inline-size: 18px; block-size: 18px; }
+  .vr-ui .vr-metric-value { margin-block-start: 8px !important; }
+  .vr-ui .vr-metric-trend { block-size: 22px; margin-block-start: 8px; }
+}
