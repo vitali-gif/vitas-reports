@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Sparkles, X, RefreshCw, TrendingUp, TrendingDown, Minus, Copy, Check, AlertTriangle, MessageCircle } from 'lucide-react'
+import { Sparkles, X, RefreshCw, TrendingUp, TrendingDown, Minus, Copy, Check, AlertTriangle, MessageCircle, Mail } from 'lucide-react'
 import { periodLabel } from '../../../lib/report-pdf.js'
 import { analysisText, clientText, qualityOf } from '../../../lib/ai-analysis-text.js'
 
@@ -10,7 +10,7 @@ import { analysisText, clientText, qualityOf } from '../../../lib/ai-analysis-te
 
 const OWNER = { agency: 'סוכנות', sales: 'צוות מכירות', client: 'לקוח' }
 const CONF = { high: 'סביר מאוד', medium: 'אפשרי', low: 'השערה רחוקה' }
-const TRIGGER = { manual: 'בלחיצה', weekly: 'שבועי' }
+const TRIGGER = { manual: 'בלחיצה', weekly: 'שבועי', monthly: 'דוח חודשי' }
 const fmtDate = (iso) => { try { return new Date(iso).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
 
 // העתקה (28.10): הניתוח כטקסט פשוט, מוכן להדבקה בוואטסאפ או במייל. clipboard דורש https —
@@ -101,7 +101,7 @@ function Analysis({ a, project, client }) {
   )
 }
 
-export default function AiAnalysisModal({ project, client, periodKey, state, onRun, onSelect, onClose }) {
+export default function AiAnalysisModal({ project, client, periodKey, state, onRun, onSelect, onClose, onSendMonthly, monthly }) {
   const { loading, listLoading, error, list, current } = state
   const isThisPeriod = current && current.period_key === periodKey
   return (
@@ -121,6 +121,16 @@ export default function AiAnalysisModal({ project, client, periodKey, state, onR
             {loading ? <><RefreshCw size={15} className="ai-spin" aria-hidden="true" /> Claude מנתח… (עד דקה)</> : isThisPeriod ? <><RefreshCw size={15} aria-hidden="true" /> נתח מחדש</> : <><Sparkles size={15} aria-hidden="true" /> נתח את התקופה</>}
           </button>
         </div>
+
+        {/* הדוח החודשי (29.10): אותו PDF שהקרון שולח ב-5 לחודש, עם "סיכום החודש" מהניתוח — רק לחודש שהסתיים */}
+        {onSendMonthly && (
+          <div className="ai-run">
+            <span>{monthly?.msg || 'דוח PDF חודשי עם סיכום מהניתוח - נשלח אוטומטית ב-5 לחודש, רק אליך.'}</span>
+            <button type="button" className="ai-btn" disabled={loading || monthly?.sending} onClick={onSendMonthly}>
+              {monthly?.sending ? <><RefreshCw size={15} className="ai-spin" aria-hidden="true" /> מכין ושולח… (עד 2 דקות)</> : <><Mail size={15} aria-hidden="true" /> שלח לי עכשיו</>}
+            </button>
+          </div>
+        )}
 
         {error && <div className="ai-error">{error}</div>}
         {listLoading ? <div className="ai-empty">טוען ניתוחים…</div>

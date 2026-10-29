@@ -579,8 +579,12 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     if (!w) { showToast('הדפדפן חסם את חלון הדוח. אפשר חלונות קופצים לאתר ונסה שוב.'); return; }
     w.document.write('<!doctype html><html dir="rtl"><body style="font-family:Arial,sans-serif;padding:48px;text-align:center;color:#56636f">מכין את הדוח…</body></html>');
     try {
-      const { lib, model } = await buildPeriodModel();
-      const html = lib.renderReportHtml(model, { assetBase: window.location.origin });
+      const { lib, model, prevKey } = await buildPeriodModel();
+      // "סיכום החודש" (29.10): ניתוח AI שמור לאותה תקופה ואותה השוואה — אם יש. בלי ניתוח, הדוח כמו קודם.
+      const aiRes = await apiFetch(`/api/ai/analyze?projectId=${selectedProject.id}`, { headers: {} }).catch(() => null);
+      const aiList = aiRes && aiRes.ok ? ((await aiRes.json().catch(() => null))?.analyses || []) : [];
+      const insights = aiList.find(a => a.period_key === selectedMonth && (a.compare_key || '') === (prevKey || '') && a.result?.clientMessage)?.result || null;
+      const html = lib.renderReportHtml(model, { assetBase: window.location.origin, insights });
       w.document.open(); w.document.write(html); w.document.close();
       // דיאלוג ההדפסה אחרי שהגופן והתמונות של המודעות נטענו, אחרת העברית יוצאת בגופן ברירת המחדל
       // והמודעות ריקות. תמונה שלא נטענת לא מעכבת יותר מ-6 שניות.
@@ -627,6 +631,21 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     } catch (err) {
       setAiState(s => ({ ...s, loading: false, error: 'הניתוח נכשל: ' + (err?.message || err) }));
     }
+  };
+
+  // הדוח החודשי (29.10): אותו דוח שהקרון שולח ב-5 לחודש (/api/cron/monthly-report) — PDF עם "סיכום
+  // החודש" מניתוח ה-AI, במייל לויטלי בלבד. ניתוח קיים לחודש הזה נכנס כמו שהוא; אם אין — נוצר חדש.
+  const [monthlyState, setMonthlyState] = useState(null);
+  const isClosedMonth = (k) => { if (!/^\d{4}-\d{2}$/.test(k || '')) return false; const t = new Date(); return k < `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`; };
+  const sendMonthlyReport = async () => {
+    if (!selectedProject || !isClosedMonth(selectedMonth)) return;
+    setMonthlyState({ sending: true });
+    const res = await apiFetch(`/api/cron/monthly-report?projectId=${selectedProject.id}&key=${selectedMonth}&force=1`, { headers: {} }).catch(() => null);
+    const body = res ? await res.json().catch(() => null) : null;
+    const msg = body?.emailed ? `✓ נשלח למייל שלך${body.aiError ? ' (בלי סיכום - הניתוח נכשל)' : ''}`
+      : body?.skipped ? 'לא נשלח: ' + body.skipped : 'השליחה נכשלה: ' + (body?.error || (res ? res.status : 'אין חיבור'));
+    setMonthlyState({ sending: false, msg });
+    if (body?.emailed && !body.aiReused && !body.aiError) openAiAnalysis();   // ניתוח חדש נשמר — מרעננים את הרשימה
   };
 
   const loadClientAccess = async () => {
@@ -7598,7 +7617,9 @@ const selectProject = async (client, project) => {
           state={aiState}
           onRun={runAiAnalysis}
           onSelect={(a) => setAiState(s => ({ ...s, current: a }))}
-          onClose={() => setAiOpen(false)}
+          onClose={() => { setAiOpen(false); setMonthlyState(null); }}
+          onSendMonthly={isClosedMonth(selectedMonth) ? sendMonthlyReport : undefined}
+          monthly={monthlyState}
         />
       )}
       {showSessionLogs && (
