@@ -59,6 +59,19 @@ async function shootTabs(page, prefix) {
     await settle(page)
     await page.evaluate(() => window.scrollTo(0, 0))
     await shot(page, `${prefix}-t${i + 1}-${slug(label)}`)
+    // תתי-טאבים של CRM (מקורות הגעה, זמני תגובה, התנגדויות…) — בדסקטופ בלבד; בטלפון הם בורר נפתח.
+    const subs = page.locator('.vcs-subtabs-row .client-tab')
+    const ns = await subs.count()
+    for (let j = 1; j < ns; j++) {   // הראשון כבר צולם עם הטאב
+      const sub = subs.nth(j)
+      if (!(await sub.isVisible().catch(() => false))) continue
+      const subLabel = (await sub.innerText()).trim()
+      await sub.click()
+      await settle(page)
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await shot(page, `${prefix}-t${i + 1}-s${j + 1}-${slug(subLabel)}`)
+    }
+    if (ns > 1) await subs.first().click().catch(() => {})
   }
 }
 
@@ -76,10 +89,25 @@ test.describe('סיור צילומי מסך', () => {
     await page.locator('input[type="password"]').fill(PASSWORD)
     await page.getByRole('button', { name: 'כניסה', exact: true }).click()
     await settle(page)
+    // אבחון גלישה אופקית (29.10): מה רחב מהמסך. נכתב לקובץ ליד הצילומים.
+    const overflow = await page.evaluate(() => {
+      const vw = document.documentElement.clientWidth
+      const out = []
+      for (const el of document.querySelectorAll('body *')) {
+        const r = el.getBoundingClientRect()
+        if (r.width > vw + 2 || r.left < -2 || r.right > vw + 2) {
+          if (out.length < 40) out.push({ tag: el.tagName, cls: String(el.className).slice(0, 80), w: Math.round(r.width), l: Math.round(r.left), r: Math.round(r.right) })
+        }
+      }
+      return { vw, scrollWidth: document.documentElement.scrollWidth, out }
+    })
+    fs.mkdirSync(OUT, { recursive: true })
+    fs.writeFileSync(path.join(OUT, `${dev}-overflow.json`), JSON.stringify(overflow, null, 1))
     const onboarding = page.getByRole('button', { name: /הבנתי, קדימה/ })
     if (await onboarding.isVisible({ timeout: 3000 }).catch(() => false)) {
       await shot(page, `${dev}-01-onboarding`)
-      await onboarding.click()
+      // dispatchEvent ולא click: אם משהו מכסה את הכפתור (גלישה אופקית, 29.10) הסיור לא נתקע.
+      await onboarding.dispatchEvent('click')
     }
     await expect(page.locator('.client-tabs').first()).toBeVisible({ timeout: 30_000 })
 

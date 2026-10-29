@@ -25,10 +25,11 @@ export function DataState({ state = 'ready', message, onRetry, children }) {
   </div>;
 }
 
-export function ReportSection({ title, description, actions, children }) {
+// icon (סבב 3, 29.10): אייקון lucide לצד הכותרת, באותו סגנון כמו כותרות הסקשנים הישנים (.section-head .ico).
+export function ReportSection({ title, description, actions, icon: Icon, children }) {
   const id = useId();
   return <section className="vr-section" aria-labelledby={id}>
-    <div className="vr-section-heading"><div><h2 id={id}>{title}</h2>{description && <p>{description}</p>}</div>{actions && <div className="vr-actions">{actions}</div>}</div>
+    <div className="vr-section-heading"><div className="vr-section-titles">{Icon && <span className="vr-section-ico" aria-hidden="true"><Icon size={18} strokeWidth={1.8} /></span>}<div><h2 id={id}>{title}</h2>{description && <p>{description}</p>}</div></div>{actions && <div className="vr-actions">{actions}</div>}</div>
     {children}
   </section>;
 }
