@@ -10,6 +10,8 @@ import './components/report-ui/erika.css';
 import './components/report-ui/ads-sections.css';
 import './components/meetings/meetings.css';
 import './components/auth/signin.css';
+// שדרוג העיצוב (29.10) — נטען אחרון כדי לגבור על השכבות הקודמות. ראו את ראש הקובץ.
+import './components/report-ui/cluzo-polish.css';
 
 export const metadata = {
   title: 'Cluzo by Vitas — מערכת דוחות',

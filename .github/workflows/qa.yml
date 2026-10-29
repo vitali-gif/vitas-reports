@@ -26,6 +26,11 @@ on:
         description: 'כתובת לבדיקת E2E (ריק = פרודקשן)'
         required: false
         default: ''
+      tour:
+        description: 'סיור צילומי מסך לעבודת עיצוב (e2e/tour.spec.mjs) במקום הבדיקות'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: qa-${{ github.workflow }}-${{ github.event.pull_request.number || github.event.deployment_status.environment_url || github.ref }}
@@ -84,6 +89,7 @@ jobs:
       QA_CLIENT_EMAIL: ${{ secrets.QA_CLIENT_EMAIL }}
       QA_CLIENT_PASSWORD: ${{ secrets.QA_CLIENT_PASSWORD }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      QA_TOUR: ${{ inputs.tour && '1' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -94,10 +100,16 @@ jobs:
         run: |
           echo "E2E against: $QA_BASE_URL"
           if [ -z "$QA_CLIENT_EMAIL" ]; then echo "::warning::QA_CLIENT_EMAIL/QA_CLIENT_PASSWORD לא מוגדרים — רצות רק בדיקות מסך הכניסה"; fi
-      - run: npx playwright test
+      - run: npx playwright test ${{ inputs.tour && 'e2e/tour.spec.mjs' || '' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report-${{ github.run_id }}
           path: playwright-report
           retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.tour
+        with:
+          name: tour-shots-${{ github.run_id }}
+          path: tour-shots
+          retention-days: 7

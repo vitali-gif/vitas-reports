@@ -329,7 +329,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   }
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
   const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was SUCCESSFULLY lazy-loaded
-  const monthDataInFlight = useRef(new Set())  // month-keys with a heavy-data fetch currently in flight (dedupe)
+  const monthDataInFlight = useRef(new Set())  // `${projectId}|${monthKey}` with a heavy-data fetch currently in flight (dedupe)
+  // הפרויקט שהמשתמש בחר אחרון (נקבע ב-selectProject, לפני כל await). תשובה של פרויקט אחר —
+  // כולל רענון שהתחיל לפני המעבר — לא נוגעת ב-state. ראו loadProjectReports (E2E, 29.10).
+  const reportsPidRef = useRef(null)
   const projectReportsCache = useRef(new Map())  // projectId -> light reports (stale-while-revalidate for instant project switching)
 
   // D14: הדוחות שהדשבורד רואה. בלי מיקוד — בדיוק reportsAll. עם מיקוד — שורות התקופה שעל המסך
@@ -1147,6 +1150,13 @@ const loadClients = async () => {
     }).catch(() => null);
     let data = null;
     if (res && res.ok) data = await res.json().catch(() => null);
+    // מעבר מהיר בין פרויקטים (E2E "כל פרויקט בסיידבר נפתח", 28-29.10): האינדקס של BCure (כבד)
+    // חזר אחרי זה של ISMOOTH ודרס את ה-state — המסך סינן לפי ISMOOTH ולא מצא שורות, והציג
+    // "אין נתונים עדיין". תשובה של פרויקט שכבר לא על המסך נשמרת רק במטמון.
+    if (reportsPidRef.current !== projectId) {
+      if (data) projectReportsCache.current.set(projectId, data);
+      return { hasData: !!(data && data.length), failed: !data, stale: true };
+    }
     if (data) {
       projectReportsCache.current.set(projectId, data);
       if (!cached) monthDataLoaded.current = new Set();
@@ -1176,13 +1186,15 @@ const loadClients = async () => {
   // months; this fetches the heavy rows on demand and merges them in.
   const loadMonthsData = async (projectId, monthKeys) => {
     if (!projectId || !monthKeys.length) return;
-    monthKeys.forEach(m => monthDataInFlight.current.add(m));
+    monthKeys.forEach(m => monthDataInFlight.current.add(projectId + '|' + m));
     try {
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
       const res = await apiFetch(`/api/reports/by-project?projectId=${projectId}&dataForMonths=${encodeURIComponent(monthKeys.join(','))}`, { headers: {} }).catch(() => null);
       if (!res || !res.ok) return;                 // transient — leave keys UN-marked so a later render retries
       const rows = await res.json().catch(() => null);
       if (!Array.isArray(rows)) return;
+      // הפרויקט התחלף בזמן הבקשה: לא מסמנים את החודשים כטעונים — הם של הפרויקט הקודם.
+      if (reportsPidRef.current !== projectId) return;
       const dataById = {};
       for (const r of rows) if (r.data != null) dataById[r.id] = r.data;
       // T2: השורות הכבדות מביאות גם את הסיכום המלא — משלימים אותו לשורות שהגיעו מקוצצות.
@@ -1199,7 +1211,7 @@ const loadClients = async () => {
       // Only NOW mark as loaded (a prior attempt that raced/failed must be retryable).
       monthKeys.forEach(m => monthDataLoaded.current.add(m));
     } finally {
-      monthKeys.forEach(m => monthDataInFlight.current.delete(m));
+      monthKeys.forEach(m => monthDataInFlight.current.delete(projectId + '|' + m));
     }
   };
 
@@ -1212,7 +1224,7 @@ const loadClients = async () => {
     // data that isn't displayed — making tables/breakdowns appear late and switching slow.
     if (dashTab === 'recommendations') { try { getRecommendationsWindowMonths(60).forEach(m => needed.add(m)); } catch {} }
     if (compareEnabled && selectedMonth) { const pm = comparisonPeriodKey(selectedMonth); if (pm) needed.add(pm); }
-    const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && !monthDataInFlight.current.has(m) && reports.some(r => r.month === m && (r.data == null || r.summaryLite)));
+    const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && !monthDataInFlight.current.has(selectedProject.id + '|' + m) && reports.some(r => r.month === m && (r.data == null || r.summaryLite)));
     if (!toLoad.length) return;
     loadMonthsData(selectedProject.id, toLoad);   // marks monthDataLoaded only on SUCCESS (inside)
   }, [selectedProject, selectedMonth, compareEnabled, reports, dashTab]);
@@ -1225,9 +1237,10 @@ const loadClients = async () => {
     const key = comparisonPeriodKey(selectedMonth);
     if (!key || !key.includes('_')) return;               // חודש מלא — כבר קיים
     if (reports.some(r => r.month === key)) return;       // כבר נטען
-    if (monthDataInFlight.current.has(key)) return;
-    monthDataInFlight.current.add(key);
-    loadRangeRows(selectedProject.id, key).finally(() => monthDataInFlight.current.delete(key));
+    const flightKey = selectedProject.id + '|' + key;
+    if (monthDataInFlight.current.has(flightKey)) return;
+    monthDataInFlight.current.add(flightKey);
+    loadRangeRows(selectedProject.id, key).finally(() => monthDataInFlight.current.delete(flightKey));
   }, [compareEnabled, selectedProject, selectedMonth, reports]);
 
   const loadProjectTasks = async (projectId) => {
@@ -1453,12 +1466,13 @@ const loadClients = async () => {
 
 const selectProject = async (client, project) => {
     setSelectedClient(client); setSelectedProject(project); setView('dashboard'); setCompareEnabled(false);
+    reportsPidRef.current = project.id;   // לפני כל await — ראו loadProjectReports
     if (typeof window !== 'undefined' && project?.id) { try { localStorage.setItem('vitas_last_project', project.id) } catch {} }
     setVitasTasks([]); setRecSubTab('new');
     const _loadRes = await loadProjectReports(project.id);
     await loadProjectTasks(project.id);
     // Client view: alert the owner if the dashboard opened with NO data (broken pipeline / cron)
-    if (isClientView && _loadRes && !_loadRes.hasData && typeof window !== 'undefined') {
+    if (isClientView && _loadRes && !_loadRes.hasData && !_loadRes.stale && typeof window !== 'undefined') {
       try {
         window.__vitasNoDataAlerted = window.__vitasNoDataAlerted || new Set();
         if (!window.__vitasNoDataAlerted.has(project.id)) {
@@ -1717,7 +1731,8 @@ const selectProject = async (client, project) => {
    */
   const tableToolbar = ({ hint, allOpen, onToggleAll, onExport, exportLabel = 'ייצוא לאקסל' }) => (
     <div className="vr-tbl-bar">
-      {hint ? <p className="vr-tbl-hint">{hint}</p> : <span />}
+      {/* שדרוג העיצוב (29.10): אייקון info במקום 💡 בתחילת ההסבר — אימוג'י לא בצד הלקוח (Cluzo Design System). */}
+      {hint ? <p className="vr-tbl-hint"><Info size={14} aria-hidden="true" className="vr-tbl-hint-ico" /><span>{typeof hint === 'string' ? hint.replace(/^💡\s*/u, '') : hint}</span></p> : <span />}
       <div className="vr-tbl-actions">
         {onToggleAll && (
           <button type="button" className="vr-tbl-btn" onClick={onToggleAll} aria-pressed={!!allOpen}>
@@ -4251,7 +4266,7 @@ const selectProject = async (client, project) => {
         const isPos = isCost ? pct.pct < 0 : pct.pct > 0;
         return <span className={`change-badge ${isPos ? 'positive' : 'negative'}`}>{pct.pct > 0 ? '▲' : '▼'} {Math.abs(pct.pct).toFixed(1)}%</span>;
       };
-      const sortIcon = (key) => { if(!sc||sc.key!==key) return ' ⇅'; return sc.dir==='desc'?' ▼':' ▲'; };
+      const sortIcon = (key) => { if(!sc||sc.key!==key) return <span className="sort-ind" aria-hidden="true"> ⇅</span>; return sc.dir==='desc'?' ▼':' ▲'; };
       const thStyle = {cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'};
       const cellMark = (key, val) => { const e = extremes[key]; if (!e || val <= 0 || e.min === e.max) return null; const col = cols.find(c=>c.key===key); if (!col || col.higher === undefined) return null; if (val === e.max) return <span style={{fontSize:9,marginRight:2,opacity:0.75}}>{col.higher ? '\u25b2' : '\u25bc'}</span>; if (val === e.min) return <span style={{fontSize:9,marginRight:2,opacity:0.75}}>{col.higher ? '\u25bc' : '\u25b2'}</span>; return null; };
       const extremes = {};
@@ -6730,7 +6745,7 @@ const selectProject = async (client, project) => {
             <h3 style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'1.05em',fontWeight:600,color:'var(--text-primary)',margin:'0 0 12px 0'}}>{!vrAds && <span style={{fontSize:'1.2em'}}>📅</span>}פילוח גילאי</h3>
             <div className="card" style={{marginBottom:'20px'}}><div className="card-body" style={{overflowX:'auto'}}>
               <table className="data-table"><thead><tr>
-                {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return ' ⇅';return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
+                {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return <span className="sort-ind" aria-hidden="true"> ⇅</span>;return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
               </tr></thead><tbody>
                 {(()=>{const ageCols={age:{get:(d,n)=>n},clicks:{get:d=>d.clicks,higher:true},impressions:{get:d=>d.impressions,higher:true},cpc:{get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},ctr:{get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},cpm:{get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},leads:{get:d=>d.leads,higher:true},cpl:{get:d=>d.leads>0?d.spend/d.leads:0,higher:false},spend:{get:d=>d.spend}};const sc=sortConfig['ages'];let sorted=[...sortedAges];if(sc&&ageCols[sc.key]){sorted.sort((a,b)=>{const va=ageCols[sc.key].get(ad[a],a),vb=ageCols[sc.key].get(ad[b],b);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}const ageExtremes={};Object.keys(ageCols).forEach(k=>{if(k==='age'||k==='spend')return;const c=ageCols[k];const vals=sorted.map(a=>c.get(ad[a],a)).filter(v=>typeof v==='number'&&v>0);if(vals.length<2)return;ageExtremes[k]={min:Math.min(...vals),max:Math.max(...vals)};});const agePill=(key,val,display)=>{const e=ageExtremes[key];if(!e||val<=0||e.min===e.max)return display;const c=ageCols[key];if(!c||c.higher===undefined)return display;const isGood=(val===e.max&&c.higher)||(val===e.min&&!c.higher);const isBad=(val===e.max&&!c.higher)||(val===e.min&&c.higher);if(!isGood&&!isBad)return display;const bg=isGood?'rgba(16,185,129,0.13)':'rgba(239,68,68,0.10)';const col=isGood?'#059669':'#dc2626';return <span style={{background:bg,color:col,fontWeight:800,borderRadius:'999px',padding:'2px 9px',display:'inline-block',whiteSpace:'nowrap'}}>{display}</span>;};return sorted.map(age => { const d = ad[age]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
                   <tr key={age}><td style={{fontWeight:600}}>{age}</td><td>{agePill('clicks',d.clicks,formatNum(d.clicks))}</td><td>{agePill('impressions',d.impressions,formatNum(d.impressions))}</td><td>{agePill('cpc',cpc,formatCurrency(cpc))}</td><td>{agePill('ctr',ctr,ctr.toFixed(2)+'%')}</td><td>{agePill('cpm',cpm,formatCurrency(cpm))}</td><td>{agePill('leads',d.leads,formatNum(Math.round(d.leads)))}</td><td><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>);});})()}
@@ -7163,7 +7178,7 @@ const selectProject = async (client, project) => {
           clients={visibleClients}
           activeClient={selectedClient?.name}
           activeProject={selectedProject?.name}
-          onSelectClient={(client) => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}
+          onSelectClient={(client) => { reportsPidRef.current = null; setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}
           onSelectProject={(client, project) => { selectProject(client, project); setSidebarOpen(false); }}
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
