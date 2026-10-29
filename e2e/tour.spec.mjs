@@ -106,7 +106,8 @@ test.describe('סיור צילומי מסך', () => {
     const onboarding = page.getByRole('button', { name: /הבנתי, קדימה/ })
     if (await onboarding.isVisible({ timeout: 3000 }).catch(() => false)) {
       await shot(page, `${dev}-01-onboarding`)
-      await onboarding.click()
+      // dispatchEvent ולא click: אם משהו מכסה את הכפתור (גלישה אופקית, 29.10) הסיור לא נתקע.
+      await onboarding.dispatchEvent('click')
     }
     await expect(page.locator('.client-tabs').first()).toBeVisible({ timeout: 30_000 })
 
