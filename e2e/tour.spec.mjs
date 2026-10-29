@@ -1,7 +1,7 @@
 // e2e/tour.spec.mjs — סיור צילומי מסך בצד הלקוח, לעבודת עיצוב (לא בדיקה).
 //
-// רץ רק כש-QA_TOUR=1 (ב-Actions: QA → Run workflow → tour). מצלם את כל הטאבים של שני הפרויקטים
-// הראשונים, ואת טאב הפתיחה של כל שאר הפרויקטים — בדסקטופ ובמובייל — ושומר ב-tour-shots/,
+// רץ רק כש-QA_TOUR=1 (ב-Actions: QA → Run workflow → tour). מצלם את כל הטאבים של שלושת הפרויקטים
+// הראשונים (BCure, ISMOOTH, HI PARK), ואת טאב הפתיחה של כל שאר הפרויקטים — בדסקטופ ובמובייל — ושומר ב-tour-shots/,
 // שעולה כ-artifact נפרד. כך אפשר לראות "לפני" ו"אחרי" של שינוי עיצוב מול פרודקשן או preview,
 // בלי סיסמה ביד.
 import { test, expect } from '@playwright/test'
@@ -12,7 +12,7 @@ const EMAIL = process.env.QA_CLIENT_EMAIL
 const PASSWORD = process.env.QA_CLIENT_PASSWORD
 const ON = process.env.QA_TOUR === '1' || process.env.QA_TOUR === 'true'
 const OUT = path.resolve('tour-shots')
-const FULL_TABS_PROJECTS = 2
+const FULL_TABS_PROJECTS = Number(process.env.QA_TOUR_FULL || 3)
 
 const slug = (s) => String(s).replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'x'
 const loader = (page) => page.getByRole('status', { name: /טוען/ })
@@ -20,6 +20,8 @@ const loader = (page) => page.getByRole('status', { name: /טוען/ })
 async function settle(page) {
   await expect(loader(page)).toHaveCount(0, { timeout: 45_000 })
   await expect(page.getByText('מושכים נתונים לתקופה הזו')).toHaveCount(0, { timeout: 60_000 }).catch(() => {})
+  // שלד הטעינה (lib/skeleton.js) אינו role="status" — מחכים שייעלם, אחרת מצלמים קופסאות ריקות.
+  await expect(page.locator('.skel')).toHaveCount(0, { timeout: 60_000 }).catch(() => {})
   await page.waitForTimeout(2500)   // גרפים ותמונות מודעות
 }
 
