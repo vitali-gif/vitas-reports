@@ -46,7 +46,28 @@ const isNarrowViewport = () =>
 const applyChartFontFloor = () => {
   if (typeof window === 'undefined') return
   Chart.defaults.font.size = isNarrowViewport() ? 12 : 11
+  // Cluzo Design System (29.10): Heebo בכל הגרפים, טקסט משני tv-text-secondary.
+  Chart.defaults.font.family = "Heebo, system-ui, -apple-system, sans-serif"
+  Chart.defaults.color = '#52627A'
 }
+
+/**
+ * צבעי הגרפים לפי Cluzo Design System (ויטלי, 29.10: "לתקן את הגרפים לפי ה-DESIGN SYSTEM").
+ * עשרות קריאות ל-createChart קבעו צבעים ישנים בקוד (#10B981, #EF4444, #F59E0B…). במקום לגעת
+ * בכל אחת, createChart ממפה אותם לפלטה: chart-1 #4559df · chart-2 #299be4 · chart-3 #119e8c ·
+ * chart-4 #e6a72f · chart-5 #9257d1 · chart-6 #cb567c · chart-7 #586581. צבע שלא ברשימה
+ * (rgba מחושב, צבעי מקור) עובר כמו שהוא.
+ */
+const DS_CHART_COLOR = {
+  '#6366F1': '#4559DF', '#4F46E5': '#4559DF', '#3B82F6': '#4559DF', '#315CF5': '#4559DF', '#5B5EF4': '#4559DF',
+  '#38A4F8': '#299BE4', '#0EA5E9': '#299BE4', '#38BDF8': '#299BE4',
+  '#10B981': '#119E8C', '#12B89C': '#119E8C', '#2EC4B6': '#119E8C', '#26B99B': '#119E8C', '#0FB1B6': '#119E8C', '#14B8A6': '#119E8C',
+  '#F59E0B': '#E6A72F', '#F6AD3C': '#E6A72F', '#FFBF32': '#E6A72F', '#FBBF24': '#E6A72F',
+  '#8B5CF6': '#9257D1', '#7C3AED': '#9257D1', '#7E6AD8': '#9257D1', '#A78BFA': '#9257D1',
+  '#EF4444': '#CB567C', '#DC2626': '#CB567C', '#F43F5E': '#CB567C', '#FC8792': '#CB567C', '#E11D48': '#CB567C',
+  '#9AA3B5': '#8A93A8', '#5E6478': '#586581',
+}
+const dsColor = (c) => (typeof c === 'string' ? (DS_CHART_COLOR[c.toUpperCase()] || c) : Array.isArray(c) ? c.map(dsColor) : c)
 
 /**
  * cfs — "chart font size". מעלה רצפה של 12px במסך צר ומשאיר את גודל
@@ -79,7 +100,7 @@ import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../compone
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
-import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays } from 'lucide-react'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays, House, Funnel as FunnelIcon, ChartPie, Network } from 'lucide-react'
 // צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
@@ -1754,11 +1775,15 @@ const selectProject = async (client, project) => {
     if (!canvas) return;
     applyChartFontFloor();
     const isDoughnut = type === 'doughnut' || type === 'pie';
-    const enhancedDatasets = datasets.map(ds => isDoughnut
-      ? { borderColor: '#FFFFFF', borderWidth: 3, hoverOffset: 8, ...ds }
-      : { borderRadius: 4, ...ds });
+    const enhancedDatasets = datasets.map(ds0 => {
+      const ds = { ...ds0 };
+      for (const k of ['backgroundColor', 'borderColor', 'pointBackgroundColor', 'pointBorderColor', 'hoverBackgroundColor']) if (k in ds) ds[k] = dsColor(ds[k]);
+      return isDoughnut
+        ? { borderColor: '#FFFFFF', borderWidth: 3, hoverOffset: 8, ...ds }
+        : { borderRadius: 6, maxBarThickness: 44, ...ds };
+    });
     const tooltipCfg = {
-      backgroundColor: '#0B0F1E', titleColor: '#FFFFFF', bodyColor: '#C9CEDC',
+      backgroundColor: '#14243C', titleColor: '#FFFFFF', bodyColor: '#DEE6FF',
       borderColor: 'transparent', cornerRadius: 8, padding: 10,
       titleFont: { size: 12, weight: '700' }, bodyFont: { size: 12, weight: '500' },
       displayColors: true, boxPadding: 6, rtl: true, textDirection: 'rtl',
@@ -1767,7 +1792,7 @@ const selectProject = async (client, project) => {
       position: 'bottom', rtl: true, textDirection: 'rtl',
       labels: { boxWidth: 10, boxHeight: 10, padding: 14,
         font: { weight: '600', size: 11 }, usePointStyle: true,
-        pointStyle: 'rectRounded', color: '#374151' }
+        pointStyle: 'rectRounded', color: '#52627A' }
     };
     const config = {
       type, data: { labels, datasets: enhancedDatasets },
@@ -1786,10 +1811,19 @@ const selectProject = async (client, project) => {
       const { indexAxis, ..._scaleAxes } = scalesConfig || {};
       if (indexAxis) config.options.indexAxis = indexAxis;
       config.options.scales = scalesConfig ? _scaleAxes : {
-        y: { beginAtZero: true, position: 'right', grid: { color: '#F2F4F8' },
-             ticks: { font: { size: cfs(11) }, color: '#6B7280' } },
-        x: { grid: { display: false }, ticks: { font: { size: cfs(11) }, color: '#6B7280' } }
+        y: { beginAtZero: true, position: 'right', grid: { color: '#E8EDF5' },
+             ticks: { font: { size: cfs(11) }, color: '#64748B' } },
+        x: { grid: { display: false }, ticks: { font: { size: cfs(11) }, color: '#64748B' } }
       };
+      // צירים שהגיעו מבחוץ: אותם קווי רשת וצבעי טקסט של מערכת העיצוב, בלי מסגרת לציר.
+      for (const ax of Object.values(config.options.scales || {})) {
+        if (!ax || typeof ax !== 'object') continue;
+        if (ax.grid && (ax.grid.color === '#F2F4F8' || ax.grid.color === '#E9EDF5')) ax.grid.color = '#E8EDF5';
+        ax.border = { display: false, ...(ax.border || {}) };
+        ax.ticks = { color: '#64748B', ...(ax.ticks || {}) };
+        if (ax.ticks.color === '#6B7280' || ax.ticks.color === '#5E6478') ax.ticks.color = '#64748B';
+        if (ax.title && ax.title.color) ax.title.color = dsColor(ax.title.color) === '#586581' ? '#52627A' : ax.title.color;
+      }
     }
     // אופציונלי: לחיצה על פלח מחזירה את התווית שלו (משמש בגרף ההתנגדויות)
     if (typeof onSliceClick === 'function') {
@@ -1918,7 +1952,7 @@ const selectProject = async (client, project) => {
             <MetricCard label="לידים עם יישוב" value={formatNum(_sumLeads)} tone="emerald" icon={Users} description="לידים שנרשם להם יישוב מגורים" />
             <MetricCard label="ללא יישוב" value={formatNum(_noCity)} tone="sky" icon={Building2} description="לידים שלא נרשם להם יישוב" />
           </div>
-          <ReportSection title="Top 10 יישובים" description={'לפי ' + metricLabel}
+          <ReportSection icon={MapPin} title="Top 10 יישובים" description={'לפי ' + metricLabel}
             actions={<div className="client-tabs vr-inline-tabs" role="group" aria-label="בחירת מדד">
               {[['leads', 'לידים'], ['meetings', 'פגישות'], ['contracts', 'חוזים']].map(([k, l]) => (
                 <button key={k} type="button" className={`client-tab ${cityMetric === k ? 'active' : ''}`} aria-pressed={cityMetric === k} onClick={() => setCityMetric(k)}>{l}</button>
@@ -1932,10 +1966,10 @@ const selectProject = async (client, project) => {
             </div>
           </ReportSection>
           {isHiPark && lsEntries.length > 0 && (
-            <ReportSection title="מצב דיור" description="לפי לידים · כפי שנרשם בטופס הליד">{_dist('crmLivingStatusChart', lsEntries, 'לידים')}</ReportSection>
+            <ReportSection icon={House} title="מצב דיור" description="לפי לידים · כפי שנרשם בטופס הליד">{_dist('crmLivingStatusChart', lsEntries, 'לידים')}</ReportSection>
           )}
           {isHiPark && ptEntries.length > 0 && (
-            <ReportSection title="סוג נכס" description="באיזו דירה מתעניינים · ליד שסימן כמה סוגים נספר בכל אחד">{_dist('crmPropertyTypeChart', ptEntries, 'לידים')}</ReportSection>
+            <ReportSection icon={Building2} title="סוג נכס" description="באיזו דירה מתעניינים · ליד שסימן כמה סוגים נספר בכל אחד">{_dist('crmPropertyTypeChart', ptEntries, 'לידים')}</ReportSection>
           )}
         </div>
       );
@@ -2585,7 +2619,7 @@ const selectProject = async (client, project) => {
             <MetricCard label="סוגי התנגדויות" value={formatNum(objTypes)} tone="sky" icon={ListChecks} description="סוגים שונים אחרי איחוד ניסוחים" />
             <MetricCard label="ההתנגדות המובילה" value={topName} tone="amber" icon={MessageSquareWarning} className="vr-metric-text" description={formatNum(topCount) + ' לידים · ' + _pctOf(topCount) + '%'} onClick={_canOpen(topName) ? () => _openObj(topName) : undefined} />
           </div>
-          <ReportSection title="התפלגות ההתנגדויות" description="10 ההתנגדויות הנפוצות · לחיצה על התנגדות פותחת את רשימת הלידים">
+          <ReportSection icon={MessageSquareWarning} title="התפלגות ההתנגדויות" description="10 ההתנגדויות הנפוצות · לחיצה על התנגדות פותחת את רשימת הלידים">
             <div className="vcs-panel">
               <div className="vcs-distribution">
                 <div className="vcs-chart-wrap"><canvas id="crmObjChart"></canvas><div className="vcs-chart-center" aria-hidden="true"><strong>{formatNum(totalAll)}</strong><span>התנגדויות</span></div></div>
@@ -2721,7 +2755,7 @@ const selectProject = async (client, project) => {
             <MetricCard label="מקור מוביל" value={_topSrc ? _topSrc[0] : 'אין נתון'} tone="sky" icon={Tag} className="vr-metric-text" description={_topSrc ? formatNum(_topSrc[1]) + ' פגישות · ' + formatNum(Object.keys(_bySrc).length) + ' מקורות' : undefined} />
             <MetricCard label="עם סיכום פגישה" value={formatNum(_withDesc)} tone="violet" icon={NotebookPen} description="פגישות שנרשם להן תיאור ב-CRM" />
           </div>
-          <ReportSection title="רשימת הפגישות" description={formatNum(meetings.length) + ' פגישות · מהחדשה לישנה'}
+          <ReportSection icon={CalendarCheck} title="רשימת הפגישות" description={formatNum(meetings.length) + ' פגישות · מהחדשה לישנה'}
             actions={<button type="button" className="vr-button" onClick={exportMeetings} title="ייצוא הטבלה כפי שהיא לקובץ אקסל"><Download size={16} aria-hidden="true" />ייצוא לאקסל</button>}>
             <div className="table-wrapper">
               <table className="data-table vrm-table">
@@ -3162,14 +3196,14 @@ const selectProject = async (client, project) => {
           // טאב Facebook/Google (design/handoff-facebook): הקוהורט של הערוץ בלבד, בלי בורר פלטפורמה.
           const _chName = channel === 'facebook' ? 'Facebook' : 'Google';
           return (
-            <ReportSection title="מה קרה ללידים שנכנסו בתקופה" description={'לידים שנכנסו מ-' + _chName + ' בתקופה, לפי שיוך המקור ב-CRM · חשיפות וקליקים: נתוני הפרסום המצטברים של ' + _chName + ' בתקופה, בנפרד מהקוהורט'}>
+            <ReportSection icon={FunnelIcon} title="מה קרה ללידים שנכנסו בתקופה" description={'לידים שנכנסו מ-' + _chName + ' בתקופה, לפי שיוך המקור ב-CRM · חשיפות וקליקים: נתוני הפרסום המצטברים של ' + _chName + ' בתקופה, בנפרד מהקוהורט'}>
               <div className="vcs-root vfb-funnel"><CohortFunnel model={model} platforms={[]} selectedPlatform={channel} /></div>
             </ReportSection>
           );
         }
         const platforms = [{ id: 'all', label: 'הכל' }, chF ? { id: 'facebook', label: 'Facebook' } : null, chG ? { id: 'google', label: 'Google' } : null].filter(Boolean);
         return (
-          <ReportSection title="משפך לידים" description={flowDesc + " · כל אחוז נמדד מהמכנה הרשום לידו"}>
+          <ReportSection icon={FunnelIcon} title="משפך לידים" description={flowDesc + " · כל אחוז נמדד מהמכנה הרשום לידו"}>
             <CohortFunnel model={model} platforms={platforms} selectedPlatform={funnelChannel} onPlatformChange={setFunnelChannel} />
           </ReportSection>
         );
@@ -3202,7 +3236,7 @@ const selectProject = async (client, project) => {
           </div>
         ) : null;
         return (
-          <ReportSection title="משפך לידים" description={flowDesc + " · כל אחוז נמדד מהמכנה הרשום מתחתיו"} actions={actions}>
+          <ReportSection icon={FunnelIcon} title="משפך לידים" description={flowDesc + " · כל אחוז נמדד מהמכנה הרשום מתחתיו"} actions={actions}>
             <Funnel items={items} description={notes.join(' ')} />
           </ReportSection>
         );
@@ -3899,7 +3933,7 @@ const selectProject = async (client, project) => {
 
         {/* CRM Charts — במצב העיצוב המחודש: דונאט + רשימת ערכים (SourceDistribution), מופע Chart.js משלו */}
         {vrCrm ? (
-          <ReportSection title={_distMeet ? 'התפלגות פגישות לפי מקור' : 'התפלגות לידים לפי מקור'}
+          <ReportSection icon={ChartPie} title={_distMeet ? 'התפלגות פגישות לפי מקור' : 'התפלגות לידים לפי מקור'}
             description={formatNum(_distMeet ? _distTotal : ct.totalLeads) + (_distMeet ? ' פגישות שתואמו בתקופה' : ' לידים בתקופה') + ' · לפי מקור ההגעה כפי שנרשם ב-CRM'}
             actions={<div className="vcs-segmented" role="group" aria-label="מה להציג בהתפלגות">
               {[['leads', 'לידים'], ['meetings', 'פגישות']].map(([k, l]) => (
@@ -5126,7 +5160,7 @@ const selectProject = async (client, project) => {
             // לא מהסקיצה — בסקיצה סדר חלק מהקארדים בשורות 2 ו-4 שונה, והמפרט גובר.
             // הצבע קבוע לכל מדד ואינו משתנה לפי טוב/רע.
             const netCards = (
-              <ReportSection title="מסך רשת" description="תמונת מצב ללידים שנוצרו בתקופה שנבחרה.">
+              <ReportSection icon={Network} title="מסך רשת" description="תמונת מצב ללידים שנוצרו בתקופה שנבחרה.">
                 <div className="vr-metric-grid">
                   {CARD('תקציב שנוצל', formatCurrency(_spend), 'indigo', Wallet, 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.')}
                   {CARD('סה"כ לידים', formatNum(_leads), 'emerald', Users, 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו. אחוז ההמרה מקליקים יוצג אוטומטית כשיחוברו חשבונות הפרסום.', _clicks > 0 ? pctOf(_leads, _clicks) + ' מהקליקים' : null)}
@@ -5171,7 +5205,7 @@ const selectProject = async (client, project) => {
               const leadsTot = mainSteps[0] ? mainSteps[0].v : 0
               const heading = (<>{title}<span className={`vr-kloss-tag vr-kloss-tag-${tagTone}`}>{tagText}</span></>)
               return (
-                <ReportSection title={heading} description={description}>
+                <ReportSection icon={FunnelIcon} title={heading} description={description}>
                   <ol className="vr-kloss-bars">
                     {steps.map((st, i) => {
                       const w = Math.max(2, Math.round(st.v / mx * 100))
@@ -6728,7 +6762,7 @@ const selectProject = async (client, project) => {
                   if(sc&&gCols[sc.key]){sorted.sort((a,b)=>{const va=gCols[sc.key].get(gd[a],a),vb=gCols[sc.key].get(gd[b],b);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}
                   const gExtremes={};
                   Object.keys(gCols).forEach(k=>{if(k==='gender'||k==='spend')return;const c=gCols[k];const vals=sorted.map(g=>c.get(gd[g],g)).filter(v=>typeof v==='number'&&v>0);if(vals.length<2)return;gExtremes[k]={min:Math.min(...vals),max:Math.max(...vals)};});
-                  const gPill=(key,val,display)=>{const e=gExtremes[key];if(!e||val<=0||e.min===e.max)return display;const c=gCols[key];if(!c||c.higher===undefined)return display;const isGood=(val===e.max&&c.higher)||(val===e.min&&!c.higher);const isBad=(val===e.max&&!c.higher)||(val===e.min&&c.higher);if(!isGood&&!isBad)return display;const bg=isGood?'rgba(16,185,129,0.13)':'rgba(239,68,68,0.10)';const col=isGood?'#059669':'#dc2626';return <span style={{background:bg,color:col,fontWeight:800,borderRadius:'999px',padding:'2px 9px',display:'inline-block',whiteSpace:'nowrap'}}>{display}</span>;};
+                  const gPill=(key,val,display)=>{const e=gExtremes[key];if(!e||val<=0||e.min===e.max)return display;const c=gCols[key];if(!c||c.higher===undefined)return display;const isGood=(val===e.max&&c.higher)||(val===e.min&&!c.higher);const isBad=(val===e.max&&!c.higher)||(val===e.min&&c.higher);if(!isGood&&!isBad)return display;return <span className={'cz-cell-pill ' + (isGood ? 'good' : 'bad')} title={isGood ? 'הטוב ביותר בעמודה' : 'החלש ביותר בעמודה'}>{display}<span className="vr-sr-only">{isGood ? ' (הטוב ביותר)' : ' (החלש ביותר)'}</span></span>;};
                   return sorted.map(g => { const d = gd[g]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
                     <tr key={g}><td style={{fontWeight:600}}>{genderLabel(g)}</td><td>{gPill('clicks',d.clicks,formatNum(d.clicks))}</td><td>{gPill('impressions',d.impressions,formatNum(d.impressions))}</td><td>{gPill('cpc',cpc,formatCurrency(cpc))}</td><td>{gPill('ctr',ctr,ctr.toFixed(2)+'%')}</td><td>{gPill('cpm',cpm,formatCurrency(cpm))}</td><td>{gPill('leads',d.leads,formatNum(Math.round(d.leads)))}</td><td><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>);});
                 })()}
@@ -6747,7 +6781,7 @@ const selectProject = async (client, project) => {
               <table className="data-table"><thead><tr>
                 {[{key:'age',label:'גיל'},{key:'clicks',label:'קליקים'},{key:'impressions',label:'חשיפות'},{key:'cpc',label:'עלות לקליק'},{key:'ctr',label:'CTR'},{key:'cpm',label:'CPM'},{key:'leads',label:'לידים'},{key:'cpl',label:'עלות לליד'},{key:'spend',label:'תקציב שנוצל'}].map(c=>(<th key={c.key} style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>handleSort('ages',c.key)}>{c.label}{(()=>{const s=sortConfig['ages'];if(!s||s.key!==c.key)return <span className="sort-ind" aria-hidden="true"> ⇅</span>;return s.dir==='desc'?' ▼':' ▲';})()}</th>))}
               </tr></thead><tbody>
-                {(()=>{const ageCols={age:{get:(d,n)=>n},clicks:{get:d=>d.clicks,higher:true},impressions:{get:d=>d.impressions,higher:true},cpc:{get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},ctr:{get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},cpm:{get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},leads:{get:d=>d.leads,higher:true},cpl:{get:d=>d.leads>0?d.spend/d.leads:0,higher:false},spend:{get:d=>d.spend}};const sc=sortConfig['ages'];let sorted=[...sortedAges];if(sc&&ageCols[sc.key]){sorted.sort((a,b)=>{const va=ageCols[sc.key].get(ad[a],a),vb=ageCols[sc.key].get(ad[b],b);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}const ageExtremes={};Object.keys(ageCols).forEach(k=>{if(k==='age'||k==='spend')return;const c=ageCols[k];const vals=sorted.map(a=>c.get(ad[a],a)).filter(v=>typeof v==='number'&&v>0);if(vals.length<2)return;ageExtremes[k]={min:Math.min(...vals),max:Math.max(...vals)};});const agePill=(key,val,display)=>{const e=ageExtremes[key];if(!e||val<=0||e.min===e.max)return display;const c=ageCols[key];if(!c||c.higher===undefined)return display;const isGood=(val===e.max&&c.higher)||(val===e.min&&!c.higher);const isBad=(val===e.max&&!c.higher)||(val===e.min&&c.higher);if(!isGood&&!isBad)return display;const bg=isGood?'rgba(16,185,129,0.13)':'rgba(239,68,68,0.10)';const col=isGood?'#059669':'#dc2626';return <span style={{background:bg,color:col,fontWeight:800,borderRadius:'999px',padding:'2px 9px',display:'inline-block',whiteSpace:'nowrap'}}>{display}</span>;};return sorted.map(age => { const d = ad[age]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
+                {(()=>{const ageCols={age:{get:(d,n)=>n},clicks:{get:d=>d.clicks,higher:true},impressions:{get:d=>d.impressions,higher:true},cpc:{get:d=>d.clicks>0?d.spend/d.clicks:0,higher:false},ctr:{get:d=>d.impressions>0?(d.clicks/d.impressions*100):0,higher:true},cpm:{get:d=>d.impressions>0?(d.spend/d.impressions*1000):0,higher:false},leads:{get:d=>d.leads,higher:true},cpl:{get:d=>d.leads>0?d.spend/d.leads:0,higher:false},spend:{get:d=>d.spend}};const sc=sortConfig['ages'];let sorted=[...sortedAges];if(sc&&ageCols[sc.key]){sorted.sort((a,b)=>{const va=ageCols[sc.key].get(ad[a],a),vb=ageCols[sc.key].get(ad[b],b);if(typeof va==='string')return sc.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);return sc.dir==='asc'?va-vb:vb-va;});}const ageExtremes={};Object.keys(ageCols).forEach(k=>{if(k==='age'||k==='spend')return;const c=ageCols[k];const vals=sorted.map(a=>c.get(ad[a],a)).filter(v=>typeof v==='number'&&v>0);if(vals.length<2)return;ageExtremes[k]={min:Math.min(...vals),max:Math.max(...vals)};});const agePill=(key,val,display)=>{const e=ageExtremes[key];if(!e||val<=0||e.min===e.max)return display;const c=ageCols[key];if(!c||c.higher===undefined)return display;const isGood=(val===e.max&&c.higher)||(val===e.min&&!c.higher);const isBad=(val===e.max&&!c.higher)||(val===e.min&&c.higher);if(!isGood&&!isBad)return display;return <span className={'cz-cell-pill ' + (isGood ? 'good' : 'bad')} title={isGood ? 'הטוב ביותר בעמודה' : 'החלש ביותר בעמודה'}>{display}<span className="vr-sr-only">{isGood ? ' (הטוב ביותר)' : ' (החלש ביותר)'}</span></span>;};return sorted.map(age => { const d = ad[age]; const cpl = d.leads > 0 ? d.spend / d.leads : 0; const cpc = d.clicks > 0 ? d.spend / d.clicks : 0; const ctr = d.impressions > 0 ? (d.clicks / d.impressions * 100) : 0; const conv = d.clicks > 0 ? (d.leads / d.clicks * 100) : 0; const cpm = d.impressions > 0 ? (d.spend / d.impressions * 1000) : 0; const cplClass = cpl > 0 && cpl < 80 ? 'tag-green' : cpl < 120 ? 'tag-blue' : cpl < 150 ? 'tag-purple' : 'tag-red'; return (
                   <tr key={age}><td style={{fontWeight:600}}>{age}</td><td>{agePill('clicks',d.clicks,formatNum(d.clicks))}</td><td>{agePill('impressions',d.impressions,formatNum(d.impressions))}</td><td>{agePill('cpc',cpc,formatCurrency(cpc))}</td><td>{agePill('ctr',ctr,ctr.toFixed(2)+'%')}</td><td>{agePill('cpm',cpm,formatCurrency(cpm))}</td><td>{agePill('leads',d.leads,formatNum(Math.round(d.leads)))}</td><td><span className={`cpl-tag ${cplClass}`}>{formatCurrency(cpl)}</span></td><td>{formatCurrency(d.spend)}</td></tr>);});})()}
               </tbody></table>
             </div></div>

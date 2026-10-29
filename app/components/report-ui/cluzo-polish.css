@@ -186,3 +186,93 @@ th:hover .sort-ind { opacity: .8; }
 .client-tabs-main .tab-ico { display: inline-flex; flex-shrink: 0; opacity: .8; }
 .client-tabs-main .client-tab.active .tab-ico { opacity: 1; }
 @media (max-width: 768px) { .client-tabs-main .client-tab { gap: 5px; } .client-tabs-main .tab-ico svg { inline-size: 14px; block-size: 14px; } }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   סבב 3 (29.10) — משפכים, פילוח דמוגרפי, אייקוני כותרות, גרפים, שדה תקציב.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 13. שדה התקציב החודשי: 6 ספרות נחתכו ─────────────────────────────────────────
+   אריקה כרמל, 130,000: הרוחב היה 7ch ב-20px מודגש — "130,000" עם הריפוד לא נכנס.
+   רוחב שגדל עם התוכן (field-sizing), ו-11ch בדפדפן שלא מכיר אותו (עד 9,999,999). */
+.vr-budget-field.vr-budget-amount input { inline-size: 11ch; padding-inline: 8px; }
+@supports (field-sizing: content) {
+  .vr-budget-field.vr-budget-amount input { field-sizing: content; inline-size: auto; min-inline-size: 6ch; max-inline-size: 14ch; }
+}
+
+/* ── 14. אייקונים ליד כותרות סעיפים — סגנון אחד בכל המסכים ─────────────────────────
+   קודם: צ'יפים בשבעה צבעים (ענבר, סגול, ירוק…) בלי משמעות, ולחלק מהכותרות (משפך לידים,
+   מקורות הגעה) לא היה אייקון בכלל. עכשיו: כחול המותג על tv-brand-soft, 36px, בכל כותרת. */
+.vr-section-titles { display: flex; align-items: flex-start; gap: 12px; min-inline-size: 0; }
+.vr-section-ico,
+.section-head .ico, .section-head .ico.amber, .section-head .ico.violet, .section-head .ico.emerald,
+.section-head .ico.indigo, .section-head .ico.rose, .section-head .ico.sky, .section-head .ico.terra {
+  display: inline-grid; place-items: center; flex-shrink: 0;
+  inline-size: 36px; block-size: 36px; border-radius: 10px;
+  background: var(--tv-brand-soft); color: var(--tv-brand);
+  border: 1px solid var(--tv-brand-line);
+}
+.vr-section-ico { margin-block-start: 2px; }
+.section-head .ico svg, .vr-section-ico svg { inline-size: 18px; block-size: 18px; stroke: currentColor; }
+.vr-ui .vr-section-heading h2, .vr-ui .section-head h2 { color: var(--tv-navy); font-weight: 800; }
+@media (max-width: 767px) {
+  .vr-section-ico, .section-head .ico { inline-size: 30px; block-size: 30px; border-radius: 8px; }
+  .section-head .ico svg, .vr-section-ico svg { inline-size: 16px; block-size: 16px; }
+}
+
+/* ── 15. משפך לידים — אותו מראה בכל הטאבים ──────────────────────────────────────────
+   שני רכיבים: Funnel (טאב "הכל", .vr-funnel) ו-CohortFunnel (CRM ו"מה קרה ללידים" ב-Facebook
+   / Google, .vcs-stage). שניהם: כרטיס לבן, פס עליון בצבע השלב (לא פס צד), אייקון בצ'יפ בגוון
+   השלב, מספר גדול בנייבי, ואחוז המעבר כתגית. */
+.vr-ui .vr-funnel-step,
+.vr-ui .vcs-root .vcs-stage {
+  border: 1px solid var(--tv-border);
+  border-inline-start-width: 1px; border-inline-start-color: var(--tv-border);
+  border-radius: 12px;
+  background: var(--tv-surface);
+  box-shadow: inset 0 3px 0 var(--vr-accent, var(--tv-brand)), var(--tv-shadow);
+}
+.vr-ui .vr-funnel-label svg,
+.vr-ui .vcs-root .vcs-stage-icon {
+  box-sizing: content-box; padding: 5px; border-radius: 8px;
+  color: var(--vr-accent, var(--tv-brand));
+  background: color-mix(in srgb, var(--vr-accent, #315cf5) 12%, #fff);
+}
+.vr-ui .vr-funnel-label h3, .vr-ui .vcs-root .vcs-stage-head h3 { color: var(--tv-text-secondary); font-weight: 700; }
+.vr-ui .vr-funnel-value, .vr-ui .vcs-root .vcs-stage-value { color: var(--tv-navy); font-weight: 800; letter-spacing: -0.01em; }
+/* אחוז המעבר: תגית קטנה במקום טקסט אפור */
+.vr-ui .vcs-root .vcs-arrow { color: var(--tv-text-muted); }
+.vr-ui .vcs-root .vcs-arrow b {
+  background: var(--tv-brand-soft); color: var(--tv-link);
+  border-radius: 999px; padding: 1px 8px; font-size: 12px;
+}
+/* ענף (ביטולים / לא הגיעו): אדום עדין, פס עליון אדום */
+.vr-ui .vr-funnel-leak {
+  background: var(--tv-danger-bg); border-color: var(--tv-danger-border);
+  box-shadow: inset 0 3px 0 var(--tv-danger-fg);
+}
+.vr-ui .vr-funnel-leak .vr-funnel-label svg { background: #fff; color: var(--tv-danger-fg); }
+.vr-ui .vcs-root .vcs-cancellation { border-radius: 10px; background: var(--tv-danger-bg); border-color: var(--tv-danger-border); color: var(--tv-danger-fg); }
+/* מכנה האחוז: שורה אחת קטנה ועמומה */
+.vr-ui .vr-funnel .vr-caption { color: var(--tv-text-muted); }
+/* המשפך של KLOSS (פסים) — אותו אייקון ואותה כותרת; הפסים בצבעי המערכת */
+.vr-ui .vr-kloss-bars { --vr-accent: var(--tv-brand); }
+
+/* ── 16. פילוח דמוגרפי: הטוב והחלש בכל עמודה ─────────────────────────────────────────
+   קודם: גלולה ירוקה/אדומה זוהרת עם inline style על כל ערך קיצון — שורה שלמה הייתה
+   צבעונית. עכשיו: good / bad של מערכת העיצוב, עדין, אותו גובה כמו הטקסט. */
+.cz-cell-pill {
+  display: inline-block; white-space: nowrap; font-weight: 700;
+  border-radius: 6px; padding: 1px 7px;
+  font-variant-numeric: tabular-nums;
+}
+.cz-cell-pill.good { background: var(--good-bg, #e3f6ef); color: var(--good, #0f7a5c); }
+.cz-cell-pill.bad  { background: var(--bad-bg, #fde8e8);  color: var(--bad, #b3261e); }
+.vr-ui .card h3 { color: var(--tv-navy); }
+.vr-ui .card .data-table td:first-child { font-weight: 700; color: var(--tv-navy); }
+
+/* ── 17. זמני תגובה — פאנלים ונוסח לפי מערכת העיצוב ─────────────────────────────────── */
+.vr-ui .vrt-root .vrt-panel { border-color: var(--tv-border); border-radius: 12px; box-shadow: var(--tv-shadow); }
+.vr-ui .vrt-root .vrt-explanation { background: var(--tv-info-bg); border-color: var(--tv-info-border); color: var(--tv-text); border-radius: 12px; }
+.vr-ui .vrt-root .vrt-explanation svg { color: var(--tv-brand); }
+.vr-ui .vrt-root .vrt-unit { color: var(--tv-text-muted); }
+.vr-ui .vrt-root .vrt-speed h2, .vr-ui .vrt-root .vrt-patterns h2 { color: var(--tv-navy); font-weight: 800; }

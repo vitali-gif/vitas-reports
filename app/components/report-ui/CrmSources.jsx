@@ -1,7 +1,7 @@
 'use client';
 
 import { useId } from 'react';
-import { Ban, Download, RefreshCw, Eye, MousePointerClick, ArrowLeft } from 'lucide-react';
+import { Ban, Download, RefreshCw, Eye, MousePointerClick, ArrowLeft, Compass, Funnel as FunnelIcon, Table2, ChartPie } from 'lucide-react';
 import { VitasPresentation, MetricGrid, DataState, ReportSection } from './VitasPresentation';
 
 export const SOURCE_COLUMNS = [
@@ -80,14 +80,14 @@ export function CohortFunnel({ model, platforms, selectedPlatform, onPlatformCha
 export function CrmSources({ model, state = 'ready', onRetry, onRefresh, refreshing = false, platforms = [], selectedPlatform, onPlatformChange, funnelState = 'ready', sort, onSort, onExport, onOpenSource, chart, additionalContent }) {
   if (state !== 'ready') return <VitasPresentation className="vcs-root"><DataState state={state} onRetry={onRetry} /></VitasPresentation>;
   return <VitasPresentation className="vcs-root">
-    <ReportSection title="מקורות הגעה" description="מהיכן מגיעים הלידים ואיך הם מתקדמים למכירה" actions={onRefresh && <button type="button" className="vr-button" disabled={refreshing} onClick={onRefresh}><RefreshCw size={16} aria-hidden="true" />{refreshing ? 'מרענן נתונים…' : 'רענון נתונים'}</button>}>
+    <ReportSection icon={Compass} title="מקורות הגעה" description="מהיכן מגיעים הלידים ואיך הם מתקדמים למכירה" actions={onRefresh && <button type="button" className="vr-button" disabled={refreshing} onClick={onRefresh}><RefreshCw size={16} aria-hidden="true" />{refreshing ? 'מרענן נתונים…' : 'רענון נתונים'}</button>}>
       <p className="vcs-metric-scope">{model.metricsScope}</p><MetricGrid metrics={model.metrics} />
     </ReportSection>
-    <ReportSection title="משפך לידים"><CohortFunnel model={model.funnel} platforms={platforms} selectedPlatform={selectedPlatform} onPlatformChange={onPlatformChange} state={funnelState} /></ReportSection>
-    <ReportSection title="נתונים לפי מקור הגעה" description={model.table.scopeNote} actions={onExport && <button type="button" className="vr-button" onClick={onExport}><Download size={16} aria-hidden="true" />ייצוא</button>}>
+    <ReportSection icon={FunnelIcon} title="משפך לידים"><CohortFunnel model={model.funnel} platforms={platforms} selectedPlatform={selectedPlatform} onPlatformChange={onPlatformChange} state={funnelState} /></ReportSection>
+    <ReportSection icon={Table2} title="נתונים לפי מקור הגעה" description={model.table.scopeNote} actions={onExport && <button type="button" className="vr-button" onClick={onExport}><Download size={16} aria-hidden="true" />ייצוא</button>}>
       <SourceTable {...model.table} sort={sort} onSort={onSort} onOpenSource={onOpenSource} /><p className="vcs-table-note">{model.table.rateNote}</p>
     </ReportSection>
-    <ReportSection title="התפלגות לידים לפי מקור" description={model.distributionScope}><div className="vcs-panel">{chart || <p className="vr-caption">תרשים ההתפלגות אינו זמין</p>}</div></ReportSection>
+    <ReportSection icon={ChartPie} title="התפלגות לידים לפי מקור" description={model.distributionScope}><div className="vcs-panel">{chart || <p className="vr-caption">תרשים ההתפלגות אינו זמין</p>}</div></ReportSection>
     {additionalContent}
   </VitasPresentation>;
 }
