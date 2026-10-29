@@ -32,6 +32,8 @@
   /* בטלפון בורר הפרויקט (.vproj) כבר מציג "לקוח / פרויקט" ולוחצים עליו — הכותרת כפולה
      ותפסה שלוש שורות של 38px. נשארת רק כשאין בורר. */
   .titlebar:has(.vproj) .tb-title { display: none; }
+  .titlebar { gap: 8px; margin-bottom: 12px; }
+  .titlebar .vproj { margin-bottom: 0; }
   .titlebar .tb-title h1 { font-size: 21px; }
   .tb-eyebrow { font-size: 12.5px; }
 }
