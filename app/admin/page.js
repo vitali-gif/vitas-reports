@@ -329,7 +329,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   }
   const pendingChartsRef = useRef([])  // pending chart-creation setTimeout IDs
   const monthDataLoaded = useRef(new Set())  // month-keys whose heavy `data` was SUCCESSFULLY lazy-loaded
-  const monthDataInFlight = useRef(new Set())  // month-keys with a heavy-data fetch currently in flight (dedupe)
+  const monthDataInFlight = useRef(new Set())  // `${projectId}|${monthKey}` with a heavy-data fetch currently in flight (dedupe)
+  // הפרויקט שהמשתמש בחר אחרון (נקבע ב-selectProject, לפני כל await). תשובה של פרויקט אחר —
+  // כולל רענון שהתחיל לפני המעבר — לא נוגעת ב-state. ראו loadProjectReports (E2E, 29.10).
+  const reportsPidRef = useRef(null)
   const projectReportsCache = useRef(new Map())  // projectId -> light reports (stale-while-revalidate for instant project switching)
 
   // D14: הדוחות שהדשבורד רואה. בלי מיקוד — בדיוק reportsAll. עם מיקוד — שורות התקופה שעל המסך
@@ -1147,6 +1150,13 @@ const loadClients = async () => {
     }).catch(() => null);
     let data = null;
     if (res && res.ok) data = await res.json().catch(() => null);
+    // מעבר מהיר בין פרויקטים (E2E "כל פרויקט בסיידבר נפתח", 28-29.10): האינדקס של BCure (כבד)
+    // חזר אחרי זה של ISMOOTH ודרס את ה-state — המסך סינן לפי ISMOOTH ולא מצא שורות, והציג
+    // "אין נתונים עדיין". תשובה של פרויקט שכבר לא על המסך נשמרת רק במטמון.
+    if (reportsPidRef.current !== projectId) {
+      if (data) projectReportsCache.current.set(projectId, data);
+      return { hasData: !!(data && data.length), failed: !data, stale: true };
+    }
     if (data) {
       projectReportsCache.current.set(projectId, data);
       if (!cached) monthDataLoaded.current = new Set();
@@ -1176,13 +1186,15 @@ const loadClients = async () => {
   // months; this fetches the heavy rows on demand and merges them in.
   const loadMonthsData = async (projectId, monthKeys) => {
     if (!projectId || !monthKeys.length) return;
-    monthKeys.forEach(m => monthDataInFlight.current.add(m));
+    monthKeys.forEach(m => monthDataInFlight.current.add(projectId + '|' + m));
     try {
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
       const res = await apiFetch(`/api/reports/by-project?projectId=${projectId}&dataForMonths=${encodeURIComponent(monthKeys.join(','))}`, { headers: {} }).catch(() => null);
       if (!res || !res.ok) return;                 // transient — leave keys UN-marked so a later render retries
       const rows = await res.json().catch(() => null);
       if (!Array.isArray(rows)) return;
+      // הפרויקט התחלף בזמן הבקשה: לא מסמנים את החודשים כטעונים — הם של הפרויקט הקודם.
+      if (reportsPidRef.current !== projectId) return;
       const dataById = {};
       for (const r of rows) if (r.data != null) dataById[r.id] = r.data;
       // T2: השורות הכבדות מביאות גם את הסיכום המלא — משלימים אותו לשורות שהגיעו מקוצצות.
@@ -1199,7 +1211,7 @@ const loadClients = async () => {
       // Only NOW mark as loaded (a prior attempt that raced/failed must be retryable).
       monthKeys.forEach(m => monthDataLoaded.current.add(m));
     } finally {
-      monthKeys.forEach(m => monthDataInFlight.current.delete(m));
+      monthKeys.forEach(m => monthDataInFlight.current.delete(projectId + '|' + m));
     }
   };
 
@@ -1212,7 +1224,7 @@ const loadClients = async () => {
     // data that isn't displayed — making tables/breakdowns appear late and switching slow.
     if (dashTab === 'recommendations') { try { getRecommendationsWindowMonths(60).forEach(m => needed.add(m)); } catch {} }
     if (compareEnabled && selectedMonth) { const pm = comparisonPeriodKey(selectedMonth); if (pm) needed.add(pm); }
-    const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && !monthDataInFlight.current.has(m) && reports.some(r => r.month === m && (r.data == null || r.summaryLite)));
+    const toLoad = [...needed].filter(m => !monthDataLoaded.current.has(m) && !monthDataInFlight.current.has(selectedProject.id + '|' + m) && reports.some(r => r.month === m && (r.data == null || r.summaryLite)));
     if (!toLoad.length) return;
     loadMonthsData(selectedProject.id, toLoad);   // marks monthDataLoaded only on SUCCESS (inside)
   }, [selectedProject, selectedMonth, compareEnabled, reports, dashTab]);
@@ -1225,9 +1237,10 @@ const loadClients = async () => {
     const key = comparisonPeriodKey(selectedMonth);
     if (!key || !key.includes('_')) return;               // חודש מלא — כבר קיים
     if (reports.some(r => r.month === key)) return;       // כבר נטען
-    if (monthDataInFlight.current.has(key)) return;
-    monthDataInFlight.current.add(key);
-    loadRangeRows(selectedProject.id, key).finally(() => monthDataInFlight.current.delete(key));
+    const flightKey = selectedProject.id + '|' + key;
+    if (monthDataInFlight.current.has(flightKey)) return;
+    monthDataInFlight.current.add(flightKey);
+    loadRangeRows(selectedProject.id, key).finally(() => monthDataInFlight.current.delete(flightKey));
   }, [compareEnabled, selectedProject, selectedMonth, reports]);
 
   const loadProjectTasks = async (projectId) => {
@@ -1453,12 +1466,13 @@ const loadClients = async () => {
 
 const selectProject = async (client, project) => {
     setSelectedClient(client); setSelectedProject(project); setView('dashboard'); setCompareEnabled(false);
+    reportsPidRef.current = project.id;   // לפני כל await — ראו loadProjectReports
     if (typeof window !== 'undefined' && project?.id) { try { localStorage.setItem('vitas_last_project', project.id) } catch {} }
     setVitasTasks([]); setRecSubTab('new');
     const _loadRes = await loadProjectReports(project.id);
     await loadProjectTasks(project.id);
     // Client view: alert the owner if the dashboard opened with NO data (broken pipeline / cron)
-    if (isClientView && _loadRes && !_loadRes.hasData && typeof window !== 'undefined') {
+    if (isClientView && _loadRes && !_loadRes.hasData && !_loadRes.stale && typeof window !== 'undefined') {
       try {
         window.__vitasNoDataAlerted = window.__vitasNoDataAlerted || new Set();
         if (!window.__vitasNoDataAlerted.has(project.id)) {
@@ -7164,7 +7178,7 @@ const selectProject = async (client, project) => {
           clients={visibleClients}
           activeClient={selectedClient?.name}
           activeProject={selectedProject?.name}
-          onSelectClient={(client) => { setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}
+          onSelectClient={(client) => { reportsPidRef.current = null; setSelectedClient(client); setSelectedProject(null); setView('welcome'); }}
           onSelectProject={(client, project) => { selectProject(client, project); setSidebarOpen(false); }}
           onAddClient={!isClientView ? () => setShowAddClient(true) : undefined}
           onAddProject={!isClientView ? () => setShowAddProject(true) : undefined}
