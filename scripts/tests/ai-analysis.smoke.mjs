@@ -63,6 +63,8 @@ eq('email: escaped, both projects, actions, no long dash', [mail.includes('HI &l
   eq('copy text: sections, numbered actions with owner, no long dash', [t.includes('- עלות לליד: מ-₪138 ל-₪167'), t.includes('1. פ1 (סוכנות): ד'), t.includes('מה לבדוק'), /[—–]/.test(t)], [true, true, true, false])
   eq('copy text: good data → no quality block; empty sections skipped', analysisText({ period_key: '2026-10', result: { headline: 'כותרת', changes: [], reasons: [], actions: [], watch: [], dataCheck: { level: 'good', notes: [] } } }), 'אוקטובר 2026\n\nכותרת')
   eq('quality: code level wins over the model', qualityOf({ dataCheck: { level: 'insufficient', notes: [] }, dataQuality: { level: 'good', notes: [] } }).level, 'insufficient')
+  eq('quality: the model restates the code notes, so only its notes are shown', qualityOf({ dataCheck: { level: 'partial', notes: ['קוד א', 'קוד ב'] }, dataQuality: { level: 'partial', notes: ['מודל א', 'מודל א'] } }).notes, ['מודל א'])
+  eq('quality: no model notes → the code notes', qualityOf({ dataCheck: { level: 'partial', notes: ['קוד א'] } }).notes, ['קוד א'])
   const c = clientText(a, { project: 'ONCE' })
   eq('client text: what/meaning/next, on us / on you, no jargon markers', [c.split('\n')[0], c.includes('הצעד הבא: נמשיך'), c.includes('מה עלינו:\n- לרענן'), c.includes('מה עליכם:\n- לחזור'), c.includes('*')], ['עדכון ONCE - אוקטובר 2026', true, true, true, false])
   eq('client text: old analysis without a client message → null', clientText({ period_key: '2026-10', result: answer }), null)
