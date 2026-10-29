@@ -100,7 +100,7 @@ import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../compone
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
-import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays, House, Funnel as FunnelIcon, ChartPie, Network } from 'lucide-react'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays, House, Funnel as FunnelIcon, ChartPie, Network, Gem, Lightbulb } from 'lucide-react'
 // צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
@@ -2304,30 +2304,34 @@ const selectProject = async (client, project) => {
           const _idx = Array.from({ length: 24 }, (_, h) => h).filter(h => leadHourMerged[h] > 0 || contactHourMerged[h] > 0 || contactMeetingMerged[h] > 0 || (cmpHasData && cmpContactHour[h] > 0));
           const _from = _idx.length ? Math.min(..._idx) : 8, _to = _idx.length ? Math.max(..._idx) : 20;
           const _hours = Array.from({ length: _to - _from + 1 }, (_, i) => _from + i);
-          const _line = (color) => ({ borderColor: color, backgroundColor: color, borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 6,
-            pointBackgroundColor: color, pointBorderColor: '#FFFFFF', pointBorderWidth: 1.5, tension: 0, fill: false, yAxisID: 'y' });
+          // 29.10 (ויטלי: "לא מובן בכלל"): ארבעה קווים על אותו ציר נראו כמו סבך. עכשיו: שלוש
+          // עמודות לכל שעה (נכנסו → טופלו → מתוכם פגישה, מהבהיר לכהה — כל אחת תת-קבוצה של
+          // הקודמת), וקו אחד בלבד — אחוז ההמרה, על הציר השני. הגרף יושב בשורה משלו ברוחב מלא.
+          const _bar = (color, order) => ({ type: 'bar', backgroundColor: color, borderRadius: 4, maxBarThickness: 22, categoryPercentage: 0.78, barPercentage: 0.92, yAxisID: 'y', order });
+          const _line = (color) => ({ type: 'line', borderColor: color, backgroundColor: color, borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 6,
+            pointBackgroundColor: color, pointBorderColor: '#FFFFFF', pointBorderWidth: 1.5, tension: 0.3, fill: false, yAxisID: 'y1', order: 0 });
           const _sets = [
-            { label: 'לידים שנכנסו', data: _hours.map(h => leadHourMerged[h]), ..._line('#3B82F6') },
-            { label: 'לידים שטופלו', data: _hours.map(h => contactHourMerged[h]), ..._line('#F59E0B') },
-            { label: 'מתוכם תואמה פגישה', data: _hours.map(h => contactMeetingMerged[h]), ..._line('#8B5CF6') },
-            { label: '% המרה לפגישה', data: _hours.map(h => contactRate[h]), ..._line('#EF4444'), borderDash: [5, 4], pointRadius: 3, spanGaps: true, yAxisID: 'y1' },
+            { label: 'לידים שנכנסו', data: _hours.map(h => leadHourMerged[h]), ..._bar('#BFC8F5', 3) },
+            { label: 'לידים שטופלו', data: _hours.map(h => contactHourMerged[h]), ..._bar('#4559DF', 2) },
+            { label: 'מתוכם תואמה פגישה', data: _hours.map(h => contactMeetingMerged[h]), ..._bar('#119E8C', 1) },
+            { label: '% המרה לפגישה (מתוך מי שטופל)', data: _hours.map(h => contactRate[h]), ..._line('#CB567C'), spanGaps: true },
           ];
           if (cmpHasData) _sets.push({ label: '% המרה · תקופה קודמת', data: _hours.map(h => cmpRate[h]),
-            ..._line('#9AA3B5'), borderWidth: 2, borderDash: [2, 3], pointRadius: 0, spanGaps: true, yAxisID: 'y1' });
+            ..._line('#8A93A8'), borderWidth: 2, borderDash: [4, 4], pointRadius: 0, spanGaps: true });
           // מובייל (ויטלי, 24.10): השעות "12:0016:0020:00" נדבקו זו לזו, ושתי כותרות הצירים
           // לקחו רוחב מהגרף. במסך צר: שעה עגולה בלי ":00", עד 7 תוויות, בלי כותרות צירים
           // (הצבע של הציר השמאלי והמקרא כבר אומרים מה הוא).
           const _narrow = isNarrowViewport();
-          createChart('apptHourChart', 'line', _hours.map(h => h + ':00'), _sets, {
+          createChart('apptHourChart', 'bar', _hours.map(h => h + ':00'), _sets, {
             x: { grid: { display: false }, ticks: { font: { size: cfs(11), weight: '600' }, color: '#374151', maxRotation: 0,
                  ...(_narrow ? { autoSkip: true, maxTicksLimit: 7, autoSkipPadding: 12, callback: (_v, i) => String(_hours[i]) } : {}) } },
             y: { beginAtZero: true, position: 'right', grid: { color: '#E9EDF5' }, ticks: { precision: 0, color: '#6B7280' },
                  title: { display: !_narrow, text: 'כמות', font: { size: cfs(10.5), weight: '700' }, color: '#5E6478' } },
             y1: { beginAtZero: true, suggestedMax: 100, position: 'left', grid: { display: false },
-                  ticks: { precision: 0, color: '#EF4444', callback: (v) => v + '%' },
-                  title: { display: !_narrow, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#EF4444' } },
+                  ticks: { precision: 0, color: '#CB567C', callback: (v) => v + '%' },
+                  title: { display: !_narrow, text: '% המרה', font: { size: cfs(10.5), weight: '700' }, color: '#CB567C' } },
           }, undefined, { options: { plugins: {
-            legend: { position: 'top', align: 'center', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 18, font: { weight: '600', size: 12 }, color: '#374151' } },
+            legend: { position: 'top', align: 'start', labels: { usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 10, boxHeight: 10, padding: 18, font: { weight: '600', size: 12.5 }, color: '#52627A' } },
             tooltip: { callbacks: { afterBody: (items) => {
               const h = _hours[items[0].dataIndex];
               const c = contactHourMerged[h];
@@ -2420,7 +2424,7 @@ const selectProject = async (client, project) => {
     return (
       <div className={vrResp ? 'vrt-root' : undefined}>
         {vrResp ? (<>
-          <p className="vrt-explanation"><Info size={18} aria-hidden="true" />{_vrIsFb ? 'זמן המענה נמדד מכניסת הליד ל-Fireberry ועד ההערה הראשונה של איש מכירות על הליד, בשעות העסקים בלבד.' : 'זמן המענה נמדד מכניסת הליד ל-BMBY ועד הפעולה הראשונה של איש מכירות אנושי, בשעות העסקים בלבד.'} לידים שטרם קיבלו מענה מוצגים בנפרד ואינם נכללים בממוצע.</p>
+          <p className="vrt-explanation cz-note"><span className="cz-note-label">איך נמדד</span><span>{_vrIsFb ? 'זמן המענה נמדד מכניסת הליד ל-Fireberry ועד ההערה הראשונה של איש מכירות על הליד, בשעות העסקים בלבד.' : 'זמן המענה נמדד מכניסת הליד ל-BMBY ועד הפעולה הראשונה של איש מכירות אנושי, בשעות העסקים בלבד.'} לידים שטרם קיבלו מענה מוצגים בנפרד ואינם נכללים בממוצע.</span></p>
           <p className="vr-caption vcs-metric-scope">{formatNum(totalLids)} לידים שנכנסו בתקופה · {formatNum(respondedCount)} מהם עם מענה אנושי</p>
           <div className="vr-metric-grid">
             <MetricCard label={'סה"כ לידים'} value={formatNum(totalLids)} tone="indigo" icon={Users} details={_vrRespTips[0]}
@@ -2490,9 +2494,9 @@ const selectProject = async (client, project) => {
         )}
 
         {hourHasData && (
-          <div className="section">
-            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות טיפול בלידים ותיאום פגישות</h2><span className="sub">לפי שעה ביום (שעון ישראל): כמה לידים נכנסו, כמה מהם טופלו בפועל, וכמה מהלידים שטופלו באותה שעה הבשילו לפגישה. הקו המקווקו הוא אחוז ההמרה — מתוך אותם לידים עצמם, ולכן תמיד 0–100%.</span></div>
-            <div className="chart-card"><div className="chart-container" style={{height: 320}}><canvas id="apptHourChart"></canvas></div></div>
+          <div className={vrResp ? 'section vrt-wide' : 'section'}>
+            <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h2>שעות טיפול בלידים ותיאום פגישות</h2><span className="sub">לכל שעה ביום (שעון ישראל) שלוש עמודות: כמה לידים נכנסו, בכמה טיפלו בפועל, ומתוכם כמה קיבלו פגישה. הקו הוא אחוז ההמרה לפגישה מתוך מי שטופל באותה שעה - כך רואים באילו שעות טיפול מביא הכי הרבה פגישות.</span></div>
+            <div className="chart-card"><div className="chart-container" style={{height: vrResp ? 400 : 320}}><canvas id="apptHourChart"></canvas></div></div>
           </div>
         )}
 
@@ -4538,9 +4542,9 @@ const selectProject = async (client, project) => {
             {meetingsOn && <button className={`client-tab ${dashTab === 'meetings' ? 'active' : ''}`} onClick={() => setDashTab('meetings')}><CalendarDays size={16} aria-hidden="true" className="tab-ico" />ישיבות שיווק<ProBadge /></button>}
             {/* "המלצות חכמות" מוסתר לכל הלקוחות עד שנשפר אותו (ויטלי, 21.9). הקוד של
                 הטאב נשאר במקומו — רק הכניסה אליו חסומה, כדי שהחזרה תהיה שינוי של שורה. */}
-            {RECOMMENDATIONS_TAB_ON && hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}>💡 המלצות חכמות</button>}
+            {RECOMMENDATIONS_TAB_ON && hasCrm && <button className={`client-tab tab-reco-hide-mobile ${dashTab === 'recommendations' ? 'active' : ''}`} onClick={() => setDashTab('recommendations')}><Lightbulb size={16} aria-hidden="true" className="tab-ico" />המלצות חכמות</button>}
             {/* D8 (27.10): "ערך הדשבורד" — אדמין בלבד, לא בפרויקט הדמו */}
-            {!isClientView && !isDemoProject && <button className={`client-tab ${dashTab === 'value' ? 'active' : ''}`} onClick={() => setDashTab('value')}>📈 ערך הדשבורד</button>}
+            {!isClientView && !isDemoProject && <button className={`client-tab ${dashTab === 'value' ? 'active' : ''}`} onClick={() => setDashTab('value')}><Gem size={16} aria-hidden="true" className="tab-ico" />ערך הדשבורד</button>}
         </div>
 
         {dashTab === 'value' && !isClientView ? (
@@ -5951,7 +5955,8 @@ const selectProject = async (client, project) => {
             return (<VitasPresentation className="vr-erika">
                 {/* היקף הנתונים. בלי המשפט הזה "רכשו" נקרא כמספר סופי, והוא לא:
                     עסקה שתיסגר בשבוע הבא עדיין תשויך ללידים של התקופה הזו. */}
-                <div className="vr-erika-scope">
+                <div className="vr-erika-scope cz-note">
+                  <span className="cz-note-label">היקף הנתונים</span>
                   <p>תוצאות הלידים שנוצרו בתקופה שנבחרה</p>
                   <p>רכישות וביטולים עשויים להתעדכן גם לאחר סיום התקופה.</p>
                 </div>

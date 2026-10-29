@@ -280,3 +280,35 @@ th:hover .sort-ind { opacity: .8; }
 .vr-ui .vrt-root .vrt-explanation svg { color: var(--tv-brand); }
 .vr-ui .vrt-root .vrt-unit { color: var(--tv-text-muted); }
 .vr-ui .vrt-root .vrt-speed h2, .vr-ui .vrt-root .vrt-patterns h2 { color: var(--tv-navy); font-weight: 800; }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   סבב 4 (29.10) — תיבות הסבר, טאב "ערך הדשבורד", גרף שעות הטיפול.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 18. תיבת הסבר (.cz-note) ────────────────────────────────────────────────────
+   ויטלי: "בועה של טקסט עם הסימן ! ... משהו יותר מודרני ולא נראות של AI ברירת מחדל".
+   קודם: תיבה כחולה עם אייקון i (זמני תגובה), ופס כחול בצד (אריקה כרמל). עכשיו אחיד:
+   רצועה לבנה עם מסגרת דקה, תווית קטנה בכחול המותג שאומרת מה זה ("איך נמדד", "היקף
+   הנתונים"), והטקסט בגוון המשני. בלי אייקון, בלי רקע צבעוני, בלי פס צד. */
+.vr-ui .cz-note,
+.vr-ui .vrt-root .vrt-explanation.cz-note,
+.vr-ui .vr-erika-scope.cz-note {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 18px; padding: 12px 16px;
+  background: var(--tv-surface); color: var(--tv-text-secondary);
+  border: 1px solid var(--tv-border); border-inline-start-width: 1px; border-radius: 12px;
+  font-size: 14px; line-height: 1.6; box-shadow: none;
+}
+.vr-ui .vr-erika-scope.cz-note p { margin: 0; color: var(--tv-text-secondary); font-size: 14px; }
+.vr-ui .vr-erika-scope.cz-note p:first-of-type { color: var(--tv-text); font-weight: 600; }
+.cz-note-label {
+  flex-shrink: 0; white-space: nowrap;
+  font-size: 12px; font-weight: 700; letter-spacing: .01em;
+  color: var(--tv-brand); background: var(--tv-brand-soft);
+  border-radius: 999px; padding: 2px 10px;
+}
+.vr-ui .vr-erika-note { background: var(--tv-surface); border-color: var(--tv-border); color: var(--tv-text-secondary); border-radius: 12px; }
+
+/* ── 19. זמני תגובה: "שעות טיפול בלידים ותיאום פגישות" בשורה משלו, ברוחב מלא, ראשון ── */
+.vr-ui .vrt-root .vrt-patterns > .vrt-wide { grid-column: 1 / -1; order: -1; }
+.vr-ui .vrt-root .vrt-patterns > .vrt-wide .section-head .sub { display: block; max-inline-size: 760px; }
