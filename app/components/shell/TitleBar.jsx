@@ -2,6 +2,7 @@
 import DatePicker from './DatePicker'
 import DateRangePicker from './DateRangePicker'
 import ProjectPicker from './ProjectPicker'
+import { Building2 } from 'lucide-react'
 
 // ── Mobile presets (IDs match the existing DatePicker keys) ──────────────────
 const sod = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x }
@@ -89,9 +90,13 @@ export default function TitleBar({
           קודם: "סקירה / PROJECT" באותיות גדולות + "לקוח / פרויקט" ב-38px — שם לקוח ארוך נשבר
           לשלוש שורות, והפרויקט הופיע פעמיים. בלי פרויקט — הפירורים והכותרת כמו קודם. */}
       {client && project ? (
-        <div className="tb-title">
-          <div className="tb-eyebrow">{client}</div>
-          <h1 title={`${client} / ${project}`}><span className="brand" dir="auto">{project}</span></h1>
+        <div className="tb-head">
+          {/* סמל הפרויקט (סבב 2, 29.10) — מוסתר בטלפון */}
+          <span className="tb-avatar" aria-hidden="true"><Building2 size={24} strokeWidth={1.7} /></span>
+          <div className="tb-title">
+            <div className="tb-eyebrow">{client}</div>
+            <h1 title={`${client} / ${project}`}><span className="brand" dir="auto">{project}</span></h1>
+          </div>
         </div>
       ) : (
       <div className="tb-title">

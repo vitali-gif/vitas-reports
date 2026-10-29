@@ -31,7 +31,7 @@
 @media (max-width: 768px) {
   /* בטלפון בורר הפרויקט (.vproj) כבר מציג "לקוח / פרויקט" ולוחצים עליו — הכותרת כפולה
      ותפסה שלוש שורות של 38px. נשארת רק כשאין בורר. */
-  .titlebar:has(.vproj) .tb-title { display: none; }
+  .titlebar:has(.vproj) .tb-title, .titlebar:has(.vproj) .tb-head { display: none; }
   .titlebar { gap: 8px; margin-bottom: 12px; }
   .titlebar .vproj { margin-bottom: 0; }
   .titlebar .tb-title h1 { font-size: 21px; }
@@ -115,3 +115,74 @@ th:hover .sort-ind { opacity: .8; }
   .vr-ui .vr-metric-value { margin-block-start: 8px !important; }
   .vr-ui .vr-metric-trend { block-size: 22px; margin-block-start: 8px; }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   סבב 2 (29.10) — כיוון א': כרטיסים צבעוניים רגועים, פטרנים ואייקונים.
+
+   ויטלי (29.10): "תנסה את אופציה אחד ... תוסיף פאטרנים אולי אייקונים". זה מחליף את
+   ההחלטה של 21.9 ("לא לגעת בצבעים של הקארדס"): אותו צבע לכל מדד — הלקוח מזהה את
+   הכרטיס — אבל גוון אחד עמוק במקום גרדיאנט ניאון, בלי הצל הצבעוני, והטקסט הלבן
+   קריא יותר (תכלת: 2.1:1 → 3.9-5.1:1, ירוק: 2.5:1 → 3.9-4.9:1).
+   --g-* משמשים גם את פסי המשפך הישן ואייקוני תפקידים — הם מתיישרים יחד.
+   ═════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --g-indigo:  linear-gradient(160deg, #5b5fe0 0%, #4b4fd2 100%);
+  --g-emerald: linear-gradient(160deg, #10917a 0%, #0b7f6a 100%);
+  --g-violet:  linear-gradient(160deg, #8058d6 0%, #6f46c6 100%);
+  --g-sky:     linear-gradient(160deg, #1b88c6 0%, #1574b0 100%);
+  --g-terra:   linear-gradient(160deg, #df6a2d 0%, #c95a1f 100%);
+  --g-amber:   linear-gradient(160deg, #d9950f 0%, #c4820a 100%);
+  --g-rose:    linear-gradient(160deg, #d9486c 0%, #c3385c 100%);
+  --shadow-indigo: var(--tv-kpi-shadow);  --shadow-emerald: var(--tv-kpi-shadow);
+  --shadow-violet: var(--tv-kpi-shadow);  --shadow-sky: var(--tv-kpi-shadow);
+  --shadow-terra: var(--tv-kpi-shadow);   --shadow-amber: var(--tv-kpi-shadow);
+  --shadow-rose: var(--tv-kpi-shadow);
+  /* פטרן הנקודות של Cluzo (מערכת העיצוב: cluzo-dots) — פינת נקודות לבנות שדועכות */
+  --cz-dots-corner: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='132' height='132'%3E%3Ccircle cx='6' cy='6' r='1.6' fill='%23fff' fill-opacity='0.55'/%3E%3Ccircle cx='6' cy='18' r='1.6' fill='%23fff' fill-opacity='0.475'/%3E%3Ccircle cx='6' cy='30' r='1.6' fill='%23fff' fill-opacity='0.402'/%3E%3Ccircle cx='6' cy='42' r='1.6' fill='%23fff' fill-opacity='0.334'/%3E%3Ccircle cx='6' cy='54' r='1.6' fill='%23fff' fill-opacity='0.269'/%3E%3Ccircle cx='6' cy='66' r='1.6' fill='%23fff' fill-opacity='0.208'/%3E%3Ccircle cx='6' cy='78' r='1.6' fill='%23fff' fill-opacity='0.152'/%3E%3Ccircle cx='6' cy='90' r='1.6' fill='%23fff' fill-opacity='0.102'/%3E%3Ccircle cx='6' cy='102' r='1.6' fill='%23fff' fill-opacity='0.058'/%3E%3Ccircle cx='18' cy='6' r='1.6' fill='%23fff' fill-opacity='0.475'/%3E%3Ccircle cx='18' cy='18' r='1.6' fill='%23fff' fill-opacity='0.444'/%3E%3Ccircle cx='18' cy='30' r='1.6' fill='%23fff' fill-opacity='0.386'/%3E%3Ccircle cx='18' cy='42' r='1.6' fill='%23fff' fill-opacity='0.323'/%3E%3Ccircle cx='18' cy='54' r='1.6' fill='%23fff' fill-opacity='0.261'/%3E%3Ccircle cx='18' cy='66' r='1.6' fill='%23fff' fill-opacity='0.203'/%3E%3Ccircle cx='18' cy='78' r='1.6' fill='%23fff' fill-opacity='0.148'/%3E%3Ccircle cx='18' cy='90' r='1.6' fill='%23fff' fill-opacity='0.099'/%3E%3Ccircle cx='18' cy='102' r='1.6' fill='%23fff' fill-opacity='0.055'/%3E%3Ccircle cx='30' cy='6' r='1.6' fill='%23fff' fill-opacity='0.402'/%3E%3Ccircle cx='30' cy='18' r='1.6' fill='%23fff' fill-opacity='0.386'/%3E%3Ccircle cx='30' cy='30' r='1.6' fill='%23fff' fill-opacity='0.345'/%3E%3Ccircle cx='30' cy='42' r='1.6' fill='%23fff' fill-opacity='0.294'/%3E%3Ccircle cx='30' cy='54' r='1.6' fill='%23fff' fill-opacity='0.24'/%3E%3Ccircle cx='30' cy='66' r='1.6' fill='%23fff' fill-opacity='0.186'/%3E%3Ccircle cx='30' cy='78' r='1.6' fill='%23fff' fill-opacity='0.135'/%3E%3Ccircle cx='30' cy='90' r='1.6' fill='%23fff' fill-opacity='0.089'/%3E%3Ccircle cx='30' cy='102' r='1.6' fill='%23fff' fill-opacity='0.048'/%3E%3Ccircle cx='42' cy='6' r='1.6' fill='%23fff' fill-opacity='0.334'/%3E%3Ccircle cx='42' cy='18' r='1.6' fill='%23fff' fill-opacity='0.323'/%3E%3Ccircle cx='42' cy='30' r='1.6' fill='%23fff' fill-opacity='0.294'/%3E%3Ccircle cx='42' cy='42' r='1.6' fill='%23fff' fill-opacity='0.254'/%3E%3Ccircle cx='42' cy='54' r='1.6' fill='%23fff' fill-opacity='0.208'/%3E%3Ccircle cx='42' cy='66' r='1.6' fill='%23fff' fill-opacity='0.162'/%3E%3Ccircle cx='42' cy='78' r='1.6' fill='%23fff' fill-opacity='0.116'/%3E%3Ccircle cx='42' cy='90' r='1.6' fill='%23fff' fill-opacity='0.074'/%3E%3Ccircle cx='42' cy='102' r='1.6' fill='%23fff' fill-opacity='0.037'/%3E%3Ccircle cx='54' cy='6' r='1.6' fill='%23fff' fill-opacity='0.269'/%3E%3Ccircle cx='54' cy='18' r='1.6' fill='%23fff' fill-opacity='0.261'/%3E%3Ccircle cx='54' cy='30' r='1.6' fill='%23fff' fill-opacity='0.24'/%3E%3Ccircle cx='54' cy='42' r='1.6' fill='%23fff' fill-opacity='0.208'/%3E%3Ccircle cx='54' cy='54' r='1.6' fill='%23fff' fill-opacity='0.171'/%3E%3Ccircle cx='54' cy='66' r='1.6' fill='%23fff' fill-opacity='0.131'/%3E%3Ccircle cx='54' cy='78' r='1.6' fill='%23fff' fill-opacity='0.092'/%3E%3Ccircle cx='54' cy='90' r='1.6' fill='%23fff' fill-opacity='0.055'/%3E%3Ccircle cx='66' cy='6' r='1.6' fill='%23fff' fill-opacity='0.208'/%3E%3Ccircle cx='66' cy='18' r='1.6' fill='%23fff' fill-opacity='0.203'/%3E%3Ccircle cx='66' cy='30' r='1.6' fill='%23fff' fill-opacity='0.186'/%3E%3Ccircle cx='66' cy='42' r='1.6' fill='%23fff' fill-opacity='0.162'/%3E%3Ccircle cx='66' cy='54' r='1.6' fill='%23fff' fill-opacity='0.131'/%3E%3Ccircle cx='66' cy='66' r='1.6' fill='%23fff' fill-opacity='0.099'/%3E%3Ccircle cx='66' cy='78' r='1.6' fill='%23fff' fill-opacity='0.066'/%3E%3Ccircle cx='66' cy='90' r='1.6' fill='%23fff' fill-opacity='0.035'/%3E%3Ccircle cx='78' cy='6' r='1.6' fill='%23fff' fill-opacity='0.152'/%3E%3Ccircle cx='78' cy='18' r='1.6' fill='%23fff' fill-opacity='0.148'/%3E%3Ccircle cx='78' cy='30' r='1.6' fill='%23fff' fill-opacity='0.135'/%3E%3Ccircle cx='78' cy='42' r='1.6' fill='%23fff' fill-opacity='0.116'/%3E%3Ccircle cx='78' cy='54' r='1.6' fill='%23fff' fill-opacity='0.092'/%3E%3Ccircle cx='78' cy='66' r='1.6' fill='%23fff' fill-opacity='0.066'/%3E%3Ccircle cx='78' cy='78' r='1.6' fill='%23fff' fill-opacity='0.039'/%3E%3Ccircle cx='90' cy='6' r='1.6' fill='%23fff' fill-opacity='0.102'/%3E%3Ccircle cx='90' cy='18' r='1.6' fill='%23fff' fill-opacity='0.099'/%3E%3Ccircle cx='90' cy='30' r='1.6' fill='%23fff' fill-opacity='0.089'/%3E%3Ccircle cx='90' cy='42' r='1.6' fill='%23fff' fill-opacity='0.074'/%3E%3Ccircle cx='90' cy='54' r='1.6' fill='%23fff' fill-opacity='0.055'/%3E%3Ccircle cx='90' cy='66' r='1.6' fill='%23fff' fill-opacity='0.035'/%3E%3Ccircle cx='102' cy='6' r='1.6' fill='%23fff' fill-opacity='0.058'/%3E%3Ccircle cx='102' cy='18' r='1.6' fill='%23fff' fill-opacity='0.055'/%3E%3Ccircle cx='102' cy='30' r='1.6' fill='%23fff' fill-opacity='0.048'/%3E%3Ccircle cx='102' cy='42' r='1.6' fill='%23fff' fill-opacity='0.037'/%3E%3C/svg%3E");
+}
+
+/* ── 8. כרטיסי מדד: פטרן נקודות בפינה במקום הוויניֶט ─────────────────────────────── */
+.kpi::before { background: var(--cz-dots-corner) left top / 132px 132px no-repeat; }
+.kpi-card, .vr-ui .vr-metric { position: relative; overflow: hidden; }
+.kpi-card::after, .vr-ui .vr-metric::after {
+  content: ''; position: absolute; inset-block-start: 0; inset-inline-end: 0;
+  inline-size: 132px; block-size: 132px; pointer-events: none;
+  background: var(--cz-dots-corner) left top / 132px 132px no-repeat;
+}
+.kpi-card > *:not(.kpi-icon):not(.kpi-accent), .vr-ui .vr-metric > * { position: relative; z-index: 1; }
+.kpi-card > .kpi-icon { z-index: 1; }
+.vr-ui .vr-metric-icon, .kpi-card .kpi-icon { background: #ffffff24; border-color: #ffffff40; }
+.vr-metric-clickable:hover, .kpi:hover, .kpi-card:hover { box-shadow: var(--shadow-md); }
+
+/* ── 9. רקע העמוד: רשת נקודות עדינה בראש העמוד, נעלמת אחרי הכותרת ───────────────── */
+.vr-shell .main-content, .main-content {
+  background:
+    linear-gradient(to bottom, rgba(245, 247, 252, 0) 0, var(--tv-canvas) 300px),
+    radial-gradient(circle, var(--tv-brand-line) 1.4px, transparent 1.7px) 0 0 / 24px 24px,
+    var(--tv-canvas);
+}
+
+/* ── 10. סיידבר: נקודות על נייבי בתחתית ─────────────────────────────────────────── */
+.vr-shell .sidebar.side-vr {
+  background:
+    linear-gradient(to bottom, var(--tv-navy) 0, var(--tv-navy) 55%, rgba(20, 36, 60, 0) 100%),
+    radial-gradient(circle, var(--tv-sidebar-active) 1.5px, transparent 1.8px) 0 0 / 24px 24px,
+    var(--tv-navy);
+}
+
+/* ── 11. כותרת: סמל פרויקט ──────────────────────────────────────────────────────── */
+.tb-head { display: flex; align-items: center; gap: 14px; min-inline-size: 0; }
+.tb-avatar {
+  flex-shrink: 0; display: inline-grid; place-items: center;
+  inline-size: 52px; block-size: 52px; border-radius: 14px;
+  background: var(--tv-brand-soft); color: var(--tv-brand);
+  border: 1px solid var(--tv-brand-line);
+}
+.tb-head .tb-title { min-inline-size: 0; }
+@media (max-width: 768px) { .tb-avatar { display: none; } }
+
+/* ── 12. אייקונים בטאבים הראשיים ────────────────────────────────────────────────── */
+.client-tabs-main .client-tab { display: inline-flex; align-items: center; gap: 8px; }
+.client-tabs-main .tab-ico { display: inline-flex; flex-shrink: 0; opacity: .8; }
+.client-tabs-main .client-tab.active .tab-ico { opacity: 1; }
+@media (max-width: 768px) { .client-tabs-main .client-tab { gap: 5px; } .client-tabs-main .tab-ico svg { inline-size: 14px; block-size: 14px; } }
