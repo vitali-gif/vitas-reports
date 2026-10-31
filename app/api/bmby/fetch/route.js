@@ -435,7 +435,29 @@ async function runSync(opts = {}) {
     const adNames = await adNamesForBmby(supabase, clients)
     const R = computeBmbySummary({ clients, tasks, prices, contracts }, { since, until, monthKey: m, adNames })
     const { _allRecentContracts, _apptByCoord, _apptByDate, _aprilLidStatusCounts, _completedMeetings, _contractAttribDebug, _meetRecs, _noRespAnyTask, _noRespInclUpdate, _noResponseCids, _skippedBroken, adBreakdown, apptStatusDebug, aprilLids, clientApptList, clientProfileSamples, clientRelevant, clientsWithAppt, clientsWithCancelledAppt, clientsWithDoneAppt, completedMeetingSamples, contractsSignedInRange, crmReportRows, dayOfWeekStats, hourlyApptStats, hourlyContactMeeting, hourlyContactStats, hourlyLeadStats, meetingDayOfWeek, namedLeads, noAnswerContactHour, pricesInRange, registrationsInRange, responseTimeStats, sources, tasksByClient, totals, xlsxRows } = R
-    if (_skippedBroken) {
+    // 31.10: משיכה שנכשלה או חזרה ריקה נשמרה כ"0 לידים" על דוח תקין (ONCE 1–30.10: 0 מול 179,
+    // HI PARK, REHAVIA — 8 טווחים ב-3 ימים), ובדיקת התקינות נשארה ירוקה. עכשיו לא כותבים:
+    // (1) כשאחת המשיכות מ-BMBY נכשלה — חישוב על חלק מהנתונים נותן מספרים שגויים;
+    // (2) כש-BMBY החזיר 0 לקוחות אבל לאותו טווח כבר נשמרו לידים, או שהפרסום הביא 3 לידים ומעלה.
+    // הדוח השמור נשאר, ובטווח שאין לו דוח הדשבורד מחשב מהתמונה (crm_compact).
+    const failedFetch = [['clients', clientsR], ['tasks', tasksR], ['price_offers', pricesR], ['contracts', contractsR]]
+      .filter(([, r]) => r.status === 'rejected').map(([label]) => label)
+    let emptyReason = ''
+    if (!failedFetch.length && clients.length === 0) {
+      const [{ data: prev }, { data: ads }] = await Promise.all([
+        supabase.from('reports').select('summary').eq('project_id', p.id).eq('source', 'crm').eq('month', m).maybeSingle(),
+        supabase.from('reports').select('summary').eq('project_id', p.id).eq('month', m).in('source', ['facebook', 'google', 'google_pmax']),
+      ])
+      const prevLeads = Number(prev?.summary?.totalLeads) || 0
+      const adLeads = (ads || []).reduce((a, r) => a + (Number(r.summary?.leads) || 0), 0)
+      if (prevLeads > 0) emptyReason = `the saved report has ${prevLeads} leads`
+      else if (adLeads >= 3) emptyReason = `ads brought ${Math.round(adLeads)} leads in the same range`
+    }
+    if (failedFetch.length) {
+      errors.push(`SKIPPED write for ${p.name} [${m}]: BMBY ${failedFetch.join(', ')} failed - kept the saved report`)
+    } else if (emptyReason) {
+      errors.push(`SKIPPED empty write for ${p.name} [${m}]: BMBY returned 0 clients but ${emptyReason} - kept the saved report`)
+    } else if (_skippedBroken) {
       errors.push(`SKIPPED broken write for ${p.name} [${m}]: 0 leads but registrations/contracts/meetings present (likely failed fetch)`)
     } else {
       const { error: upsertErr } = await supabase.from('reports').upsert({
