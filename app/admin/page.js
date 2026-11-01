@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { apiFetch } from '../../lib/api-fetch'
 import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, comparisonPeriodKey, comparisonPeriodLabel, COLORS, sourceColor, getRecommendationsWindowMonths } from '../../lib/helpers'
-import { normalizeObjections, isReviewObjection, REVIEW_LABEL } from '../../lib/objection-normalize.js'
+import { normalizeObjections, isReviewObjection, REVIEW_LABEL, OFF_TARGET_LABEL } from '../../lib/objection-normalize.js'
 import { HANDLING_LABELS, HANDLING_METHOD } from '../../lib/client-wording.js'
 import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
@@ -2690,6 +2690,17 @@ const selectProject = async (client, project) => {
       }], undefined, _openObj, vrObj ? { options: { plugins: { legend: { display: false } } } } : undefined);
     }, 200));
 
+    // ויטלי, 1.11 (אפשרות 2): ללקוח — רק "X לידים סווגו כלא תואמים לקהל היעד"; באדמין — במפורש, וכמה מהם בלי תיעוד שיחה
+    const _otRows = crmRows.map(r => r.summary && r.summary.leadGroups).filter(g => g && g.offTarget != null);
+    const _ot = _otRows.length === crmRows.length && _otRows.length
+      ? _otRows.reduce((a, g) => ({ n: a.n + (g.offTarget || 0), noCall: a.noCall + (g.offTargetNoCall || 0) }), { n: 0, noCall: 0 })
+      : { n: allRows.filter(row => normalizeObjections(row.objections || '').some(isReviewObjection)).length, noCall: null };
+    const offTargetNote = _ot.n > 0 ? (
+      <p className="cz-note"><span className="cz-note-label">{isClientView ? 'קהל יעד' : REVIEW_LABEL}</span><span>{isClientView
+        ? `${formatNum(_ot.n)} לידים סווגו כ${OFF_TARGET_LABEL}.`
+        : `${formatNum(_ot.n)} לידים סווגו "מגזר" / "שפה"${_ot.noCall != null ? `, ${formatNum(_ot.noCall)} מהם ללא תיעוד שיחה` : ''}. ללקוח זה מוצג רק כ"${OFF_TARGET_LABEL}", בלי קשר לשיחות.`}</span></p>
+    ) : null;
+
     if (vrObj) {
       const [topName, topCount] = objEntries[0];
       const _pctOf = (c) => totalAll > 0 ? Math.round(c / totalAll * 100) : 0;
@@ -2697,6 +2708,7 @@ const selectProject = async (client, project) => {
       return (
         <div className="vcs-root vro-root">
           <p className="vr-caption vcs-metric-scope">התנגדויות שנרשמו ללידים בתקופה · ליד עם כמה התנגדויות נספר בכל אחת מהן</p>
+          {offTargetNote}
           <div className="vr-metric-grid">
             <MetricCard label="לידים עם התנגדות" value={formatNum(rowsWithObjection)} tone="rose" icon={Ban} description="לידים שנרשמה להם לפחות התנגדות אחת" />
             <MetricCard label={'סה"כ התנגדויות'} value={formatNum(totalAll)} tone="indigo" icon={ClipboardList} description="כל ההתנגדויות שנרשמו בתקופה" />
@@ -2727,6 +2739,7 @@ const selectProject = async (client, project) => {
     return (
       <div className="section">
         <div className="section-head"><div className="ico rose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><h2>התנגדויות לידים</h2></div>
+        {offTargetNote}
         <div className="chart-grid" style={{gridTemplateColumns: '1fr 1fr'}}>
           <div className="chart-card"><div className="chart-container" style={{height: 400}}><canvas id="crmObjChart"></canvas></div></div>
           <div className="chart-card" style={{padding: '20px'}}>
