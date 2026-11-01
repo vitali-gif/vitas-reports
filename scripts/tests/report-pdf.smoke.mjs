@@ -160,6 +160,10 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   const ho = render(mo)
   eq('off-target: soft line under the funnel, no sector word', [ho.includes('74 לידים סווגו כלא תואמים לקהל היעד של הפרויקט'), /מגזר|שפה/.test(ho)], [true, false])
   eq('ai input: off-target count only', analysisInput(mo).leadsNotMatchingTargetAudience, 74)
+  // השוואת צוות: לניתוח הפנימי, לא לדוח
+  const tm = build({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: { ...withG(lg), responseTimeStats: { totalLids: 20, respondedCount: 15, noResponseCount: 5, noResponseByUser: { 'דנה': 4, 'יוסי': 1 }, business: { medianMinutes: 30, buckets: { '0-15m': 15 }, byUser: { 'דנה': { count: 5, avgMinutes: 90, medianMinutes: 60 }, 'יוסי': { count: 10, avgMinutes: 20, medianMinutes: 12 } } } } } }], prevRows: [] })
+  const tc = analysisInput(tm).leadHandling.teamComparison
+  eq('team comparison reaches the AI, not the PDF', [tc.map(t => [t.person, t.leadsWithRecordedAction, t.leadsWithoutRecordedAction, t.medianMinutesToFirstRecordedAction]), render(tm).includes('יוסי')], [[['יוסי', 10, 1, 12], ['דנה', 5, 4, 60]], false])
   const fb = build({ project: 'אלפא', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: { crmType: 'fireberry', totalLeads: 948, byStatus: { 'לא רלוונטי כללי': 333, 'לא רלוונטי שפה': 1 }, responseTimeStats: { totalLids: 948, respondedCount: 800, noResponseCount: 148 } } }], prevRows: [] })
   const hf = render(fb)
   eq('fireberry: language status counted as off-target, not shown by name', [fb.offTarget, hf.includes('לא רלוונטי שפה'), hf.includes('1 לידים סווגו כלא תואמים')], [1, false, true])
