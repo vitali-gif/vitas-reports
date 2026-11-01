@@ -132,4 +132,21 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   eq('cover: Cluzo logo, no VITAS logo', [h.includes('/brand/cluzo/cluzo-logo-light.svg'), h.includes('vitas-logo')], [true, false])
 }
 
+// 1.11: ביטולים ליד "תואמו / בוצעו", ובלי שמות נציגים בדוח שהולך ללקוח
+{
+  const { buildReportModel: build, renderReportHtml: render } = await import('../../lib/report-pdf.js')
+  const { analysisInput } = await import('../../lib/ai-analysis.js')
+  const summ = (sch, comp, canc, upc) => ({ crmType: 'bmby', totalLeads: 120, relevantLeads: 50, meetingsScheduled: sch, meetingsCompleted: comp, meetingsCancelled: canc, meetingsUpcoming: upc, contracts: 0,
+    responseTimeStats: { totalLids: 120, respondedCount: 56, noResponseCount: 64, noResponseByUser: { 'גליה': 64 } } })
+  const m = build({ project: 'ONCE', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: summ(28, 18, 10, 1) }], prevRows: [{ source: 'crm', summary: summ(20, 18, 6, 0) }] })
+  eq('meetings: breakdown with previous', [m.meetings.scheduled, m.meetings.completed, m.meetings.cancelled, m.meetings.upcoming, m.meetings.prev.cancelled], [28, 18, 10, 1, 6])
+  const h = render(m)
+  eq('pdf: cancellations shown under the funnel', [h.includes('מה קרה לפגישות'), /<b>10<\/b> בוטלו/.test(h), h.includes('עוד לפני מועדן')], [true, true, true])
+  eq('pdf: no rep names for the client', [h.includes('גליה'), h.includes('לפי נציג')], [false, false])
+  const inp = analysisInput(m)
+  eq('ai input: cancellations reach the analysis', [inp.meetings.cancelled, inp.meetings.upcoming, inp.meetings.previous.cancelled], [10, 1, 6])
+  const z = build({ project: 'z', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: { crmType: 'zoho', totalLeads: 5 } }], prevRows: [] })
+  eq('meetings: none for zoho', z.meetings, null)
+}
+
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
