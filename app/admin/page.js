@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { apiFetch } from '../../lib/api-fetch'
 import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, comparisonPeriodKey, comparisonPeriodLabel, COLORS, sourceColor, getRecommendationsWindowMonths } from '../../lib/helpers'
-import { normalizeObjections } from '../../lib/objection-normalize.js'
+import { normalizeObjections, isReviewObjection, REVIEW_LABEL } from '../../lib/objection-normalize.js'
+import { HANDLING_LABELS, HANDLING_METHOD } from '../../lib/client-wording.js'
 import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
@@ -813,6 +814,12 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const _projCrmType = _vrCrmType || reports.find(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType)?.summary?.crmType || null
   const _vrCrmName = ({ fireberry: 'Fireberry', zoho: 'Zoho', salesforce: 'Salesforce' })[_projCrmType] || 'BMBY'
   const _vrIsFb = _vrCrmType === 'fireberry'
+  // ש.ברוך, 1.11: התנגדות שמבוססת על מוצא הפונה — בתצוגת לקוח לא מוצגת בשמה (באדמין: מסומנת)
+  const _objForView = (raw) => {
+    if (!raw) return raw
+    const parts = normalizeObjections(raw)
+    return isClientView ? parts.filter(o => !isReviewObjection(o)).join(', ') : parts.map(o => (isReviewObjection(o) ? `${o} (${REVIEW_LABEL})` : o)).join(', ')
+  }
   // vrShell — המעטפת (סיידבר, header, כותרת, תקציב) בעיצוב החדש בכל הטאבים של פרויקט נדל"ן, כדי שהמסך לא
   // יקפוץ בין שני עיצובים במעבר טאב. vrMode — תוכן הטאב "הכל" בלבד (הפיילוט).
   const _vrOwnCrm = ['zoho', 'salesforce'].includes(_vrCrmType)
@@ -2131,6 +2138,15 @@ const selectProject = async (client, project) => {
     // חציון נלקח מהסיכום רק כשיש דוח CRM אחד לטווח (חציונים של כמה דוחות אינם ניתנים למיזוג).
     // "טרם התקיימה שיחה" (noResponseByUser/BySource) — מסכם רק אם כל הדוחות כוללים את השדה (סכמה v34+).
     let _rtReports = 0, _pendingComplete = true, _bizMedianOverall = null;
+    // ש.ברוך, 1.11: שלוש קבוצות טיפול (לקוח ייחודי) במקום "בלי מענה" — רק אם לכל הדוחות בטווח יש אותן
+    const _lgRows = crmRows.map(r => r.summary && r.summary.leadGroups).filter(Boolean);
+    const leadGroups = (!_vrIsFb && _lgRows.length && _lgRows.length === crmRows.length)
+      ? _lgRows.reduce((a, g) => { for (const k of ['total', 'documented', 'classifiedNoCall', 'waiting', 'repeat', 'inWindow', 'classifiedForReview']) a[k] += (g[k] || 0); a.ok = a.ok && g.ok !== false; return a; },
+        { total: 0, documented: 0, classifiedNoCall: 0, waiting: 0, repeat: 0, inWindow: 0, classifiedForReview: 0, ok: true })
+      : null;
+    const _lgLists = _crmRespLeads?.leadGroups || null;
+    // בתצוגת לקוח: סיווג שדורש בדיקה לא מוצג בשמו
+    const _lgNames = (arr) => (arr || []).map(e => (isClientView && e && e.review) ? { ...e, objection: undefined, review: undefined } : e);
     const pendingByUser = {}, pendingBySource = {};
     for (const r of crmRows) {
       const rt = r.summary && r.summary.responseTimeStats;
@@ -2461,24 +2477,41 @@ const selectProject = async (client, project) => {
     // חציון אינו זמין: הדוחות שומרים סיכומים (ממוצעים ודליים), לא זמן תגובה לכל ליד — לכן נשמרו המדדים הקיימים.
     // פיירברי: המענה נמדד מההערה האנושית הראשונה על הליד (lib/crm/fireberry-summary.js), לא מפעולות.
     const _vrRespTips = _vrIsFb
-      ? ['כמות הלידים החדשים שנכנסו ל-Fireberry בתקופה הנבחרת.', 'לידים שאיש מכירות כתב עליהם הערה ב-Fireberry. הערות אוטומטיות (שם הליד או מספר טלפון בלבד) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות לכתוב הערה ראשונה על ליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שעדיין אין עליהם אף הערה של איש מכירות. דורש מעקב.']
-      : ['כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות.', 'לידים שאיש מכירות אנושי חזר אליהם (יצר משימה, שיחה, פעולה במערכת). תגובות אוטומטיות של BMBY (Update Info Lead) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שאף איש מכירות אנושי לא חזר אליהם - או שרק BMBY השיב אוטומטית, או שלא נרשמה אף פעולה. דורש מעקב.'];
+      ? ['כמות הלידים החדשים שנכנסו ל-Fireberry בתקופה הנבחרת.', 'לידים שאיש מכירות כתב עליהם הערה ב-Fireberry. הערות אוטומטיות (שם הליד או מספר טלפון בלבד) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות לכתוב הערה ראשונה על ליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שעדיין אין עליהם הערה מתועדת ב-Fireberry. שיחה שלא תועדה לא נספרת.']
+      : ['כמות הלידים החדשים (LID) שנכנסו ב-BMBY בתקופה הנבחרת. כל LID נספר פעם אחת - ספירה אחרי ניכוי כפילויות.', 'לידים שנרשמה אחריהם פעולה ב-BMBY (משימה, הערה, SMS, וואטסאפ, פגישה, או סיכום שיחה בליד). תגובות אוטומטיות (Update Info Lead) לא נספרות.', 'ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל.', 'לידים שלא נרשמה אחריהם פעולה ב-BMBY (תגובות אוטומטיות לא נספרות). שיחה שלא תועדה לא נספרת.'];
     return (
       <div className={vrResp ? 'vrt-root' : undefined}>
         {vrResp ? (<>
           <p className="vrt-explanation cz-note"><span className="cz-note-label">איך נמדד</span><span>{_vrIsFb ? 'זמן המענה נמדד מכניסת הליד ל-Fireberry ועד ההערה הראשונה של איש מכירות על הליד, בשעות העסקים בלבד.' : 'זמן המענה נמדד מכניסת הליד ל-BMBY ועד הפעולה הראשונה של איש מכירות אנושי, בשעות העסקים בלבד.'} לידים שטרם קיבלו מענה מוצגים בנפרד ואינם נכללים בממוצע.</span></p>
-          <p className="vr-caption vcs-metric-scope">{formatNum(totalLids)} לידים שנכנסו בתקופה · {formatNum(respondedCount)} מהם עם מענה אנושי</p>
+          {leadGroups ? (<>
+            <p className="vr-caption vcs-metric-scope">{formatNum(leadGroups.total)} לקוחות השאירו פרטים בתקופה{(leadGroups.repeat || leadGroups.inWindow) ? ` · לא נכללו בקבוצות: ${[leadGroups.repeat ? leadGroups.repeat + ' ' + HANDLING_LABELS.repeat : '', leadGroups.inWindow ? leadGroups.inWindow + ' ' + HANDLING_LABELS.inWindow + ' (נכנסו ביום העסקים האחרון)' : ''].filter(Boolean).join(', ')}` : ''}</p>
+            {!leadGroups.ok && <p className="cz-note" style={{color:'#b3261e'}}><span className="cz-note-label">שגיאה</span><span>קבוצות הטיפול לא מסתכמות לסך הלקוחות. לרענן את נתוני ה-CRM; עד אז הדוח לא יופק.</span></p>}
+            <div className="vr-metric-grid">
+              <MetricCard label={HANDLING_LABELS.documented} value={formatNum(leadGroups.documented)} tone="emerald" icon={CheckCircle2} details={'לקוחות שנרשמה אחריהם פעולה ב-BMBY: משימה, הערה, SMS, וואטסאפ, פגישה, או סיכום שיחה בליד.'}
+                description={leadGroups.total > 0 ? Math.round(leadGroups.documented / leadGroups.total * 100) + '% מהלקוחות' : undefined} />
+              <MetricCard label={HANDLING_LABELS.classifiedNoCall} value={formatNum(leadGroups.classifiedNoCall)} tone="sky" icon={Tag} details={'אין פעולה מתועדת, אבל הוזנה התנגדות או שהשלב ב-BMBY שונה מ"חדש". ייתכן שהייתה שיחה שלא תועדה.'}
+                description={!isClientView && leadGroups.classifiedForReview > 0 ? `${leadGroups.classifiedForReview} מהם: ${REVIEW_LABEL}` : (leadGroups.total > 0 ? Math.round(leadGroups.classifiedNoCall / leadGroups.total * 100) + '% מהלקוחות' : undefined)}
+                onClick={_lgLists?.classifiedNoCall?.length > 0 ? () => setNamedLeadsModal({title: HANDLING_LABELS.classifiedNoCall, names: _lgNames(_lgLists.classifiedNoCall)}) : undefined} />
+              <MetricCard label={HANDLING_LABELS.waiting} value={formatNum(leadGroups.waiting)} tone="amber" icon={Clock} details={'אין פעולה מתועדת, אין התנגדות, והשלב ב-BMBY עדיין "חדש" או "לטיפול".'}
+                onClick={_lgLists?.waiting?.length > 0 ? () => setNamedLeadsModal({title: HANDLING_LABELS.waiting, names: _lgNames(_lgLists.waiting)}) : undefined} />
+              <MetricCard label="זמן מענה ממוצע" value={fmt(overallBusinessMin)} tone="indigo" icon={Clock} details={_vrRespTips[2]}
+                description={respondedCount > 0 ? (_rtReports === 1 && _bizMedianOverall != null ? 'חציון ' + fmt(_bizMedianOverall) + ' · ' : '') + 'עד הפעולה המתועדת הראשונה' : undefined} />
+            </div>
+            <p className="cz-note"><span className="cz-note-label">איך נמדד</span><span>{HANDLING_METHOD}</span></p>
+          </>) : (<>
+          <p className="vr-caption vcs-metric-scope">{formatNum(totalLids)} לידים שנכנסו בתקופה · {formatNum(respondedCount)} מהם עם תיעוד שיחה ב-CRM</p>
           <div className="vr-metric-grid">
             <MetricCard label={'סה"כ לידים'} value={formatNum(totalLids)} tone="indigo" icon={Users} details={_vrRespTips[0]}
               onClick={_crmRespLeads?.allLeads?.length > 0 ? () => setNamedLeadsModal({title: 'סה"כ לידים', names: _crmRespLeads.allLeads}) : undefined} />
-            <MetricCard label="קיבלו מענה" value={formatNum(respondedCount)} tone="emerald" icon={CheckCircle2} details={_vrRespTips[1]}
+            <MetricCard label="עם תיעוד שיחה" value={formatNum(respondedCount)} tone="emerald" icon={CheckCircle2} details={_vrRespTips[1]}
               description={totalLids > 0 ? Math.round(respondedCount / totalLids * 100) + '% מהלידים' : undefined} />
             <MetricCard label="זמן מענה ממוצע" value={fmt(overallBusinessMin)} tone="sky" icon={Clock} details={_vrRespTips[2]}
               description={respondedCount > 0 ? (_rtReports === 1 && _bizMedianOverall != null ? 'חציון ' + fmt(_bizMedianOverall) + ' · ' : '') + 'שעות עסקים · מתוך ' + formatNum(respondedCount) + ' לידים עם מענה' : undefined} />
-            <MetricCard label="בלי מענה" value={formatNum(noResponseCount)} tone="amber" icon={PhoneOff} details={_vrRespTips[3]}
+            <MetricCard label="ללא תיעוד שיחה ב-CRM" value={formatNum(noResponseCount)} tone="amber" icon={PhoneOff} details={_vrRespTips[3]}
               description={totalLids > 0 ? 'מתוך ' + formatNum(totalLids) + ' לידים' : undefined}
-              onClick={_crmRespLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים בלי מענה', names: _crmRespLeads.noResponse}) : undefined} />
+              onClick={_crmRespLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים ללא תיעוד שיחה ב-CRM', names: _crmRespLeads.noResponse}) : undefined} />
           </div>
+          </>)}
         </>) : (
                 <div className="kpi-tier primary" style={{marginBottom:'36px'}}>
           <div className="kpi-c indigo" style={_crmRespLeads?.allLeads?.length > 0 ? {cursor:'pointer'} : undefined} onClick={_crmRespLeads?.allLeads?.length > 0 ? () => setNamedLeadsModal({title: 'סה"כ לידים', names: _crmRespLeads.allLeads}) : undefined}>
@@ -2492,7 +2525,7 @@ const selectProject = async (client, project) => {
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
             </div>
-            <div className="lbl">קיבלו מענה <InfoTip text={_vrRespTips[1]} /></div>
+            <div className="lbl">עם תיעוד שיחה <InfoTip text={_vrRespTips[1]} /></div>
             <div className="val">{respondedCount}</div>
           </div>
           <div className="kpi-c terra">
@@ -2502,11 +2535,11 @@ const selectProject = async (client, project) => {
             <div className="lbl">זמן מענה ממוצע <InfoTip text="ממוצע הזמן שלוקח לאיש מכירות אנושי לחזור לליד חדש. מדידה בשעות עסקים בלבד - א-ה 09:00-19:00, שישי 09:00-13:00, ללא שבת וחגי ישראל." /></div>
             <div className="val">{fmt(overallBusinessMin)}</div>
           </div>
-          <div className="kpi-c violet" style={_crmRespLeads?.noResponse?.length > 0 ? {cursor:'pointer'} : undefined} onClick={_crmRespLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים בלי מענה', names: _crmRespLeads.noResponse}) : undefined}>
+          <div className="kpi-c violet" style={_crmRespLeads?.noResponse?.length > 0 ? {cursor:'pointer'} : undefined} onClick={_crmRespLeads?.noResponse?.length > 0 ? () => setNamedLeadsModal({title: 'לידים ללא תיעוד שיחה ב-CRM', names: _crmRespLeads.noResponse}) : undefined}>
             <div className="ic-wrap">
               <div className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
             </div>
-            <div className="lbl">בלי מענה <InfoTip text={_vrRespTips[3]} /></div>
+            <div className="lbl">ללא תיעוד שיחה ב-CRM <InfoTip text={_vrRespTips[3]} /></div>
             <div className="val">{noResponseCount}</div>
           </div>
         </div>)}
@@ -2552,12 +2585,13 @@ const selectProject = async (client, project) => {
         )}
         </div>
 
-        <div className={vrResp ? 'vrt-tables' : 'chart-grid'} style={vrResp ? undefined : {gridTemplateColumns: '1fr 1fr'}}>
-          <div className="section">
+        <div className={vrResp ? 'vrt-tables' : 'chart-grid'} style={vrResp ? undefined : {gridTemplateColumns: isClientView ? '1fr' : '1fr 1fr'}}>
+          {/* ש.ברוך, 1.11: פילוח לפי נציג — באדמין בלבד */}
+          {!isClientView && <div className="section">
             <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><h2>זמן מענה לפי איש מכירות</h2></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
-                <thead><tr><th>איש מכירות</th><th>{vrResp ? 'לידים עם שיחה' : 'לידים'}</th><th>{vrResp ? 'זמן ממוצע' : 'זמן מענה ממוצע'}</th>{vrResp && <th>זמן חציוני</th>}{vrResp && <th>טרם התקיימה שיחה</th>}</tr></thead>
+                <thead><tr><th>איש מכירות</th><th>{vrResp ? 'לידים עם שיחה' : 'לידים'}</th><th>{vrResp ? 'זמן ממוצע' : 'זמן מענה ממוצע'}</th>{vrResp && <th>זמן חציוני</th>}{vrResp && <th>ללא תיעוד שיחה</th>}</tr></thead>
                 <tbody>
                   {userList.map(u => (
                     <tr key={u.name}>
@@ -2571,12 +2605,12 @@ const selectProject = async (client, project) => {
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
           <div className="section">
             <div className="section-head"><div className="ico sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="20" x2="2" y2="14"/><line x1="7" y1="20" x2="7" y2="8"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="17" y1="20" x2="17" y2="10"/><line x1="22" y1="20" x2="22" y2="2"/></svg></div><h2>{vrResp ? 'מקורות עם זמן המענה הארוך ביותר' : 'הכי איטיים - לפי מקור'}</h2></div>
             <div className="chart-card" style={{padding:'10px'}}>
               <table className="data-table">
-                <thead><tr><th>מקור</th><th>{vrResp ? 'לידים עם שיחה' : 'לידים'}</th><th>זמן מענה ממוצע</th>{vrResp && <th>טרם התקיימה שיחה</th>}</tr></thead>
+                <thead><tr><th>מקור</th><th>{vrResp ? 'לידים עם שיחה' : 'לידים'}</th><th>זמן מענה ממוצע</th>{vrResp && <th>ללא תיעוד שיחה</th>}</tr></thead>
                 <tbody>
                   {sourceList.map(s => (
                     <tr key={s.name}>
@@ -2595,7 +2629,7 @@ const selectProject = async (client, project) => {
     );
     // compareEnabled נקרא בתוך ה-callback (סדרת "תקופה קודמת"), ולכן חייב להיות כאן —
     // בלעדיו הדלקת מתג ההשוואה לא מציירת את הגרף מחדש.
-  }, [vrResp, selectedMonth, reports, compareEnabled]);
+  }, [vrResp, selectedMonth, reports, compareEnabled, isClientView, _vrIsFb]);
 
     // ==================== CRM OBJECTIONS SUB-TAB ====================
   const renderCrmObjectionsDashboard = useCallback(() => {
@@ -2618,16 +2652,18 @@ const selectProject = async (client, project) => {
     });
     // מקבצים עם אותו normalizeObjections שהגרף סופר איתו, אחרת מספר השורות
     // בפופ-אפ לא יתאים למספר שמוצג ליד סוג ההתנגדות.
+    // ש.ברוך, 1.11: סיווג שמבוסס על מוצא הפונה — באדמין מסומן "סיווג שדורש בדיקה"; בתצוגת לקוח לא מוצג בשמו
+    const _objLabel = (o) => (isReviewObjection(o) ? (isClientView ? null : `${o} · ${REVIEW_LABEL}`) : o);
     const _leadsByObj = {};
     for (const L of _objLeads) {
-      for (const o of normalizeObjections(L.objection)) (_leadsByObj[o] = _leadsByObj[o] || []).push(L);
+      for (const o0 of normalizeObjections(L.objection)) { const o = _objLabel(o0); if (o) (_leadsByObj[o] = _leadsByObj[o] || []).push(L); }
     }
     const _openObj = (name) => { const list = _leadsByObj[name] || []; if (list.length) setObjModal({ title: name, leads: list }); };
 
     const objCounts = {};
     let rowsWithObjection = 0;
     for (const row of allRows) {
-      const objs = normalizeObjections(row.objections || '');
+      const objs = normalizeObjections(row.objections || '').map(_objLabel).filter(Boolean);
       if (objs.length > 0) rowsWithObjection++;
       for (const o of objs) objCounts[o] = (objCounts[o] || 0) + 1;
     }
@@ -2726,7 +2762,7 @@ const selectProject = async (client, project) => {
         </ul>
       </div>
     );
-  }, [vrObj, selectedMonth, reports]);
+  }, [vrObj, selectedMonth, reports, isClientView]);
 
   // היסטוריית ההערות של ליד — נמשכת חי מ-BMBY בלחיצה, לא נשמרת בדוח.
   // הסיבה: הסנכרון הלילי מושך משימות רק בטווח התקופה שמסונכרנת, אז ליד שנכנס במרץ
@@ -4229,7 +4265,7 @@ const selectProject = async (client, project) => {
       // גם טאב ה-CRM של אריקה מקבל את הכרטיס המשותף — אותם ערכים, אותה תגית שינוי.
       if (vrAds || vrZohoCrm) {
         // עיצוב מחודש: אותם ערכים, אותה תגית שינוי, אותה לחיצה לרשימת לידים — בכרטיס report-ui.
-        const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'לידים שלא טופלו': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature,
+        const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'ממתינים לטיפול ב-CRM': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature,
           // מדדים שקיימים רק אצל אריקה (Zoho) ו-KLOSS (Salesforce). בלעדיהם הכרטיסים שלהם
           // היו מקבלים את העיצוב אבל בלי אייקון, בזמן שהשאר כן.
           'תקציב שנוצל': Wallet, 'עלות ממוצעת לקליק': MousePointerClick, 'עברו להזדמנות': Handshake, 'הזדמנויות': Handshake,
@@ -4644,7 +4680,7 @@ const selectProject = async (client, project) => {
             const _hls = r.summary && r.summary.hourlyLeadStats;
             if (Array.isArray(_hls)) for (let _hi = 0; _hi < 24; _hi++) _hourlyLeadMerged[_hi] += _hls[_hi] || 0;
             if (Array.isArray(r.summary && r.summary.crmRepRows)) {
-              _crmRepRows.push(...r.summary.crmRepRows);
+              _crmRepRows.push(...(isClientView ? r.summary.crmRepRows.map(row => (row && row.objections ? { ...row, objections: _objForView(row.objections) } : row)) : r.summary.crmRepRows));
             }
             // Merge sources from per-source CRM rows (stored in data[])
             if (Array.isArray(r.data)) {
@@ -6217,7 +6253,7 @@ const selectProject = async (client, project) => {
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות שבוצעו', formatNum(_cs.meetingsCompleted || 0), 'orange', _cs.meetingsCompleted || 0, prevCrmTotals?.meetingsCompleted, false, _tabCrmLeads?.meetingsCompleted, (activeT.spend > 0 && (_cs.meetingsCompleted || 0) > 0) ? ('עלות/בוצעה ' + formatCurrency(activeT.spend / _cs.meetingsCompleted)) : null) : null}
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות עתידיות', formatNum(_cs.meetingsUpcoming || 0), 'cyan', _cs.meetingsUpcoming || 0, prevCrmTotals?.meetingsUpcoming, false, _tabCrmLeads?.meetingsUpcoming) : null}
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות שבוטלו', formatNum(_cs.meetingsCancelled || 0), 'red', _cs.meetingsCancelled || 0, prevCrmTotals?.meetingsCancelled, false, _tabCrmLeads?.meetingsCancelled) : null}
-          {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('לידים שלא טופלו', formatNum(_cs.leadsToHandle || 0), 'amber', _cs.leadsToHandle || 0, null, false, null) : null}
+          {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('ממתינים לטיפול ב-CRM', formatNum(_cs.leadsToHandle || 0), 'amber', _cs.leadsToHandle || 0, null, false, null) : null}
           {crmTotals && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations,
             (vrAds && activeT.spend > 0 && (crmTotals?.registrationValue || 0) > 0) ? ('שווי ' + formatCurrencyCompact(crmTotals.registrationValue)) : undefined) : null}
           {!vrAds && activeT.spend > 0 && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
@@ -7612,6 +7648,7 @@ const selectProject = async (client, project) => {
                     <div style={{display:'flex',flexDirection:'column',gap:2,minWidth:0,flex:1}}>
                       <span style={{fontWeight:600}}>{_n}{_v ? ` (₪${Number(_v).toLocaleString('he-IL')})` : ''}</span>
                       {(_p || _s) && <span style={{fontSize:12,color:'#94a3b8'}}>{_p ? <span style={{unicodeBidi:'plaintext'}}>{_p}</span> : null}{_p && _s ? ' · ' : ''}{_s}</span>}
+                      {entry && typeof entry === 'object' && entry.objection && <span style={{fontSize:11.5,color:'#64748b'}}>התנגדות: {entry.objection}{entry.review && !isClientView ? <span style={{marginInlineStart:6,padding:'1px 7px',borderRadius:999,background:'#fff4dc',color:'#8a5a00',fontWeight:600}}>{REVIEW_LABEL}</span> : null}</span>}
                       {(_ld || _ad) && <span style={{fontSize:11.5,color:'#64748b',display:'flex',gap:10,flexWrap:'wrap'}}>
                         {_ld ? <span>📥 כניסת ליד: <span style={{unicodeBidi:'plaintext'}}>{_ld}</span></span> : null}
                         {_ad ? <span>📅 תיאום פגישה: <span style={{unicodeBidi:'plaintext'}}>{_ad}</span></span> : null}
@@ -7668,7 +7705,7 @@ const selectProject = async (client, project) => {
                     ) : null}
                     {(L.objection || L.propertyType || L.lastMeeting) ? (
                       <div style={{fontSize:12,color:'#64748b',marginTop:6,display:'flex',gap:12,flexWrap:'wrap'}}>
-                        {L.objection ? <span>🚧 {decodeHtmlEntities(L.objection)}</span> : null}
+                        {L.objection && _objForView(L.objection) ? <span>🚧 {_objForView(decodeHtmlEntities(L.objection))}</span> : null}
                         {L.propertyType ? <span>🏠 {decodeHtmlEntities(L.propertyType)}</span> : null}
                         {L.lastMeeting ? <span>🗓️ מועד פגישה: <span style={{unicodeBidi:'plaintext'}}>{dmy(L.lastMeeting) || L.lastMeeting}</span></span> : null}
                       </div>

@@ -143,6 +143,23 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   const h = render(m)
   eq('pdf: cancellations shown under the funnel', [h.includes('מה קרה לפגישות'), /<b>10<\/b> בוטלו/.test(h), h.includes('עוד לפני מועדן')], [true, true, true])
   eq('pdf: no rep names for the client', [h.includes('גליה'), h.includes('לפי נציג')], [false, false])
+  const { findForbidden } = await import('../../lib/client-wording.js')
+  eq('pdf (old summary, no groups): no forbidden phrases', findForbidden(h), [])
+
+  // ש.ברוך, 1.11: שלוש קבוצות + חריגים + שורת שיטה; סכום שלא מתאים → אין דוח
+  const lg = { unit: 'client', total: 243, documented: 152, classifiedNoCall: 83, waiting: 1, repeat: 7, inWindow: 0, ok: true }
+  const withG = (g) => ({ ...summ(28, 18, 10, 1), responseTimeStats: { totalLids: 250, respondedCount: 152, noResponseCount: 98, medianMinutes: 40, buckets: { '0-15m': 60, '15m-1h': 40, '1h-4h': 52 } }, leadGroups: g, crmRepRows: [{ objections: 'מגזר ערבי, Price' }, { objections: 'Price' }] })
+  const mg = build({ project: 'HI PARK', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: withG(lg) }], prevRows: [{ source: 'crm', summary: withG({ ...lg, waiting: 3, documented: 150 }) }] })
+  const hg = render(mg)
+  eq('pdf: three handling groups with counts', [hg.includes('טופלו ומתועדים'), hg.includes('סווגו ללא תיעוד שיחה'), hg.includes('ממתינים לטיפול'), /<div class="kv">83/.test(hg), hg.includes('7 לידים חוזרים')], [true, true, true, true, true])
+  eq('pdf: method line under the numbers', [hg.includes('שיחה שלא תועדה לא נספרת'), hg.includes('נמדד מכניסת הליד')], [true, true])
+  eq('pdf: review objection not shown by name, others are', [hg.includes('מגזר ערבי'), hg.includes('מחיר')], [false, true])
+  eq('pdf with groups: no forbidden phrases', findForbidden(hg), [])
+  let threw = ''
+  try { render(build({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: withG({ ...lg, ok: false }) }], prevRows: [] })) } catch (e) { threw = e.message }
+  eq('pdf: groups that do not add up → no report', threw.startsWith('LEAD_GROUPS_MISMATCH'), true)
+  const ig = analysisInput(mg).leadHandling
+  eq('ai input: groups, method, no answered/notAnswered/rep', [ig.waitingForHandling, ig.classifiedWithoutCallRecord, ig.excludedRepeatLeads, !!ig.method, 'notAnswered' in ig, 'notAnsweredByRep' in ig, ig.previousGroups.waitingForHandling], [1, 83, 7, true, false, false, 3])
   const inp = analysisInput(m)
   eq('ai input: cancellations reach the analysis', [inp.meetings.cancelled, inp.meetings.upcoming, inp.meetings.previous.cancelled], [10, 1, 6])
   const z = build({ project: 'z', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: { crmType: 'zoho', totalLeads: 5 } }], prevRows: [] })

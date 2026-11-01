@@ -37,6 +37,20 @@ const codeOf = async (reply, opts) => { try { await runAnalysis(input, opts || {
 eq('refusal → REFUSED', await codeOf({ stop_reason: 'refusal', content: [] }), 'REFUSED')
 eq('cut off → TRUNCATED', await codeOf({ stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"head' }] }), 'TRUNCATED')
 eq('not JSON → BAD_OUTPUT', await codeOf({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'שלום' }] }), 'BAD_OUTPUT')
+// ש.ברוך, 1.11: ביטוי אסור → ניסיון נוסף אחד; שוב אסור → WORDING ולא נשמר
+{
+  const { forbiddenInResult } = await import('../../lib/ai-analysis.js')
+  const badAns = { ...answer, clientMessage: { ...answer.clientMessage, onYou: ['לחזור ל-110 לידים שלא קיבלו מענה'] } }
+  eq('wording: forbidden phrase found anywhere in the result', [forbiddenInResult(badAns), forbiddenInResult(answer)], [['לא קיבלו מענה'], []])
+  const reply = (a) => ({ model: AI_MODEL, stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(a) }], usage: { input_tokens: 10000, output_tokens: 3000 } })
+  const seq = (...replies) => { let i = 0; const reqs = []; return { reqs, beta: { messages: { create: async (req) => { reqs.push(req); return replies[Math.min(i++, replies.length - 1)] } } } } }
+  const fix = seq(reply(badAns), reply(answer))
+  const fixed = await runAnalysis(input, { client: fix })
+  eq('wording: one retry with a note, fixed result kept, both calls billed', [fix.reqs.length, fix.reqs[1].messages[0].content.includes('ביטויים אסורים'), forbiddenInResult(fixed.result).length, fixed.usage.costUsd], [2, true, 0, 0.2])
+  eq('wording: still forbidden after retry → WORDING', await codeOf(null, { client: seq(reply(badAns)) }), 'WORDING')
+  eq('prompt lists the forbidden phrases', [/לא קיבלו מענה/.test(fix.reqs[0].system), /ממתינים לטיפול/.test(fix.reqs[0].system)], [true, true])
+}
+
 const keep = process.env.ANTHROPIC_API_KEY; delete process.env.ANTHROPIC_API_KEY
 eq('no API key → NO_KEY (no call made)', await codeOf(null, {}), 'NO_KEY')
 if (keep) process.env.ANTHROPIC_API_KEY = keep
