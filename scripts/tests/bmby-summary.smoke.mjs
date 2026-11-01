@@ -45,7 +45,7 @@ eq('adBreakdown node for AD 1 has adId', R.adBreakdown.find(a => a.ad === 'AD 1'
 eq('not skipped (short range)', R._skippedBroken, false)
 // v34 (ענף redesign): responseTimeStats.noResponseBySource/ByUser. הקבוע עלה ב-lib/crm/schema-version.js
 // ולא כאן, ולכן הבדיקה נכשלה עוד לפני המיזוג של main. להעלות כאן בכל bump של CRM_SCHEMA_VERSION.
-eq('schema version exported', CRM_SCHEMA_VERSION, 34)
+eq('schema version exported', CRM_SCHEMA_VERSION, 35)
 for (const k of ['hourlyApptStats', 'hourlyLeadStats', 'hourlyContactStats', 'hourlyContactMeeting', 'noAnswerContactHour']) eq(`${k} has 24 buckets`, R[k].length, 24)
 eq('dayOfWeekStats has 7 days', Object.keys(R.dayOfWeekStats).length, 7)
 eq('meetingDayOfWeek has 7 days', Object.keys(R.meetingDayOfWeek).length, 7)
@@ -75,6 +75,29 @@ eq('deterministic output', JSON.stringify(R.totals) + JSON.stringify(R.namedLead
   eq('adNames fills ad/adset/campaign by id', [a901?.ad, a901?.adset, a901?.campaign, a901?.leads], ['מודעה א', 'סדרה א', 'קמפיין א', 2])
   eq('id not in adNames stays nameless, own node', named.filter(a => a.adId === '902').map(a => [a.ad, a.leads]), [['', 1]])
   eq('BMBY ad name wins over adNames', named.find(a => a.adId === '903')?.ad, 'שם מ-BMBY')
+}
+
+// ONCE, 1.11: סיכום שיחה בתוך משימת ה-LID = קיבל מענה; טקסט אוטומטי של BMBY = לא
+{
+  const { lidHasRepNote } = await import('../../lib/crm/bmby-summary.js')
+  eq('lid note: rep text yes, BMBY auto text no', [
+    lidHasRepNote({ message: 'מחיר לא רלוונטי' }), lidHasRepNote({ message: 'אין מענה נשלחה הודעה' }),
+    lidHasRepNote({ message: 'To Contact' }), lidHasRepNote({ message: '' }), lidHasRepNote({ message: 'ליד טלפוני - 0501234567' }),
+    lidHasRepNote({ message: '&#1504;&#1488; &#1500;&#1497;&#1510;&#1493;&#1512; &#1511;&#1513;&#1512;.' }), lidHasRepNote({ message: '&#1504;&#1508;&#1514;&#1495; &#1497;&#1491;&#1504;&#1497;.' }),
+  ], [true, true, false, false, false, false, false])
+  const cl = [{ client_id: '1', user_id: '7', user_name: 'נציג א', _cf: {} }, { client_id: '2', user_id: '7', user_name: 'נציג א', _cf: {} }, { client_id: '3', user_id: '7', user_name: 'נציג א', _cf: {} }]
+  const tk = [
+    { client_id: '1', type: 'lid', media_title: 'פייסבוק', create_date: '2026-09-10 09:00:00', start_date: '2026-09-10 09:00:00', message: 'מחיר לא רלוונטי', update_date: '2026-09-10 10:30:00', update_user_id: '7' },
+    { client_id: '2', type: 'lid', media_title: 'פייסבוק', create_date: '2026-09-11 09:00:00', start_date: '2026-09-11 09:00:00', message: 'To Contact', update_date: '2026-09-11 09:05:00' },
+    { client_id: '3', type: 'lid', media_title: 'פייסבוק', create_date: '2026-09-12 09:00:00', start_date: '2026-09-12 09:00:00', message: 'שיחה', update_date: '2026-09-12 12:00:00' },
+    { client_id: '3', type: 'call', subject: 'שיחה', create_date: '2026-09-12 09:20:00', user_id: '7' },
+  ]
+  const r = computeBmbySummary({ clients: cl, tasks: tk, prices: [], contracts: [] }, { since: '2026-09-08', until: '2026-09-15', monthKey: 'x', now }).responseTimeStats
+  eq('lid note counts as answered; auto text does not; a real follow-up still wins', [r.respondedCount, r.noResponseCount, r.avgMinutes], [2, 1, 55])
+  // מ-crm_compact שעוד בלי update_date: נענה, בלי זמן (לא נכנס לממוצע)
+  const tk2 = tk.map(t => ({ ...t, update_date: undefined }))
+  const r2 = computeBmbySummary({ clients: cl, tasks: tk2, prices: [], contracts: [] }, { since: '2026-09-08', until: '2026-09-15', monthKey: 'x', now }).responseTimeStats
+  eq('lid note without update_date: answered, untimed', [r2.respondedCount, r2.noResponseCount, r2.avgMinutes, r2.medianMinutes], [2, 1, 20, 20])
 }
 
 if (process.exitCode) { console.error('\nבדיקת העשן נכשלה'); } else { console.log('\n✓ בדיקת העשן עברה') }
