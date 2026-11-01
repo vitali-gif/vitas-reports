@@ -104,6 +104,7 @@ import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle
 // צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
+import { ClientAccessModal, AccessCredsModal } from '../components/admin/ClientAccessModal'
 import AiAnalysisModal from '../components/ai/AiAnalysisModal'
 import DashboardValueTab from '../components/value/DashboardValueTab'
 import { ProBadge, MeetingsProLock } from '../components/ProGate'
@@ -315,7 +316,6 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // מייל שכבר יש לו גישה: ברירת המחדל היא לעדכן היקף בלי לאפס סיסמה. איפוס ושליחת
   // סיסמה חדשה רק אם האדמין מסמן זאת במפורש (למקרה שהלקוח איבד את הסיסמה).
   const [caResendPassword, setCaResendPassword] = useState(false)
-  const [expandedAccess, setExpandedAccess] = useState(new Set())  // אילו שורות פתוחות ברשימה
   const [caLabel, setCaLabel] = useState('')
   const [caSaving, setCaSaving] = useState(false)
   const [vitasTasks, setVitasTasks] = useState([])
@@ -520,6 +520,19 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       return;
     }
     if (session) loadClients();
+  }, [session, isClientView]); // eslint-disable-line
+
+  // מסך הניהול רק לאדמין (1.11): מי שמחובר כלקוח — למשל אחרי שפתח בדפדפן הזה קישור הזמנה של
+  // לקוח — מועבר ל-/client במקום לראות מסך ניהול ריק. הנתונים מוגנים בשרת בכל מקרה.
+  const [notAdmin, setNotAdmin] = useState(false);
+  useEffect(() => {
+    if (isClientView || !session) return;
+    let off = false;
+    apiFetch('/api/auth/me', { headers: {} })
+      .then(r => (r.ok ? r.json() : null))
+      .then(me => { if (!off && me && me.admin === false) { setNotAdmin(true); setTimeout(() => window.location.replace('/client'), 1800); } })
+      .catch(() => {});
+    return () => { off = true; };
   }, [session, isClientView]); // eslint-disable-line
 
   const handleAuth = async (e) => {
@@ -7160,6 +7173,14 @@ const selectProject = async (client, project) => {
 
   if (loading && !isClientView) return <div className="loading-page"><BrandLoader hint={'\u05d8\u05d5\u05e2\u05df \u05d0\u05ea \u05d4\u05d3\u05e9\u05d1\u05d5\u05e8\u05d3\u2026'} /></div>;
 
+  if (notAdmin && !isClientView) {
+    return (
+      <div className="loading-page">
+        <BrandLoader hint="המשתמש המחובר בדפדפן הזה אינו אדמין. עוברים למסך הלקוח…" />
+      </div>
+    );
+  }
+
   if (!session && !isClientView) {
     return (
       <div className="login-container">
@@ -7391,229 +7412,26 @@ const selectProject = async (client, project) => {
       <div className={`modal-overlay ${showAddProject ? 'active' : ''}`} onClick={e => { if (e.target === e.currentTarget) setShowAddProject(false); }}><div className="modal"><h3>{'\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05dc-'}{selectedClient?.name}</h3><div className="form-group"><label>{'\u05e9\u05dd \u05e4\u05e8\u05d5\u05d9\u05e7\u05d8'}</label><input className="form-input" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder={'\u05dc\u05d3\u05d5\u05d2\u05de\u05d4: HI PARK'} /></div><div className="modal-actions"><button className="btn btn-primary" onClick={addProject}>{'\u05d4\u05d5\u05e1\u05e3'}</button><button className="btn btn-outline" onClick={() => setShowAddProject(false)}>{'\u05d1\u05d9\u05d8\u05d5\u05dc'}</button></div></div></div>
 
       {showClientAccess && (
-        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setShowClientAccess(false); }}>
-          <div className="modal" style={{maxWidth:560,width:'100%',direction:'rtl',maxHeight:'80vh',overflow:'auto'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700}}>👥 ניהול גישת לקוחות</h3>
-              <button onClick={() => setShowClientAccess(false)} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'#64748b'}}>&times;</button>
-            </div>
-            <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:16,lineHeight:1.6}}>
-              הוסף מייל של איש קשר וסמן <strong>אילו פרויקטים</strong> הוא יראה — אפשר כמה לקוחות בבת אחת.
-              הוא יקבל מייל אחד עם קישור כניסה חד-פעמי ויבחר סיסמה בעצמו. לא נשלחת סיסמה במייל.
-              לעריכת גישה קיימת — לחץ על תגית הפרויקטים בטבלה.
-            </p>
-
-            {/* Add form */}
-            <div style={{background:'var(--surface)',borderRadius:12,padding:'16px',marginBottom:20,display:'flex',flexDirection:'column',gap:10}}>
-              <div>
-                <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',display:'block',marginBottom:4}}>מייל איש קשר</label>
-                <input className="form-input" type="email" value={caEmail} onChange={e => onAccessEmailChange(e.target.value)}
-                  placeholder="client@example.com" style={{direction:'ltr',textAlign:'left'}} />
-              </div>
-
-              {/* פרויקטים מקובצים לפי לקוח — מסמנים כמה לקוחות שרוצים, שמירה אחת, מייל אחד */}
-              {(() => {
-                const groups = clients.filter(cl => (cl.projects || []).length)
-                const allIds = groups.flatMap(cl => cl.projects.map(p => p.id))
-                const allOn = allIds.length > 0 && allIds.every(id => caProjectIds.includes(id))
-                return (
-                  <div>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                      <label style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>
-                        פרויקטים ({caProjectIds.length}/{allIds.length}) — לפי לקוח
-                      </label>
-                      <button type="button"
-                        onClick={() => setCaProjectIds(allOn ? [] : allIds)}
-                        style={{background:'none',border:'none',cursor:'pointer',color:'var(--indigo)',fontSize:12,fontWeight:600,padding:0}}>
-                        {allOn ? 'נקה הכל' : 'בחר הכל'}
-                      </button>
-                    </div>
-                    {groups.map(cl => {
-                      const ids = cl.projects.map(p => p.id)
-                      const n = ids.filter(id => caProjectIds.includes(id)).length
-                      const all = n === ids.length
-                      return (
-                        <div key={cl.id} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:6,padding:'7px 0',borderTop:'1px solid var(--divider)'}}>
-                          <button type="button" title={all ? 'נקה את כל הפרויקטים של הלקוח' : 'סמן את כל הפרויקטים של הלקוח'}
-                            onClick={() => setCaProjectIds(prev => all ? prev.filter(id => !ids.includes(id)) : Array.from(new Set([...prev, ...ids])))}
-                            style={{minWidth:130,textAlign:'right',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',
-                              fontSize:12.5,fontWeight:700,padding:'2px 0',color: n ? 'var(--indigo)' : 'var(--text)'}}>
-                            <span style={{display:'inline-block',width:16}}>{all ? '☑' : n ? '◪' : '☐'}</span> {cl.name}
-                          </button>
-                          {cl.projects.map(pr => {
-                            const on = caProjectIds.includes(pr.id)
-                            return (
-                              <button key={pr.id} type="button" onClick={() => toggleAccessProject(pr.id)}
-                                style={{display:'inline-flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:20,
-                                  cursor:'pointer',fontSize:12,fontWeight:on?700:500,fontFamily:'inherit',
-                                  border:'1.5px solid ' + (on ? 'var(--indigo)' : 'var(--border)'),
-                                  background: on ? 'var(--indigo-50,rgba(91,94,244,0.08))' : 'transparent',
-                                  color: on ? 'var(--indigo)' : 'var(--text-secondary)'}}>
-                                <span style={{fontSize:11}}>{on ? '✓' : '＋'}</span>{pr.name}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
-
-              {caEmailExists && (
-                <div style={{display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',borderRadius:10,
-                  background:'rgba(245,158,11,0.10)',border:'1px solid rgba(245,158,11,0.35)',fontSize:12.5,lineHeight:1.5}}>
-                  <span style={{color:'#B45309',fontWeight:600}}>למייל הזה כבר יש גישה (הסימון למעלה משקף אותה). שמירה תעדכן את הפרויקטים אצל הלקוחות שסומנו, בלי לשלוח מייל.</span>
-                  <label style={{display:'inline-flex',alignItems:'center',gap:6,cursor:'pointer',color:'var(--text-secondary)'}}>
-                    <input type="checkbox" checked={caResendPassword} onChange={e => setCaResendPassword(e.target.checked)} style={{margin:0}} />
-                    לשלוח קישור כניסה חדש במייל (הלקוח לא מצא את המייל / שכח סיסמה). הסיסמה הקיימת לא משתנה.
-                  </label>
-                </div>
-              )}
-
-              <button className="btn btn-primary" onClick={addClientAccess}
-                disabled={caSaving || !caEmail || caProjectIds.length === 0}
-                style={{alignSelf:'flex-end',padding:'8px 20px'}}>
-                {caSaving ? 'שומר...'
-                  : caEmailExists && !caResendPassword ? `עדכן גישה בלי מייל${caProjectIds.length ? ` (${caProjectIds.length})` : ''}`
-                  : `+ הוסף גישה ושלח קישור אחד${caProjectIds.length ? ` (${caProjectIds.length})` : ''}`}
-              </button>
-            </div>
-
-            {/* List — grouped by email + client */}
-            {(() => {
-              // Group rows: email → clientId → rows[]
-              const groups = {}
-              clientAccessList.forEach(ca => {
-                const cid = ca.projects?.client_id || 'unknown'
-                const key = ca.email + '|||' + cid
-                if (!groups[key]) groups[key] = { email: ca.email, clientId: cid, clientName: ca.projects?.clients?.name || '—', rows: [] }
-                groups[key].rows.push(ca)
-              })
-              const entries = Object.values(groups)
-              if (!entries.length) return <div style={{textAlign:'center',padding:'24px 0',color:'var(--text-secondary)',fontSize:13}}>אין גישות מוגדרות עדיין</div>
-              return (
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                  <thead>
-                    <tr style={{borderBottom:'1px solid var(--border)'}}>
-                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>מייל</th>
-                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>לקוח</th>
-                      <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>פרויקטים</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map(g => {
-                      const gKey = g.email + '|||' + g.clientId
-                      const isOpen = expandedAccess.has(gKey)
-                      const toggle = () => setExpandedAccess(prev => {
-                        const n = new Set(prev)
-                        if (n.has(gKey)) n.delete(gKey); else n.add(gKey)
-                        return n
-                      })
-                      const totalProjects = (clients.find(c => c.id === g.clientId)?.projects || []).length
-                      const partial = totalProjects > 0 && g.rows.length < totalProjects
-                      return (
-                        <Fragment key={gKey}>
-                          <tr style={{borderBottom: isOpen ? 'none' : '1px solid var(--surface)'}}>
-                            <td style={{padding:'10px',direction:'ltr',textAlign:'left',fontFamily:'monospace',fontSize:12}}>{g.email}</td>
-                            <td style={{padding:'10px',fontWeight:700,color:'var(--text)'}}>{g.clientName}</td>
-                            <td style={{padding:'10px'}}>
-                              <button onClick={toggle} title="הצג/הסתר פרויקטים"
-                                style={{display:'inline-flex',alignItems:'center',gap:5,cursor:'pointer',fontFamily:'inherit',
-                                  background: partial ? 'rgba(245,158,11,0.12)' : 'var(--indigo-50,rgba(91,94,244,0.08))',
-                                  color: partial ? '#B45309' : 'var(--indigo)',
-                                  border:'none',borderRadius:20,padding:'4px 11px',fontSize:12,fontWeight:600}}>
-                                <span style={{fontSize:9,transform: isOpen ? 'rotate(90deg)' : 'none',display:'inline-block',transition:'transform .15s'}}>▶</span>
-                                {totalProjects ? `${g.rows.length}/${totalProjects}` : g.rows.length} פרויקטים
-                              </button>
-                            </td>
-                            <td style={{padding:'10px',textAlign:'center'}}>
-                              <button onClick={() => deleteClientAccess(g.email, g.clientId)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:16,padding:'2px 6px'}} title="מחק את כל הגישות של הלקוח הזה">🗑</button>
-                            </td>
-                          </tr>
-                          {isOpen && (
-                            <tr style={{borderBottom:'1px solid var(--surface)'}}>
-                              <td colSpan={4} style={{padding:'0 10px 12px'}}>
-                                <div style={{background:'var(--surface)',borderRadius:10,padding:'8px 10px',display:'flex',flexDirection:'column',gap:2}}>
-                                  {g.rows.map(row => (
-                                    <div key={row.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 4px',fontSize:12.5}}>
-                                      <span style={{fontWeight:600}}>{row.projects?.name || '—'}</span>
-                                      <button onClick={() => deleteAccessRow(row)} title="הסר גישה לפרויקט זה"
-                                        style={{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:12,fontWeight:600,fontFamily:'inherit',padding:'2px 6px'}}>
-                                        הסר
-                                      </button>
-                                    </div>
-                                  ))}
-                                  {partial && (() => {
-                                    const granted = new Set(g.rows.map(r => r.project_id))
-                                    const missing = (clients.find(c => c.id === g.clientId)?.projects || []).filter(p => !granted.has(p.id))
-                                    return (
-                                      <div style={{marginTop:6,paddingTop:8,borderTop:'1px solid var(--border)'}}>
-                                        <div style={{fontSize:11.5,color:'var(--text-secondary)',marginBottom:6}}>ללא גישה:</div>
-                                        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                                          {missing.map(p => (
-                                            <button key={p.id} onClick={() => grantAccessProject(g.email, g.clientId, g.rows, p.id)}
-                                              title="הוסף גישה לפרויקט זה (לא נשלח מייל ללקוח)"
-                                              style={{display:'inline-flex',alignItems:'center',gap:5,padding:'5px 11px',borderRadius:20,
-                                                cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit',
-                                                border:'1.5px dashed var(--border)',background:'transparent',color:'var(--text-secondary)'}}>
-                                              ＋ {p.name}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )
-                                  })()}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </Fragment>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              )
-            })()}
-
-            {/* ── מנויי PRO ─────────────────────────────────────────────────
-                המנוי יושב על הלקוח, ולכן הוא חל על כל הפרויקטים שלו. השינוי כאן
-                נכנס לתוקף מיד — גם בשרת, שקורא את אותה עמודה בכל בקשה. */}
-            <div style={{marginTop:24,paddingTop:18,borderTop:'1px solid var(--border)'}}>
-              <h4 style={{margin:'0 0 4px',fontSize:14,fontWeight:700}}>מנויי PRO</h4>
-              <p style={{margin:'0 0 12px',fontSize:12,color:'var(--text-secondary)',lineHeight:1.6}}>
-                מנוי PRO פותח את טאב <strong>ישיבות שיווק</strong> בצד הלקוח. המנוי חל על כל הפרויקטים של הלקוח.
-                לקוח ללא מנוי רואה את הכפתור עם תגית PRO, ובלחיצה מגיע למסך שדרוג.
-              </p>
-              <div style={{display:'flex',flexDirection:'column',gap:2}}>
-                {clients.map(cl => {
-                  const isPro = cl.plan === 'pro'
-                  return (
-                    <div key={cl.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'8px 4px',borderTop:'1px solid var(--divider)'}}>
-                      <span style={{fontSize:13,fontWeight:600,display:'inline-flex',alignItems:'center'}}>
-                        {cl.name}{isPro && <ProBadge />}
-                      </span>
-                      <button type="button" onClick={() => setClientPlan(cl.id, isPro ? 'basic' : 'pro')}
-                        title={isPro ? 'הורדת הלקוח חזרה ל-Basic' : 'שדרוג הלקוח ל-PRO'}
-                        style={{cursor:'pointer',fontFamily:'inherit',fontSize:12,fontWeight:700,padding:'5px 14px',borderRadius:20,
-                          border:'1.5px solid ' + (isPro ? 'var(--border)' : 'var(--indigo)'),
-                          background:'transparent',
-                          color: isPro ? 'var(--text-secondary)' : 'var(--indigo)'}}>
-                        {isPro ? 'הורדה ל-Basic' : 'שדרוג ל-PRO'}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div style={{marginTop:20,padding:'12px',background:'#eff6ff',borderRadius:8,fontSize:12,color:'#1e40af',lineHeight:1.6}}>
-              <strong>קישור לדאשבורד לקוח:</strong>{' '}
-              <span style={{direction:'ltr',display:'inline-block'}}>{typeof window !== 'undefined' ? window.location.origin : ''}/client</span>
-            </div>
-          </div>
-        </div>
+        <ClientAccessModal
+          clients={clients}
+          accessList={clientAccessList}
+          email={caEmail}
+          onEmailChange={onAccessEmailChange}
+          projectIds={caProjectIds}
+          setProjectIds={setCaProjectIds}
+          onToggleProject={toggleAccessProject}
+          emailExists={caEmailExists}
+          resendPassword={caResendPassword}
+          setResendPassword={setCaResendPassword}
+          saving={caSaving}
+          onSave={addClientAccess}
+          onDeleteClient={deleteClientAccess}
+          onRemoveRow={deleteAccessRow}
+          onGrantProject={grantAccessProject}
+          onSetPlan={setClientPlan}
+          loginUrl={(typeof window !== 'undefined' ? window.location.origin : '') + '/client'}
+          onClose={() => setShowClientAccess(false)}
+        />
       )}
 
       {/* ── Session Logs Modal ── */}
@@ -7702,33 +7520,9 @@ const selectProject = async (client, project) => {
         </div>
       )}
 
-      {accessCreds && (() => {
-        const _wa = `שלום 👋\nנוצרה עבורך גישה לדשבורד${accessCreds.clientName ? ' של ' + accessCreds.clientName : ''}.\n\nשם משתמש: ${accessCreds.email}\nלכניסה ראשונה ובחירת סיסמה (קישור חד-פעמי):\n${accessCreds.inviteLink}\n\nכניסות הבאות: ${accessCreds.loginUrl}`
-        return (
-        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setAccessCreds(null); }} style={{zIndex:9999}}>
-          <div className="modal" style={{maxWidth:440,direction:'rtl'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-              <h3 style={{margin:0,fontSize:16,fontWeight:700}}>פרטי גישה{accessCreds.clientName ? ' — ' + accessCreds.clientName : ''}</h3>
-              <button onClick={() => setAccessCreds(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
-            </div>
-            <div style={{fontSize:12,color: accessCreds.emailSent ? '#059669' : '#b45309',marginBottom:14}}>{accessCreds.emailSent ? '✓ נשלח במייל קישור כניסה חד-פעמי (הלקוח בוחר סיסמה בעצמו)' : '⚠️ המייל לא נשלח — שלח את הקישור ידנית (וואטסאפ). הקישור לשימוש חד-פעמי.'}</div>
-            <div style={{background:'#f8fafc',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',marginBottom:14}}>
-              <table style={{width:'100%',fontSize:14}}>
-                <tbody>
-                  <tr><td style={{color:'#64748b',padding:'4px 0'}}>כתובת</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{accessCreds.loginUrl}</td></tr>
-                  <tr><td style={{color:'#64748b',padding:'4px 0'}}>אימייל</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{accessCreds.email}</td></tr>
-                  <tr><td style={{color:'#64748b',padding:'4px 0',verticalAlign:'top'}}>קישור כניסה</td><td style={{fontSize:11,direction:'ltr',textAlign:'right',wordBreak:'break-all',color:'var(--text-2,#475569)'}}>{accessCreds.inviteLink}</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div style={{display:'flex',gap:8}}>
-              <button onClick={() => { navigator.clipboard?.writeText(_wa).catch(()=>{}); showToast('✓ הודעת וואטסאפ הועתקה'); }} style={{flex:1,background:'#25D366',color:'#fff',border:'none',borderRadius:8,padding:'10px',fontSize:14,fontWeight:600,cursor:'pointer'}}>העתק הודעת וואטסאפ</button>
-              <button onClick={() => { navigator.clipboard?.writeText(accessCreds.inviteLink).catch(()=>{}); showToast('✓ הקישור הועתק'); }} style={{background:'#fff',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px',fontSize:14,cursor:'pointer'}}>העתק קישור</button>
-            </div>
-          </div>
-        </div>
-        )
-      })()}
+      {accessCreds && (
+        <AccessCredsModal creds={accessCreds} onClose={() => setAccessCreds(null)} onCopied={(m) => showToast('✓ ' + m)} />
+      )}
 
       {objModal && (
         <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setObjModal(null); }} style={{zIndex:9999}}>

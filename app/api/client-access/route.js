@@ -61,31 +61,31 @@ async function sendInviteEmail(toEmail, link, clientName) {
 <!DOCTYPE html>
 <html dir="rtl" lang="he">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#F5F7FB;font-family:'Heebo',Arial,sans-serif;direction:rtl">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F7FB;padding:40px 16px">
+<body style="margin:0;padding:0;background:#F5F7FC;font-family:'Heebo',Arial,sans-serif;direction:rtl">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F7FC;padding:24px 10px">
 <tr><td align="center">
-<table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(11,15,30,0.08)">
-<tr><td style="background:#14243C;padding:28px 36px;text-align:right">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(11,15,30,0.08)">
+<tr><td style="background:#14243C;padding:24px 24px;text-align:right">
   <span style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.03em">cluzo</span>
   <span style="color:#7191FF;font-size:14px;font-weight:700"> by Vitas</span>
 </td></tr>
-<tr><td style="padding:36px 36px 28px">
-  <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#0B0F1E">הוזמנת לצפות בדוח הפרויקט</h1>
-  <p style="margin:0 0 20px;font-size:15px;color:#5E6478;line-height:1.6">
-    ${clientName ? `ניתנה לך גישה לדוח הביצועים של <strong style="color:#0B0F1E">${escapeHtml(clientName)}</strong>.` : 'ניתנה לך גישה לדוח הביצועים.'}<br>
-    שם המשתמש שלך הוא כתובת המייל הזו: <strong style="color:#0B0F1E;direction:ltr;unicode-bidi:isolate">${escapeHtml(toEmail)}</strong>
+<tr><td style="padding:28px 24px 24px">
+  <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#14243C">הוזמנת לצפות בדוח הפרויקט</h1>
+  <p style="margin:0 0 20px;font-size:15px;color:#52627A;line-height:1.6">
+    ${clientName ? `ניתנה לך גישה לדוח הביצועים של <strong style="color:#14243C">${escapeHtml(clientName)}</strong>.` : 'ניתנה לך גישה לדוח הביצועים.'}<br>
+    שם המשתמש שלך הוא כתובת המייל הזו: <strong style="color:#14243C;direction:ltr;unicode-bidi:isolate">${escapeHtml(toEmail)}</strong>
   </p>
   <div style="text-align:center;margin:24px 0">
-    <a href="${link}" style="display:inline-block;background:#5B5EF4;color:#fff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:10px;box-shadow:0 6px 20px rgba(91,94,244,0.35)">כניסה וקביעת סיסמה &rarr;</a>
+    <a href="${link}" style="display:inline-block;background:#315CF5;color:#fff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:10px;box-shadow:0 6px 20px rgba(91,94,244,0.35)">כניסה וקביעת סיסמה &rarr;</a>
   </div>
-  <p style="margin:0;font-size:13px;color:#5E6478;line-height:1.7">
+  <p style="margin:0;font-size:13px;color:#52627A;line-height:1.7">
     הקישור לשימוש חד-פעמי. בלחיצה תיכנס לדוח ותתבקש לבחור סיסמה משלך לכניסות הבאות.<br>
-    אם הקישור פג תוקף — במסך הכניסה ב-<a href="${siteUrl}/client" style="color:#5B5EF4">${siteUrl}/client</a> לוחצים "שלחו לי קישור כניסה".
+    אם הקישור פג תוקף — במסך הכניסה ב-<a href="${siteUrl}/client" style="color:#315CF5">${siteUrl}/client</a> לוחצים "שלחו לי קישור כניסה".
   </p>
-  <p style="margin:18px 0 0;font-size:12px;color:#98A0B2;line-height:1.6;text-align:center">אם לא ביקשת גישה — ניתן להתעלם ממייל זה.</p>
+  <p style="margin:18px 0 0;font-size:12px;color:#64748B;line-height:1.6;text-align:center">אם לא ביקשת גישה — ניתן להתעלם ממייל זה.</p>
 </td></tr>
-<tr><td style="background:#F5F7FB;padding:18px 36px;border-top:1px solid #DDE2EC">
-  <p style="margin:0;font-size:11px;color:#98A0B2;text-align:center">VITAS Digital Marketing &bull; vitas.co.il</p>
+<tr><td style="background:#F5F7FC;padding:16px 24px;border-top:1px solid #DCE3EF">
+  <p style="margin:0;font-size:11px;color:#64748B;text-align:center">VITAS Digital Marketing &bull; vitas.co.il</p>
 </td></tr>
 </table>
 </td></tr>
