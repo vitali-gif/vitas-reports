@@ -314,3 +314,103 @@ th:hover .sort-ind { opacity: .8; }
 .vr-ui .vrt-root .vrt-patterns > .vrt-wide .section-head .sub { display: block; max-inline-size: 760px; }
 /* תיבת "איך לקרוא" מתחת לכותרת הגרף, לפני הגרף */
 .vr-ui .vrt-root .vrt-chart-note { margin: 0 0 14px; }
+
+/* ── 20. ניהול גישת לקוחות + פרטי גישה (1.11) ─────────────────────────────────────
+   ויטלי: "במובייל לא רואים לאילו פרויקטים יש לחשבון גישה". כרטיס לכל מייל עם הפרויקטים
+   כתגיות, במקום טבלה שנחתכה. בטלפון: גיליון שעולה מלמטה, כותרת דביקה, כפתורים ברוחב מלא.
+   רכיב: app/components/admin/ClientAccessModal.jsx */
+.modal.cza-sheet {
+  max-width: 600px; width: 100%; max-height: 88vh; overflow: auto; padding: 0;
+  border-radius: 20px; background: var(--tv-surface); color: var(--tv-text);
+  box-shadow: 0 24px 60px -20px rgba(20, 36, 60, .35); direction: rtl;
+}
+.modal.cza-sheet.cza-creds { max-width: 460px; }
+.cza-head {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: flex-start; gap: 12px;
+  padding: 20px 22px 16px; background: var(--tv-surface); border-bottom: 1px solid var(--tv-divider);
+}
+.cza-ico { flex: none; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--tv-brand-soft); color: var(--tv-brand); }
+.cza-head-text { flex: 1; min-width: 0; }
+.modal.cza-sheet h3 { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -.01em; color: var(--tv-text); }
+.cza-head-text p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--tv-text-secondary); }
+.cza-x { flex: none; width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: var(--tv-text-muted); cursor: pointer; display: grid; place-items: center; }
+.cza-x:hover { background: var(--tv-canvas); color: var(--tv-text); }
+.cza-card, .cza-list, .cza-sheet > .cza-status, .cza-sheet > .cza-creds-list, .cza-sheet > .cza-sub, .cza-sheet > .cza-actions { margin: 16px 22px 0; }
+.cza-card { background: var(--tv-surface-subtle); border: 1px solid var(--tv-border); border-radius: 14px; padding: 16px; display: grid; gap: 12px; }
+.cza-label { font-size: 13px; font-weight: 600; color: var(--tv-text-secondary); }
+.cza-count { display: inline-block; margin-inline-start: 6px; font-size: 12px; font-weight: 700; color: var(--tv-brand); background: var(--tv-brand-soft); border-radius: 999px; padding: 0 8px; font-variant-numeric: tabular-nums; }
+.cza-input { width: 100%; font: 400 16px/1.4 inherit; font-family: inherit; color: var(--tv-text); background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: 10px; padding: 11px 13px; text-align: left; }
+.cza-input:focus { outline: none; border-color: var(--tv-brand); box-shadow: 0 0 0 3px var(--tv-brand-tint); }
+.cza-row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cza-link { background: none; border: 0; padding: 4px 0; cursor: pointer; font: 600 13px inherit; font-family: inherit; color: var(--tv-link); }
+.cza-clients { display: grid; gap: 2px; }
+.cza-client { padding: 10px 0; border-top: 1px solid var(--tv-divider); display: grid; gap: 8px; }
+.cza-client:first-child { border-top: 0; padding-top: 2px; }
+.cza-client-name { justify-self: start; display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 0; cursor: pointer; font: 700 14px inherit; font-family: inherit; color: var(--tv-text); }
+.cza-client-name.on { color: var(--tv-brand); }
+.cza-box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--tv-border); display: grid; place-items: center; background: var(--tv-surface); color: #fff; }
+.cza-box.full { background: var(--tv-brand); border-color: var(--tv-brand); }
+.cza-box.part { border-color: var(--tv-brand); background: linear-gradient(var(--tv-brand), var(--tv-brand)) center / 8px 2px no-repeat, var(--tv-surface); }
+.cza-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cza-chip { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 4px 11px; border-radius: 999px; cursor: pointer; font: 500 13px inherit; font-family: inherit;
+  border: 1px solid var(--tv-border); background: var(--tv-surface); color: var(--tv-text-secondary); }
+.cza-chip:hover { border-color: var(--tv-brand-line); color: var(--tv-text); }
+.cza-chip.on { border-color: var(--tv-brand-line); background: var(--tv-brand-soft); color: var(--tv-brand); font-weight: 700; }
+.cza-chip.static { cursor: default; padding-inline-end: 4px; }
+.cza-chip.add { border-style: dashed; }
+.cza-chip-x { width: 22px; height: 22px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer; background: transparent; color: var(--tv-brand); }
+.cza-chip-x:hover { background: var(--tv-danger-bg); color: var(--tv-danger-fg); }
+.cza-warn { background: var(--tv-warning-bg); border: 1px solid var(--tv-warning-border); color: var(--tv-warning-fg); border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.55; display: grid; gap: 8px; }
+.cza-check { display: flex; align-items: flex-start; gap: 8px; color: var(--tv-text-secondary); cursor: pointer; }
+.cza-check input { margin-top: 3px; }
+.cza-primary, .cza-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 18px; border-radius: 10px; cursor: pointer; font: 700 14.5px inherit; font-family: inherit; }
+.cza-primary { border: 0; background: var(--tv-brand); color: #fff; }
+.cza-primary:hover:not(:disabled) { background: var(--tv-brand-hover); }
+.cza-primary:disabled { background: var(--tv-disabled-bg); color: var(--tv-disabled-fg); cursor: not-allowed; }
+.cza-add .cza-primary { justify-self: end; }
+.cza-ghost { border: 1px solid var(--tv-border); background: var(--tv-surface); color: var(--tv-text); font-weight: 600; }
+.cza-ghost:hover { border-color: var(--tv-brand-line); }
+.cza-ghost.brand { color: var(--tv-brand); border-color: var(--tv-brand-line); }
+.cza-list h4 { margin: 8px 0 0; font-size: 15px; font-weight: 800; color: var(--tv-text); }
+.cza-sub { margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: var(--tv-text-secondary); }
+.cza-search { margin-top: 10px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--tv-border); border-radius: 10px; padding: 0 12px; color: var(--tv-text-muted); background: var(--tv-surface); }
+.cza-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: 400 15px inherit; font-family: inherit; padding: 10px 0; color: var(--tv-text); text-align: right; }
+.cza-empty { padding: 18px 0; text-align: center; font-size: 13.5px; color: var(--tv-text-secondary); }
+.cza-acc { margin-top: 10px; border: 1px solid var(--tv-border); border-radius: 14px; padding: 12px 14px; background: var(--tv-surface); }
+.cza-acc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--tv-divider); }
+.cza-acc-mail { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; color: var(--tv-text); }
+.cza-acc-n { font-size: 12px; font-weight: 700; color: var(--tv-text-secondary); background: var(--tv-canvas); border-radius: 999px; padding: 2px 9px; }
+.cza-acc-client { padding-top: 10px; display: grid; gap: 6px; }
+.cza-acc-cname { font-size: 13px; font-weight: 700; color: var(--tv-text-secondary); }
+.cza-icon-btn { width: 32px; height: 32px; border-radius: 8px; border: 0; background: transparent; display: grid; place-items: center; cursor: pointer; color: var(--tv-text-muted); }
+.cza-icon-btn.danger:hover { background: var(--tv-danger-bg); color: var(--tv-danger-fg); }
+.cza-plans { margin-top: 8px; display: grid; }
+.cza-plan { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid var(--tv-divider); }
+.cza-plan-name { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.cza-pro { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 800; color: #855000; background: var(--tv-warning-bg); border-radius: 999px; padding: 1px 8px; }
+.cza-plan .cza-ghost { min-height: 36px; padding: 6px 14px; font-size: 13px; }
+.cza-sheet > .cza-foot { margin: 18px 22px 22px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--tv-border); border-radius: 12px; font-size: 13.5px; color: var(--tv-text-secondary); background: var(--tv-surface); }
+.cza-sheet > .cza-foot .cz-note-label { font-size: 12px; }
+/* פרטי גישה */
+.cza-status { padding: 10px 12px; border-radius: 10px; font-size: 13.5px; line-height: 1.55; border: 1px solid; }
+.cza-status.ok { background: var(--tv-success-bg); border-color: var(--tv-success-border); color: var(--tv-success-fg); }
+.cza-status.warn { background: var(--tv-warning-bg); border-color: var(--tv-warning-border); color: var(--tv-warning-fg); }
+.cza-creds-list { display: grid; gap: 10px; border: 1px solid var(--tv-border); border-radius: 14px; padding: 14px; background: var(--tv-surface-subtle); }
+.cza-creds-list div { display: grid; gap: 2px; }
+.cza-creds-list dt { font-size: 12px; font-weight: 600; color: var(--tv-text-secondary); }
+.cza-creds-list dd { margin: 0; font-size: 14.5px; font-weight: 700; overflow-wrap: anywhere; text-align: left; color: var(--tv-text); }
+.cza-creds-list dd.cza-link-box { font-size: 12px; font-weight: 500; color: var(--tv-text-secondary); display: flex; gap: 6px; align-items: flex-start; }
+.cza-creds-list dd.cza-link-box svg { flex: none; margin-top: 2px; color: var(--tv-brand); }
+.cza-sheet > .cza-actions { display: flex; gap: 8px; margin-bottom: 22px; }
+.cza-actions .cza-primary { flex: 1; }
+.cza-primary.wa { background: #128C4B; }
+.cza-primary.wa:hover { background: #0E7A40; }
+@media (max-width: 640px) {
+  .modal-overlay:has(> .cza-sheet) { padding: 0; align-items: flex-end; }
+  .modal.cza-sheet { max-width: none; max-height: 92vh; border-radius: 20px 20px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .cza-head { padding: 16px 16px 12px; }
+  .cza-card, .cza-list, .cza-sheet > .cza-status, .cza-sheet > .cza-creds-list, .cza-sheet > .cza-sub, .cza-sheet > .cza-actions { margin-inline: 16px; }
+  .cza-sheet > .cza-foot { margin-inline: 16px; }
+  .cza-add .cza-primary { justify-self: stretch; }
+  .cza-sheet > .cza-actions { flex-direction: column; }
+}
