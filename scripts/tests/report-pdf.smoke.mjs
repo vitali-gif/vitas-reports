@@ -68,7 +68,7 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   // פיירברי: אותו מבנה + byStatus
   const fb = leadHandling({ crmType: 'fireberry', crm: { byStatus: { 'לא רלוונטי שפה': 130, 'לא רלוונטי': 112, 'אין מענה': 62, 'תואמה פגישה': 27 },
     responseTimeStats: { totalLids: 344, respondedCount: 222, noResponseCount: 122, business: { medianMinutes: 110, buckets: { '0-15m': 5, '15m-1h': 21 } } } } })
-  eq('fireberry: statuses sorted', fb.statuses.map(x => x.name).slice(0, 2), ['לא רלוונטי שפה', 'לא רלוונטי'])
+  eq('fireberry: statuses sorted, language status hidden from the client', fb.statuses.map(x => x.name).slice(0, 2), ['לא רלוונטי', 'אין מענה'])
   // זוהו: responseTime עם byAgent ו-8h-24h
   const z = leadHandling({ crmType: 'zoho', crm: { byStatus: { 'חדש': 435, 'אין מענה': 39 }, objections: { 'יקר לי': 25 },
     responseTime: { avgHours: 31.5, respondedWithin1h: 9, respondedCount: 255, noResponseCount: 800, buckets: { '8h-24h': 70, '3d+': 63 },
@@ -143,6 +143,35 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   const h = render(m)
   eq('pdf: cancellations shown under the funnel', [h.includes('מה קרה לפגישות'), /<b>10<\/b> בוטלו/.test(h), h.includes('עוד לפני מועדן')], [true, true, true])
   eq('pdf: no rep names for the client', [h.includes('גליה'), h.includes('לפי נציג')], [false, false])
+  const { findForbidden } = await import('../../lib/client-wording.js')
+  eq('pdf (old summary, no groups): no forbidden phrases', findForbidden(h), [])
+
+  // ש.ברוך, 1.11: שלוש קבוצות + חריגים + שורת שיטה; סכום שלא מתאים → אין דוח
+  const lg = { unit: 'client', total: 243, documented: 152, classifiedNoCall: 83, waiting: 1, repeat: 7, inWindow: 0, ok: true }
+  const withG = (g) => ({ ...summ(28, 18, 10, 1), responseTimeStats: { totalLids: 250, respondedCount: 152, noResponseCount: 98, medianMinutes: 40, buckets: { '0-15m': 60, '15m-1h': 40, '1h-4h': 52 } }, leadGroups: g, crmRepRows: [{ objections: 'מגזר ערבי, Price' }, { objections: 'Price' }] })
+  const mg = build({ project: 'HI PARK', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: withG(lg) }], prevRows: [{ source: 'crm', summary: withG({ ...lg, waiting: 3, documented: 150 }) }] })
+  const hg = render(mg)
+  eq('pdf: three handling groups with counts', [hg.includes('טופלו ומתועדים'), hg.includes('סווגו ללא תיעוד שיחה'), hg.includes('ממתינים לטיפול'), /<div class="kv">83/.test(hg), hg.includes('7 לידים חוזרים')], [true, true, true, true, true])
+  eq('pdf: method line under the numbers', [hg.includes('שיחה שלא תועדה לא נספרת'), hg.includes('נמדד מכניסת הליד')], [true, true])
+  eq('pdf: review objection not shown by name, others are', [hg.includes('מגזר ערבי'), hg.includes('מחיר')], [false, true])
+  eq('pdf with groups: no forbidden phrases', findForbidden(hg), [])
+  // אפשרות 2: ללקוח רק "X לידים סווגו כלא תואמים לקהל היעד", בלי "מגזר"; גם סטטוס "לא רלוונטי שפה" (פיירברי)
+  const mo = build({ project: 'HI PARK', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: withG({ ...lg, offTarget: 74, offTargetNoCall: 73 }) }], prevRows: [] })
+  const ho = render(mo)
+  eq('off-target: soft line under the funnel, no sector word', [ho.includes('74 לידים סווגו כלא תואמים לקהל היעד של הפרויקט'), /מגזר|שפה/.test(ho)], [true, false])
+  eq('ai input: off-target count only', analysisInput(mo).leadsNotMatchingTargetAudience, 74)
+  // השוואת צוות: לניתוח הפנימי, לא לדוח
+  const tm = build({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: { ...withG(lg), responseTimeStats: { totalLids: 20, respondedCount: 15, noResponseCount: 5, noResponseByUser: { 'דנה': 4, 'יוסי': 1 }, business: { medianMinutes: 30, buckets: { '0-15m': 15 }, byUser: { 'דנה': { count: 5, avgMinutes: 90, medianMinutes: 60 }, 'יוסי': { count: 10, avgMinutes: 20, medianMinutes: 12 } } } } } }], prevRows: [] })
+  const tc = analysisInput(tm).leadHandling.teamComparison
+  eq('team comparison reaches the AI, not the PDF', [tc.map(t => [t.person, t.leadsWithRecordedAction, t.leadsWithoutRecordedAction, t.medianMinutesToFirstRecordedAction]), render(tm).includes('יוסי')], [[['יוסי', 10, 1, 12], ['דנה', 5, 4, 60]], false])
+  const fb = build({ project: 'אלפא', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: { crmType: 'fireberry', totalLeads: 948, byStatus: { 'לא רלוונטי כללי': 333, 'לא רלוונטי שפה': 1 }, responseTimeStats: { totalLids: 948, respondedCount: 800, noResponseCount: 148 } } }], prevRows: [] })
+  const hf = render(fb)
+  eq('fireberry: language status counted as off-target, not shown by name', [fb.offTarget, hf.includes('לא רלוונטי שפה'), hf.includes('1 לידים סווגו כלא תואמים')], [1, false, true])
+  let threw = ''
+  try { render(build({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: withG({ ...lg, ok: false }) }], prevRows: [] })) } catch (e) { threw = e.message }
+  eq('pdf: groups that do not add up → no report', threw.startsWith('LEAD_GROUPS_MISMATCH'), true)
+  const ig = analysisInput(mg).leadHandling
+  eq('ai input: groups, method, no answered/notAnswered/rep', [ig.waitingForHandling, ig.classifiedWithoutCallRecord, ig.excludedRepeatLeads, !!ig.method, 'notAnswered' in ig, 'notAnsweredByRep' in ig, ig.previousGroups.waitingForHandling], [1, 83, 7, true, false, false, 3])
   const inp = analysisInput(m)
   eq('ai input: cancellations reach the analysis', [inp.meetings.cancelled, inp.meetings.upcoming, inp.meetings.previous.cancelled], [10, 1, 6])
   const z = build({ project: 'z', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: { crmType: 'zoho', totalLeads: 5 } }], prevRows: [] })

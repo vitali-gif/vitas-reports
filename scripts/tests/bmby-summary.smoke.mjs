@@ -1,7 +1,7 @@
 // scripts/tests/bmby-summary.smoke.mjs — בדיקת עשן לפונקציה הטהורה computeBmbySummary.
 // מריצה רשומות BMBY מלאכותיות קטנות דרך החישוב ובודקת שהפלט בצורה שהדשבורד מצפה לה.
 // הרצה:  node scripts/tests/bmby-summary.smoke.mjs
-import { computeBmbySummary } from '../../lib/crm/bmby-summary.js'
+import { computeBmbySummary, toReportRow } from '../../lib/crm/bmby-summary.js'
 import { CRM_SCHEMA_VERSION } from '../../lib/crm/schema-version.js'
 
 const clients = [
@@ -45,7 +45,7 @@ eq('adBreakdown node for AD 1 has adId', R.adBreakdown.find(a => a.ad === 'AD 1'
 eq('not skipped (short range)', R._skippedBroken, false)
 // v34 (ענף redesign): responseTimeStats.noResponseBySource/ByUser. הקבוע עלה ב-lib/crm/schema-version.js
 // ולא כאן, ולכן הבדיקה נכשלה עוד לפני המיזוג של main. להעלות כאן בכל bump של CRM_SCHEMA_VERSION.
-eq('schema version exported', CRM_SCHEMA_VERSION, 35)
+eq('schema version exported', CRM_SCHEMA_VERSION, 36)
 for (const k of ['hourlyApptStats', 'hourlyLeadStats', 'hourlyContactStats', 'hourlyContactMeeting', 'noAnswerContactHour']) eq(`${k} has 24 buckets`, R[k].length, 24)
 eq('dayOfWeekStats has 7 days', Object.keys(R.dayOfWeekStats).length, 7)
 eq('meetingDayOfWeek has 7 days', Object.keys(R.meetingDayOfWeek).length, 7)
@@ -98,6 +98,34 @@ eq('deterministic output', JSON.stringify(R.totals) + JSON.stringify(R.namedLead
   const tk2 = tk.map(t => ({ ...t, update_date: undefined }))
   const r2 = computeBmbySummary({ clients: cl, tasks: tk2, prices: [], contracts: [] }, { since: '2026-09-08', until: '2026-09-15', monthKey: 'x', now }).responseTimeStats
   eq('lid note without update_date: answered, untimed', [r2.respondedCount, r2.noResponseCount, r2.avgMinutes, r2.medianMinutes], [2, 1, 20, 20])
+}
+
+// ש.ברוך, 1.11: שלוש קבוצות טיפול + חריגים, לפי לקוח ייחודי
+{
+  const C = (id, extra = {}) => ({ client_id: id, user_id: '7', user_name: 'נציג א', _cf: {}, ...extra })
+  const L = (id, d, extra = {}) => ({ client_id: id, type: 'lid', media_title: 'פייסבוק', create_date: d, start_date: d, message: 'To Contact', ...extra })
+  const cl = [
+    C('1'), C('2', { objection: 'Price', client_stage: 'not_relevant' }), C('3', { client_stage: 'not_handeled' }),
+    C('4', { client_stage: 'new' }), C('5', { client_stage: 'new' }), C('6', { objection: 'מגזר ערבי', client_stage: 'not_relevant' }),
+    C('7', { client_stage: 'interessed' }), C('8', { client_stage: 'new' }),
+  ]
+  const tk = [
+    L('1', '2026-09-10 09:00:00'), L('1', '2026-09-11 09:00:00'), { client_id: '1', type: 'comment', create_date: '2026-09-10 10:00:00' },  // מתועד, 2 לידים = לקוח אחד
+    L('2', '2026-09-10 09:00:00'),                                     // התנגדות בלי פעולה → סווג
+    L('3', '2026-09-10 09:00:00'),                                     // not_handeled בלי כלום → ממתין
+    L('4', '2026-09-12 09:00:00'), { client_id: '4', type: 'task', create_date: '2026-08-01 10:00:00' }, // פעולה רק לפני → חוזר
+    L('5', '2026-09-15 08:00:00'),                                     // יום העסקים האחרון (16.9 היום) → בחלון
+    L('6', '2026-09-10 09:00:00'),                                     // התנגדות לבדיקה → סווג + review
+    L('7', '2026-09-10 09:00:00'),                                     // שלב שונה, בלי התנגדות → סווג
+    L('8', '2026-09-10 09:00:00', { message: 'מחיר לא רלוונטי' }),     // סיכום בליד → מתועד
+    { client_id: '3', type: 'lid', subject: 'Update Info Lead', create_date: '2026-09-10 09:00:01' },
+    { client_id: '3', type: 'comment', subject: 'Update Info Lead', create_date: '2026-09-10 09:00:02' }, // אוטומטי → לא פעולה
+  ]
+  const R = computeBmbySummary({ clients: cl, tasks: tk, prices: [], contracts: [] }, { since: '2026-09-08', until: '2026-09-16', monthKey: 'x', now })
+  const g = R.leadGroups
+  eq('lead groups per unique client', [g.total, g.documented, g.classifiedNoCall, g.waiting, g.repeat, g.inWindow, g.classifiedForReview, g.ok], [8, 2, 3, 1, 1, 1, 1, true])
+  eq('lead groups: names for the admin check, review flag', [R.namedLeads.all.leadGroups.waiting.length, R.namedLeads.all.leadGroups.classifiedNoCall.filter(e => e.review).length], [1, 1])
+  eq('lead groups ride on the stored summary', !!toReportRow(R).summary.leadGroups, true)
 }
 
 if (process.exitCode) { console.error('\nבדיקת העשן נכשלה'); } else { console.log('\n✓ בדיקת העשן עברה') }
