@@ -14,7 +14,8 @@ import { adminClient, requireAdmin } from '../../../../lib/auth'
 import { weekKeys } from '../../../../lib/ai-analysis.js'
 import { META_GRAPH_VERSION, extractLeads, metaFetchAll, metaAccountIds, metaTokenFor, num } from '../../../../lib/ads/meta-api.js'
 import { credsFor, getAccessToken, gaqlSearch, googleCustomerIds } from '../../../../lib/ads/google-api.js'
-import { sumWeek, compareAccount, weeklyAccountsEmailHtml } from '../../../../lib/weekly-accounts.js'
+import { compareAccount, weeklyAccountsEmailHtml, ruleFor, applyRule } from '../../../../lib/weekly-accounts.js'
+import { ACCOUNT_RULES, EXTRA_ACCOUNTS } from '../../../../lib/weekly-accounts-config.js'
 import { periodLabel } from '../../../../lib/report-pdf.js'
 import { sendAlert } from '../../../../lib/alert.js'
 import { logJob } from '../../../../lib/job-log.js'
@@ -43,24 +44,26 @@ async function metaAccounts() {
     for (const a of rows) seen.set(String(a.account_id), { id: String(a.account_id), name: a.name, status: a.account_status })
   }
   // חשבונות עם טוקן משלהם (META_ACCESS_TOKEN_<id>) שהטוקן הראשי לא רואה
-  for (const id of metaAccountIds()) if (!seen.has(id)) seen.set(id, { id, name: null, status: null })
+  for (const id of [...metaAccountIds(), ...EXTRA_ACCOUNTS.meta]) if (!seen.has(id)) seen.set(id, { id, name: null, status: null })
   return [...seen.values()]
 }
 
 async function metaWeeks(acc, cur, prev) {
   const token = metaTokenFor(acc.id)
   const ranges = encodeURIComponent(JSON.stringify([{ since: prev[0], until: prev[1] }, { since: cur[0], until: cur[1] }]))
-  // רמת קמפיין: לכל קמפיין "התוצאה" שלו (extractLeads), כמו "תוצאות" במנהל המודעות
-  const rows = await metaFetchAll(`${G}/act_${acc.id}/insights?level=campaign&fields=spend,clicks,impressions,actions&time_ranges=${ranges}&limit=500`, token)
+  // רמת קמפיין: לכל קמפיין "התוצאה" שלו (extractLeads), כמו "תוצאות" במנהל המודעות; והשם — לסינון ולפיצול
+  const rows = await metaFetchAll(`${G}/act_${acc.id}/insights?level=campaign&fields=campaign_name,spend,clicks,impressions,actions&time_ranges=${ranges}&limit=500`, token)
   let name = acc.name
   if (!name) {
     const r = await fetch(`${G}/act_${acc.id}?fields=name,account_status&access_token=${encodeURIComponent(token)}`).then(x => x.json()).catch(() => ({}))
     name = r.name || acc.id; acc.status = r.account_status
   }
-  const pick = (since) => sumWeek(rows.filter(r => r.date_start === since).map(r => ({ spend: num(r.spend), clicks: num(r.clicks), impressions: num(r.impressions), leads: extractLeads(r.actions) })))
   // account_status: 1 פעיל, 2 מושבת, 101 סגור (ושאר הערכים — בהמתנה/בבדיקה, נחשבים פעילים)
   const status = acc.status === 2 ? 'disabled' : acc.status === 101 ? 'closed' : 'active'
-  return { name, cur: pick(cur[0]), prev: pick(prev[0]), status }
+  return {
+    name, status,
+    rows: rows.map(r => ({ campaign: r.campaign_name, week: r.date_start === cur[0] ? 'cur' : 'prev', spend: num(r.spend), clicks: num(r.clicks), impressions: num(r.impressions), leads: extractLeads(r.actions) })),
+  }
 }
 
 // ── גוגל ──
@@ -78,7 +81,7 @@ async function googleAccounts() {
       out.set(String(c.id), { id: String(c.id), name: c.descriptiveName || String(c.id) })
     }
   }
-  for (const id of googleCustomerIds()) if (!out.has(id)) out.set(id, { id, name: null })
+  for (const id of [...googleCustomerIds(), ...EXTRA_ACCOUNTS.google]) if (!out.has(id)) out.set(id, { id, name: null })
   return [...out.values()]
 }
 
@@ -86,15 +89,16 @@ async function googleWeeks(acc, cur, prev) {
   const c = credsFor(acc.id)
   const at = await getAccessToken(c)
   const rows = await gaqlSearch(at, acc.id,
-    `SELECT customer.descriptive_name, segments.date, metrics.cost_micros, metrics.conversions, metrics.clicks, metrics.impressions FROM customer WHERE segments.date BETWEEN '${prev[0]}' AND '${cur[1]}'`,
+    `SELECT customer.descriptive_name, campaign.name, segments.date, metrics.cost_micros, metrics.conversions, metrics.clicks, metrics.impressions FROM campaign WHERE segments.date BETWEEN '${prev[0]}' AND '${cur[1]}' AND metrics.cost_micros > 0`,
     { login: c.loginCustomerId || undefined, developerToken: c.developerToken })
   const inW = (d, w) => d >= w[0] && d <= w[1]
-  const toRow = (r) => ({ spend: num(r.metrics?.costMicros) / 1e6, leads: num(r.metrics?.conversions), clicks: num(r.metrics?.clicks), impressions: num(r.metrics?.impressions) })
   return {
     name: acc.name || rows[0]?.customer?.descriptiveName || acc.id,
-    cur: sumWeek(rows.filter(r => inW(r.segments?.date, cur)).map(toRow)),
-    prev: sumWeek(rows.filter(r => inW(r.segments?.date, prev)).map(toRow)),
     status: 'active',
+    rows: rows.map(r => ({
+      campaign: r.campaign?.name, week: inW(r.segments?.date, cur) ? 'cur' : 'prev',
+      spend: num(r.metrics?.costMicros) / 1e6, leads: num(r.metrics?.conversions), clicks: num(r.metrics?.clicks), impressions: num(r.metrics?.impressions),
+    })),
   }
 }
 
@@ -115,17 +119,19 @@ export async function GET(req) {
   })
   const jobs = [...metaList.map(a => ({ platform: 'meta', acc: a })), ...googleList.map(a => ({ platform: 'google', acc: a }))]
   const results = await pool(jobs, 6, async ({ platform, acc }) => {
+    if (ruleFor(ACCOUNT_RULES, platform, acc.id, acc.name)?.exclude) return []   // מוחרג — לא נמשך בכלל
     try {
       const w = platform === 'meta' ? await metaWeeks(acc, cur, prev) : await googleWeeks(acc, cur, prev)
-      return { platform, id: acc.id, name: w.name, cmp: compareAccount(w) }
+      const rule = ruleFor(ACCOUNT_RULES, platform, acc.id, w.name)
+      return applyRule(rule, w.name, w.rows).map(e => ({ platform, id: acc.id, name: e.name, cmp: compareAccount({ cur: e.cur, prev: e.prev, status: w.status }) }))
     } catch (e) {
       // חשבון סגור בלי הוצאה הוא לא תקלה — רק חשבון שאמור לעבוד
-      if (platform === 'meta' && (acc.status === 101 || acc.status === 2)) return null
+      if (platform === 'meta' && (acc.status === 101 || acc.status === 2)) return []
       errors.push({ platform, name: acc.name || acc.id, error: e.message || String(e) })
-      return null
+      return []
     }
   })
-  const accounts = results.filter(a => a && (a.cmp.cur.spend > 0 || a.cmp.prev.spend > 0))
+  const accounts = results.flat().filter(a => a && (a.cmp.cur.spend > 0 || a.cmp.prev.spend > 0))
 
   const weekLabel = periodLabel(key), prevLabel = periodLabel(prevKey)
   let email = null
