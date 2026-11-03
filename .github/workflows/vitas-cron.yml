@@ -18,8 +18,13 @@ on:
   # כלומר כל המשיכות מ-BMBY/Zoho/Salesforce והכתיבות לבסיס הנתונים כפולות. אם cron-job.org
   # מפסיק, שומר הקרונים (health, למטה — נשאר כאן בכוונה, כמתזמן בלתי תלוי) מתריע אחרי
   # 3 שעות, ואפשר להריץ ידנית מ-Run workflow. להחזרה: להחזיר את ארבע השורות מההיסטוריה.
+  # 3.11: הקרונים השבועי והחודשי היו רק ב-vercel.json — והמתזמן של Vercel לא יורה מאז יולי (למעלה),
+  # ולכן הם אף פעם לא רצו. מעכשיו הם כאן. השעות ב-UTC (ישראל בחורף = UTC+2).
   schedule:
     - cron: '47 * * * *'                      # health watchdog
+    - cron: '20 5 * * 0'                      # ai-weekly: ניתוח AI שבועי לפרויקטים, ראשון 07:20
+    - cron: '50 5 * * 0'                      # weekly-accounts: סטטוס כל חשבונות הפרסום, ראשון 07:50
+    - cron: '40 5 5 * *'                      # monthly-report: הדוח החודשי, ה-5 לחודש 07:40
   workflow_dispatch:
     inputs:
       target:
@@ -30,7 +35,7 @@ on:
         # fireberry-notes: ידני בלבד — מילוי ראשוני של פרויקט חדש (240 שניות לריצה). הסנכרון השוטף
         # רץ כל שעה בתוך prefetch-daily (cron-job.org); כאן הוא דולג ברוב הלילות, ושתי ריצות
         # במקביל עלולות לעבור את מגבלת 100 הקריאות לדקה של Fireberry.
-        options: [all, prefetch-ads, prefetch-crm, health, fireberry-notes]
+        options: [all, prefetch-ads, prefetch-crm, health, fireberry-notes, ai-weekly, weekly-accounts, monthly-report]
 
 concurrency:
   group: vitas-cron-${{ github.event.schedule || github.event.inputs.target }}
@@ -50,6 +55,9 @@ jobs:
               '17 4,6,8,10,12,14,16,18 * * *') echo 'paths=prefetch-crm?only=months' >> "$GITHUB_OUTPUT" ;;
               '37 4,6,8,10,12,14,16,18 * * *') echo 'paths=prefetch-crm?only=ranges' >> "$GITHUB_OUTPUT" ;;
               '47 * * * *')                    echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
+              '20 5 * * 0')                    echo 'paths=ai-weekly'    >> "$GITHUB_OUTPUT" ;;
+              '50 5 * * 0')                    echo 'paths=weekly-accounts' >> "$GITHUB_OUTPUT" ;;
+              '40 5 5 * *')                    echo 'paths=monthly-report' >> "$GITHUB_OUTPUT" ;;
               *)                               echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
             esac
           elif [ "${{ github.event.inputs.target }}" = "all" ]; then
