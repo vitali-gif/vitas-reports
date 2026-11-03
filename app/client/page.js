@@ -1,4 +1,8 @@
 'use client'
+import OnboardingGuide from '../components/OnboardingGuide.jsx'
+
+// המדריך ללקוח (app/components/OnboardingGuide.jsx) כבוי לבינתיים — ויטלי, 3.11
+const ONBOARDING_ON = false
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { apiFetch, accessToken } from '../../lib/api-fetch'
@@ -239,7 +243,8 @@ export default function ClientPage() {
       // לא כעזרה. מי שרוצה לראות אותו שוב לוחץ על כפתור העזרה הקבוע.
       if (typeof window !== 'undefined') {
         try {
-          if (!localStorage.getItem('vitas_onboarding_seen')) setShowOnboarding(true)
+          // ויטלי, 3.11: "תבטל אותו בכלל בנתיים" — המדריך כבוי. להחזרה: ONBOARDING_ON = true
+          if (ONBOARDING_ON && !localStorage.getItem('vitas_onboarding_seen')) setShowOnboarding(true)
         } catch { /* דפדפן שחוסם אחסון — פשוט לא מציגים */ }
       }
     } catch (err) {
@@ -532,32 +537,10 @@ export default function ClientPage() {
     setShowOnboarding(false)
   }
 
-  const STEPS = [
-    {
-      icon: '📂',
-      title: 'בחר פרויקט',
-      desc: 'בסרגל הצד הימני תמצא את הפרויקטים שלך. לחץ על שם הפרויקט כדי לפתוח את הדוח.',
-    },
-    {
-      icon: '📅',
-      title: 'בחר תקופה',
-      desc: 'בחר חודש, שבוע אחרון, או טווח תאריכים מותאם דרך בורר התאריכים בראש המסך.',
-    },
-    {
-      icon: '🗂',
-      title: 'טאבים',
-      desc: '"הכל" — סיכום כולל. "CRM" — לידים ופגישות. "Facebook" ו-"Google" — פירוט לפי פלטפורמה.',
-    },
-    {
-      icon: '📊',
-      title: 'מדדים מרכזיים',
-      desc: 'כרטיסיות ה-KPI בראש הדוח מציגות: תקציב, לידים, עלות לליד, פגישות וחוזים.',
-    },
-  ]
 
   return (
     <>
-      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} onLogout={logout} onHelp={() => setShowOnboarding(true)} />
+      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} onLogout={logout} onHelp={ONBOARDING_ON ? () => setShowOnboarding(true) : undefined} />
 
       {installPrompt && (
         <div style={{
@@ -581,101 +564,7 @@ export default function ClientPage() {
         </div>
       )}
 
-      {showOnboarding && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(11,15,30,0.7)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '16px', fontFamily: 'var(--font, Heebo, sans-serif)',
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: 20, maxWidth: 520, width: '100%',
-            direction: 'rtl', textAlign: 'right',
-            boxShadow: '0 24px 60px rgba(11,15,30,0.3)',
-            maxHeight: '90vh', position: 'relative', display: 'flex', flexDirection: 'column',
-          }}>
-            {/* סגירה. עד 28.9 היה רק "הבנתי" בתחתית, ובמובייל צריך היה לגלול עד אליו.
-                ה-X יושב מחוץ לאזור הגלילה, כך שהוא נשאר במקום גם כשגוללים. */}
-            <button
-              type="button"
-              onClick={dismissOnboarding}
-              aria-label="סגור את המדריך"
-              style={{
-                position: 'absolute', top: 12, left: 12, zIndex: 1,
-                width: 36, height: 36, borderRadius: '50%', border: 'none',
-                background: '#F1F3F9', color: '#5E6478', cursor: 'pointer',
-                fontSize: 22, lineHeight: 1, fontFamily: 'inherit',
-              }}
-            >×</button>
-          <div style={{ padding: '36px clamp(18px, 5vw, 32px) 28px', overflowY: 'auto' }}>
-
-            {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <img src="/brand/cluzo/cluzo-logo-light.svg" alt="Cluzo by Vitas" style={{ height: 42, width: 'auto', marginBottom: 12 }} />
-              <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: '#0B0F1E', letterSpacing: '-0.02em' }}>
-                ברוכים הבאים לדוח הביצועים 👋
-              </h2>
-              <p style={{ margin: 0, fontSize: 14, color: '#5E6478', lineHeight: 1.6 }}>
-                מדריך קצר שיעזור לך להתמצא במערכת
-              </p>
-            </div>
-
-            {/* Steps */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 28 }}>
-              {STEPS.map((s, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 14,
-                  background: '#F8F9FF', borderRadius: 12, padding: '14px 16px',
-                  border: '1px solid #E8EAFB',
-                }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                    background: 'rgba(91,94,244,0.1)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 20,
-                  }}>{s.icon}</div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0B0F1E', marginBottom: 3 }}>
-                      {s.title}
-                    </div>
-                    <div style={{ fontSize: 13, color: '#5E6478', lineHeight: 1.6 }}>
-                      {s.desc}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Tip */}
-            <div style={{
-              background: 'rgba(91,94,244,0.06)', border: '1px solid rgba(91,94,244,0.2)',
-              borderRadius: 10, padding: '11px 14px', marginBottom: 24,
-              fontSize: 13, color: '#3B3ECC', lineHeight: 1.6,
-            }}>
-              💡 <strong>טיפ:</strong> הנתונים מתעדכנים אוטומטית. אין צורך ללחוץ על "רענן".
-            </div>
-
-            <p style={{ margin: '0 0 12px', textAlign: 'center', fontSize: 12.5, color: '#98A0B2' }}>
-              אפשר לפתוח את המדריך שוב בכל רגע מכפתור העזרה (?) בראש העמוד.
-            </p>
-
-            {/* CTA */}
-            <button
-              onClick={dismissOnboarding}
-              style={{
-                display: 'block', width: '100%', padding: '13px',
-                background: 'var(--tv-brand, #315CF5)', color: '#fff', border: 'none',
-                borderRadius: 10, fontSize: 15, fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit',
-                boxShadow: '0 6px 20px rgba(91,94,244,0.35)',
-              }}>
-              הבנתי, קדימה! →
-            </button>
-
-          </div>
-          </div>
-        </div>
-      )}
+      {showOnboarding && <OnboardingGuide onClose={dismissOnboarding} />}
     </>
   )
 }
