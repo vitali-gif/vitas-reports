@@ -7,6 +7,7 @@ import { apiFetch } from '../../lib/api-fetch'
 import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFacebookRows, mapGoogleRows, mapCrmRows, mapCrmReportRows, aggregateRows, aggregateCrmRows, aggregateCrmReportRows, changePercent, getPrevMonth, comparisonPeriodKey, comparisonPeriodLabel, COLORS, sourceColor, getRecommendationsWindowMonths } from '../../lib/helpers'
 import { normalizeObjections, isReviewObjection, REVIEW_LABEL, OFF_TARGET_LABEL } from '../../lib/objection-normalize.js'
 import { HANDLING_LABELS, HANDLING_METHOD } from '../../lib/client-wording.js'
+import NamedLeadsModal from '../components/admin/NamedLeadsModal.jsx'
 import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
@@ -7637,47 +7638,7 @@ const selectProject = async (client, project) => {
         </div>
       )}
 
-      {namedLeadsModal && (
-        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setNamedLeadsModal(null); }} style={{zIndex:9999}}>
-          <div className="modal" style={{maxWidth:420,maxHeight:'75vh',display:'flex',flexDirection:'column',direction:'rtl'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-              <h3 style={{margin:0,fontSize:16,fontWeight:700}}>{namedLeadsModal.title}</h3>
-              <button onClick={() => setNamedLeadsModal(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
-            </div>
-            {namedLeadsModal.names.length === 0 ? (
-              <p style={{color:'#94a3b8',textAlign:'center',margin:'24px 0'}}>אין נתונים להצגה</p>
-            ) : (
-              <ul style={{margin:0,padding:0,listStyle:'none',overflowY:'auto',flex:1}}>
-                {namedLeadsModal.names.map((entry, i) => {
-                  const _n = typeof entry === 'string' ? entry : (entry && entry.name) || '—';
-                  const _p = (entry && typeof entry === 'object') ? (entry.phone || '') : '';
-                  const _s = (entry && typeof entry === 'object') ? (entry.source || '') : '';
-                  const _v = (entry && typeof entry === 'object' && entry.value) ? entry.value : null;
-                  const _ld = (entry && typeof entry === 'object') ? dmy(entry.leadDate) : '';
-                  const _ad = (entry && typeof entry === 'object') ? dmy(entry.apptDate) : '';
-                  return (
-                  <li key={i} style={{padding:'9px 12px',borderBottom:'1px solid var(--border)',fontSize:14,display:'flex',alignItems:'center',gap:10}}>
-                    <span style={{width:22,height:22,borderRadius:'50%',background:'var(--indigo-50)',color:'var(--indigo)',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
-                    <div style={{display:'flex',flexDirection:'column',gap:2,minWidth:0,flex:1}}>
-                      <span style={{fontWeight:600}}>{_n}{_v ? ` (₪${Number(_v).toLocaleString('he-IL')})` : ''}</span>
-                      {(_p || _s) && <span style={{fontSize:12,color:'#94a3b8'}}>{_p ? <span style={{unicodeBidi:'plaintext'}}>{_p}</span> : null}{_p && _s ? ' · ' : ''}{_s}</span>}
-                      {entry && typeof entry === 'object' && entry.objection && <span style={{fontSize:11.5,color:'#64748b'}}>התנגדות: {entry.objection}{entry.review && !isClientView ? <span style={{marginInlineStart:6,padding:'1px 7px',borderRadius:999,background:'#fff4dc',color:'#8a5a00',fontWeight:600}}>{REVIEW_LABEL}</span> : null}</span>}
-                      {(_ld || _ad) && <span style={{fontSize:11.5,color:'#64748b',display:'flex',gap:10,flexWrap:'wrap'}}>
-                        {_ld ? <span>📥 כניסת ליד: <span style={{unicodeBidi:'plaintext'}}>{_ld}</span></span> : null}
-                        {_ad ? <span>📅 תיאום פגישה: <span style={{unicodeBidi:'plaintext'}}>{_ad}</span></span> : null}
-                      </span>}
-                    </div>
-                  </li>
-                  );
-                })}
-              </ul>
-            )}
-            <div style={{marginTop:14,textAlign:'left'}}>
-              <span style={{fontSize:12,color:'#94a3b8'}}>{namedLeadsModal.names.length} רשומות</span>
-            </div>
-          </div>
-        </div>
-      )}
+      {namedLeadsModal && <NamedLeadsModal title={namedLeadsModal.title} names={namedLeadsModal.names} isClientView={isClientView} onClose={() => setNamedLeadsModal(null)} />}
 
       {leadsModal && (
         <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setLeadsModal(null); }} style={{zIndex:9999}}>

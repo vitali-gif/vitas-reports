@@ -414,3 +414,111 @@ th:hover .sort-ind { opacity: .8; }
   .cza-add .cza-primary { justify-self: stretch; }
   .cza-sheet > .cza-actions { flex-direction: column; }
 }
+
+/* ── 21. ניתוח AI — פאנל צד (3.11) ───────────────────────────────────────────────
+   ויטלי: "הפופ אפ לא נראה מקצועי". פאנל בגובה המסך בצד, השורה התחתונה למעלה, לשוניות
+   במקום גלילה ארוכה, העתקות בתחתית קבועה. בטלפון: מסך מלא. רכיב: app/components/ai/AiAnalysisModal.jsx */
+.modal-overlay.aid-overlay { display: flex; direction: rtl; justify-content: flex-end; align-items: stretch; padding: 0; } /* RTL: flex-end = שמאל — הפאנל בצד, הדשבורד נשאר גלוי */
+.modal.aid-drawer {
+  width: min(720px, 100vw); max-width: none; height: 100vh; max-height: none; margin: 0; padding: 0;
+  border-radius: 0; display: flex; flex-direction: column; overflow: hidden; direction: rtl;
+  background: var(--tv-canvas); color: var(--tv-text); box-shadow: 0 0 60px -10px rgba(20, 36, 60, .35);
+}
+.aid-head { display: flex; align-items: center; gap: 12px; padding: 18px 22px; background: var(--tv-surface); border-bottom: 1px solid var(--tv-divider); }
+.aid-head-text { flex: 1; min-width: 0; }
+.aid-kicker { font-size: 12px; font-weight: 700; color: var(--tv-brand); letter-spacing: .02em; }
+.aid-head h2 { margin: 1px 0 0; font-size: 19px; font-weight: 800; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aid-scroll { flex: 1; overflow: auto; padding: 18px 22px 24px; display: grid; gap: 14px; align-content: start; }
+.aid-run { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: 14px; padding: 12px 14px; }
+.aid-run > div { display: grid; gap: 1px; }
+.aid-run-k { font-size: 12px; color: var(--tv-text-secondary); }
+.aid-run b { font-size: 15px; }
+.aid-error { margin: 0; }
+.aid-empty { background: var(--tv-surface); border: 1px dashed var(--tv-border); border-radius: 14px; padding: 22px 18px; font-size: 14px; line-height: 1.65; color: var(--tv-text-secondary); text-align: center; }
+.aid-analysis { display: grid; gap: 12px; }
+/* השורה התחתונה: כרטיס נייבי עם נקודות, כמו כרטיסי ה-KPI */
+.aid-bottomline { position: relative; overflow: hidden; border-radius: 16px; padding: 18px 20px; color: #fff;
+  background: var(--cz-dots-corner) left top / 132px 132px no-repeat, linear-gradient(160deg, #1d3557, var(--tv-navy)); }
+.aid-bl-k { font-size: 12px; font-weight: 700; color: #b7c4da; letter-spacing: .02em; }
+.aid-bottomline h3 { margin: 6px 0 8px; font-size: 18px; line-height: 1.45; font-weight: 800; }
+.aid-bottomline p { margin: 0; font-size: 14px; line-height: 1.7; color: #dde5f2; }
+.aid-bl-meta { margin-top: 12px; font-size: 12px; color: #9fb0cc; }
+.aid-quality { background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: 12px; }
+.aid-q-head { width: 100%; display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 10px 14px; cursor: pointer; font: inherit; color: inherit; text-align: start; }
+.aid-q-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 2px 10px; }
+.aid-q-partial .aid-q-label { background: var(--tv-warning-bg); color: var(--tv-warning-fg); }
+.aid-q-insufficient .aid-q-label { background: var(--tv-danger-bg); color: var(--tv-danger-fg); }
+.aid-q-good .aid-q-label { background: var(--tv-success-bg); color: var(--tv-success-fg); }
+.aid-q-n { margin-inline-start: auto; font-size: 12.5px; color: var(--tv-text-secondary); }
+.aid-rot { transform: rotate(180deg); }
+.aid-quality ul { margin: 0; padding: 0 30px 12px 14px; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.6; color: var(--tv-text-secondary); }
+.aid-tabs { display: flex; gap: 4px; overflow-x: auto; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: 12px; padding: 4px; scrollbar-width: none; }
+.aid-tabs button { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 6px 12px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font: 600 13.5px inherit; font-family: inherit; color: var(--tv-text-secondary); white-space: nowrap; }
+.aid-tabs button:hover { color: var(--tv-text); background: var(--tv-canvas); }
+.aid-tabs button.on { background: var(--tv-brand-soft); color: var(--tv-brand); font-weight: 700; }
+.aid-tab-n { font-size: 11.5px; font-weight: 700; min-width: 20px; text-align: center; border-radius: 999px; padding: 0 6px; background: var(--tv-canvas); color: var(--tv-text-secondary); }
+.aid-tabs button.on .aid-tab-n { background: #fff; color: var(--tv-brand); }
+.aid-panel { display: grid; gap: 10px; }
+.aid-hint { margin: 0; font-size: 12.5px; color: var(--tv-text-muted); }
+.aid-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.aid-items li { display: flex; gap: 12px; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: 14px; padding: 13px 14px; font-size: 14px; line-height: 1.6; }
+.aid-items li b { font-weight: 700; }
+.aid-items li p { margin: 3px 0 0; color: var(--tv-text-secondary); }
+.aid-items li p.aid-plain { margin: 0; color: var(--tv-text); }
+.aid-ico, .aid-num { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--tv-canvas); color: var(--tv-text-secondary); }
+.aid-num { background: var(--tv-brand); color: #fff; font-weight: 800; font-size: 14px; }
+.aid-dir-good { border-inline-start: 3px solid var(--tv-success-fg) !important; }
+.aid-dir-good .aid-ico { background: var(--tv-success-bg); color: var(--tv-success-fg); }
+.aid-dir-bad { border-inline-start: 3px solid var(--tv-danger-fg) !important; }
+.aid-dir-bad .aid-ico { background: var(--tv-danger-bg); color: var(--tv-danger-fg); }
+.aid-pill { font-style: normal; font-size: 11.5px; font-weight: 700; padding: 1px 9px; border-radius: 999px; background: var(--tv-canvas); color: var(--tv-text-secondary); white-space: nowrap; }
+.aid-conf-high { background: var(--tv-success-bg); color: var(--tv-success-fg); }
+.aid-conf-low { background: var(--tv-warning-bg); color: var(--tv-warning-fg); }
+.aid-owner { background: var(--tv-brand-soft); color: var(--tv-brand); }
+.aid-client-msg { margin: 0; white-space: pre-wrap; font: 400 14px/1.7 inherit; font-family: inherit; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: 14px; padding: 14px 16px; color: var(--tv-text); }
+.aid-history { background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: 12px; }
+.aid-history-toggle { width: 100%; display: flex; align-items: center; gap: 8px; background: none; border: 0; padding: 11px 14px; cursor: pointer; font: 700 13.5px inherit; font-family: inherit; color: var(--tv-text); }
+.aid-history-toggle svg:last-child { margin-inline-start: auto; color: var(--tv-text-muted); }
+.aid-history ul { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; gap: 2px; }
+.aid-history li button { display: grid; gap: 1px; width: 100%; text-align: start; background: none; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; cursor: pointer; font: inherit; color: inherit; }
+.aid-history li button:hover { background: var(--tv-canvas); }
+.aid-history li button.on { background: var(--tv-brand-soft); border-color: var(--tv-brand-line); }
+.aid-h-when { font-size: 11.5px; color: var(--tv-text-muted); }
+.aid-h-text { font-size: 13.5px; font-weight: 600; }
+.aid-monthly { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--tv-text-secondary); background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: 12px; padding: 10px 14px; }
+.aid-monthly .cza-ghost { min-height: 38px; padding: 6px 14px; font-size: 13px; }
+.aid-note { margin: 0; font-size: 12px; color: var(--tv-text-muted); }
+.aid-foot { display: flex; gap: 8px; padding: 12px 22px; background: var(--tv-surface); border-top: 1px solid var(--tv-divider); }
+.aid-foot .aid-copy { flex: 1; }
+.aid-copy.ok { background: var(--tv-success-fg) !important; color: #fff !important; border-color: transparent !important; }
+@media (max-width: 640px) {
+  .modal.aid-drawer { width: 100vw; }
+  .aid-head { padding: 14px 16px; }
+  .aid-scroll { padding: 14px 16px 20px; }
+  .aid-foot { padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); flex-direction: column; }
+  .aid-run .cza-primary { width: 100%; }
+}
+
+/* ── 22. רשימת לידים מאחורי כרטיס (3.11) — app/components/admin/NamedLeadsModal.jsx ── */
+.modal.cza-sheet.nlm-sheet { max-width: 520px; }
+.nlm-search { margin: 14px 22px 0; }
+.nlm-empty { margin: 0 22px; }
+.nlm-list { list-style: none; margin: 10px 0 0; padding: 0 12px 16px; display: grid; }
+.nlm-row { display: flex; gap: 12px; padding: 12px 10px; border-bottom: 1px solid var(--tv-divider); }
+.nlm-row:last-child { border-bottom: 0; }
+.nlm-av { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--tv-brand-soft); color: var(--tv-brand); font-weight: 800; font-size: 15px; }
+.nlm-main { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.nlm-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.nlm-name { font-weight: 700; font-size: 14.5px; color: var(--tv-text); overflow-wrap: anywhere; }
+.nlm-val { font-weight: 700; color: var(--tv-success-fg); }
+.nlm-phone { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--tv-link); text-decoration: none; font-variant-numeric: tabular-nums; }
+.nlm-phone:hover { text-decoration: underline; }
+.nlm-src { justify-self: start; max-width: 100%; font-size: 12px; color: var(--tv-text-secondary); background: var(--tv-canvas); border-radius: 999px; padding: 2px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nlm-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--tv-text-muted); }
+.nlm-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.nlm-meta b { font-weight: 600; color: var(--tv-text-secondary); }
+.nlm-review { font-style: normal; font-size: 11px; font-weight: 700; color: var(--tv-warning-fg); background: var(--tv-warning-bg); border-radius: 999px; padding: 0 8px; margin-inline-start: 6px; }
+@media (max-width: 640px) {
+  .nlm-search { margin-inline: 16px; }
+  .nlm-list { padding-inline: 6px; }
+}
