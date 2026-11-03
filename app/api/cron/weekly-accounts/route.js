@@ -51,8 +51,9 @@ async function metaAccounts() {
 async function metaWeeks(acc, cur, prev) {
   const token = metaTokenFor(acc.id)
   const ranges = encodeURIComponent(JSON.stringify([{ since: prev[0], until: prev[1] }, { since: cur[0], until: cur[1] }]))
-  // רמת קמפיין: לכל קמפיין "התוצאה" שלו (extractLeads), כמו "תוצאות" במנהל המודעות; והשם — לסינון ולפיצול
-  const rows = await metaFetchAll(`${G}/act_${acc.id}/insights?level=campaign&fields=campaign_name,spend,clicks,impressions,actions&time_ranges=${ranges}&limit=500`, token)
+  // רמת קמפיין: לכל קמפיין "התוצאה" שלו (extractLeads), כמו "תוצאות" במנהל המודעות; והשם — לסינון ולפיצול.
+  // use_unified_attribution_setting: כמו ad_daily (lib/ads/meta-daily.js). בלעדיו אלפא אקספו קיבלה ליד 1 במקום 229.
+  const rows = await metaFetchAll(`${G}/act_${acc.id}/insights?level=campaign&fields=campaign_name,spend,clicks,impressions,actions&time_ranges=${ranges}&use_unified_attribution_setting=true&limit=500`, token)
   let name = acc.name
   if (!name) {
     const r = await fetch(`${G}/act_${acc.id}?fields=name,account_status&access_token=${encodeURIComponent(token)}`).then(x => x.json()).catch(() => ({}))
