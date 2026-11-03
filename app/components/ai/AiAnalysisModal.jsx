@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { Sparkles, X, RefreshCw, TrendingUp, TrendingDown, Minus, Copy, Check, AlertTriangle, MessageCircle, Mail, ChevronDown, History, Lightbulb, ListChecks, Eye, CheckCircle2 } from 'lucide-react'
 import { periodLabel } from '../../../lib/report-pdf.js'
-import { analysisText, clientText, qualityOf } from '../../../lib/ai-analysis-text.js'
+import { analysisText, clientText, qualityOf, stripSampleSizes } from '../../../lib/ai-analysis-text.js'
 
 // ניתוח AI לפרויקט (ויטלי, 27.10) — אדמין בלבד. המצב והקריאות ב-admin/page.js (openAiAnalysis /
 // runAiAnalysis); כאן רק התצוגה: הניתוח של התקופה שעל המסך, ורשימת הניתוחים הקודמים (בלחיצה ושבועיים).
@@ -60,7 +60,7 @@ function Quality({ r }) {
 // ויטלי, 3.11: "הפופ אפ לא נראה מקצועי" — פאנל צד לפי ה-Design System: השורה התחתונה למעלה,
 // ומתחת לשוניות במקום גלילה ארוכה. ההעתקות בתחתית קבועה.
 function Analysis({ a, project }) {
-  const r = a.result || {}
+  const r = stripSampleSizes(a.result || {})
   const tabs = [
     r.changes?.length && { key: 'changes', label: 'מה השתנה', n: r.changes.length, icon: TrendingUp },
     r.reasons?.length && { key: 'reasons', label: 'למה', n: r.reasons.length, icon: Lightbulb },
@@ -159,7 +159,7 @@ export default function AiAnalysisModal({ project, client, periodKey, state, onR
                 <li key={a.id}>
                   <button type="button" className={current && a.id === current.id ? 'on' : ''} onClick={() => onSelect(a)}>
                     <span className="aid-h-when">{fmtDate(a.created_at)} · {TRIGGER[a.trigger] || a.trigger} · {periodLabel(a.period_key)}</span>
-                    <span className="aid-h-text">{a.result?.headline}</span>
+                    <span className="aid-h-text">{stripSampleSizes(a.result?.headline)}</span>
                   </button>
                 </li>))}
               </ul>}
