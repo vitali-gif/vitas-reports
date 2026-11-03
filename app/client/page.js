@@ -1,5 +1,8 @@
 'use client'
 import OnboardingGuide from '../components/OnboardingGuide.jsx'
+
+// המדריך ללקוח (app/components/OnboardingGuide.jsx) כבוי לבינתיים — ויטלי, 3.11
+const ONBOARDING_ON = false
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { apiFetch, accessToken } from '../../lib/api-fetch'
@@ -240,7 +243,8 @@ export default function ClientPage() {
       // לא כעזרה. מי שרוצה לראות אותו שוב לוחץ על כפתור העזרה הקבוע.
       if (typeof window !== 'undefined') {
         try {
-          if (!localStorage.getItem('vitas_onboarding_seen')) setShowOnboarding(true)
+          // ויטלי, 3.11: "תבטל אותו בכלל בנתיים" — המדריך כבוי. להחזרה: ONBOARDING_ON = true
+          if (ONBOARDING_ON && !localStorage.getItem('vitas_onboarding_seen')) setShowOnboarding(true)
         } catch { /* דפדפן שחוסם אחסון — פשוט לא מציגים */ }
       }
     } catch (err) {
@@ -536,7 +540,7 @@ export default function ClientPage() {
 
   return (
     <>
-      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} onLogout={logout} onHelp={() => setShowOnboarding(true)} />
+      <AdminPage isClientView={true} allowedProjectIds={allowedProjectIds} initialClients={buildClients(accessList)} initialProjectId={initialProjectId} onLogout={logout} onHelp={ONBOARDING_ON ? () => setShowOnboarding(true) : undefined} />
 
       {installPrompt && (
         <div style={{
