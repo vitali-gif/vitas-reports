@@ -19,7 +19,7 @@ import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { computeBmbySummary, toReportRow } from '../../../../lib/crm/bmby-summary.js'
 import { adNamesForBmby } from '../../../../lib/crm/meta-ad-names.js'
-import { upsertRawRecords, rebuildCompactIfChanged, ENTITIES } from '../../../../lib/crm/raw-store.js'
+import { upsertRawRecords, rebuildCompactIfChanged, pruneVanishedLids, ENTITIES } from '../../../../lib/crm/raw-store.js'
 import { CRM_SCHEMA_VERSION } from '../../../../lib/crm/schema-version.js'
 
 export const dynamic = 'force-dynamic'
@@ -400,6 +400,14 @@ async function runSync(opts = {}) {
           [clients, tasks, prices, contracts].map((rows, i) => upsertRawRecords(supabase, p.id, 'bmby', ENTITIES[i], rows))
         )
         snapshot = Object.fromEntries(parts.map((r, i) => [ENTITIES[i], r]))
+        // LIDs שנמחקו/מוזגו ב-BMBY יוצאים מהתמונה (raw-store.js, pruneVanishedLids) — רק אחרי משיכת משימות מלאה
+        if (tasksR.status === 'fulfilled' && tasks.length) {
+          try {
+            const truncated = (tasksR.value.pages || 0) >= 10 && !tasksR.value.earlyStop
+            snapshot.prunedLids = await pruneVanishedLids(supabase, p.id, { since, until, fetched: tasks, truncated })
+            if (snapshot.prunedLids.pruned) parts[1] = { ...parts[1], changed: true }
+          } catch (e) { snapshot.prunedLids = { error: String(e?.message || e) } }
+        }
         // תמונה דחוסה לחישוב מהיר (מיגרציה 009) — נבנית בתוך ה-DB, קריאה אחת זולה.
         try { snapshot.compact = await oneRebuildAtATime(() => rebuildCompactIfChanged(supabase, p.id, 'bmby', parts)) }
         catch (e) { snapshot.compact = { error: String(e?.message || e) } }
