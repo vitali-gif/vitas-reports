@@ -1,4 +1,5 @@
 'use client'
+import { useEffect, useRef, useState } from 'react'
 import { LogOut, Users, Link2, FileText, HelpCircle, Sparkles } from 'lucide-react'
 
 // VITAS v2 Header — design-v2-playbook classes (h-brand / h-actions / btn)
@@ -18,6 +19,22 @@ import { LogOut, Users, Link2, FileText, HelpCircle, Sparkles } from 'lucide-rea
 export default function Header({ onMenuOpen, onExport, onAiAnalysis, onClientAccess, onSessionLogs, onLogout, onHelp, loadingIndicator = null, className = '' }) {
   // עיצוב מחודש (header-vr): אייקוני lucide במקום אימוג'י, כפתורים בהירים אחידים
   const vr = className.includes('header-vr')
+  // ⋮ בטלפון (ויטלי, 6.11): היה כפתור ריק. עכשיו תפריט של הפעולות שמוסתרות בטלפון; בלי פעולות כאלה
+  // (כניסת לקוח) — הכפתור לא מוצג בכלל.
+  const [menu, setMenu] = useState(false)
+  const menuRef = useRef(null)
+  useEffect(() => {
+    if (!menu) return
+    const close = (e) => { if (!menuRef.current?.contains(e.target)) setMenu(false) }
+    const esc = (e) => { if (e.key === 'Escape') setMenu(false) }
+    document.addEventListener('pointerdown', close); document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', esc) }
+  }, [menu])
+  const overflow = [
+    onExport && { key: 'export', label: 'ייצוא דוח', icon: FileText, run: onExport },
+    onSessionLogs && { key: 'usage', label: 'שימוש לקוחות', icon: Users, run: onSessionLogs },
+    onClientAccess && { key: 'access', label: 'גישת לקוחות', icon: Link2, run: onClientAccess },
+  ].filter(Boolean)
   return (
     <header className={`header${className ? ' ' + className : ''}`}>
 
@@ -84,19 +101,34 @@ export default function Header({ onMenuOpen, onExport, onAiAnalysis, onClientAcc
           </button>
         )}
 
-        {/* MOBILE ONLY: kebab — placeholder for future overflow menu */}
-        {!onHelp && <button
-          type="button"
-          className="btn h-kebab btn-kebab"
-          onClick={() => {}}
-          aria-label="עוד פעולות"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="5"  r="1.5"/>
-            <circle cx="12" cy="12" r="1.5"/>
-            <circle cx="12" cy="19" r="1.5"/>
-          </svg>
-        </button>}
+        {/* MOBILE ONLY: ⋮ — התפריט של הפעולות שמוסתרות בטלפון */}
+        {!onHelp && overflow.length > 0 && (
+          <div className="h-kebab-wrap" ref={menuRef}>
+            <button
+              type="button"
+              className="btn h-kebab btn-kebab"
+              onClick={() => setMenu(m => !m)}
+              aria-label="עוד פעולות"
+              aria-haspopup="menu"
+              aria-expanded={menu}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="5"  r="1.5"/>
+                <circle cx="12" cy="12" r="1.5"/>
+                <circle cx="12" cy="19" r="1.5"/>
+              </svg>
+            </button>
+            {menu && (
+              <div className="h-kebab-menu" role="menu">
+                {overflow.map(({ key, label, icon: Icon, run }) => (
+                  <button key={key} type="button" role="menuitem" onClick={() => { setMenu(false); run() }}>
+                    <Icon size={16} aria-hidden="true" />{label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Logout — visible on both desktop and mobile */}
         {onLogout && (
