@@ -547,3 +547,20 @@ th:hover .sort-ind { opacity: .8; }
 .sh-btn:hover, .sh-btn.on { background: var(--tv-brand-soft); }
 .sh-note { margin: 0 0 14px; }
 .sh-note[hidden] { display: none !important; }
+
+/* ── 25. "מה עובד במודעות" בטאב Facebook (5.11) — app/components/report-ui/CreativeTests.jsx ── */
+.ctz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+.ctz-card { background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: 14px; padding: 14px 16px; min-width: 0; box-shadow: var(--tv-shadow); }
+.ctz-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ctz-head h3 { margin: 0; font-size: 15px; font-weight: 800; color: var(--tv-text); }
+.ctz-ind { font-size: 11.5px; font-weight: 700; color: var(--tv-warning-fg); background: var(--tv-warning-bg); border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
+.ctz-scroll { overflow-x: auto; }
+.ctz-table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.ctz-table th { text-align: start; font-size: 12px; font-weight: 600; color: var(--tv-text-muted); padding: 6px 6px; border-bottom: 1px solid var(--tv-divider); white-space: nowrap; }
+.ctz-table td { padding: 8px 6px; border-bottom: 1px solid var(--tv-divider); color: var(--tv-text-secondary); white-space: nowrap; }
+.ctz-table tr:last-child td { border-bottom: 0; }
+.ctz-table td.ctz-name { color: var(--tv-text); font-weight: 600; white-space: normal; }
+.ctz-table td.ctz-cpl { color: var(--tv-text); font-weight: 800; }
+.ctz-table tr.best td { background: var(--tv-success-bg); }
+.ctz-best { display: inline-block; margin-inline-start: 6px; font-size: 11px; font-weight: 700; color: var(--tv-success-fg); background: #fff; border: 1px solid var(--tv-success-border); border-radius: 999px; padding: 0 7px; }
+.ctz-note { margin: 12px 2px 0; font-size: 12.5px; line-height: 1.6; color: var(--tv-text-muted); }
