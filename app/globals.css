@@ -2676,7 +2676,6 @@
 
   /* Hide desktop-only header actions */
   .h-actions .btn-export,
-  .h-actions .btn-ai,
   .h-actions .btn-client-access,
   .h-actions .h-search { display: none !important; }
 
@@ -2686,7 +2685,7 @@
     height: 34px; padding: 0 8px;
     border-color: transparent;
   }
-  .h-actions .btn:not(.btn-logout):not(.btn-kebab):not(.h-help) { display: none; }
+  .h-actions .btn:not(.btn-logout):not(.btn-kebab):not(.h-help):not(.btn-ai) { display: none; }
   .h-help { width: 34px; padding: 0 !important; justify-content: center; }
   .h-kebab {
     display: inline-flex !important;

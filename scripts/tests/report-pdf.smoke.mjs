@@ -163,6 +163,9 @@ eq('biggestChange: none when no comparable', biggestChange([{ label: 'x', change
   // השוואת צוות: לניתוח הפנימי, לא לדוח
   const tm = build({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: { ...withG(lg), responseTimeStats: { totalLids: 20, respondedCount: 15, noResponseCount: 5, noResponseByUser: { 'דנה': 4, 'יוסי': 1 }, business: { medianMinutes: 30, buckets: { '0-15m': 15 }, byUser: { 'דנה': { count: 5, avgMinutes: 90, medianMinutes: 60 }, 'יוסי': { count: 10, avgMinutes: 20, medianMinutes: 12 } } } } } }], prevRows: [] })
   const tc = analysisInput(tm).leadHandling.teamComparison
+  // ויטלי, 5.11: בדוח ללקוח אין "AI" — רק הערת כוכבית על מקור הנתונים
+  const hi = render(tm, { insights: { clientMessage: { whatHappened: 'באוקטובר התקיימו 18 פגישות (n=18).', meaning: 'טוב.', nextStep: 'נמשיך.', onUs: ['א'], onYou: ['ב'] } } })
+  eq('pdf summary: no "AI", disclaimer, no (n=)', [/\bAI\b/.test(hi), hi.includes('* כל הנתונים מחושבים על בסיס הנתונים הקיימים בכלל המערכות'), hi.includes('(n=18)')], [false, true, false])
   eq('team comparison reaches the AI, not the PDF', [tc.map(t => [t.person, t.leadsWithRecordedAction, t.leadsWithoutRecordedAction, t.medianMinutesToFirstRecordedAction]), render(tm).includes('יוסי')], [[['יוסי', 10, 1, 12], ['דנה', 5, 4, 60]], false])
   const fb = build({ project: 'אלפא', key: '2026-10', prevKey: '2026-09', rows: [{ source: 'crm', summary: { crmType: 'fireberry', totalLeads: 948, byStatus: { 'לא רלוונטי כללי': 333, 'לא רלוונטי שפה': 1 }, responseTimeStats: { totalLids: 948, respondedCount: 800, noResponseCount: 148 } } }], prevRows: [] })
   const hf = render(fb)
