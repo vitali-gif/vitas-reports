@@ -35,6 +35,7 @@ export default function Sidebar({
   onAiAnalysis,
   onClientAccess,
   onSessionLogs,
+  onOnboarding,
   // עיצוב מחודש (ענף redesign): כשמועבר brand={{logo, tagline}} הסיידבר מציג לוגו למעלה,
   // אייקוני lucide במקום נקודות/אימוג'י, וה-inline styles מפנים את מקומם ל-CSS (.vr-shell).
   brand = null,
@@ -145,7 +146,7 @@ export default function Sidebar({
         </div>
 
         {/* MOBILE ONLY: surface the hidden header actions inside the drawer */}
-        {(onExport || onAiAnalysis || onClientAccess || onSessionLogs) && (
+        {(onExport || onAiAnalysis || onClientAccess || onSessionLogs || onOnboarding) && (
           <div className="side-mobile-actions">
             {onExport && (
               <button className="btn" onClick={() => { onExport(); onClose?.(); }}>
@@ -160,6 +161,11 @@ export default function Sidebar({
             {onClientAccess && (
               <button className="btn" onClick={() => { onClientAccess(); onClose?.(); }}>
                 🔗 גישת לקוחות
+              </button>
+            )}
+            {onOnboarding && (
+              <button className="btn" onClick={() => { onOnboarding(); onClose?.(); }}>
+                ✅ קליטת לקוחות
               </button>
             )}
             {onSessionLogs && (
