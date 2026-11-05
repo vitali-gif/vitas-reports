@@ -85,24 +85,32 @@ function Timeline({ email, days }) {
   }, [email, days])
   if (!data) return <div style={{ ...muted, padding: 10 }}>טוען...</div>
   if (!data.length) return <div style={{ ...muted, padding: 10 }}>אין כניסות בתקופה</div>
+  // כניסות מלפני הפעלת המעקב (6.11): אין להן זמן עבודה ולא פעולות — שורה אחת במקום רשימה של "אין פעולות"
+  const tracked = data.filter(s => s.active_sec != null)
+  const before = data.length - tracked.length
   return (
     <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-      {data.slice(0, 25).map(s => (
+      {tracked.slice(0, 25).map(s => (
         <div key={s.id} style={{ borderInlineStart: '3px solid var(--tv-brand,#315cf5)', paddingInlineStart: 10 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700 }}>
-            {fmtDate(s.logged_in_at)} · {s.active_sec != null ? `פעיל ${fmtMin(s.active_sec)}` : `פתוח ${fmtMin(s.durSec)}`}
+            {fmtDate(s.logged_in_at)} · זמן עבודה {fmtMin(s.active_sec)}
             {s.device ? ` · ${DEVICES[s.device] || s.device}` : ''}{s.selected_project ? ` · ${s.selected_project}` : ''}
-            {s.isActive && <span style={{ color: '#059669', marginInlineStart: 6 }}>● עכשיו</span>}
+            {s.isActive && <span style={{ color: '#059669', marginInlineStart: 6 }}>● עובד עכשיו</span>}
           </div>
           <div style={{ marginTop: 4 }}>
             {s.events.length ? s.events.map((e, i) => (
               <span key={i} style={{ ...chip, ...(e.name === 'tab' ? { background: 'var(--tv-brand-soft,#eef2ff)', color: 'var(--tv-brand,#315cf5)', fontWeight: 600 } : {}), ...(e.name === 'help' ? { background: '#fff7e6', color: '#92400e' } : {}) }} title={fmtDate(e.at)}>
                 {EVENT_LABEL[e.name] || e.name}{eventText(e) ? `: ${eventText(e)}` : ''}
               </span>
-            )) : <span style={muted}>אין פעולות מתועדות (כניסה לפני העדכון, או רק פתח וסגר)</span>}
+            )) : <span style={muted}>לא נרשמו פעולות — נכנס ויצא</span>}
           </div>
         </div>
       ))}
+      {before > 0 && (
+        <div style={{ ...muted, borderInlineStart: '3px solid var(--tv-border,#e2e8f0)', paddingInlineStart: 10 }}>
+          {tracked.length ? 'ועוד' : ''} {before} כניסות מלפני הפעלת המעקב (6.11). בהן ידוע רק מתי נכנס — לא כמה זמן עבד ומה עשה.
+        </div>
+      )}
     </div>
   )
 }
@@ -116,13 +124,13 @@ function SessionsTable() {
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead><tr style={{ borderBottom: '2px solid var(--tv-border,#e2e8f0)' }}><th style={th}>מייל</th><th style={th}>לקוח</th><th style={th}>כניסה</th><th style={th}>זמן פעיל</th><th style={th}>מכשיר</th><th style={th}>פרויקט</th><th style={th}>סטטוס</th></tr></thead>
+        <thead><tr style={{ borderBottom: '2px solid var(--tv-border,#e2e8f0)' }}><th style={th}>מייל</th><th style={th}>לקוח</th><th style={th}>כניסה</th><th style={th}>זמן עבודה</th><th style={th}>מכשיר</th><th style={th}>פרויקט</th><th style={th}>סטטוס</th></tr></thead>
         <tbody>{rows.map(s => (
           <tr key={s.id} style={{ borderBottom: '1px solid var(--tv-divider,#f1f5f9)' }}>
             <td style={{ padding: 10, direction: 'ltr', textAlign: 'left', fontFamily: 'monospace', fontSize: 12 }}>{s.email}</td>
             <td style={{ padding: 10, fontWeight: 600 }}>{s.client_name || '—'}</td>
             <td style={{ padding: 10, ...muted }}>{fmtDate(s.logged_in_at)}</td>
-            <td style={{ padding: 10, fontWeight: 600 }}>{s.active_sec != null ? fmtMin(s.active_sec) : <span style={muted}>{'פתוח ' + fmtMin(s.durSec)}</span>}</td>
+            <td style={{ padding: 10, fontWeight: 600 }}>{s.active_sec != null ? fmtMin(s.active_sec) : <span style={muted} title="כניסה מלפני הפעלת המעקב (6.11)">לא נמדד</span>}</td>
             <td style={{ padding: 10, ...muted }}>{DEVICES[s.device] || '—'}</td>
             <td style={{ padding: 10, ...muted }}>{s.selected_project || '—'}</td>
             <td style={{ padding: 10 }}>{s.isActive ? <span style={{ background: 'rgba(16,185,129,0.12)', color: '#059669', borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>● פעיל כעת</span> : <span style={muted}>יצא</span>}</td>
@@ -180,7 +188,7 @@ export default function UsageModal({ onClose }) {
         ) : (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
-              {[['משתמשים שנכנסו', totals.users], ['כניסות', totals.sessions], ['זמן פעיל (כולם)', fmtMin(totals.active)], ['מהטלפון', totals.devices ? Math.round(totals.mobile / totals.devices * 100) + '%' : '—']].map(([l, v]) => (
+              {[['משתמשים שנכנסו', totals.users], ['כניסות', totals.sessions], ['זמן עבודה (כולם)', fmtMin(totals.active)], ['מהטלפון', totals.devices ? Math.round(totals.mobile / totals.devices * 100) + '%' : '—']].map(([l, v]) => (
                 <div key={l} style={card}><div style={muted}>{l}</div><div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>{v}</div></div>
               ))}
             </div>
@@ -208,7 +216,7 @@ export default function UsageModal({ onClose }) {
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '8px 0', fontSize: 13 }}>
                       <span><b>{u.sessions}</b> כניסות</span>
                       <span><b>{u.days}</b> ימים שונים</span>
-                      <span>{u.activeSec != null ? <>זמן פעיל <b>{fmtMin(u.activeSec)}</b></> : <>פתוח <b>{fmtMin(u.durSec)}</b> <span style={muted}>(זמן פעיל יימדד מעכשיו)</span></>}</span>
+                      <span>{u.activeSec != null ? <>זמן עבודה <b>{fmtMin(u.activeSec)}</b>{u.activeSessions < u.sessions ? <span style={muted}> (ב-{u.activeSessions} כניסות שנמדדו)</span> : null}</> : <span style={muted}>זמן עבודה יימדד מהכניסה הבאה</span>}</span>
                       {Object.entries(u.devices || {}).map(([d, n]) => <span key={d} style={chip}>{DEVICES[d] || d} · {n}</span>)}
                       {u.projects.map(p => <span key={p} style={chip}>{p}</span>)}
                     </div>
@@ -230,7 +238,7 @@ export default function UsageModal({ onClose }) {
               })}
             </div>
             <p style={{ ...muted, marginTop: 12, lineHeight: 1.6 }}>
-              זמן פעיל: המסך פתוח והייתה פעולה (גלילה, לחיצה) בשתי הדקות האחרונות — לשונית שנשארה פתוחה לא נספרת. נמדד מהעדכון הזה והלאה; כניסות ישנות מציגות רק כמה זמן הדשבורד היה פתוח.
+              זמן עבודה: רק כשהמסך פתוח והייתה פעולה (גלילה, לחיצה) בשתי הדקות האחרונות — לשונית שנשכחה פתוחה לא נספרת. נמדד מ-6.11; בכניסות ישנות יותר ידוע רק מתי נכנס.
               לא נשמרים פרטי לידים — רק טאבים, תקופות, שמות סעיפים ולחיצות. משתמשי בדיקה לא נספרים.
             </p>
           </>

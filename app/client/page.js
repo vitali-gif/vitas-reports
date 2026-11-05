@@ -6,7 +6,7 @@ const ONBOARDING_ON = false
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { apiFetch, accessToken } from '../../lib/api-fetch'
-import { startUsage, flushUsage, activeSeconds, deviceKind } from '../../lib/usage-track.js'
+import { startUsage, flushUsage, activeSeconds, deviceKind, workingNow } from '../../lib/usage-track.js'
 import dynamic from 'next/dynamic'
 import { GoogleMark, MicrosoftMark } from '../components/auth/ProviderMarks'
 import GoogleGisButton from '../components/auth/GoogleGisButton'
@@ -97,6 +97,7 @@ export default function ClientPage() {
     accessToken().then(t => { token = t })
     const hb = setInterval(() => {
       accessToken().then(t => { token = t })
+      if (!workingNow()) return   // לשונית ברקע או בלי פעולה — לא "פעיל"
       apiFetch('/api/client-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -66,7 +66,10 @@ export async function POST(req) {
   if (event === 'heartbeat') {
     if (!sessionId) return NextResponse.json({ ok: true })
     const act = okSec(body.activeSec)
-    await updateSession(sessionId, email, { last_seen_at: new Date().toISOString() }, act != null ? { active_sec: act } : {})
+    // heartbeat בלי activeSec = גרסה ישנה של הדף שנשארה פתוחה בלשונית (לפני 6.11). היא שולחת כל דקה גם
+    // כשאף אחד לא משתמש, ולכן לא מעדכנים לפיה — אחרת הכניסה נראית "פעילה עכשיו" ימים שלמים.
+    if (act == null) return NextResponse.json({ ok: true })
+    await updateSession(sessionId, email, { last_seen_at: new Date().toISOString() }, { active_sec: act })
     return NextResponse.json({ ok: true })
   }
 
@@ -159,7 +162,7 @@ export async function GET(req) {
   const enriched = (data || []).map(s => {
     const lastSeen = new Date(s.last_seen_at).getTime()
     const loggedIn = new Date(s.logged_in_at).getTime()
-    const isActive = !s.ended && (now - lastSeen) < 3 * 60 * 1000 // active if heartbeat < 3 min ago
+    const isActive = !s.ended && s.active_sec != null && (now - lastSeen) < 3 * 60 * 1000 // heartbeat < 3 min ago, from a page that measures work time (6.11+)
     const durSec = s.ended ? s.duration_sec : Math.round((lastSeen - loggedIn) / 1000)
     return { ...s, isActive, durSec }
   })
@@ -189,7 +192,7 @@ async function usageView(url, view) {
       evs.push(...(data || []))
     }
     const by = new Map(); for (const e of evs) { if (!by.has(e.session_id)) by.set(e.session_id, []); by.get(e.session_id).push(e) }
-    return NextResponse.json({ sessions: (ss || []).map(x => ({ ...x, durSec: effDur(x, now), isActive: !x.ended && now - new Date(x.last_seen_at).getTime() < 180000, events: by.get(x.id) || [] })) }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ sessions: (ss || []).map(x => ({ ...x, durSec: effDur(x, now), isActive: !x.ended && x.active_sec != null && now - new Date(x.last_seen_at).getTime() < 180000, events: by.get(x.id) || [] })) }, { headers: { 'Cache-Control': 'no-store' } })
   }
 
   const { data: ss, error } = await notIgnored(supabaseAdmin.from('client_sessions').select('*').gte('logged_in_at', since)).order('logged_in_at', { ascending: false }).limit(5000)
