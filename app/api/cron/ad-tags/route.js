@@ -10,7 +10,7 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { adminClient, requireAdmin } from '../../../../lib/auth'
-import { tagCreative } from '../../../../lib/ad-tags.js'
+import { tagCreative, fetchImage } from '../../../../lib/ad-tags.js'
 import { META_GRAPH_VERSION, metaTokenFor } from '../../../../lib/ads/meta-api.js'
 import { logJob } from '../../../../lib/job-log.js'
 
@@ -35,6 +35,7 @@ async function metaCreative(adId, account) {
   const token = metaTokenFor(account || '')
   const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/${adId}?fields=name,creative{title,body,image_url,thumbnail_url,video_id}&access_token=${encodeURIComponent(token)}`
   const r = await fetch(url).then(x => x.json()).catch(() => ({}))
+  if (r.error) throw new Error('Meta: ' + String(r.error.message || r.error.type || 'error').slice(0, 160))
   const c = r.creative || {}
   return { name: r.name || '', title: c.title || '', body: c.body || '', imageUrl: c.image_url || c.thumbnail_url || '', isVideo: !!c.video_id }
 }
@@ -68,10 +69,17 @@ export async function GET(req) {
   const ids = [...ads.keys()]
   const done = new Set()
   for (let i = 0; i < ids.length; i += 200) {
-    const { data } = await sb.from('ad_creative_tags').select('ad_id').in('ad_id', ids.slice(i, i + 200))
-    for (const x of data || []) done.add(x.ad_id)
+    const { data } = await sb.from('ad_creative_tags').select('ad_id, image_url, ad_name').in('ad_id', ids.slice(i, i + 200))
+    // סיווג בלי תמונה ובלי שם (ריצה ראשונה, 5.11 — הקלט הגיע ריק) לא נחשב: מסווגים שוב ודורסים
+    for (const x of data || []) if (x.image_url || x.ad_name) done.add(x.ad_id)
   }
   const todo = ids.filter(id => !done.has(id)).slice(0, limit).map(id => ads.get(id))
+  // מודעה שמופיעה רק במספרים (בלי activeAds): החשבון שלה מ-ad_daily, כדי לפנות למטא עם הטוקן הנכון
+  const noAcc = todo.filter(a => !a.account).map(a => a.adId)
+  if (noAcc.length) {
+    const { data: accs } = await sb.from('ad_daily').select('ad_id, account, ad').eq('source', 'facebook').in('ad_id', noAcc).limit(2000)
+    for (const r of accs || []) { const a = ads.get(String(r.ad_id)); if (a && !a.account) { a.account = String(r.account || ''); if (!a.name && r.ad) a.name = r.ad } }
+  }
   if (dry) return J({ ads: ids.length, tagged: done.size, todo: todo.length })
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY.trim() })
@@ -79,11 +87,14 @@ export async function GET(req) {
   let ok = 0
   await pool(todo, 4, async (a) => {
     try {
-      const c = a.full ? a : { ...a, ...(await metaCreative(a.adId, a.account)) }
-      const { tags, model } = await tagCreative(anthropic, { imageUrl: c.imageUrl, title: c.title, body: c.body, adName: c.name })
+      // רק שדות שבאמת חזרו ממטא — תשובה ריקה לא מוחקת את מה שכבר ידוע (שם המודעה מהדוח)
+      const c = a.full ? a : { ...a, ...Object.fromEntries(Object.entries(await metaCreative(a.adId, a.account)).filter(([, v]) => v)) }
+      const image = await fetchImage(c.imageUrl)
+      if (!image && !c.title && !c.body) throw new Error('no image and no text for this ad (Meta returned nothing) - not tagged')
+      const { tags, model } = await tagCreative(anthropic, { image, title: c.title, body: c.body, adName: c.name })
       const { error: upErr } = await sb.from('ad_creative_tags').upsert({
         ad_id: a.adId, account: c.account || '', ad_name: c.name || null, image_url: c.imageUrl || null,
-        is_video: !!c.isVideo, tags, model, tagged_at: new Date().toISOString(),
+        is_video: !!c.isVideo, tags: { ...tags, ...(image ? {} : { fromTextOnly: true }) }, model, tagged_at: new Date().toISOString(),
       })
       if (upErr) throw new Error(upErr.message)
       ok++

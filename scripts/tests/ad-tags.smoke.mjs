@@ -42,4 +42,11 @@ const mock = { beta: { messages: { create: async (req) => { sent = req; return {
 const r = await tagCreative(mock, { imageUrl: 'https://x/y.jpg', title: 'דירות גן', body: 'החל מ-2.9 מיליון', adName: 'ad' })
 eq('tag: image by URL + text, structured output, low effort', [sent.messages[0].content[0].source.url, sent.output_config.format.schema === TAG_SCHEMA, sent.output_config.effort, r.tags.property], ['https://x/y.jpg', true, 'low', 'garden'])
 
+// תמונה כקובץ (קישורים של פייסבוק חסומים לשליפה של Anthropic)
+const { fetchImage } = await import('../../lib/ad-tags.js')
+const fakeFetch = (type, bytes = 10) => async () => ({ ok: true, headers: { get: () => type }, arrayBuffer: async () => new Uint8Array(bytes).buffer })
+eq('fetchImage: jpeg → base64, html → null, bad url → null', [(await fetchImage('https://x/a.jpg', { fetchImpl: fakeFetch('image/jpeg') }))?.media_type, await fetchImage('https://x/a', { fetchImpl: fakeFetch('text/html') }), await fetchImage('ftp://x')], ['image/jpeg', null, null])
+await tagCreative(mock, { image: { media_type: 'image/png', data: 'AAAA' }, title: 't' })
+eq('tag: image sent as base64 when downloaded', [sent.messages[0].content[0].source.type, sent.messages[0].content[0].source.media_type], ['base64', 'image/png'])
+
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
