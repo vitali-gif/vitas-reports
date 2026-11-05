@@ -38,6 +38,21 @@ eq('pdf without tags: no section', renderReportHtml(buildReportModel({ project: 
 const inp = analysisInput(m)
 eq('ai input carries the groups', [inp.creativeTests.length > 0, inp.creativeTests[0].groups[0].value.length > 0], [true, true])
 
+// פגישות מה-CRM (adBreakdown לפי מזהה מודעה): עמודות פגישות ועלות לפגישה, ודירוג לפי עלות לפגישה כשיש מספיק
+const crm = (list) => ({ source: 'crm', summary: { adBreakdown: list } })
+const rowsM = [...rows, crm([{ adId: '\u200f1', meetings: 2 }, { adId: '2', meetings: 6 }, { adId: '2', meetings: 2 }, { adId: '3', meetings: 1 }, { adId: '4', meetings: 3 }])]
+const adsM = adsFromRows(rowsM)
+eq('meetings joined by ad id (RTL marks stripped, nodes summed)', ['1', '2', '3', '4', '5'].map(id => adsM.find(a => a.adId === id).meetings), [2, 8, 1, 3, 0])
+eq('no CRM ad ids → meetings null', adsFromRows([...rows, crm([{ ad: 'x', meetings: 4 }])])[0].meetings, null)
+const pm = creativeTests(adsM, tags).find(t => t.key === 'people')
+// עם אנשים: 1500₪, 35 לידים, 5 פגישות (300₪) · בלי אנשים: 1500₪, 15 לידים, 9 פגישות (167₪)
+eq('people ranked by cost per meeting: without wins despite pricier leads', [pm.rankBy, pm.groups.map(g => [g.label, g.meetings, Math.round(g.cpm)])], ['meeting', [['בלי אנשים', 9, 167], ['עם אנשים', 5, 300]]])
+eq('few meetings in a dimension → ranked by lead', creativeTests(adsFromRows([...rows, crm([{ adId: '1', meetings: 1 }, { adId: '2', meetings: 1 }])]), tags).find(t => t.key === 'people').rankBy, 'lead')
+eq('no CRM → hasMeetings false, meetings null', [people.hasMeetings, people.groups[0].meetings], [false, null])
+const hM = renderReportHtml(buildReportModel({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: rowsM, prevRows: [], adTags: tags }))
+eq('pdf: leads + meetings columns', [hM.includes('עלות לפגישה'), hM.includes('>לידים<'), h.includes('עלות לפגישה'), h.includes('>לידים<')], [true, true, false, true])
+eq('ai input: meetings when present', [analysisInput(buildReportModel({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: rowsM, prevRows: [], adTags: tags })).creativeTests.find(t => t.attribute === 'אנשים בתמונה').groups[0].meetings, inp.creativeTests[0].groups[0].meetings], [9, undefined])
+
 // הסיווג: הבקשה למודל
 let sent = null
 const mock = { beta: { messages: { create: async (req) => { sent = req; return { model: 'm', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ people: 'with', visual: 'lifestyle', property: 'garden', price: 'shown', color: 'warm', angle: 'lifestyle' }) }] } } } } }
