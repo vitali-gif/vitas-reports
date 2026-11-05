@@ -1600,7 +1600,7 @@ const selectProject = async (client, project) => {
         apiFetch('/api/client-log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event: 'project_select', sessionId: sid, projectName: project.name })
+          body: JSON.stringify({ event: 'project_select', sessionId: sid, projectName: project.name, clientName: client?.name || null })
         }).catch(() => {})
       }
     }
