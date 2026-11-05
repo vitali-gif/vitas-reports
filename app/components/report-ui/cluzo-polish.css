@@ -570,3 +570,7 @@ th:hover .sort-ind { opacity: .8; }
 .ctz-best { white-space: nowrap; }
 .ctz-table td.ctz-name .ctz-best { display: block; width: fit-content; margin: 3px 0 0; }
 @media (max-width: 600px) { .ctz-meet .ctz-opt { display: none; } .ctz-table { font-size: 13px; } .ctz-table th, .ctz-table td { padding-inline: 4px; } }
+
+/* §26 המודעות הכי מובילות: בטלפון רק 5 הראשונות (ויטלי, 6.11) */
+.ta-n-mob { display: none; }
+@media (max-width: 640px) { .section-top-ads .ta-extra { display: none !important; } .ta-n-mob { display: inline; } .ta-n-desk { display: none; } }

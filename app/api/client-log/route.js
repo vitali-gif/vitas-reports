@@ -25,6 +25,17 @@ const LOG_IGNORED = new Set(['qa@vitas.co.il', ...String(process.env.CLIENT_LOG_
   .map(e => e.toLowerCase().trim()).filter(Boolean))
 
 // POST â log session events from client dashboard
+// פעולות בתוך הכניסה (lib/usage-track.js, מיגרציה 029): רק השמות והשדות האלה נשמרים, טקסט קצר בלבד.
+const ACTIONS = { tab: ['tab'], crm_view: ['view'], period: ['period'], compare: [], section: ['title'], help: ['title'], ai_open: [], modal: ['kind'] }
+const DEVICES = new Set(['mobile', 'tablet', 'desktop'])
+const cleanText = (v, n = 80) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n)
+const okSec = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.min(Math.round(Number(v)), 86400) : null)
+// עמודות מיגרציה 029 — לפני שהיא רצה, העדכון נכשל על העמודה; מנסים שוב בלעדיה
+async function updateSession(id, email, patch, extra) {
+  const { error } = await supabaseAdmin.from('client_sessions').update({ ...patch, ...extra }).eq('id', id).eq('email', email)
+  if (error && Object.keys(extra).length) await supabaseAdmin.from('client_sessions').update(patch).eq('id', id).eq('email', email)
+}
+
 export async function POST(req) {
   const body = await req.json().catch(() => ({}))
   // navigator.sendBeacon (אירוע logout) לא יכול לשאת כותרות, לכן הטוקן מתקבל גם מהגוף.
@@ -38,27 +49,41 @@ export async function POST(req) {
     if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 })
     // בלי sessionId ה-heartbeat וה-project_select שאחריו לא נוגעים בטבלה.
     if (LOG_IGNORED.has(email.toLowerCase().trim())) return NextResponse.json({ ok: true, sessionId: null })
-    const { data, error } = await supabaseAdmin
-      .from('client_sessions')
-      .insert({
-        email: email.toLowerCase().trim(),
-        client_name: clientName || null,
-        project_ids: projectIds || [],
-        logged_in_at: new Date().toISOString(),
-        last_seen_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single()
+    const row = {
+      email: email.toLowerCase().trim(),
+      client_name: clientName || null,
+      project_ids: projectIds || [],
+      logged_in_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+    }
+    const device = DEVICES.has(body.device) ? body.device : null
+    let { data, error } = await supabaseAdmin.from('client_sessions').insert(device ? { ...row, device } : row).select('id').single()
+    if (error && device) ({ data, error } = await supabaseAdmin.from('client_sessions').insert(row).select('id').single())
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, sessionId: data.id })
   }
 
   if (event === 'heartbeat') {
     if (!sessionId) return NextResponse.json({ ok: true })
-    await supabaseAdmin
-      .from('client_sessions')
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq('id', sessionId).eq('email', email)
+    const act = okSec(body.activeSec)
+    await updateSession(sessionId, email, { last_seen_at: new Date().toISOString() }, act != null ? { active_sec: act } : {})
+    return NextResponse.json({ ok: true })
+  }
+
+  if (event === 'actions') {
+    if (!sessionId || !Array.isArray(body.items) || !body.items.length) return NextResponse.json({ ok: true })
+    // הכניסה חייבת להיות של המשתמש הזה — אחרת אפשר היה לכתוב פעולות לכניסה של מישהו אחר
+    const { data: own } = await supabaseAdmin.from('client_sessions').select('id').eq('id', sessionId).eq('email', email).maybeSingle()
+    if (!own) return NextResponse.json({ ok: true })
+    const now = Date.now()
+    const rows = body.items.slice(0, 60).filter(i => i && Object.prototype.hasOwnProperty.call(ACTIONS, i.name)).map(i => {
+      const detail = {}
+      for (const k of ACTIONS[i.name]) if (i.detail && i.detail[k] != null) detail[k] = cleanText(i.detail[k])
+      const t = Date.parse(i.at)
+      return { session_id: sessionId, email: email.toLowerCase().trim(), project_name: i.project ? cleanText(i.project, 120) : null, name: i.name, detail,
+        at: Number.isFinite(t) && t <= now + 60000 && t > now - 864e5 ? new Date(t).toISOString() : new Date(now).toISOString() }
+    })
+    if (rows.length) await supabaseAdmin.from('client_events').insert(rows)   // לפני מיגרציה 029 — נכשל בשקט
     return NextResponse.json({ ok: true })
   }
 
@@ -73,14 +98,8 @@ export async function POST(req) {
 
   if (event === 'logout') {
     if (!sessionId) return NextResponse.json({ ok: true })
-    await supabaseAdmin
-      .from('client_sessions')
-      .update({
-        ended: true,
-        last_seen_at: new Date().toISOString(),
-        duration_sec: durationSec || 0,
-      })
-      .eq('id', sessionId).eq('email', email)
+    const act = okSec(body.activeSec)
+    await updateSession(sessionId, email, { ended: true, last_seen_at: new Date().toISOString(), duration_sec: durationSec || 0 }, act != null ? { active_sec: act } : {})
     return NextResponse.json({ ok: true })
   }
 
@@ -119,6 +138,10 @@ export async function GET(req) {
   const gate = await requireAdmin(req)
   if (!gate.ok) return gate.res
 
+  const url = new URL(req.url)
+  const view = url.searchParams.get('view')
+  if (view === 'usage' || view === 'user') return usageView(url, view)
+
   // השורות הישנות של משתמשי הבדיקה נשארות בטבלה — מסננים אותן כאן, לפני תקרת ה-100.
   let q = supabaseAdmin
     .from('client_sessions')
@@ -141,4 +164,68 @@ export async function GET(req) {
   })
 
   return NextResponse.json(enriched)
+}
+
+// ── מסך השימוש (ויטלי, 6.11): סיכום לכל משתמש, וציר זמן של משתמש אחד ─────────────────────────
+// view=usage&days=30 → { since, users: [...] } · view=user&email=…&days=30 → { sessions: [{ ..., events: [...] }] }
+const effDur = (s, now) => (s.ended ? (s.duration_sec || 0) : Math.round((new Date(s.last_seen_at).getTime() - new Date(s.logged_in_at).getTime()) / 1000))
+async function usageView(url, view) {
+  const days = Math.min(180, Math.max(1, Number(url.searchParams.get('days')) || 30))
+  const since = new Date(Date.now() - days * 864e5).toISOString()
+  const now = Date.now()
+  const ignored = [...LOG_IGNORED]
+  const notIgnored = (q) => (ignored.length ? q.not('email', 'in', `(${ignored.map(e => `"${e.replace(/"/g, '')}"`).join(',')})`) : q)
+
+  if (view === 'user') {
+    const email = String(url.searchParams.get('email') || '').toLowerCase().trim()
+    if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 })
+    const { data: ss, error } = await supabaseAdmin.from('client_sessions').select('*').eq('email', email).gte('logged_in_at', since).order('logged_in_at', { ascending: false }).limit(60)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const ids = (ss || []).map(x => x.id)
+    const evs = []
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data } = await supabaseAdmin.from('client_events').select('session_id, project_name, name, detail, at').in('session_id', ids.slice(i, i + 100)).order('at', { ascending: true }).limit(5000)
+      evs.push(...(data || []))
+    }
+    const by = new Map(); for (const e of evs) { if (!by.has(e.session_id)) by.set(e.session_id, []); by.get(e.session_id).push(e) }
+    return NextResponse.json({ sessions: (ss || []).map(x => ({ ...x, durSec: effDur(x, now), isActive: !x.ended && now - new Date(x.last_seen_at).getTime() < 180000, events: by.get(x.id) || [] })) }, { headers: { 'Cache-Control': 'no-store' } })
+  }
+
+  const { data: ss, error } = await notIgnored(supabaseAdmin.from('client_sessions').select('*').gte('logged_in_at', since)).order('logged_in_at', { ascending: false }).limit(5000)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const { data: evs, error: evErr } = await notIgnored(supabaseAdmin.from('client_events').select('email, name, detail, at').gte('at', since)).order('at', { ascending: false }).limit(20000)
+  const users = new Map()
+  const U = (email) => users.get(email) || users.set(email, { email, client: null, sessions: 0, days: new Set(), durSec: 0, activeSec: 0, activeKnown: 0, lastAt: null, devices: {}, projects: new Set(), tabs: {}, sections: {}, help: {}, crmViews: {}, ai: 0, compare: 0, modals: 0, periods: { month: 0, range: 0 } }).get(email)
+  for (const x of ss || []) {
+    const u = U(x.email)
+    u.client = u.client || x.client_name
+    u.sessions++
+    u.days.add(String(x.logged_in_at).slice(0, 10))
+    u.durSec += effDur(x, now)
+    if (x.active_sec != null) { u.activeSec += x.active_sec; u.activeKnown++ }
+    if (!u.lastAt || x.last_seen_at > u.lastAt) u.lastAt = x.last_seen_at
+    if (x.device) u.devices[x.device] = (u.devices[x.device] || 0) + 1
+    if (x.selected_project) u.projects.add(x.selected_project)
+  }
+  const inc = (o, k) => { if (k) o[k] = (o[k] || 0) + 1 }
+  for (const e of evs || []) {
+    const u = users.get(e.email); if (!u) continue
+    const d = e.detail || {}
+    if (e.name === 'tab') inc(u.tabs, d.tab)
+    else if (e.name === 'section') inc(u.sections, d.title)
+    else if (e.name === 'help') inc(u.help, d.title)
+    else if (e.name === 'crm_view') inc(u.crmViews, d.view)
+    else if (e.name === 'ai_open') u.ai++
+    else if (e.name === 'compare') u.compare++
+    else if (e.name === 'modal') u.modals++
+    else if (e.name === 'period') u.periods[String(d.period || '').includes('_') ? 'range' : 'month']++
+  }
+  const top = (o, n = 8) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n)
+  const out = [...users.values()].map(u => ({
+    email: u.email, client: u.client, sessions: u.sessions, days: u.days.size, durSec: u.durSec,
+    activeSec: u.activeKnown ? u.activeSec : null, activeSessions: u.activeKnown, lastAt: u.lastAt, devices: u.devices, projects: [...u.projects],
+    tabs: top(u.tabs, 12), sections: top(u.sections, 40), help: top(u.help, 10), crmViews: top(u.crmViews, 10),
+    ai: u.ai, compare: u.compare, modals: u.modals, periods: u.periods,
+  })).sort((a, b) => String(b.lastAt || '').localeCompare(String(a.lastAt || '')))
+  return NextResponse.json({ since, days, eventsReady: !evErr, users: out }, { headers: { 'Cache-Control': 'no-store' } })
 }

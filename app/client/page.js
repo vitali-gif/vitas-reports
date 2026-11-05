@@ -6,6 +6,7 @@ const ONBOARDING_ON = false
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { apiFetch, accessToken } from '../../lib/api-fetch'
+import { startUsage, flushUsage, activeSeconds, deviceKind } from '../../lib/usage-track.js'
 import dynamic from 'next/dynamic'
 import { GoogleMark, MicrosoftMark } from '../components/auth/ProviderMarks'
 import GoogleGisButton from '../components/auth/GoogleGisButton'
@@ -89,6 +90,7 @@ export default function ClientPage() {
   useEffect(() => {
     if (!sessionId) return
     const start = sessionStart
+    startUsage(sessionId)   // מה הלקוח עושה בדשבורד (lib/usage-track.js, ויטלי 6.11)
     // הטוקן נשמר כאן כי sendBeacon (למטה) חייב לרוץ סינכרונית ולא יכול להמתין
     // ל-getSession. מתרענן בכל פעימה כדי שלא יפוג במהלך סשן ארוך.
     let token = null
@@ -98,14 +100,15 @@ export default function ClientPage() {
       apiFetch('/api/client-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event: 'heartbeat', sessionId })
+        body: JSON.stringify({ event: 'heartbeat', sessionId, activeSec: activeSeconds() })
       }).catch(() => {})
     }, 60000)
     const handleUnload = () => {
       const dur = Math.round((Date.now() - start) / 1000)
       // sendBeacon לא יכול לשאת כותרות — השרת מקבל את הטוקן מגוף הבקשה.
+      flushUsage(token)
       navigator.sendBeacon('/api/client-log',
-        JSON.stringify({ event: 'logout', sessionId, durationSec: dur, accessToken: token }))
+        JSON.stringify({ event: 'logout', sessionId, durationSec: dur, activeSec: activeSeconds(), accessToken: token }))
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => { clearInterval(hb); window.removeEventListener('beforeunload', handleUnload) }
@@ -235,6 +238,7 @@ export default function ClientPage() {
           email: userEmail,
           clientName: list[0]?.projects?.clients?.name || '',
           projectIds: list.map(a => a.project_id),
+          device: deviceKind(),
         })
       }).then(r => r.json()).then(d => { if (d.sessionId) { setSessionId(d.sessionId); if (typeof window !== 'undefined') window.__vitasSessionId = d.sessionId } }).catch(() => {})
 

@@ -71,8 +71,8 @@ export default function Header({ onMenuOpen, onExport, onAiAnalysis, onClientAcc
 
         {/* Session Logs */}
         {onSessionLogs && (
-          <button className="btn btn-outline" onClick={onSessionLogs} title="לוג כניסות לקוחות">
-            {vr ? <Users size={16} aria-hidden="true" className="h-ico" /> : '👁'} לוג לקוחות
+          <button className="btn btn-outline" onClick={onSessionLogs} title="שימוש לקוחות: מי נכנס ומה עשה">
+            {vr ? <Users size={16} aria-hidden="true" className="h-ico" /> : '👁'} שימוש לקוחות
           </button>
         )}
 

@@ -36,6 +36,7 @@ function enhance(root) {
       note.hidden = !note.hidden
       btn.setAttribute('aria-expanded', String(!note.hidden))
       btn.classList.toggle('on', !note.hidden)
+      if (!note.hidden && typeof window !== 'undefined' && window.__vitasTrack) window.__vitasTrack('help', { title: title.slice(0, 80) })
     })
     h2.insertAdjacentElement('afterend', btn)
     head.insertAdjacentElement('afterend', note)
