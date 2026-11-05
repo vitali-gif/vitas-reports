@@ -23,6 +23,24 @@ const supabaseAdmin = new Proxy({}, {
 // מופרדות בפסיק.
 const LOG_IGNORED = new Set(['qa@vitas.co.il', ...String(process.env.CLIENT_LOG_IGNORE || '').split(',')]
   .map(e => e.toLowerCase().trim()).filter(Boolean))
+// לא נספרים גם (ויטלי, 6.11: "תסנן את הפעולות שלי ושל גורדל ואת המייל הפרטי שלי"): כל מייל בטבלת
+// admins, וכל כינוי של המייל הפרטי (vitalidisel+משהו@gmail.com — משתמשי בדיקה שלו).
+const OWNER_ALIAS = /^vitalidisel(\+[^@]*)?@gmail\.com$/
+let _admins = { at: 0, set: new Set() }
+async function adminEmails() {
+  if (Date.now() - _admins.at < 5 * 60 * 1000) return _admins.set
+  const { data } = await supabaseAdmin.from('admins').select('email')
+  _admins = { at: Date.now(), set: new Set((data || []).map(a => String(a.email || '').toLowerCase().trim()).filter(Boolean)) }
+  return _admins.set
+}
+async function isIgnored(email) {
+  const e = String(email || '').toLowerCase().trim()
+  return LOG_IGNORED.has(e) || OWNER_ALIAS.test(e) || (await adminEmails()).has(e)
+}
+// מסנן לשאילתה: הרשימה המדויקת + כל הכינויים של המייל הפרטי. סינכרוני בכוונה — await על
+// query builder של Supabase מריץ אותו; את הרשימה מביאים קודם (ignoreList).
+async function ignoreList() { return [...new Set([...LOG_IGNORED, ...(await adminEmails()), 'vitalidisel@gmail.com'])] }
+const excludeIgnored = (q, list) => q.not('email', 'in', `(${list.map(e => `"${e.replace(/"/g, '')}"`).join(',')})`).not('email', 'ilike', 'vitalidisel+%@gmail.com')
 
 // POST â log session events from client dashboard
 // פעולות בתוך הכניסה (lib/usage-track.js, מיגרציה 029): רק השמות והשדות האלה נשמרים, טקסט קצר בלבד.
@@ -48,7 +66,7 @@ export async function POST(req) {
   if (event === 'login') {
     if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 })
     // בלי sessionId ה-heartbeat וה-project_select שאחריו לא נוגעים בטבלה.
-    if (LOG_IGNORED.has(email.toLowerCase().trim())) return NextResponse.json({ ok: true, sessionId: null })
+    if (await isIgnored(email)) return NextResponse.json({ ok: true, sessionId: null })
     const row = {
       email: email.toLowerCase().trim(),
       client_name: clientName || null,
@@ -150,7 +168,7 @@ export async function GET(req) {
   let q = supabaseAdmin
     .from('client_sessions')
     .select('*')
-  if (LOG_IGNORED.size) q = q.not('email', 'in', `(${[...LOG_IGNORED].map(e => `"${e.replace(/"/g, '')}"`).join(',')})`)
+  q = excludeIgnored(q, await ignoreList())
   const { data, error } = await q
     .order('logged_in_at', { ascending: false })
     .limit(100)
@@ -177,8 +195,8 @@ async function usageView(url, view) {
   const days = Math.min(180, Math.max(1, Number(url.searchParams.get('days')) || 30))
   const since = new Date(Date.now() - days * 864e5).toISOString()
   const now = Date.now()
-  const ignored = [...LOG_IGNORED]
-  const notIgnored = (q) => (ignored.length ? q.not('email', 'in', `(${ignored.map(e => `"${e.replace(/"/g, '')}"`).join(',')})`) : q)
+  const ign = await ignoreList()
+  const notIgnored = (q) => excludeIgnored(q, ign)
 
   if (view === 'user') {
     const email = String(url.searchParams.get('email') || '').toLowerCase().trim()
