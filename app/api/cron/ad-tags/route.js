@@ -67,11 +67,16 @@ export async function GET(req) {
     }
   }
   const ids = [...ads.keys()]
-  const done = new Set()
+  const done = new Set(), retry = new Set()
   for (let i = 0; i < ids.length; i += 200) {
-    const { data } = await sb.from('ad_creative_tags').select('ad_id, image_url, ad_name').in('ad_id', ids.slice(i, i + 200))
-    // סיווג בלי תמונה ובלי שם (ריצה ראשונה, 5.11 — הקלט הגיע ריק) לא נחשב: מסווגים שוב ודורסים
-    for (const x of data || []) if (x.image_url || x.ad_name) done.add(x.ad_id)
+    const { data } = await sb.from('ad_creative_tags').select('ad_id, image_url, ad_name, tags').in('ad_id', ids.slice(i, i + 200))
+    // לא נחשב "סווג": בלי תמונה ובלי שם (הריצה הראשונה, 5.11), או סיווג מהטקסט בלבד שעוד לא נוסה שוב עם תמונה
+    for (const x of data || []) {
+      const textOnly = x.tags && x.tags.fromTextOnly
+      if (x.tags && x.tags.unavailable) done.add(x.ad_id)
+      else if ((x.image_url || x.ad_name) && (!textOnly || x.tags.retried)) done.add(x.ad_id)
+      else if (textOnly) retry.add(x.ad_id)
+    }
   }
   const todo = ids.filter(id => !done.has(id)).slice(0, limit).map(id => ads.get(id))
   // מודעה שמופיעה רק במספרים (בלי activeAds): החשבון שלה מ-ad_daily, כדי לפנות למטא עם הטוקן הנכון
@@ -84,25 +89,33 @@ export async function GET(req) {
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY.trim() })
   const errors = []
-  let ok = 0
+  let ok = 0, unavailable = 0
   await pool(todo, 4, async (a) => {
     try {
-      // רק שדות שבאמת חזרו ממטא — תשובה ריקה לא מוחקת את מה שכבר ידוע (שם המודעה מהדוח)
-      const c = a.full ? a : { ...a, ...Object.fromEntries(Object.entries(await metaCreative(a.adId, a.account)).filter(([, v]) => v)) }
-      const image = await fetchImage(c.imageUrl)
+      // תמונה טרייה ממטא תמיד: קישורי התמונות ששמורים בדוח פגים אחרי כמה ימים. רק שדות שבאמת חזרו
+      // ממטא נכנסים — תשובה ריקה לא מוחקת את מה שכבר ידוע (שם, טקסט, הקישור הישן).
+      let fresh = {}
+      try { fresh = await metaCreative(a.adId, a.account) } catch (e) { if (!a.full) throw e }
+      const c = { ...a, ...Object.fromEntries(Object.entries(fresh).filter(([, v]) => v)) }
+      const image = await fetchImage(c.imageUrl) || (fresh.imageUrl && a.imageUrl && a.imageUrl !== fresh.imageUrl ? await fetchImage(a.imageUrl) : null)
       if (!image && !c.title && !c.body) throw new Error('no image and no text for this ad (Meta returned nothing) - not tagged')
       const { tags, model } = await tagCreative(anthropic, { image, title: c.title, body: c.body, adName: c.name })
       const { error: upErr } = await sb.from('ad_creative_tags').upsert({
-        ad_id: a.adId, account: c.account || '', ad_name: c.name || null, image_url: c.imageUrl || null,
-        is_video: !!c.isVideo, tags: { ...tags, ...(image ? {} : { fromTextOnly: true }) }, model, tagged_at: new Date().toISOString(),
+        ad_id: a.adId, account: c.account || '', ad_name: c.name || null, image_url: image ? (c.imageUrl || null) : null,
+        is_video: !!c.isVideo, tags: { ...tags, ...(image ? {} : { fromTextOnly: true, ...(retry.has(a.adId) ? { retried: true } : {}) }) }, model, tagged_at: new Date().toISOString(),
       })
       if (upErr) throw new Error(upErr.message)
       ok++
     } catch (e) {
-      errors.push({ adId: a.adId, error: String(e?.message || e).slice(0, 200) })
+      const msg = String(e?.message || e)
+      // מודעה שנמחקה במטא: מסמנים פעם אחת "לא זמינה", כדי שלא תתפוס כל יום מקום בתור של 40 (לא נכנסת להשוואה)
+      if (/does not exist|cannot be loaded|Unsupported get request/i.test(msg)) {
+        await sb.from('ad_creative_tags').upsert({ ad_id: a.adId, account: a.account || '', ad_name: a.name || null, image_url: null, is_video: false, tags: { unavailable: true }, model: null, tagged_at: new Date().toISOString() })
+        unavailable++
+      } else errors.push({ adId: a.adId, error: msg.slice(0, 200) })
     }
   })
-  const out = { ads: ids.length, alreadyTagged: done.size, tagged: ok, errors: errors.slice(0, 10), left: Math.max(0, ids.length - done.size - todo.length) }
+  const out = { ads: ids.length, alreadyTagged: done.size, tagged: ok, unavailable, errors: errors.slice(0, 10), left: Math.max(0, ids.length - done.size - todo.length) }
   try { await logJob(sb, 'ad-tags', errors.length < todo.length || !todo.length, Date.now() - t0, out) } catch { /* הרישום לא מפיל */ }
   return J(out)
 }
