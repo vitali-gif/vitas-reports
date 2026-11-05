@@ -91,7 +91,8 @@ export async function POST(req) {
     if (!sessionId) return NextResponse.json({ ok: true })
     await supabaseAdmin
       .from('client_sessions')
-      .update({ selected_project: body.projectName || null })
+      // שם הלקוח לפי הפרויקט שנבחר — משתמש עם גישה לכמה לקוחות נרשם בכניסה לפי הראשון ברשימה
+      .update({ selected_project: body.projectName || null, ...(clientName ? { client_name: String(clientName).slice(0, 120) } : {}) })
       .eq('id', sessionId).eq('email', email)
     return NextResponse.json({ ok: true })
   }
