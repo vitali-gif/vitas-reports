@@ -25,6 +25,7 @@ on:
     - cron: '20 5 * * 0'                      # ai-weekly: ניתוח AI שבועי לפרויקטים, ראשון 07:20
     - cron: '50 5 * * 0'                      # weekly-accounts: סטטוס כל חשבונות הפרסום, ראשון 07:50
     - cron: '40 5 5 * *'                      # monthly-report: הדוח החודשי, ה-5 לחודש 07:40
+    - cron: '10 3 * * *'                      # ad-tags: סיווג מודעות חדשות ל"מה עובד במודעות", כל יום 05:10
   workflow_dispatch:
     inputs:
       target:
@@ -35,7 +36,7 @@ on:
         # fireberry-notes: ידני בלבד — מילוי ראשוני של פרויקט חדש (240 שניות לריצה). הסנכרון השוטף
         # רץ כל שעה בתוך prefetch-daily (cron-job.org); כאן הוא דולג ברוב הלילות, ושתי ריצות
         # במקביל עלולות לעבור את מגבלת 100 הקריאות לדקה של Fireberry.
-        options: [all, prefetch-ads, prefetch-crm, health, fireberry-notes, ai-weekly, weekly-accounts, monthly-report]
+        options: [all, prefetch-ads, prefetch-crm, health, fireberry-notes, ai-weekly, weekly-accounts, monthly-report, ad-tags]
 
 concurrency:
   group: vitas-cron-${{ github.event.schedule || github.event.inputs.target }}
@@ -58,6 +59,7 @@ jobs:
               '20 5 * * 0')                    echo 'paths=ai-weekly'    >> "$GITHUB_OUTPUT" ;;
               '50 5 * * 0')                    echo 'paths=weekly-accounts' >> "$GITHUB_OUTPUT" ;;
               '40 5 5 * *')                    echo 'paths=monthly-report' >> "$GITHUB_OUTPUT" ;;
+              '10 3 * * *')                    echo 'paths=ad-tags'      >> "$GITHUB_OUTPUT" ;;
               *)                               echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
             esac
           elif [ "${{ github.event.inputs.target }}" = "all" ]; then
