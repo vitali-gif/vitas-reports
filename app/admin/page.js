@@ -9,6 +9,9 @@ import { normalizeObjections, isReviewObjection, REVIEW_LABEL, OFF_TARGET_LABEL 
 import { HANDLING_LABELS, HANDLING_METHOD } from '../../lib/client-wording.js'
 import NamedLeadsModal from '../components/admin/NamedLeadsModal.jsx'
 import SectionHelp from '../components/report-ui/SectionHelp.jsx'
+import UsageSections from '../components/report-ui/UsageSections.jsx'
+import UsageModal from '../components/admin/UsageModal.jsx'
+import { track as trackUsage, setUsageContext } from '../../lib/usage-track.js'
 import CreativeTests from '../components/report-ui/CreativeTests.jsx'
 import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
@@ -332,8 +335,6 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [accessCreds, setAccessCreds] = useState(null) // {email,password,loginUrl,emailSent,clientName}
   const [showClientAccess, setShowClientAccess] = useState(false)
   const [showSessionLogs, setShowSessionLogs] = useState(false)
-  const [sessionLogs, setSessionLogs] = useState([])
-  const [logsLoading, setLogsLoading] = useState(false)
   const [caEmail, setCaEmail] = useState('')
   const [caProjectIds, setCaProjectIds] = useState([])   // פרויקטים מסומנים בהוספה — מכל הלקוחות יחד
   // מייל שכבר יש לו גישה: ברירת המחדל היא לעדכן היקף בלי לאפס סיסמה. איפוס ושליחת
@@ -480,6 +481,13 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [leadsModal, setLeadsModal] = useState(null) // {title, leads:[]} — per-source leads + rep note
   const [objModal, setObjModal] = useState(null) // {title, leads:[]} — לידים מאחורי סוג התנגדות
   const [noteModal, setNoteModal] = useState(null) // {cid, name, loading, error, notes:[]} — היסטוריית הערות (משיכה חיה)
+  useEffect(() => {
+    if (!isClientView) return;
+    if (namedLeadsModal) trackUsage('modal', { kind: 'named_leads' });
+    if (leadsModal) trackUsage('modal', { kind: 'source_leads' });
+    if (objModal) trackUsage('modal', { kind: 'objection_leads' });
+    if (noteModal) trackUsage('modal', { kind: 'lead_notes' });
+  }, [isClientView, !!namedLeadsModal, !!leadsModal, !!objModal, !!noteModal]); // eslint-disable-line
   const [leadsFilter, setLeadsFilter] = useState('all') // all | relevant | irrelevant — filter for the leads modal
   const [sfNoteModal, setSfNoteModal] = useState(null) // {kind:'lead'|'opp', ...record}
   const [sfObjBranch, setSfObjBranch] = useState('all') // objections branch filter
@@ -577,14 +585,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
 
   const handleLogout = async () => { await supabase.auth.signOut({ scope: 'global' }); setSession(null); };
   const handleClientAccess = () => { setShowClientAccess(true); loadClientAccess(); };
-  const handleSessionLogs = async () => {
-    setShowSessionLogs(true)
-    setLogsLoading(true)
-    const res = await apiFetch('/api/client-log', { headers: {} })
-    const data = await res.json()
-    setSessionLogs(Array.isArray(data) ? data : [])
-    setLogsLoading(false)
-  }
+  const handleSessionLogs = () => setShowSessionLogs(true)   // מסך "שימוש לקוחות" — app/components/admin/UsageModal.jsx
   // D19 (ויטלי, 4.10): "ייצוא דוח" — דוח PDF על התקופה שעל המסך, מול תקופת ההשוואה של
   // הדשבורד. אדמין בלבד (הכפתור לא מוצג ללקוח). הבנייה והעיצוב ב-lib/report-pdf.js; כאן רק
   // איסוף השורות: מה שכבר טעון, ומה שחסר — מאותם routes שהדשבורד משתמש בהם.
@@ -651,6 +652,12 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // והשרת מעביר ל-Claude רק את השדות המוכרים (lib/ai-analysis.js). הניתוחים נשמרים ב-ai_analyses,
   // יחד עם הניתוחים השבועיים של הקרון (/api/cron/ai-weekly).
   const [aiOpen, setAiOpen] = useState(false);
+  // מה לקוחות עושים בדשבורד (ויטלי, 6.11; lib/usage-track.js). בכניסת לקוח בלבד — באדמין trackUsage לא עושה כלום.
+  useEffect(() => { if (isClientView && selectedProject) trackUsage('tab', { tab: dashTab }); }, [isClientView, dashTab, selectedProject?.id]); // eslint-disable-line
+  useEffect(() => { if (isClientView && selectedProject && dashTab === 'crm') trackUsage('crm_view', { view: crmSubTab }); }, [isClientView, crmSubTab, dashTab]); // eslint-disable-line
+  useEffect(() => { if (isClientView && selectedMonth) trackUsage('period', { period: selectedMonth }); }, [isClientView, selectedMonth]); // eslint-disable-line
+  useEffect(() => { if (isClientView && compareEnabled) trackUsage('compare', {}); }, [isClientView, compareEnabled]); // eslint-disable-line
+  useEffect(() => { if (isClientView && aiOpen) trackUsage('ai_open', {}); }, [isClientView, aiOpen]); // eslint-disable-line
   const [aiState, setAiState] = useState({ loading: false, listLoading: false, error: '', list: [], current: null });
   const openAiAnalysis = async () => {
     if (!selectedProject) { showToast('בחר פרויקט'); return; }
@@ -1569,6 +1576,7 @@ const loadClients = async () => {
 
 const selectProject = async (client, project) => {
     setSelectedClient(client); setSelectedProject(project); setView('dashboard'); setCompareEnabled(false);
+    if (isClientView) setUsageContext({ project: project?.name || null });
     reportsPidRef.current = project.id;   // לפני כל await — ראו loadProjectReports
     if (typeof window !== 'undefined' && project?.id) { try { localStorage.setItem('vitas_last_project', project.id) } catch {} }
     setVitasTasks([]); setRecSubTab('new');
@@ -6968,7 +6976,7 @@ const selectProject = async (client, project) => {
               <div className="section-head">
                 <div className="ico violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="8 6 2 6 2 12 8 12"/><polyline points="16 6 22 6 22 12 16 12"/><path d="M12 19v-7"/><path d="M8 19h8"/><path d="M8 12c0 2.21 1.79 4 4 4s4-1.79 4-4V6H8v6z"/></svg></div>
                 <h2>המודעות הכי מובילות ב-Facebook</h2>
-                <span className="sub">{vrAds ? 'Top ' + topAds.length + ' · דירוג לפי לידים בתקופה (Meta) · מודעה זהה בכמה קבוצות נספרת פעם אחת' : 'Top ' + topAds.length}</span>
+                <span className="sub">{/* בטלפון רק 5 הראשונות (ויטלי, 6.11) — cluzo-polish.css §26 */}<span className="ta-n-desk">{'Top ' + topAds.length}</span><span className="ta-n-mob">{'Top ' + Math.min(5, topAds.length)}</span>{vrAds ? ' · דירוג לפי לידים בתקופה (Meta) · מודעה זהה בכמה קבוצות נספרת פעם אחת' : ''}</span>
               </div>
               <div className={vrAds ? 'vr-ad-grid' : undefined} style={vrAds ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'20px'}}>
                 {topAds.map((ad, i) => {
@@ -6984,7 +6992,7 @@ const selectProject = async (client, project) => {
                   // קריאייטיב מקומי של הדמו (/demo/...) מוצג חד; כל מקור חיצוני מטושטש.
                   const demoBlur = (isDemoProject && !String(previewImg || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined;
                   return (
-                    <div key={ad.id || i} className="card" style={vrAds ? {overflow:'hidden',display:'flex',flexDirection:'column'} : {overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
+                    <div key={ad.id || i} className={i >= 5 ? 'card ta-extra' : 'card'} style={vrAds ? {overflow:'hidden',display:'flex',flexDirection:'column'} : {overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
                       {/* Media: video if available, else image. עיצוב מחודש: רקע בהיר, המדיה בשלמותה (contain) */}
                       <div className={vrAds ? 'vr-ad-media-box' : undefined} style={vrAds ? undefined : {position:'relative',width:'100%',aspectRatio:'4/5',background:'#0f172a',overflow:'hidden'}}>
                         {hasVideo ? (
@@ -7050,7 +7058,7 @@ const selectProject = async (client, project) => {
         })()}
 
         {/* "מה עובד במודעות" (5.11): השוואה בין קבוצות מודעות לפי מה שרואים בהן — טאב Facebook בלבד */}
-        {dashTab === 'facebook' && <CreativeTests rows={fbReports} projectId={selectedProject?.id} />}
+        {dashTab === 'facebook' && <CreativeTests rows={currentReports} projectId={selectedProject?.id} />}
 
         {/* GOOGLE SEARCH ADS (Top 5 text ads) */}
         {(crmReports[0]?.summary?.crmType === 'zoho') && (dashTab === 'google' || dashTab === 'google_search' || dashTab === 'all') && (() => {
@@ -7535,77 +7543,7 @@ const selectProject = async (client, project) => {
           monthly={monthlyState}
         />
       )}
-      {showSessionLogs && (
-        <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) setShowSessionLogs(false) }}>
-          <div className="modal" style={{maxWidth:700,width:'100%',direction:'rtl',maxHeight:'80vh',overflow:'auto'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:17,fontWeight:700}}>👁 לוג כניסות לקוחות</h3>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <button
-                  onClick={handleSessionLogs}
-                  title="רענן לוג"
-                  style={{display:'flex',alignItems:'center',gap:5,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',color:'var(--text-2)'}}>
-                  🔄 רענן
-                </button>
-                <button
-                  onClick={async () => {
-                    if (!confirm('למחוק את כל הלוגים?')) return
-                    await apiFetch('/api/client-log', { method:'DELETE', headers:{} })
-                    setSessionLogs([])
-                  }}
-                  title="מחק את כל הלוגים"
-                  style={{display:'flex',alignItems:'center',gap:5,background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer',color:'#ef4444'}}>
-                  🗑️ אפס
-                </button>
-                <button onClick={() => setShowSessionLogs(false)} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'#64748b',lineHeight:1}}>&times;</button>
-              </div>
-            </div>
-            {logsLoading ? (
-              <div style={{textAlign:'center',padding:'32px 0',color:'var(--text-secondary)'}}>טוען...</div>
-            ) : sessionLogs.length === 0 ? (
-              <div style={{textAlign:'center',padding:'32px 0',color:'var(--text-secondary)',fontSize:13}}>אין כניסות מתועדות עדיין</div>
-            ) : (
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                <thead>
-                  <tr style={{borderBottom:'2px solid var(--border)'}}>
-                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>מייל</th>
-                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>לקוח</th>
-                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>כניסה</th>
-                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>זמן בדשבורד</th>
-                    <th style={{padding:'8px 10px',textAlign:'right',fontWeight:600,color:'var(--text-secondary)',fontSize:12}}>סטטוס</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sessionLogs.map(s => {
-                    const mins = Math.floor((s.durSec || 0) / 60)
-                    const secs = (s.durSec || 0) % 60
-                    const dur = s.durSec > 0 ? `${mins}:${String(secs).padStart(2,'0')}` : '—'
-                    const loginTime = new Date(s.logged_in_at).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})
-                    return (
-                      <tr key={s.id} style={{borderBottom:'1px solid var(--surface)'}}>
-                        <td style={{padding:'10px',direction:'ltr',textAlign:'left',fontFamily:'monospace',fontSize:12}}>{s.email}</td>
-                        <td style={{padding:'10px',fontWeight:600}}>{s.client_name || '—'}</td>
-                        <td style={{padding:'10px',color:'var(--text-secondary)',fontSize:12}}>{loginTime}</td>
-                        <td style={{padding:'10px',fontWeight:600,color:'var(--indigo,#5B5EF4)'}}>{dur}</td>
-                        <td style={{padding:'10px',fontSize:12,color:'var(--text-secondary)'}}>{s.selected_project || '—'}</td>
-                        <td style={{padding:'10px'}}>
-                          {s.isActive
-                            ? <span style={{background:'rgba(16,185,129,0.12)',color:'#059669',borderRadius:20,padding:'3px 10px',fontSize:12,fontWeight:600}}>● פעיל כעת</span>
-                            : <span style={{background:'var(--surface)',color:'var(--text-secondary)',borderRadius:20,padding:'3px 10px',fontSize:12}}>יצא</span>
-                          }
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-            <div style={{marginTop:16,fontSize:12,color:'var(--text-secondary)',textAlign:'center'}}>
-              מציג {sessionLogs.length} כניסות אחרונות · "פעיל" = heartbeat לפני פחות מ-3 דקות
-            </div>
-          </div>
-        </div>
-      )}
+      {showSessionLogs && <UsageModal onClose={() => setShowSessionLogs(false)} />}
 
       {accessCreds && (
         <AccessCredsModal creds={accessCreds} onClose={() => setAccessCreds(null)} onCopied={(m) => showToast('✓ ' + m)} />
@@ -7677,6 +7615,7 @@ const selectProject = async (client, project) => {
 
       {/* ויטלי, 5.11: "איך זה עוזר לך?" ליד כל כותרת שיש לה הסבר (lib/section-help.js) */}
       <SectionHelp />
+      {isClientView && <UsageSections scope={[selectedProject?.id, dashTab, crmSubTab, selectedMonth].join('|')} />}
       {namedLeadsModal && <NamedLeadsModal title={namedLeadsModal.title} names={namedLeadsModal.names} isClientView={isClientView} onClose={() => setNamedLeadsModal(null)} />}
 
       {leadsModal && (
