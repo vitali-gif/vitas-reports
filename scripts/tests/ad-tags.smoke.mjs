@@ -28,6 +28,8 @@ eq('format: video vs image from activeAds', tests.find(t => t.key === 'format').
 eq('indicative when a group has under 10 leads', tests.find(t => t.key === 'price').indicative, false)
 eq('one value only (all light, all interior) → not compared', [tests.some(t => t.key === 'color'), tests.some(t => t.key === 'visual')], [false, false])
 eq('no tags → nothing', creativeTests(ads, {}), [])
+const t2 = creativeTests(ads, { ...tags, 1: { tags: { ...tags[1].tags, fromTextOnly: true }, is_video: false }, 5: { tags: { unavailable: true }, is_video: false } })
+eq('text-only ad left out of people, kept in price; unavailable ignored', [t2.find(t => t.key === 'people')?.groups.reduce((a, g) => a + g.ads, 0), t2.find(t => t.key === 'price').groups.reduce((a, g) => a + g.ads, 0)], [3, 4])
 
 const m = buildReportModel({ project: 'x', key: '2026-10', prevKey: '2026-09', rows, prevRows: [], adTags: tags })
 const h = renderReportHtml(m)
