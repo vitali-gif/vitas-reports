@@ -583,3 +583,63 @@ th:hover .sort-ind { opacity: .8; }
 .h-kebab-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; background: none; border-radius: 8px;
   font: inherit; font-size: 14px; font-weight: 600; color: var(--tv-text, #142044); text-align: start; cursor: pointer; }
 .h-kebab-menu button:hover, .h-kebab-menu button:focus-visible { background: var(--tv-surface-2, #f1f5f9); }
+
+/* §28 "איך זה עוזר לך?" בטלפון: רק האייקון, עיגול קטן — אחרת הכותרת נשברת לשלוש שורות
+   וה-i של הסעיף יורד לשורה נפרדת (ויטלי, 6.11). הטקסט נשאר ל-aria-label. */
+@media (max-width: 640px) {
+  .sh-btn { padding: 0; width: 30px; min-height: 30px; height: 30px; justify-content: center; flex: 0 0 auto; margin-inline-start: 6px; }
+  .sh-btn .sh-btn-text { display: none; }
+  /* הכותרת תופסת את המקום שנשאר ונשברת בתוכה; תת־כותרת ארוכה עדיין יורדת לשורה הבאה */
+  .section-head > h2 { flex: 1 1 0; min-width: 40%; }
+}
+
+/* §29 טקסט המודעה בכרטיס — app/components/report-ui/AdCopy.jsx (ויטלי, 6.11) */
+.adc { display: grid; gap: 10px; }
+.adc-label { display: inline-block; font-size: 11px; font-weight: 700; color: var(--tv-text-muted, #64748b); background: var(--tv-surface-2, #f1f5f9); border-radius: 6px; padding: 1px 7px; margin-bottom: 4px; }
+.adc-title .adc-text { font-weight: 700; font-size: .95em; color: var(--tv-text, #0f172a); line-height: 1.35; }
+.adc-body .adc-text { font-size: .86em; color: var(--tv-text-secondary, #475569); line-height: 1.55; white-space: pre-line; }
+.adc-clamp { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.adc-more { border: 0; background: none; padding: 2px 0 0; color: var(--tv-brand, #315cf5); font: inherit; font-size: .82em; font-weight: 700; cursor: pointer; }
+.adc-place { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--tv-divider, #f1f5f9); display: grid; gap: 3px; font-size: .74em; color: var(--tv-text-muted, #94a3b8); }
+.adc-place > div { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.adc-place svg { flex: 0 0 auto; }
+.adc-place span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-ad .adc-label { margin-bottom: 2px; }
+
+/* §30 "מה עובד במודעות": שורה לחיצה + חלון המודעות של הקבוצה (ויטלי, 6.11) */
+.ctz-rank { font-size: 12px; color: var(--tv-text-muted, #64748b); margin: -4px 0 6px; }
+.ctz-row { cursor: pointer; }
+.ctz-row:hover td, .ctz-row:focus-visible td { background: var(--tv-surface-2, #f1f5f9); }
+.ctz-row.best:hover td { background: var(--tv-success-bg); filter: brightness(.98); }
+.ctz-name-in { display: inline-flex; align-items: center; gap: 3px; }
+.ctz-go { color: var(--tv-brand, #315cf5); flex: 0 0 auto; }
+@media (max-width: 600px) { .ctz-meet .ctz-table th { white-space: normal; line-height: 1.25; vertical-align: bottom; } }
+.ctz-modal { max-width: 620px; width: 100%; max-height: 86vh; overflow: auto; direction: rtl; }
+.ctz-modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.ctz-modal-head h3 { margin: 2px 0 0; font-size: 17px; font-weight: 800; }
+.ctz-modal-kicker { font-size: 12px; color: var(--tv-text-muted, #64748b); font-weight: 600; }
+.ctz-x { border: 0; background: none; cursor: pointer; color: #64748b; padding: 4px; }
+.ctz-ads { display: grid; gap: 10px; }
+.ctz-ad { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: start; padding: 10px; border: 1px solid var(--tv-border, #e2e8f0); border-radius: 12px; background: var(--tv-surface, #fff); }
+.ctz-ad-img { width: 84px; height: 84px; border-radius: 8px; overflow: hidden; background: var(--tv-surface-2, #f1f5f9); display: flex; align-items: center; justify-content: center; color: #94a3b8; }
+.ctz-ad-img img { width: 100%; height: 100%; object-fit: cover; }
+.ctz-ad-name { font-weight: 700; font-size: 13.5px; overflow-wrap: anywhere; }
+.ctz-ad-title { font-size: 13px; color: var(--tv-text-secondary, #475569); margin-top: 2px; }
+.ctz-ad-nums { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12.5px; color: var(--tv-text-secondary, #475569); font-variant-numeric: tabular-nums; }
+
+/* §31 שורת הטאבים הדביקה בטלפון (ויטלי, 6.11): ה-mask-image שעשה דהייה בקצה הפך את הרקע של השורה
+   עצמה לשקוף, ולכן הכרטיסים שמתחת "ציצו" דרכה; והשורה לא נמתחה עד קצה המסך. עכשיו: רוחב מלא, רקע
+   אטום, והדהייה היא שכבה דביקה בתוך השורה (רק מעל הטאבים, כסימן שיש עוד לגלול). */
+@media (max-width: 768px) {
+  .vr-ui .client-tabs.client-tabs-main {
+    -webkit-mask-image: none; mask-image: none;
+    margin-inline: -12px; inline-size: calc(100% + 24px); max-inline-size: none;
+    border-radius: 0; border-inline: 0; border-block-start: 0;
+    background: var(--tv-surface, #fff);
+    box-shadow: 0 1px 0 var(--tv-border, #dde2ec), 0 -8px 0 var(--tv-canvas, #f6f8fc);
+  }
+  .vr-ui .client-tabs.client-tabs-main::after {
+    content: ''; position: sticky; inset-inline-end: 0; flex: 0 0 28px; margin-inline-start: -28px;
+    background: linear-gradient(to left, rgba(255, 255, 255, 0), var(--tv-surface, #fff)); pointer-events: none;
+  }
+}

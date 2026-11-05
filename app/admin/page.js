@@ -13,6 +13,7 @@ import UsageSections from '../components/report-ui/UsageSections.jsx'
 import UsageModal from '../components/admin/UsageModal.jsx'
 import { track as trackUsage, setUsageContext } from '../../lib/usage-track.js'
 import CreativeTests from '../components/report-ui/CreativeTests.jsx'
+import { AdCopy, AdPlacement } from '../components/report-ui/AdCopy.jsx'
 import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
@@ -35,6 +36,7 @@ function SearchAdText({ text, name }) {
   const showName = name && !/^Ad\s*\d+$/i.test(String(name).trim())
   return (
     <div className="gs-ad">
+      <span className="adc-label">קופי</span>
       <div className="gs-ad-main" dir="auto">{parts[0] || '—'}</div>
       {parts.length > 1 && (
         <details className="gs-ad-more">
@@ -107,7 +109,7 @@ import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../compone
 import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
-import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays, House, Funnel as FunnelIcon, ChartPie, Network, Gem, Lightbulb } from 'lucide-react'
+import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays, House, Funnel as FunnelIcon, ChartPie, Network, Gem, Lightbulb, ImageOff } from 'lucide-react'
 // צבעי הדונאט של העיצוב המחודש — תואמים ל-.vcs-color-N ב-crm-sources.css (כמו SourceDistribution)
 const VCS_PALETTE = ['#4559df', '#299be4', '#119e8c', '#e6a72f', '#9257d1', '#cb567c', '#586581']
 import MeetingsTab from '../components/meetings/MeetingsTab'
@@ -7042,12 +7044,8 @@ const selectProject = async (client, project) => {
 
                       {/* Text content */}
                       <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'8px'}}>
-                        {ad.title && <div style={{fontWeight:700,fontSize:'0.95em',color:'#0f172a',lineHeight:1.3}}>{ad.title}</div>}
-                        {ad.body && <div style={{fontSize:'0.85em',color:'#475569',lineHeight:1.5,unicodeBidi:'plaintext',maxHeight:'5em',overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>{ad.body}</div>}
-                        <div style={{fontSize:'0.72em',color:'#94a3b8',marginTop:'auto',paddingTop:'8px',borderTop:'1px solid #f1f5f9',unicodeBidi:'plaintext'}}>
-                          <div>{'\ud83d\udcca'} {ad.campaign || '-'}</div>
-                          {ad.adSet && <div style={{marginTop:'2px'}}>{'\ud83c\udfaf'} {ad.adSet}</div>}
-                        </div>
+                        <AdCopy title={ad.title} body={ad.body} />
+                        <AdPlacement campaign={ad.campaign} adSet={ad.adSet} />
                       </div>
                     </div>
                   );
@@ -7156,7 +7154,7 @@ const selectProject = async (client, project) => {
                           <img src={imgUrl(firstImg)} alt={ag.name} style={{width:'100%',height:'100%',objectFit:'contain'}} onError={(e)=>{e.target.style.display='none'}} />
                         </div>
                       ) : (
-                        <div style={{width:'100%',aspectRatio:'16/9',background:'linear-gradient(135deg,#dbeafe,#cffafe)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5em',color:'#64748b'}}>{'\ud83c\udfaf'}</div>
+                        <div style={{width:'100%',aspectRatio:'16/9',background:'linear-gradient(135deg,#dbeafe,#cffafe)',display:'flex',alignItems:'center',justifyContent:'center',color:'#64748b'}}><ImageOff size={34} aria-hidden="true" /></div>
                       )}
                       <div style={{padding:'14px 16px',flexGrow:1,display:'flex',flexDirection:'column',gap:'10px'}}>
                         {(() => {
@@ -7173,7 +7171,7 @@ const selectProject = async (client, project) => {
                           return <div style={{fontSize:'0.75em',color:agC,fontWeight:700,letterSpacing:'0.04em'}}>{'\u25cf'} {agL}{note}</div>;
                         })()}
                         <div style={{fontWeight:700,fontSize:'1em',color:'#0f172a'}}>{ag.name}</div>
-                        <div style={{fontSize:'0.72em',color:'#94a3b8',unicodeBidi:'plaintext'}}>{'\ud83d\udcca'} {ag.campaign || '-'}</div>
+                        <AdPlacement campaign={ag.campaign} />
                         {/* כל הכותרות והתיאורים, לא רק החמש/שלוש הראשונות (ויטלי, 20.9).
                             הרשימה נגללת בתוך הקארד כדי שהגובה לא יתפוצץ. */}
                         {/* הטקסטים מקופלים כברירת מחדל (ויטלי, 21.9): 18 כותרות ו-5 תיאורים
@@ -7189,7 +7187,7 @@ const selectProject = async (client, project) => {
                         )}
                         {descriptions.length > 0 && (
                           <details className="vr-ag-fold">
-                            <summary>{'\u05ea\u05d9\u05d0\u05d5\u05e8\u05d9\u05dd'} ({descriptions.length})</summary>
+                            <summary>{'קופי (תיאורים)'} ({descriptions.length})</summary>
                             <div className="vr-ag-list">
                               {descriptions.map((d,j) => <div key={j} style={{fontSize:'0.8em',color:'#475569',lineHeight:1.4,unicodeBidi:'plaintext',padding:'2px 0'}}>{'\u2022 '}{d.text}</div>)}
                             </div>

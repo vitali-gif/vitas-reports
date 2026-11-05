@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, X, ImageOff } from 'lucide-react'
 import { apiFetch } from '../../../lib/api-fetch'
 import { adsFromRows, creativeTests, MIN_LEADS, MIN_MEETINGS, RANK_BY_MEETINGS_AT } from '../../../lib/ad-tags.js'
 
@@ -8,8 +9,63 @@ import { adsFromRows, creativeTests, MIN_LEADS, MIN_MEETINGS, RANK_BY_MEETINGS_A
 // המודעה. rows: כל שורות התקופה (פייסבוק + CRM). הסיווגים מ-/api/ad-tags, רק למודעות של הפרויקט.
 const money = (v, d = 0) => (v == null ? '-' : '₪' + Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }))
 
+// פרטי המודעה להצגה (תמונה, שם, כותרת) מתוך activeAds של דוחות הפייסבוק בתקופה
+function creativesById(rows) {
+  const m = new Map()
+  for (const r of (rows || []).filter(r => r.source === 'facebook')) {
+    for (const a of r.summary?.activeAds || []) { const id = String(a.id || ''); if (id && !m.has(id)) m.set(id, a) }
+    for (const d of Array.isArray(r.data) ? r.data : []) { const id = String(d.adId || ''); if (id && !m.has(id)) m.set(id, { id, name: d.adName }) }
+  }
+  return m
+}
+
+// "צילום אמיתי — אילו מודעות?" (ויטלי, 6.11): לחיצה על שורה פותחת את המודעות של הקבוצה
+function GroupAds({ test, group, ads, creatives, meet, onClose }) {
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+  }, [onClose])
+  const byId = new Map(ads.map(a => [a.adId, a]))
+  const list = group.adIds.map(id => ({ ...(byId.get(id) || { adId: id }), c: creatives.get(id) || {} }))
+    .sort((a, b) => (b.meetings || 0) - (a.meetings || 0) || (b.leads || 0) - (a.leads || 0) || (b.spend || 0) - (a.spend || 0))
+  return (
+    <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ zIndex: 9999 }}>
+      <div className="modal ctz-modal" role="dialog" aria-label={`${test.label}: ${group.label}`}>
+        <div className="ctz-modal-head">
+          <div><div className="ctz-modal-kicker">{test.label}</div><h3>{group.label} · {list.length} מודעות</h3></div>
+          <button type="button" className="ctz-x" onClick={onClose} aria-label="סגירה"><X size={20} /></button>
+        </div>
+        <div className="ctz-ads">
+          {list.map(a => {
+            const img = a.c.imageUrl || a.c.thumbnailUrl
+            return (
+              <div key={a.adId} className="ctz-ad">
+                <div className="ctz-ad-img">{img ? <img src={img} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} /> : <ImageOff size={22} aria-hidden="true" />}</div>
+                <div className="ctz-ad-body">
+                  <div className="ctz-ad-name" dir="auto">{a.c.name || a.name || a.adId}</div>
+                  {a.c.title && <div className="ctz-ad-title" dir="auto">{a.c.title}</div>}
+                  <div className="ctz-ad-nums">
+                    <span>{Number(a.leads || 0)} לידים</span>
+                    {meet && <span>{a.meetings ?? 0} פגישות</span>}
+                    <span>הוצאה {money(a.spend)}</span>
+                    <span>לליד {money(a.leads > 0 ? a.spend / a.leads : null)}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <p className="ctz-note">מודעה שכבר לא פעילה מוצגת בלי תמונה.</p>
+      </div>
+    </div>
+  )
+}
+
 export default function CreativeTests({ rows, projectId }) {
   const ads = useMemo(() => adsFromRows(rows), [rows])
+  const creatives = useMemo(() => creativesById(rows), [rows])
+  const [open, setOpen] = useState(null)   // { test, group }
   const idsKey = useMemo(() => ads.map(a => a.adId).sort().slice(0, 500).join(','), [ads])
   const [tags, setTags] = useState(null)
   useEffect(() => {
@@ -37,13 +93,15 @@ export default function CreativeTests({ rows, projectId }) {
         {tests.map(t => (
           <div key={t.key} className="ctz-card">
             <div className="ctz-head"><h3>{t.label}</h3>{t.indicative && <span className="ctz-ind">אינדיקציה בלבד</span>}</div>
+            <div className="ctz-rank">{t.rankBy === 'meeting' ? 'דירוג לפי עלות לפגישה' : meet ? 'דירוג לפי עלות לליד — עוד מעט פגישות להשוואה' : 'דירוג לפי עלות לליד'}</div>
             <div className="ctz-scroll"><table className="ctz-table">
               <thead><tr><th></th><th className="ctz-opt">מודעות</th><th>לידים</th><th className="ctz-opt">CTR</th><th className="ctz-opt">CPC</th><th>עלות לליד</th>{meet && <><th>פגישות</th><th>עלות לפגישה</th></>}</tr></thead>
               <tbody>{t.groups.map((g, i) => {
                 const best = i === 0 && (t.rankBy === 'meeting' ? g.cpm != null : g.cpl != null)
                 return (
-                <tr key={g.value} className={best ? 'best' : undefined}>
-                  <td className="ctz-name">{g.label}{best && <span className="ctz-best">הכי טוב</span>}</td>
+                <tr key={g.value} className={best ? 'ctz-row best' : 'ctz-row'} tabIndex={0} role="button" aria-label={`${g.label} — הצגת המודעות`}
+                  onClick={() => setOpen({ test: t, group: g })} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen({ test: t, group: g }) } }}>
+                  <td className="ctz-name"><span className="ctz-name-in">{g.label}<ChevronLeft size={14} aria-hidden="true" className="ctz-go" /></span>{best && <span className="ctz-best">הכי טוב</span>}</td>
                   <td className="ctz-opt">{g.ads}</td>
                   <td>{Number(g.leads || 0).toLocaleString('en-US')}</td>
                   <td className="ctz-opt">{g.ctr != null ? g.ctr.toFixed(2) + '%' : '-'}</td>
@@ -57,7 +115,8 @@ export default function CreativeTests({ rows, projectId }) {
           </div>
         ))}
       </div>
-      <p className="ctz-note">מבוסס על ביצועי המודעות בתקופה שנבחרה.{meet ? ` פגישות: פגישות שתואמו ב-CRM ללידים שהגיעו מהמודעה. כשיש במאפיין לפחות ${RANK_BY_MEETINGS_AT} פגישות - הדירוג לפי עלות לפגישה, אחרת לפי עלות לליד.` : ''} "אינדיקציה בלבד": באחת הקבוצות פחות מ-{MIN_LEADS} לידים{meet ? ` או פחות מ-${MIN_MEETINGS} פגישות` : ''}, ולכן עוד מוקדם להסיק. זו השוואה בין קבוצות, לא הוכחה שאלמנט מסוים גרם להבדל.</p>
+      {open && <GroupAds test={open.test} group={open.group} ads={ads} creatives={creatives} meet={meet} onClose={() => setOpen(null)} />}
+      <p className="ctz-note">לחיצה על שורה מציגה את המודעות שבקבוצה. מבוסס על ביצועי המודעות בתקופה שנבחרה.{meet ? ` פגישות: פגישות שתואמו ב-CRM ללידים שהגיעו מהמודעה. כשיש במאפיין לפחות ${RANK_BY_MEETINGS_AT} פגישות - הדירוג לפי עלות לפגישה, אחרת לפי עלות לליד.` : ''} "אינדיקציה בלבד": באחת הקבוצות פחות מ-{MIN_LEADS} לידים{meet ? ` או פחות מ-${MIN_MEETINGS} פגישות` : ''}, ולכן עוד מוקדם להסיק. זו השוואה בין קבוצות, לא הוכחה שאלמנט מסוים גרם להבדל.</p>
     </div>
   )
 }

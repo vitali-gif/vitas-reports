@@ -24,7 +24,9 @@ function enhance(root) {
     btn.type = 'button'
     btn.className = 'sh-btn'
     btn.setAttribute('aria-expanded', 'false')
-    btn.innerHTML = ICON + '<span>איך זה עוזר לך?</span>'
+    btn.setAttribute('aria-label', 'איך זה עוזר לך?')
+    btn.title = 'איך זה עוזר לך?'
+    btn.innerHTML = ICON + '<span class="sh-btn-text">איך זה עוזר לך?</span>'
     const note = document.createElement('p')
     note.className = 'cz-note sh-note'
     note.hidden = true

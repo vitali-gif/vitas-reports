@@ -54,7 +54,7 @@ export function CohortFunnel({ model, platforms, selectedPlatform, onPlatformCha
         <div className="vcs-funnel-scroll" role="region" aria-label="שלבי התקדמות הלידים" tabIndex={0}>
           <ol className="vcs-funnel">{model.stages.map((stage, i) => { const Icon = stage.icon; return <li key={stage.id} className="vcs-stage-column">
             <div className="vcs-stage-row">
-              {i > 0 && <div className="vcs-arrow" aria-hidden="true"><ArrowLeft size={18} /><b>{stage.rate != null ? <bdi>{stage.smallSample ? '~' : ''}{stage.rate}</bdi> : '—'}</b></div>}
+              {i > 0 && <div className="vcs-arrow" aria-hidden="true" title={stage.smallSample ? 'מבוסס על מדגם קטן — לפרש בזהירות' : undefined}><ArrowLeft size={18} /><b>{stage.rate != null ? <bdi>{stage.smallSample ? '~' : ''}{stage.rate}</bdi> : '—'}</b></div>}
               <div className={`vcs-stage ${stage.tone ? 'vcs-tone-' + stage.tone : ''}`} title={stage.rate != null ? `${stage.rate} ${stage.denominatorLabel}` : undefined}>
                 <div className="vcs-stage-head"><h3>{stage.label}</h3>{Icon && <span className="vcs-stage-icon"><Icon size={20} aria-hidden="true" /></span>}</div>
                 <p className="vcs-stage-value"><bdi>{stage.value ?? 'אין נתון'}</bdi></p>
@@ -64,11 +64,8 @@ export function CohortFunnel({ model, platforms, selectedPlatform, onPlatformCha
             {stage.id === model.cancellation?.parentStageId && <div className="vcs-cancellation"><Ban size={17} aria-hidden="true" /><span>בוטלו <strong><bdi>{model.cancellation.value ?? 'אין נתון'}</bdi></strong></span><small>{model.cancellation.denominatorLabel}</small></div>}
           </li>; })}</ol>
         </div>
-        {/* VITAS: הניסוח תלוי במבנה ה-CRM (המכנים שונים בין ש.ברוך לאריקה), ולכן ניתן
-            להחלפה דרך המודל. ברירת המחדל היא הנוסח של ש.ברוך, שכבר אושר. */}
-        <p className="vr-caption vcs-transition-note">{model.transitionNote || 'אחוזי המעבר מוצגים מהשלב הקודם; הרשמות וחוזים נמדדים מהפגישות שהתקיימו, וביטולים מהפגישות שנקבעו.'}</p>
-        <p className="vr-caption">{model.scopeNote}</p>
-        {model.stages.some(stage => stage.smallSample) && <p className="vr-caption">~ אחוז המבוסס על מדגם קטן; יש לפרש בזהירות.</p>}
+        {/* טקסט ההסבר מתחת למשפך (אחוזי מעבר / חשיפות וקליקים / מדגם קטן) הוסר — "מיותר" (ויטלי, 6.11).
+            ההסבר על "~" עבר לטולטיפ של החץ. */}
       </>}
     </DataState>
   </div>;
