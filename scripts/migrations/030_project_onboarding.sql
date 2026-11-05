@@ -9,13 +9,13 @@ create table if not exists public.project_onboarding (
   project_id  uuid not null references public.projects(id) on delete cascade,
   step        text not null,                      -- המפתח מ-lib/onboarding-steps.js
   status      text not null default 'todo',
-  owner       text,                               -- vitali / shachar / client
+  owner       text,                               -- vitali / shachar / claude / client
   note        text,
   updated_by  text,
   updated_at  timestamptz not null default now(),
   primary key (project_id, step),
   constraint project_onboarding_status_chk check (status in ('todo', 'doing', 'done', 'na')),
-  constraint project_onboarding_owner_chk check (owner is null or owner in ('vitali', 'shachar', 'client'))
+  constraint project_onboarding_owner_chk check (owner is null or owner in ('vitali', 'shachar', 'claude', 'client'))
 );
 
 alter table public.project_onboarding enable row level security;   -- בלי policies: רק service_role

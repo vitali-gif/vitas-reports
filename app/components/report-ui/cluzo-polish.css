@@ -696,3 +696,5 @@ th:hover .sort-ind { opacity: .8; }
 .onb-controls select, .onb-note textarea { font: inherit; font-size: 13.5px; border: 1px solid var(--tv-border, #dde2ec); border-radius: 8px; padding: 6px 8px; background: #fff; color: var(--tv-text, #142044); }
 .onb-note { margin-bottom: 6px; }
 .onb-note textarea { width: 100%; resize: vertical; }
+.onb-fields { margin: 4px 0 8px; padding-inline-start: 18px; display: grid; gap: 3px; }
+.onb-owner-claude { background: #fdf0e8; color: #c2410c; }

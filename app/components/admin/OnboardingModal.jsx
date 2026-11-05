@@ -47,6 +47,7 @@ function Step({ step, state, auto, detail, onSave }) {
         <div className="onb-step-body">
           <p><b>למה:</b> {step.why}</p>
           <p><b>מה עושים:</b> {step.how}</p>
+          {step.fields && <ul className="onb-fields">{step.fields.map(f => <li key={f} dir="auto">{f}</li>)}</ul>}
           {step.auto && <p className="onb-muted"><Sparkles size={12} aria-hidden="true" /> בדיקה אוטומטית: {autoOk ? 'עברה' : 'עוד לא'}{at ? ` · ${at}` : ''}</p>}
           <div className="onb-controls">
             <label>סטטוס
