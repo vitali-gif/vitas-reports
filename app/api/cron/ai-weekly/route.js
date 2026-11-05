@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server'
 import { adminClient, requireAdmin, internalHeaders } from '../../../../lib/auth'
 import { analysisInput, runAnalysis, weeklyEmailHtml, weekKeys } from '../../../../lib/ai-analysis.js'
 import { buildReportModel } from '../../../../lib/report-pdf.js'
+import { loadAdTags } from '../../../../lib/ad-tags.js'
 import { sendAlert } from '../../../../lib/alert.js'
 
 export const dynamic = 'force-dynamic'
@@ -63,7 +64,8 @@ export async function GET(req) {
     if (doneIds.has(p.id)) return { ...base, skipped: 'already analysed' }
     try {
       const [rows, prevRows] = await Promise.all([rowsFor(p.id, key), rowsFor(p.id, prevKey)])
-      const model = buildReportModel({ project: p.name, client: base.client, key, prevKey, rows, prevRows })
+      const adTags = await loadAdTags(sb, rows).catch(() => ({}))   // "מה עובד במודעות" (5.11)
+      const model = buildReportModel({ project: p.name, client: base.client, key, prevKey, rows, prevRows, adTags })
       const input = analysisInput(model)
       if (!input.metrics.length && !input.funnel.length) return { ...base, skipped: 'no data' }
       if (dry) return { ...base, input }

@@ -611,7 +611,14 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     const prevKey = comparisonPeriodKey(selectedMonth);
     const [rows, prevRows] = await Promise.all([rowsFor(selectedMonth, { heavy: true }), prevKey ? rowsFor(prevKey, { heavy: false }) : []]);
     const lib = await import('../../lib/report-pdf.js');
-    return { lib, prevKey, model: lib.buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows }) };
+    // "מה עובד במודעות" (5.11): הסיווגים של המודעות שבתקופה (/api/ad-tags). בלי סיווגים — הסעיף פשוט לא מופיע.
+    let adTags = null;
+    try {
+      const { adsFromRows } = await import('../../lib/ad-tags.js');
+      const ids = adsFromRows(rows).map(a => a.adId).slice(0, 500);
+      if (ids.length) { const t = await getJson(`/api/ad-tags?projectId=${selectedProject.id}&ids=${ids.join(',')}`); adTags = t?.tags || null; }
+    } catch {}
+    return { lib, prevKey, model: lib.buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows, adTags }) };
   };
   const handleExport = async () => {
     if (!selectedProject || !selectedMonth) { showToast('בחר פרויקט ותקופה'); return; }
