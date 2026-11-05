@@ -7377,6 +7377,7 @@ const selectProject = async (client, project) => {
           onExport={!isClientView && !isDemoProject ? handleExport : undefined}
           onAiAnalysis={!isClientView && !isDemoProject && selectedProject ? openAiAnalysis : undefined}
           onClientAccess={!isClientView ? handleClientAccess : undefined}
+          onSessionLogs={!isClientView ? handleSessionLogs : undefined}
         />
 
         <div className="main-content">

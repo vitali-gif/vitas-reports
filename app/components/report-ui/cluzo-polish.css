@@ -574,3 +574,12 @@ th:hover .sort-ind { opacity: .8; }
 /* §26 המודעות הכי מובילות: בטלפון רק 5 הראשונות (ויטלי, 6.11) */
 .ta-n-mob { display: none; }
 @media (max-width: 640px) { .section-top-ads .ta-extra { display: none !important; } .ta-n-mob { display: inline; } .ta-n-desk { display: none; } }
+
+/* §27 ⋮ בטלפון — תפריט הפעולות שמוסתרות בכותרת (ויטלי, 6.11) */
+.h-kebab-wrap { position: relative; display: none; }
+@media (max-width: 768px) { .h-kebab-wrap { display: inline-flex; } }
+.h-kebab-menu { position: absolute; top: calc(100% + 6px); inset-inline-end: 0; z-index: 1200; min-width: 190px; padding: 6px;
+  background: var(--tv-surface, #fff); border: 1px solid var(--tv-border, #dde2ec); border-radius: 12px; box-shadow: 0 10px 30px rgba(11, 15, 30, .14); display: grid; gap: 2px; }
+.h-kebab-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; background: none; border-radius: 8px;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--tv-text, #142044); text-align: start; cursor: pointer; }
+.h-kebab-menu button:hover, .h-kebab-menu button:focus-visible { background: var(--tv-surface-2, #f1f5f9); }
