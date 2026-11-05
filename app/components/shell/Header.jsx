@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { LogOut, Users, Link2, FileText, HelpCircle, Sparkles } from 'lucide-react'
+import { LogOut, Users, Link2, FileText, HelpCircle, Sparkles, ListChecks } from 'lucide-react'
 
 // VITAS v2 Header — design-v2-playbook classes (h-brand / h-actions / btn)
 // Mobile: hamburger ☰ (right, RTL) · Cluzo logo (center) · kebab ⋮ + logout (left)
@@ -16,7 +16,7 @@ import { LogOut, Users, Link2, FileText, HelpCircle, Sparkles } from 'lucide-rea
 //                      button replaces the mobile kebab, which is still a no-op placeholder.
 //   loadingIndicator — optional JSX (spinner while fetching)
 
-export default function Header({ onMenuOpen, onExport, onAiAnalysis, onClientAccess, onSessionLogs, onLogout, onHelp, loadingIndicator = null, className = '' }) {
+export default function Header({ onMenuOpen, onExport, onAiAnalysis, onClientAccess, onSessionLogs, onOnboarding, onLogout, onHelp, loadingIndicator = null, className = '' }) {
   // עיצוב מחודש (header-vr): אייקוני lucide במקום אימוג'י, כפתורים בהירים אחידים
   const vr = className.includes('header-vr')
   // ⋮ בטלפון (ויטלי, 6.11): היה כפתור ריק. עכשיו תפריט של הפעולות שמוסתרות בטלפון; בלי פעולות כאלה
@@ -32,6 +32,7 @@ export default function Header({ onMenuOpen, onExport, onAiAnalysis, onClientAcc
   }, [menu])
   const overflow = [
     onExport && { key: 'export', label: 'ייצוא דוח', icon: FileText, run: onExport },
+    onOnboarding && { key: 'onboarding', label: 'קליטת לקוחות', icon: ListChecks, run: onOnboarding },
     onSessionLogs && { key: 'usage', label: 'שימוש לקוחות', icon: Users, run: onSessionLogs },
     onClientAccess && { key: 'access', label: 'גישת לקוחות', icon: Link2, run: onClientAccess },
   ].filter(Boolean)
@@ -83,6 +84,13 @@ export default function Header({ onMenuOpen, onExport, onAiAnalysis, onClientAcc
         {onClientAccess && (
           <button className="btn btn-client-access" onClick={onClientAccess} title="ניהול גישת לקוחות">
             {vr ? <Link2 size={16} aria-hidden="true" className="h-ico" /> : '🔗'} גישת לקוחות
+          </button>
+        )}
+
+        {/* קליטת לקוחות (6.11) — app/components/admin/OnboardingModal.jsx */}
+        {onOnboarding && (
+          <button className="btn btn-outline" onClick={onOnboarding} title="קליטת לקוחות: באיזה שלב כל לקוח">
+            {vr ? <ListChecks size={16} aria-hidden="true" className="h-ico" /> : '✅'} קליטת לקוחות
           </button>
         )}
 

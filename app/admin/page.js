@@ -11,6 +11,7 @@ import NamedLeadsModal from '../components/admin/NamedLeadsModal.jsx'
 import SectionHelp from '../components/report-ui/SectionHelp.jsx'
 import UsageSections from '../components/report-ui/UsageSections.jsx'
 import UsageModal from '../components/admin/UsageModal.jsx'
+import OnboardingModal from '../components/admin/OnboardingModal.jsx'
 import { track as trackUsage, setUsageContext } from '../../lib/usage-track.js'
 import CreativeTests from '../components/report-ui/CreativeTests.jsx'
 import { AdCopy, AdPlacement } from '../components/report-ui/AdCopy.jsx'
@@ -337,6 +338,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [accessCreds, setAccessCreds] = useState(null) // {email,password,loginUrl,emailSent,clientName}
   const [showClientAccess, setShowClientAccess] = useState(false)
   const [showSessionLogs, setShowSessionLogs] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)   // "קליטת לקוחות" (6.11)
   const [caEmail, setCaEmail] = useState('')
   const [caProjectIds, setCaProjectIds] = useState([])   // פרויקטים מסומנים בהוספה — מכל הלקוחות יחד
   // מייל שכבר יש לו גישה: ברירת המחדל היא לעדכן היקף בלי לאפס סיסמה. איפוס ושליחת
@@ -7344,6 +7346,7 @@ const selectProject = async (client, project) => {
         onAiAnalysis={!isClientView && !isDemoProject && selectedProject ? openAiAnalysis : undefined}
         onClientAccess={!isClientView ? handleClientAccess : undefined}
         onSessionLogs={!isClientView ? handleSessionLogs : undefined}
+        onOnboarding={!isClientView ? () => setShowOnboarding(true) : undefined}
         // בצד הלקוח ההתנתקות שייכת לדף /client, כי שם יושב המצב שמחליט אם להציג את הדשבורד
         // או את מסך הכניסה. handleLogout של האדמין רק מנקה את ה-state של הרכיב הזה, והדף שמעליו
         // לא ידע שהמשתמש התנתק — הכפתור "לא עשה כלום" (ויטלי, 23.9).
@@ -7376,6 +7379,7 @@ const selectProject = async (client, project) => {
           onAiAnalysis={!isClientView && !isDemoProject && selectedProject ? openAiAnalysis : undefined}
           onClientAccess={!isClientView ? handleClientAccess : undefined}
           onSessionLogs={!isClientView ? handleSessionLogs : undefined}
+          onOnboarding={!isClientView ? () => setShowOnboarding(true) : undefined}
         />
 
         <div className="main-content">
@@ -7543,6 +7547,7 @@ const selectProject = async (client, project) => {
         />
       )}
       {showSessionLogs && <UsageModal onClose={() => setShowSessionLogs(false)} />}
+      {showOnboarding && !isClientView && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
 
       {accessCreds && (
         <AccessCredsModal creds={accessCreds} onClose={() => setAccessCreds(null)} onCopied={(m) => showToast('✓ ' + m)} />
