@@ -9,6 +9,7 @@ import { normalizeObjections, isReviewObjection, REVIEW_LABEL, OFF_TARGET_LABEL 
 import { HANDLING_LABELS, HANDLING_METHOD } from '../../lib/client-wording.js'
 import NamedLeadsModal from '../components/admin/NamedLeadsModal.jsx'
 import SectionHelp from '../components/report-ui/SectionHelp.jsx'
+import CreativeTests from '../components/report-ui/CreativeTests.jsx'
 import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
@@ -7047,6 +7048,9 @@ const selectProject = async (client, project) => {
             </div>
           );
         })()}
+
+        {/* "מה עובד במודעות" (5.11): השוואה בין קבוצות מודעות לפי מה שרואים בהן — טאב Facebook בלבד */}
+        {dashTab === 'facebook' && <CreativeTests rows={fbReports} projectId={selectedProject?.id} />}
 
         {/* GOOGLE SEARCH ADS (Top 5 text ads) */}
         {(crmReports[0]?.summary?.crmType === 'zoho') && (dashTab === 'google' || dashTab === 'google_search' || dashTab === 'all') && (() => {
