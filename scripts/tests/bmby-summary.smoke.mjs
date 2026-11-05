@@ -45,7 +45,7 @@ eq('adBreakdown node for AD 1 has adId', R.adBreakdown.find(a => a.ad === 'AD 1'
 eq('not skipped (short range)', R._skippedBroken, false)
 // v34 (ענף redesign): responseTimeStats.noResponseBySource/ByUser. הקבוע עלה ב-lib/crm/schema-version.js
 // ולא כאן, ולכן הבדיקה נכשלה עוד לפני המיזוג של main. להעלות כאן בכל bump של CRM_SCHEMA_VERSION.
-eq('schema version exported', CRM_SCHEMA_VERSION, 36)
+eq('schema version exported', CRM_SCHEMA_VERSION, 37)
 for (const k of ['hourlyApptStats', 'hourlyLeadStats', 'hourlyContactStats', 'hourlyContactMeeting', 'noAnswerContactHour']) eq(`${k} has 24 buckets`, R[k].length, 24)
 eq('dayOfWeekStats has 7 days', Object.keys(R.dayOfWeekStats).length, 7)
 eq('meetingDayOfWeek has 7 days', Object.keys(R.meetingDayOfWeek).length, 7)

@@ -55,10 +55,10 @@ export default function Header({ onMenuOpen, onExport, onAiAnalysis, onClientAcc
           </button>
         )}
 
-        {/* ניתוח AI (27.10) — אדמין בלבד; במובייל דרך המגירה */}
+        {/* ניתוח AI (27.10) — אדמין בלבד. 5.11: גם במובייל, כ"ניתוח דוח" */}
         {onAiAnalysis && (
           <button className="btn btn-ai" onClick={onAiAnalysis} title="ניתוח AI של הפרויקט והתקופה שעל המסך">
-            {vr ? <Sparkles size={16} aria-hidden="true" className="h-ico" /> : '✨'} ניתוח AI
+            {vr ? <Sparkles size={16} aria-hidden="true" className="h-ico" /> : '✨'} <span className="h-ai-long">ניתוח AI</span><span className="h-ai-short">ניתוח דוח</span>
           </button>
         )}
 

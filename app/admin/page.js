@@ -8,6 +8,7 @@ import { formatCurrency, formatCurrencyCompact, formatNum, formatMonth, mapFaceb
 import { normalizeObjections, isReviewObjection, REVIEW_LABEL, OFF_TARGET_LABEL } from '../../lib/objection-normalize.js'
 import { HANDLING_LABELS, HANDLING_METHOD } from '../../lib/client-wording.js'
 import NamedLeadsModal from '../components/admin/NamedLeadsModal.jsx'
+import SectionHelp from '../components/report-ui/SectionHelp.jsx'
 import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
 import { PeriodFetching, PeriodEmpty, LastUpdated } from '../components/PeriodState'
@@ -298,6 +299,25 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [refreshElapsed, setRefreshElapsed] = useState(0)
   const [dashTab, setDashTab] = useState('all')
   const [crmSubTab, setCrmSubTab] = useState('sources')
+  // ויטלי, 5.11: כל מעבר טאב (ראשי או תת-טאב) מקפיץ לראש העמוד. בטעינה הראשונה — לא.
+  const _tabScrollInit = useRef(false)
+  useEffect(() => {
+    if (!_tabScrollInit.current) { _tabScrollInit.current = true; return }
+    try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch { window.scrollTo(0, 0) }
+  }, [dashTab, crmSubTab])
+  // בורר תצוגת ה-CRM נצמד מתחת לשורת הטאבים (cluzo-polish.css §23) — כאן מודדים איפה היא נגמרת
+  useEffect(() => {
+    const measure = () => {
+      const t = document.querySelector('.client-tabs-main')
+      if (!t) return
+      const top = parseFloat(getComputedStyle(t).top) || 0
+      document.documentElement.style.setProperty('--vr-tabs-bottom', Math.round(top + t.offsetHeight) + 'px')
+    }
+    measure()
+    const id = setTimeout(measure, 600)
+    window.addEventListener('resize', measure)
+    return () => { clearTimeout(id); window.removeEventListener('resize', measure) }
+  }, [dashTab])
   const [cityMetric, setCityMetric] = useState('leads')
   const [srcMobileMetric, setSrcMobileMetric] = useState('leads')  // mobile sources sub-tab: leads|meetings
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -505,6 +525,12 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       showAddProject, showAddClient, showSessionLogs, showClientAccess]);
 
   const [sfTab, setSfTab] = useState('network');
+  // גם תתי-הטאבים של סיילספורס (KLOSS) מקפיצים לראש העמוד (ויטלי, 5.11)
+  const _sfScrollInit = useRef(false)
+  useEffect(() => {
+    if (!_sfScrollInit.current) { _sfScrollInit.current = true; return }
+    try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch { window.scrollTo(0, 0) }
+  }, [sfTab])
   const [sfBranchLens, setSfBranchLens] = useState('cohort');
   const [expandedAgents, setExpandedAgents] = useState(new Set());
   const handleSort = (tableId, key) => { setSortConfig(prev => { const cur = prev[tableId]; if (cur && cur.key === key) return {...prev, [tableId]: {key, dir: cur.dir === 'desc' ? 'asc' : 'desc'}}; return {...prev, [tableId]: {key, dir: 'desc'}}; }); };
@@ -7638,6 +7664,8 @@ const selectProject = async (client, project) => {
         </div>
       )}
 
+      {/* ויטלי, 5.11: "איך זה עוזר לך?" ליד כל כותרת שיש לה הסבר (lib/section-help.js) */}
+      <SectionHelp />
       {namedLeadsModal && <NamedLeadsModal title={namedLeadsModal.title} names={namedLeadsModal.names} isClientView={isClientView} onClose={() => setNamedLeadsModal(null)} />}
 
       {leadsModal && (

@@ -514,6 +514,9 @@ th:hover .sort-ind { opacity: .8; }
 .nlm-phone { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--tv-link); text-decoration: none; font-variant-numeric: tabular-nums; }
 .nlm-phone:hover { text-decoration: underline; }
 .nlm-src { justify-self: start; max-width: 100%; font-size: 12px; color: var(--tv-text-secondary); background: var(--tv-canvas); border-radius: 999px; padding: 2px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nlm-ad { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--tv-text-secondary); min-width: 0; }
+.nlm-ad svg { flex: none; color: var(--tv-brand); }
+.nlm-ad b { font-weight: 600; color: var(--tv-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .nlm-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--tv-text-muted); }
 .nlm-meta span { display: inline-flex; align-items: center; gap: 5px; }
 .nlm-meta b { font-weight: 600; color: var(--tv-text-secondary); }
@@ -522,3 +525,25 @@ th:hover .sort-ind { opacity: .8; }
   .nlm-search { margin-inline: 16px; }
   .nlm-list { padding-inline: 6px; }
 }
+
+/* ── 23. מובייל (ויטלי, 5.11) ──────────────────────────────────────────────────
+   כפתור "ניתוח דוח" בכותרת; שורת הטאבים נגללת הצידה (vitas-bridge.css שם עליה overflow:hidden,
+   וכך "ישיבות שיווק" נחתך בלי דרך להגיע אליו); בורר תצוגת ה-CRM נשאר צמוד מתחת לטאבים בגלילה. */
+.h-ai-short { display: none; }
+@media (max-width: 768px) {
+  .h-actions .btn-ai { display: inline-flex !important; align-items: center; gap: 5px; padding: 0 10px !important; border-color: var(--tv-brand-line) !important; color: var(--tv-brand); background: var(--tv-brand-soft); font-size: 13px; font-weight: 700; }
+  .h-ai-long { display: none; }
+  .h-ai-short { display: inline; }
+  .vr-ui .client-tabs.client-tabs-main { display: flex !important; overflow-x: auto; overflow-y: hidden; max-inline-size: 100%; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .vr-ui .client-tabs.client-tabs-main::-webkit-scrollbar { display: none; }
+  .vr-ui .client-tabs-main .client-tab { flex: 0 0 auto; font-size: 13.5px; }
+  .vpick { position: sticky; top: var(--vr-tabs-bottom, 136px); z-index: 25; background: var(--tv-canvas); padding-block: 6px; margin-block: -6px 4px; }
+}
+
+/* ── 24. "איך זה עוזר לך?" ליד כותרות (5.11) — app/components/report-ui/SectionHelp.jsx ── */
+.sh-btn { display: inline-flex; align-items: center; gap: 5px; margin-inline-start: 8px; padding: 3px 10px; min-height: 28px;
+  border: 1px solid var(--tv-brand-line); border-radius: 999px; background: var(--tv-surface); color: var(--tv-brand);
+  font: 600 12.5px inherit; font-family: inherit; cursor: pointer; white-space: nowrap; vertical-align: middle; }
+.sh-btn:hover, .sh-btn.on { background: var(--tv-brand-soft); }
+.sh-note { margin: 0 0 14px; }
+.sh-note[hidden] { display: none !important; }

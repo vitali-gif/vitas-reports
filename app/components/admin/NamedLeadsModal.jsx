@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { Users, X, Search, Phone, CalendarPlus, CalendarCheck } from 'lucide-react'
+import { Users, X, Search, Phone, CalendarPlus, CalendarCheck, Megaphone } from 'lucide-react'
 import { REVIEW_LABEL } from '../../../lib/objection-normalize.js'
 
 // רשימת הלידים שמאחורי כרטיס (ויטלי, 3.11: "לעצב בצורה מקצועית יותר לפי ה-DESIGN SYSTEM").
@@ -18,7 +18,7 @@ export default function NamedLeadsModal({ title, names, isClientView, onClose })
   const shown = useMemo(() => {
     const t = q.trim().toLowerCase()
     if (!t) return rows
-    return rows.filter(e => [e.name, e.phone, e.source, e.objection].some(v => String(v || '').toLowerCase().includes(t)))
+    return rows.filter(e => [e.name, e.phone, e.source, e.ad, e.objection].some(v => String(v || '').toLowerCase().includes(t)))
   }, [rows, q])
   return (
     <div className="modal-overlay active" style={{ zIndex: 9999 }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -34,7 +34,7 @@ export default function NamedLeadsModal({ title, names, isClientView, onClose })
         {rows.length > 8 && (
           <label className="cza-search nlm-search">
             <Search size={16} aria-hidden="true" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש לפי שם, טלפון או מקור" aria-label="חיפוש" />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש לפי שם, טלפון, מקור או מודעה" aria-label="חיפוש" />
           </label>
         )}
         {shown.length === 0 ? (
@@ -50,6 +50,7 @@ export default function NamedLeadsModal({ title, names, isClientView, onClose })
                     {e.phone ? <a className="nlm-phone" href={`tel:${e.phone}`} dir="ltr"><Phone size={13} aria-hidden="true" />{e.phone}</a> : null}
                   </div>
                   {e.source ? <div className="nlm-src">{e.source}</div> : null}
+                  {e.ad ? <div className="nlm-ad"><Megaphone size={13} aria-hidden="true" /> <span>מודעה:</span> <b dir="auto">{e.ad}</b></div> : null}
                   {(e.leadDate || e.apptDate || e.objection) && (
                     <div className="nlm-meta">
                       {e.leadDate ? <span><CalendarPlus size={13} aria-hidden="true" /> כניסת ליד <b dir="ltr">{dmy(e.leadDate)}</b></span> : null}
