@@ -24,7 +24,7 @@ const trim = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : null)
 const CHUNK = 500
 
 export async function GET(request, { params }) {
-  const gate = await requireMeeting(request, params?.id)
+  const gate = await requireMeeting(request, (await params)?.id)
   if (!gate.ok) return gate.res
   const { sb, meeting } = gate
 
@@ -44,7 +44,7 @@ export async function GET(request, { params }) {
 }
 
 export async function POST(request, { params }) {
-  const gate = await requireMeeting(request, params?.id)
+  const gate = await requireMeeting(request, (await params)?.id)
   if (!gate.ok) return gate.res
   const { sb, meeting } = gate
 

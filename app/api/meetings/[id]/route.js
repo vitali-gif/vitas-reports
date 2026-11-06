@@ -16,14 +16,14 @@ const json = (b, s = 200) => Response.json(b, { status: s })
 const trim = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : null)
 
 export async function GET(request, { params }) {
-  const gate = await requireMeeting(request, params?.id)
+  const gate = await requireMeeting(request, (await params)?.id)
   if (!gate.ok) return gate.res
   const detail = await loadMeetingDetail(gate.sb, gate.meeting)
   return json({ ok: true, ...detail })
 }
 
 export async function PATCH(request, { params }) {
-  const gate = await requireMeeting(request, params?.id)
+  const gate = await requireMeeting(request, (await params)?.id)
   if (!gate.ok) return gate.res
   const { sb, meeting } = gate
 

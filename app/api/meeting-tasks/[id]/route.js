@@ -24,7 +24,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const STATUSES = ['proposed', 'open', 'in_progress', 'done', 'blocked', 'cancelled', 'needs_details']
 
 export async function PATCH(request, { params }) {
-  const id = params?.id
+  const id = (await params)?.id
   if (!id || !/^[0-9a-f-]{36}$/i.test(String(id))) return json({ error: 'מזהה משימה לא תקין' }, 400)
 
   // שער זהות לפני כל נגיעה ב-DB: בלעדיו פנייה אנונימית הבדילה בתשובה בין מזהה משימה

@@ -60,7 +60,7 @@ function normalizeTasks(arr) {
 }
 
 export async function PUT(request, { params }) {
-  const gate = await requireMeeting(request, params?.id)
+  const gate = await requireMeeting(request, (await params)?.id)
   if (!gate.ok) return gate.res
   const { sb, meeting } = gate
 
@@ -113,7 +113,7 @@ export async function PUT(request, { params }) {
 }
 
 export async function POST(request, { params }) {
-  const gate = await requireMeeting(request, params?.id)
+  const gate = await requireMeeting(request, (await params)?.id)
   if (!gate.ok) return gate.res
   const { sb, meeting } = gate
 
