@@ -96,7 +96,7 @@ eq('cross: combined by lead only (no meetings mixed)', [cx.combined.find(t => t.
 let sent = null
 const mock = { beta: { messages: { create: async (req) => { sent = req; return { model: 'm', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ people: 'with', visual: 'lifestyle', property: 'garden', price: 'shown', color: 'warm', angle: 'lifestyle' }) }] } } } } }
 const r = await tagCreative(mock, { imageUrl: 'https://x/y.jpg', title: 'דירות גן', body: 'החל מ-2.9 מיליון', adName: 'ad' })
-eq('tag: image by URL + text, structured output, low effort', [sent.messages[0].content[0].source.url, sent.output_config.format.schema === TAG_SCHEMA, sent.output_config.effort, r.tags.property], ['https://x/y.jpg', true, 'low', 'garden'])
+eq('tag: image by URL + text, structured output, low effort', [sent.messages[0].content[0].source.url, JSON.stringify(sent.output_config.format.schema) === JSON.stringify(TAG_SCHEMA), sent.output_config.effort, r.tags.property], ['https://x/y.jpg', true, 'low', 'garden'])
 
 // תמונה כקובץ (קישורים של פייסבוק חסומים לשליפה של Anthropic)
 const { fetchImage } = await import('../../lib/ad-tags.js')
@@ -104,5 +104,25 @@ const fakeFetch = (type, bytes = 10) => async () => ({ ok: true, headers: { get:
 eq('fetchImage: jpeg → base64, html → null, bad url → null', [(await fetchImage('https://x/a.jpg', { fetchImpl: fakeFetch('image/jpeg') }))?.media_type, await fetchImage('https://x/a', { fetchImpl: fakeFetch('text/html') }), await fetchImage('ftp://x')], ['image/jpeg', null, null])
 await tagCreative(mock, { image: { media_type: 'image/png', data: 'AAAA' }, title: 't' })
 eq('tag: image sent as base64 when downloaded', [sent.messages[0].content[0].source.type, sent.messages[0].content[0].source.media_type], ['base64', 'image/png'])
+
+// סוגי עסקים (6.11): מכשיר רפואי — בלי הדמיות ובלי "סוג נכס"; רהיטים — "המוצר במודעה"
+const { tagSchema, dimensionsFor, verticalOf } = await import('../../lib/ad-tags.js')
+await tagCreative(mock, { image: { media_type: 'image/png', data: 'AAAA' }, title: 't', vertical: 'device' })
+const dev = sent.output_config.format.schema.properties
+eq('device: no renders, no property, prompt names the device', [dev.visual.enum.includes('interior_render'), 'property' in dev, dev.angle.enum.includes('trial'), /medical or cosmetic device/.test(sent.system)], [false, false, true, true])
+eq('furniture: product field, renders of the product', [Object.keys(tagSchema('furniture').properties).includes('product'), tagSchema('furniture').properties.visual.enum.includes('render')], [true, true])
+eq('vertical by account: BCure device, KLOSS furniture, unknown real estate', [verticalOf('929034545061247'), verticalOf('295378394595304'), verticalOf('1')], ['device', 'furniture', 'real_estate'])
+eq('tag result carries vertical + version', [r.tags.vertical, r.tags.v], ['real_estate', 2])
+const D = (people, visual, angle) => ({ tags: { people, visual, price: 'shown', color: 'light', angle, vertical: 'device', v: 2 }, is_video: false })
+const tagsD = { 1: D('with', 'in_use', 'trial'), 2: D('without', 'product', 'problem'), 3: D('with', 'in_use', 'trial'), 4: D('without', 'product', 'problem') }
+const tD = creativeTests(ads, tagsD)
+eq('device project: device labels, no property dimension', [tD.find(t => t.key === 'visual').groups.map(g => g.label).sort(), tD.some(t => t.key === 'property')], [['המכשיר עצמו', 'שימוש במכשיר'].sort(), false])
+// מעורב: 2 מודעות נדל"ן ישנות + 2 מכשיר — "סוג התמונה" רק מהרוב; אנשים מכולן
+const tagsMix = { 1: D('with', 'in_use', 'trial'), 2: D('without', 'product', 'problem'), 3: T('with', 'shown'), 4: D('without', 'product', 'trial') }
+const tM = creativeTests(ads, tagsMix)
+eq('mixed verticals: visual only from the majority, people from all', [tM.find(t => t.key === 'visual').groups.reduce((s2, g) => s2 + g.ads, 0), tM.find(t => t.key === 'people').groups.reduce((s2, g) => s2 + g.ads, 0)], [3, 4])
+const cxMix = crossCreative([{ name: 'A', tests: tD }], ads, { ...tagsD, 3: T('with', 'shown') })
+eq('cross across verticals: shared dimensions only', cxMix.combined.map(t => t.key).filter(k => !['people', 'price', 'color', 'format'].includes(k)), [])
+eq('dimensions for furniture include product', dimensionsFor('furniture').map(d => d.key).includes('product'), true)
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
