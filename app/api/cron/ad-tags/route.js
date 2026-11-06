@@ -7,6 +7,8 @@
  *
  * הרשאה: קרון (CRON_SECRET) או אדמין. ?limit=N (עד 100), ?dry=1 מחזיר את הרשימה בלי לסווג.
  * ?months=N (עד 13) — כמה חודשים אחורה לקחת מודעות (ברירת מחדל 2). 12 = מילוי לניתוח שנתי (ויטלי, 6.11).
+ * ?minSpend=₪ — רק מודעות שהוציאו לפחות הסכום הזה בכל החודשים יחד. במילוי (months > 2) ברירת המחדל ₪500:
+ *   1,114 מודעות בשנה, רובן בדיקות קטנות; 242 מעל ₪500 מכסות 75%–99% מההוצאה (ויטלי אישר, 6.11).
  */
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
@@ -70,6 +72,14 @@ export async function GET(req) {
       ads.set(id, { adId: id, account: '', name: d.adName || '', full: false })
     }
   }
+  const minSpend = Math.max(0, Number(url.searchParams.get('minSpend')) || (months > 2 ? 500 : 0))
+  if (minSpend > 0) {
+    const spendOf = new Map()
+    for (const r of reps || []) for (const d of Array.isArray(r.data) ? r.data : []) {
+      const id = String(d.adId || ''); if (id) spendOf.set(id, (spendOf.get(id) || 0) + (Number(d.spend) || 0))
+    }
+    for (const id of [...ads.keys()]) if ((spendOf.get(id) || 0) < minSpend) ads.delete(id)
+  }
   const ids = [...ads.keys()]
   const done = new Set(), retry = new Set()
   for (let i = 0; i < ids.length; i += 200) {
@@ -96,7 +106,7 @@ export async function GET(req) {
   // בלי חשבון אין טעם לשאול את מטא (הטוקן יהיה הלא נכון) — מדלגים, ולא מסמנים "לא זמינה"
   const noAccount = todo.filter(a => !a.account && !a.full).map(a => a.adId)
   if (noAccount.length) { for (const id of noAccount) { const i = todo.findIndex(t => t.adId === id); if (i >= 0) todo.splice(i, 1) } }
-  if (dry) return J({ ads: ids.length, tagged: done.size, todo: todo.length, noAccount: noAccount.length, months })
+  if (dry) return J({ ads: ids.length, tagged: done.size, todo: todo.length, noAccount: noAccount.length, months, minSpend })
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY.trim() })
   const errors = []
@@ -126,7 +136,7 @@ export async function GET(req) {
       } else errors.push({ adId: a.adId, error: msg.slice(0, 200) })
     }
   })
-  const out = { months, ads: ids.length, alreadyTagged: done.size, tagged: ok, unavailable, noAccount: noAccount.length, errors: errors.slice(0, 10), left: Math.max(0, ids.length - done.size - todo.length - noAccount.length) }
+  const out = { months, minSpend, ads: ids.length, alreadyTagged: done.size, tagged: ok, unavailable, noAccount: noAccount.length, errors: errors.slice(0, 10), left: Math.max(0, ids.length - done.size - todo.length - noAccount.length) }
   try { await logJob(sb, 'ad-tags', errors.length < todo.length || !todo.length, Date.now() - t0, out) } catch { /* הרישום לא מפיל */ }
   return J(out)
 }
