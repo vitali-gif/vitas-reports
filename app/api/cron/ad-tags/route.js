@@ -7,13 +7,16 @@
  *
  * הרשאה: קרון (CRON_SECRET) או אדמין. ?limit=N (עד 100), ?dry=1 מחזיר את הרשימה בלי לסווג.
  * ?months=N (עד 13) — כמה חודשים אחורה לקחת מודעות (ברירת מחדל 2). 12 = מילוי לניתוח שנתי (ויטלי, 6.11).
+ * ?retag=1 — מסווג מחדש גם מודעות שכבר סווגו בגרסה ישנה (tags.v < TAG_VERSION). חד-פעמי, עולה כסף —
+ *   רק באישור ויטלי. 6.11: 75% מהסיווגים הראשונים נעשו על תמונה של 64×64 פיקסלים (thumbnail_url בלי גודל),
+ *   ובלי קטגוריות לפי סוג עסק (BCure ו-KLOSS סווגו כנדל"ן).
  * ?minSpend=₪ — רק מודעות שהוציאו לפחות הסכום הזה בכל החודשים יחד. במילוי (months > 2) ברירת המחדל ₪500:
  *   1,114 מודעות בשנה, רובן בדיקות קטנות; 242 מעל ₪500 מכסות 75%–99% מההוצאה (ויטלי אישר, 6.11).
  */
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { adminClient, requireAdmin } from '../../../../lib/auth'
-import { tagCreative, fetchImage, coverKeys, lastMonths } from '../../../../lib/ad-tags.js'
+import { tagCreative, fetchImage, coverKeys, lastMonths, verticalOf, TAG_VERSION, imageSize } from '../../../../lib/ad-tags.js'
 import { META_GRAPH_VERSION, metaTokenFor } from '../../../../lib/ads/meta-api.js'
 import { logJob } from '../../../../lib/job-log.js'
 
@@ -36,7 +39,7 @@ async function pool(items, size, fn) {
 // פרטי הקריאייטיב ממטא, למודעה שלא מופיעה ב-activeAds של הדוח
 async function metaCreative(adId, account) {
   const token = metaTokenFor(account || '')
-  const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/${adId}?fields=name,creative{title,body,image_url,thumbnail_url,video_id}&access_token=${encodeURIComponent(token)}`
+  const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/${adId}?fields=name,creative{title,body,image_url,thumbnail_url,video_id}&thumbnail_width=800&thumbnail_height=800&access_token=${encodeURIComponent(token)}`
   const r = await fetch(url).then(x => x.json()).catch(() => ({}))
   if (r.error) throw new Error('Meta: ' + String(r.error.message || r.error.type || 'error').slice(0, 160))
   const c = r.creative || {}
@@ -50,6 +53,7 @@ export async function GET(req) {
   const dry = url.searchParams.get('dry') === '1'
   const months = Math.min(13, Math.max(1, Number(url.searchParams.get('months')) || 2))
   // מילוי של כמה חודשים (months > 2) — 100 בכל ריצה כברירת מחדל; בלי & ב-URL של ה-workflow (bash)
+  const retag = url.searchParams.get('retag') === '1'
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || (months > 2 ? 100 : 40)))
   const t0 = Date.now()
   const sb = adminClient()
@@ -99,6 +103,7 @@ export async function GET(req) {
       // "לא זמינה" נחשב סגור רק אם נבדק מול החשבון הנכון. 73 מודעות סומנו כך בלי חשבון (5.11) — מטא ענה
       // "אין הרשאה" כי נשאלו עם הטוקן הלא נכון, לא כי נמחקו (ויטלי: "אנחנו לא מוחקים מודעות, אנחנו עוצרים").
       if (x.tags && x.tags.unavailable) { if (x.account) done.add(x.ad_id) }
+      else if (retag && Number(x.tags?.v || 1) < TAG_VERSION) retry.add(x.ad_id)
       else if ((x.image_url || x.ad_name) && (!textOnly || x.tags.retried)) done.add(x.ad_id)
       else if (textOnly) retry.add(x.ad_id)
     }
@@ -115,7 +120,7 @@ export async function GET(req) {
   // בלי חשבון אין טעם לשאול את מטא (הטוקן יהיה הלא נכון) — מדלגים, ולא מסמנים "לא זמינה"
   const noAccount = todo.filter(a => !a.account && !a.full).map(a => a.adId)
   if (noAccount.length) { for (const id of noAccount) { const i = todo.findIndex(t => t.adId === id); if (i >= 0) todo.splice(i, 1) } }
-  if (dry) return J({ ads: ids.length, tagged: done.size, todo: todo.length, noAccount: noAccount.length, months, minSpend })
+  if (dry) return J({ ads: ids.length, tagged: done.size, todo: todo.length, noAccount: noAccount.length, months, minSpend, retag })
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY.trim() })
   const errors = []
@@ -127,9 +132,11 @@ export async function GET(req) {
       let fresh = {}
       try { fresh = await metaCreative(a.adId, a.account) } catch (e) { if (!a.full) throw e }
       const c = { ...a, ...Object.fromEntries(Object.entries(fresh).filter(([, v]) => v)) }
-      const image = await fetchImage(c.imageUrl) || (fresh.imageUrl && a.imageUrl && a.imageUrl !== fresh.imageUrl ? await fetchImage(a.imageUrl) : null)
+      // תמונה קטנה מדי (64×64, מה שמטא מחזיר בלי thumbnail_width) לא מספיקה כדי לראות מה יש בה — כמו בלי תמונה
+      const big = (img) => { if (!img) return null; const sz = imageSize(img); return sz && Math.max(sz.w, sz.h) < 200 ? null : img }
+      const image = big(await fetchImage(c.imageUrl)) || (fresh.imageUrl && a.imageUrl && a.imageUrl !== fresh.imageUrl ? big(await fetchImage(a.imageUrl)) : null)
       if (!image && !c.title && !c.body) throw new Error('no image and no text for this ad (Meta returned nothing) - not tagged')
-      const { tags, model } = await tagCreative(anthropic, { image, title: c.title, body: c.body, adName: c.name })
+      const { tags, model } = await tagCreative(anthropic, { image, title: c.title, body: c.body, adName: c.name, vertical: verticalOf(c.account) })
       const { error: upErr } = await sb.from('ad_creative_tags').upsert({
         ad_id: a.adId, account: c.account || '', ad_name: c.name || null, image_url: image ? (c.imageUrl || null) : null,
         is_video: !!c.isVideo, tags: { ...tags, ...(image ? {} : { fromTextOnly: true, ...(retry.has(a.adId) ? { retried: true } : {}) }) }, model, tagged_at: new Date().toISOString(),
@@ -145,7 +152,7 @@ export async function GET(req) {
       } else errors.push({ adId: a.adId, error: msg.slice(0, 200) })
     }
   })
-  const out = { months, minSpend, ads: ids.length, alreadyTagged: done.size, tagged: ok, unavailable, noAccount: noAccount.length, errors: errors.slice(0, 10), left: Math.max(0, ids.length - done.size - todo.length - noAccount.length) }
+  const out = { months, minSpend, retag, ads: ids.length, alreadyTagged: done.size, tagged: ok, unavailable, noAccount: noAccount.length, errors: errors.slice(0, 10), left: Math.max(0, ids.length - done.size - todo.length - noAccount.length) }
   try { await logJob(sb, 'ad-tags', errors.length < todo.length || !todo.length, Date.now() - t0, out) } catch { /* הרישום לא מפיל */ }
   return J(out)
 }

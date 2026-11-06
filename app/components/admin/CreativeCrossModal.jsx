@@ -55,7 +55,7 @@ export default function CreativeCrossModal({ periodKey, onClose }) {
               const cons = data.consistency?.[t.key] || {}
               return (
                 <div key={t.key} className="ctz-card">
-                  <div className="ctz-head"><h3>{t.label}</h3>{t.indicative && <span className="ctz-ind">אינדיקציה בלבד</span>}</div>
+                  <div className="ctz-head"><h3>{t.label}</h3>{t.indicative && <span className="ctz-ind">מעט נתונים עדיין</span>}</div>
                   <div className="ctz-rank">כל הפרויקטים יחד, לפי עלות לליד · "ניצח ב" = בכמה פרויקטים הערך הזה היה הכי טוב (לפי הדירוג של כל פרויקט)</div>
                   <div className="ctz-scroll"><table className="ctz-table">
                     <thead><tr><th></th><th className="ctz-opt">מודעות</th><th>לידים</th><th className="ctz-opt">CTR</th><th>עלות לליד</th><th>ניצח ב</th></tr></thead>

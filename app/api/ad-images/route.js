@@ -6,7 +6,7 @@
  * ימים, ולמודעה שכבר לא פעילה אין קישור בכלל. כאן מבקשים ממטא את התמונה של המודעה לפי המזהה,
  * מורידים אותה בשרת ומחזירים data URL — כך גם אין תלות במדיניות הקישורים של פייסבוק בדפדפן.
  *
- * הרשאה: requireProjectAccess, ורק מודעות שמופיעות בדוחות הפייסבוק של הפרויקט (כמו /api/ad-tags).
+ * הרשאה: requireProjectAccess, ורק מודעות שמופיעות בדוחות הפייסבוק של הפרויקט ב-13 החודשים האחרונים.
  * עד 12 מודעות בבקשה. מחזיר { images: { [adId]: 'data:image/...' } } — מודעה שלא נמצאה פשוט חסרה.
  */
 import { NextResponse } from 'next/server'
@@ -29,6 +29,30 @@ async function thumbFor(adId, account) {
   return img ? `data:${img.media_type};base64,${img.data}` : null
 }
 
+// המודעות של הפרויקט (מזהה → חשבון), במטמון של 10 דקות לכל instance: חלון אחד טוען 12 תמונות בכל
+// בקשה, ודוחות הפייסבוק של שנה שלמה הם עד ~11MB (KLOSS) — לא לקרוא אותם שוב בכל בקשה.
+const _own = new Map()
+async function ownedAds(sb, projectId) {
+  const hit = _own.get(projectId)
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit
+  // עד 6.11: 24 הדוחות האחרונים — אבל רובם טווחים יומיים ושבועיים של החודשיים האחרונים, ולכן מודעות
+  // מ"12 החודשים האחרונים" נפסלו ולא הוצגו (ויטלי: "אני לא רואה את רוב המודעות"). עכשיו: חודשים
+  // ('2026-05') וטווחים שמתחילים ב-1 לחודש (חודש מלא, רבעון), 13 חודשים אחורה.
+  const now = new Date()
+  const since = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7)
+  const { data: reps, error } = await sb.from('reports').select('data, summary->activeAds').eq('project_id', projectId).eq('source', 'facebook')
+    .gte('month', since).or('month.like.____-__,month.like.____-__-01_*').limit(80)
+  if (error) throw new Error(error.message)
+  const ids = new Set(), accountOf = {}
+  for (const r of reps || []) {
+    for (const d of Array.isArray(r.data) ? r.data : []) if (d && d.adId) { ids.add(String(d.adId)); if (d.account && !accountOf[d.adId]) accountOf[String(d.adId)] = String(d.account) }
+    for (const a of Array.isArray(r.activeAds) ? r.activeAds : []) if (a && a.id && a.account && !accountOf[a.id]) accountOf[String(a.id)] = String(a.account)
+  }
+  const out = { ids, accountOf, at: Date.now() }
+  _own.set(projectId, out)
+  return out
+}
+
 export async function GET(req) {
   const url = new URL(req.url)
   const projectId = url.searchParams.get('projectId')
@@ -37,15 +61,10 @@ export async function GET(req) {
   const ids = [...new Set(String(url.searchParams.get('ids') || '').split(',').map(s => s.trim()).filter(s => /^\d{5,25}$/.test(s)))].slice(0, 12)
   if (!ids.length) return J({ images: {} })
   const sb = adminClient()
-  // רק מודעות של הפרויקט — מהחודשים האחרונים קודם, כדי לא לטעון את כל ההיסטוריה
-  const { data: reps, error } = await sb.from('reports').select('data, summary->activeAds').eq('project_id', projectId).eq('source', 'facebook').order('month', { ascending: false }).limit(24)
-  if (error) return J({ error: error.message }, 500)
-  const own = new Set(), accountOf = {}
-  for (const r of reps || []) {
-    for (const d of Array.isArray(r.data) ? r.data : []) if (d && d.adId) own.add(String(d.adId))
-    for (const a of Array.isArray(r.activeAds) ? r.activeAds : []) if (a && a.id && a.account && !accountOf[a.id]) accountOf[String(a.id)] = String(a.account)
-  }
-  const allowed = ids.filter(id => own.has(id))
+  const own = await ownedAds(sb, projectId).catch(e => ({ error: e.message }))
+  if (own.error) return J({ error: own.error }, 500)
+  const accountOf = own.accountOf
+  const allowed = ids.filter(id => own.ids.has(id))
   if (!allowed.length) return J({ images: {} })
   // החשבון של כל מודעה (לטוקן הנכון): מ-activeAds, ואם אין — מ-ad_daily
   const missing = allowed.filter(id => !accountOf[id])

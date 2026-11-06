@@ -13,7 +13,7 @@ import UsageSections from '../components/report-ui/UsageSections.jsx'
 import UsageModal from '../components/admin/UsageModal.jsx'
 import OnboardingModal from '../components/admin/OnboardingModal.jsx'
 import { track as trackUsage, setUsageContext } from '../../lib/usage-track.js'
-import CreativeTests from '../components/report-ui/CreativeTests.jsx'
+import CreativeTests, { CreativeHighlights } from '../components/report-ui/CreativeTests.jsx'
 import { AdCopy, AdPlacement } from '../components/report-ui/AdCopy.jsx'
 import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
@@ -6388,6 +6388,10 @@ const selectProject = async (client, project) => {
             כאן הוא מוצג בטאב "הכל": שלבי המדיה עם נתונים, ושלבי ה-CRM כ"אין נתון".
             ברגע שה-CRM יחובר, טאב ה-CRM ייווצר והסרגל יעבור לשם מעצמו. */}
         {dashTab === 'all' && (!hasCrm || vrFunnelMode) ? renderFunnelBar(vrFunnelMode) : null}
+
+        {/* "מה עובד במודעות" — שלושת הממצאים החזקים בראש הדשבורד (ויטלי, 6.11). הניתוח המלא בטאב Facebook. */}
+        {(dashTab === 'all' || dashTab === 'facebook') && hasFb && <CreativeHighlights projectId={selectedProject?.id} periodKey={selectedMonth}
+          onMore={() => { const go = () => document.getElementById('creative-tests')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); if (dashTab !== 'facebook') { setDashTab('facebook'); setTimeout(go, 400) } else go() }} />}
 
         {/* פילוח פנימי לפי פרויקט — לקוח בחשבון מודעות אחד שמזהה את הבניין ברמת המודעה.
             הסכום למעלה נשאר סך החשבון; כאן רואים ממה הוא מורכב. כל שקל בדלי אחד בלבד,
