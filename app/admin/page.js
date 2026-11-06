@@ -7061,7 +7061,7 @@ const selectProject = async (client, project) => {
         })()}
 
         {/* "מה עובד במודעות" (5.11): השוואה בין קבוצות מודעות לפי מה שרואים בהן — טאב Facebook בלבד */}
-        {dashTab === 'facebook' && <CreativeTests rows={currentReports} projectId={selectedProject?.id} />}
+        {dashTab === 'facebook' && <CreativeTests rows={currentReports} projectId={selectedProject?.id} isAdmin={!isClientView} periodKey={selectedMonth} />}
 
         {/* GOOGLE SEARCH ADS (Top 5 text ads) */}
         {(crmReports[0]?.summary?.crmType === 'zoho') && (dashTab === 'google' || dashTab === 'google_search' || dashTab === 'all') && (() => {

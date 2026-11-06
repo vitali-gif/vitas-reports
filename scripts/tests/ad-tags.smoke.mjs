@@ -84,6 +84,14 @@ eq('people ranked by cost per purchase', [pz.hasPurchases, pz.rankBy, pz.groups.
 const hz = renderReportHtml(buildReportModel({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: [...rows, zoho], prevRows: [], adTags: tags }))
 eq('pdf: purchase columns', [hz.includes('<th class="num">עלות לרכישה</th>'), hz.includes('<th class="num">עלות לפגישה</th>')], [true, false])
 
+// ניתוח רוחבי (6.11): ממצא שחוזר בכמה פרויקטים
+const { crossCreative } = await import('../../lib/ad-tags.js')
+const pA = { name: 'A', tests: creativeTests(ads, tags) }
+const pB = { name: 'B', tests: creativeTests(ads, tags) }
+const cx = crossCreative([pA, pB], ads, tags)
+eq('cross: with-people best in 2 of 2', [cx.consistency.people.with.best, cx.consistency.people.with.of, cx.consistency.people.without.best], [2, 2, 0])
+eq('cross: combined by lead only (no meetings mixed)', [cx.combined.find(t => t.key === 'people').rankBy, cx.combined.find(t => t.key === 'people').hasMeetings], ['lead', false])
+
 // הסיווג: הבקשה למודל
 let sent = null
 const mock = { beta: { messages: { create: async (req) => { sent = req; return { model: 'm', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ people: 'with', visual: 'lifestyle', property: 'garden', price: 'shown', color: 'warm', angle: 'lifestyle' }) }] } } } } }

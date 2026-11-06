@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, X, ImageOff } from 'lucide-react'
+import { ChevronLeft, X, ImageOff, Layers3 } from 'lucide-react'
+import CreativeCrossModal from '../admin/CreativeCrossModal.jsx'
 import { apiFetch } from '../../../lib/api-fetch'
 import { adsFromRows, creativeTests, MIN_LEADS, MIN_MEETINGS, RANK_BY_MEETINGS_AT } from '../../../lib/ad-tags.js'
 
@@ -87,7 +88,8 @@ function GroupAds({ test, group, ads, creatives, out, onClose, projectId }) {
   )
 }
 
-export default function CreativeTests({ rows, projectId }) {
+export default function CreativeTests({ rows, projectId, isAdmin = false, periodKey = '' }) {
+  const [cross, setCross] = useState(false)   // ניתוח רוחבי — אדמין בלבד (6.11)
   const ads = useMemo(() => adsFromRows(rows), [rows])
   const creatives = useMemo(() => creativesById(rows), [rows])
   const [open, setOpen] = useState(null)   // { test, group }
@@ -113,6 +115,7 @@ export default function CreativeTests({ rows, projectId }) {
       <div className="section-head">
         <div className="ico violet" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M7 15l4-4 3 3 5-6" /></svg></div>
         <h2>מה עובד במודעות</h2>
+        {isAdmin && <button type="button" className="ctx-open" onClick={() => setCross(true)}><Layers3 size={14} aria-hidden="true" />כל הלקוחות</button>}
         <span className="sub">השוואה בין קבוצות של מודעות לפי מה שרואים בהן · {byMeet ? `הזולה ביותר ל${out.one} מסומנת` : 'הזולה ביותר לליד מסומנת'}</span>
       </div>
       <div className={meet ? 'ctz-grid ctz-meet' : 'ctz-grid'}>
@@ -141,6 +144,7 @@ export default function CreativeTests({ rows, projectId }) {
           </div>
         ))}
       </div>
+      {cross && <CreativeCrossModal periodKey={periodKey} onClose={() => setCross(false)} />}
       {open && <GroupAds test={open.test} group={open.group} ads={ads} creatives={creatives} out={out} projectId={projectId} onClose={() => setOpen(null)} />}
       <p className="ctz-note">לחיצה על שורה מציגה את המודעות שבקבוצה. מבוסס על ביצועי המודעות בתקופה שנבחרה.{meet ? ` ${out.note} כשיש במאפיין לפחות ${RANK_BY_MEETINGS_AT} ${out.label} - הדירוג לפי ${out.costLabel}, אחרת לפי עלות לליד.` : ''} "אינדיקציה בלבד": באחת הקבוצות פחות מ-{MIN_LEADS} לידים{meet ? ` או פחות מ-${MIN_MEETINGS} ${out.label}` : ''}, ולכן עוד מוקדם להסיק. זו השוואה בין קבוצות, לא הוכחה שאלמנט מסוים גרם להבדל.</p>
     </div>
