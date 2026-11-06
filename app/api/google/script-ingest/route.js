@@ -20,6 +20,7 @@
 // into reports with source='google'.
 
 import { createClient } from '@supabase/supabase-js'
+import { safeEqual } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -40,7 +41,7 @@ export async function POST(request) {
   // Auth: shared secret in header
   const expected = process.env.GOOGLE_SCRIPT_SECRET
   const provided = request.headers.get('x-script-secret') || ''
-  if (!expected || provided !== expected) {
+  if (!expected || !safeEqual(provided, expected)) {
     return Response.json({ error: 'Unauthorized — invalid x-script-secret header' }, { status: 401 })
   }
 

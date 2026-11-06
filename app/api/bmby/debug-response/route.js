@@ -1,10 +1,12 @@
 // API route: /api/bmby/debug-response
-//   GET /api/bmby/debug-response?key=<ANON_KEY>&project=HI%20PARK&days=30
+//   GET /api/bmby/debug-response?project=HI%20PARK&days=30   (אדמין או קרון — Authorization: Bearer)
 //
 // For each LID in the window, finds the first non-LID task and returns:
 //   - delta minutes
 //   - user_id, type, subject, message of the first task
 // Filters to show fastest responses (< 1 min) so we can check if they're bots.
+
+import { requireAdmin } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -78,12 +80,11 @@ async function callPaginated(service, baseParams, maxPages = 6) {
 }
 
 export async function GET(req) {
+  // אבטחה (6.11): עד היום ה"הרשאה" כאן הייתה המפתח הציבורי (anon) — שמוטמע בכל דפדפן — ולכן כל אחד
+  // יכול היה למשוך נתוני BMBY (נושאי משימות, הודעות, שמות נציגים). עכשיו: אדמין או קרון בלבד.
+  const gate = await requireAdmin(req)
+  if (!gate.ok) return gate.res
   const url = new URL(req.url)
-  const key = url.searchParams.get('key') || ''
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  if (!anonKey || key !== anonKey) {
-    return Response.json({ error: 'unauthorized — pass ?secret=<CRON_SECRET>' }, { status: 401 })
-  }
 
   let projectMap = {}
   try { projectMap = JSON.parse(process.env.BMBY_PROJECT_IDS || '{}') } catch {}
