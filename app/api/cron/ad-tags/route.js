@@ -46,8 +46,9 @@ export async function GET(req) {
   if (!gate.ok) return gate.res
   const url = new URL(req.url)
   const dry = url.searchParams.get('dry') === '1'
-  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || 40))
   const months = Math.min(13, Math.max(1, Number(url.searchParams.get('months')) || 2))
+  // מילוי של כמה חודשים (months > 2) — 100 בכל ריצה כברירת מחדל; בלי & ב-URL של ה-workflow (bash)
+  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || (months > 2 ? 100 : 40)))
   const t0 = Date.now()
   const sb = adminClient()
 
