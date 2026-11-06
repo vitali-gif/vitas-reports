@@ -71,6 +71,19 @@ const hy = renderReportHtml(buildReportModel({ project: 'x', key: '2026-10', pre
 eq('pdf: year section', [hy.includes('מה עבד ב-12 החודשים האחרונים'), h.includes('מה עבד ב-12 החודשים האחרונים')], [true, false])
 eq('ai input: creativeTestsYear', [!!analysisInput(buildReportModel({ project: 'x', key: '2026-10', prevKey: '2026-09', rows, prevRows: [], adTags: tags, creativeYear: yr })).creativeTestsYear, inp.creativeTestsYear], [true, null])
 
+// Zoho (6.11): רכישות לפי שם מודעה — בלי מזהה; שם עם סימני כיוון ורווחים כפולים עדיין מתאים
+const zoho = { source: 'crm', summary: { funnel: { byChannel: [
+  { channel: 'google', campaigns: [{ adSets: [{ ads: [{ ad: 'א', purchased: 99 }] }] }] },
+  { channel: 'facebook', campaigns: [{ adSets: [{ ads: [{ ad: '\u200fא', purchased: 6 }, { ad: 'ב  ', purchased: 2 }, { ad: 'ג', purchased: 1 }, { ad: 'ד', purchased: 3 }, { ad: '(ללא מודעה)', purchased: 9 }] }] }] },
+] } } }
+const adsZ = adsFromRows([...rows, zoho])
+eq('zoho purchases by normalized name, facebook channel only', ['1', '2', '3', '4', '5'].map(id => adsZ.find(a => a.adId === id).purchases), [6, 2, 1, 3, 0])
+const pz = creativeTests(adsZ, tags).find(t => t.key === 'people')
+// עם אנשים: 1500₪ / 9 רכישות (167) · בלי אנשים: 1500₪ / 3 (500); סך 12 ≥ 10 → לפי רכישה
+eq('people ranked by cost per purchase', [pz.hasPurchases, pz.rankBy, pz.groups.map(g => [g.label, g.purchases, Math.round(g.cpp)])], [true, 'purchase', [['עם אנשים', 9, 167], ['בלי אנשים', 3, 500]]])
+const hz = renderReportHtml(buildReportModel({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: [...rows, zoho], prevRows: [], adTags: tags }))
+eq('pdf: purchase columns', [hz.includes('<th class="num">עלות לרכישה</th>'), hz.includes('<th class="num">עלות לפגישה</th>')], [true, false])
+
 // הסיווג: הבקשה למודל
 let sent = null
 const mock = { beta: { messages: { create: async (req) => { sent = req; return { model: 'm', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ people: 'with', visual: 'lifestyle', property: 'garden', price: 'shown', color: 'warm', angle: 'lifestyle' }) }] } } } } }
