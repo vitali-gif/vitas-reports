@@ -20,7 +20,27 @@ function creativesById(rows) {
 }
 
 // "צילום אמיתי — אילו מודעות?" (ויטלי, 6.11): לחיצה על שורה פותחת את המודעות של הקבוצה
-function GroupAds({ test, group, ads, creatives, meet, onClose }) {
+// תמונות טריות מהשרת (/api/ad-images) — הקישורים ששמורים בדוח פגים, ולמודעה לא פעילה אין קישור. נשמר בזיכרון לפי מזהה.
+const _imgCache = new Map()
+function GroupAds({ test, group, ads, creatives, meet, onClose, projectId }) {
+  const [imgs, setImgs] = useState(() => Object.fromEntries(group.adIds.filter(id => _imgCache.has(id)).map(id => [id, _imgCache.get(id)])))
+  const [loadingImgs, setLoadingImgs] = useState(true)
+  useEffect(() => {
+    let off = false
+    const need = group.adIds.filter(id => !_imgCache.has(id))
+    if (!projectId || !need.length) { setLoadingImgs(false); return }
+    ;(async () => {
+      for (let i = 0; i < need.length && !off; i += 12) {
+        const part = need.slice(i, i + 12)
+        const b = await apiFetch(`/api/ad-images?projectId=${projectId}&ids=${part.join(',')}`, { headers: {} })
+          .then(r => (r && r.ok ? r.json() : null)).catch(() => null)
+        for (const id of part) _imgCache.set(id, b?.images?.[id] || null)
+        if (!off && b?.images) setImgs(cur => ({ ...cur, ...b.images }))
+      }
+      if (!off) setLoadingImgs(false)
+    })()
+    return () => { off = true }
+  }, [group, projectId])
   useEffect(() => {
     const esc = (e) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', esc)
@@ -38,10 +58,10 @@ function GroupAds({ test, group, ads, creatives, meet, onClose }) {
         </div>
         <div className="ctz-ads">
           {list.map(a => {
-            const img = a.c.imageUrl || a.c.thumbnailUrl
+            const img = imgs[a.adId]
             return (
               <div key={a.adId} className="ctz-ad">
-                <div className="ctz-ad-img">{img ? <img src={img} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} /> : <ImageOff size={22} aria-hidden="true" />}</div>
+                <div className={loadingImgs && !img ? 'ctz-ad-img ctz-loading' : 'ctz-ad-img'}>{img ? <img src={img} alt="" /> : loadingImgs ? null : <ImageOff size={22} aria-hidden="true" />}</div>
                 <div className="ctz-ad-body">
                   <div className="ctz-ad-name" dir="auto">{a.c.name || a.name || a.adId}</div>
                   {a.c.title && <div className="ctz-ad-title" dir="auto">{a.c.title}</div>}
@@ -56,7 +76,7 @@ function GroupAds({ test, group, ads, creatives, meet, onClose }) {
             )
           })}
         </div>
-        <p className="ctz-note">מודעה שכבר לא פעילה מוצגת בלי תמונה.</p>
+        {!loadingImgs && list.some(a => !imgs[a.adId]) && <p className="ctz-note">מודעה שנמחקה במטא מוצגת בלי תמונה.</p>}
       </div>
     </div>
   )
@@ -115,7 +135,7 @@ export default function CreativeTests({ rows, projectId }) {
           </div>
         ))}
       </div>
-      {open && <GroupAds test={open.test} group={open.group} ads={ads} creatives={creatives} meet={meet} onClose={() => setOpen(null)} />}
+      {open && <GroupAds test={open.test} group={open.group} ads={ads} creatives={creatives} meet={meet} projectId={projectId} onClose={() => setOpen(null)} />}
       <p className="ctz-note">לחיצה על שורה מציגה את המודעות שבקבוצה. מבוסס על ביצועי המודעות בתקופה שנבחרה.{meet ? ` פגישות: פגישות שתואמו ב-CRM ללידים שהגיעו מהמודעה. כשיש במאפיין לפחות ${RANK_BY_MEETINGS_AT} פגישות - הדירוג לפי עלות לפגישה, אחרת לפי עלות לליד.` : ''} "אינדיקציה בלבד": באחת הקבוצות פחות מ-{MIN_LEADS} לידים{meet ? ` או פחות מ-${MIN_MEETINGS} פגישות` : ''}, ולכן עוד מוקדם להסיק. זו השוואה בין קבוצות, לא הוכחה שאלמנט מסוים גרם להבדל.</p>
     </div>
   )

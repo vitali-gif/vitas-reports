@@ -698,3 +698,5 @@ th:hover .sort-ind { opacity: .8; }
 .onb-note textarea { width: 100%; resize: vertical; }
 .onb-fields { margin: 4px 0 8px; padding-inline-start: 18px; display: grid; gap: 3px; }
 .onb-owner-claude { background: #fdf0e8; color: #c2410c; }
+.ctz-loading { background: linear-gradient(90deg, var(--tv-surface-2, #f1f5f9) 25%, #e6ebf3 50%, var(--tv-surface-2, #f1f5f9) 75%); background-size: 200% 100%; animation: ctzShimmer 1.2s linear infinite; }
+@keyframes ctzShimmer { to { background-position: -200% 0; } }
