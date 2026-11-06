@@ -121,7 +121,7 @@ export default function CreativeTests({ rows, projectId, isAdmin = false, period
       <div className={meet ? 'ctz-grid ctz-meet' : 'ctz-grid'}>
         {tests.map(t => (
           <div key={t.key} className="ctz-card">
-            <div className="ctz-head"><h3>{t.label}</h3>{t.indicative && <span className="ctz-ind">אינדיקציה בלבד</span>}</div>
+            <div className="ctz-head"><h3>{t.label}</h3>{t.indicative && <span className="ctz-ind">מעט נתונים עדיין</span>}</div>
             <div className="ctz-rank">{t.rankBy !== 'lead' ? `דירוג לפי ${out.costLabel}` : meet ? `דירוג לפי עלות לליד — עוד מעט ${out.label} להשוואה` : 'דירוג לפי עלות לליד'}</div>
             <div className="ctz-scroll"><table className="ctz-table">
               <thead><tr><th></th><th className="ctz-opt">מודעות</th><th>לידים</th><th className="ctz-opt">CTR</th><th className="ctz-opt">CPC</th><th>עלות לליד</th>{meet && <><th>{out.label}</th><th>{out.costLabel}</th></>}</tr></thead>
@@ -146,7 +146,7 @@ export default function CreativeTests({ rows, projectId, isAdmin = false, period
       </div>
       {cross && <CreativeCrossModal periodKey={periodKey} onClose={() => setCross(false)} />}
       {open && <GroupAds test={open.test} group={open.group} ads={ads} creatives={creatives} out={out} projectId={projectId} onClose={() => setOpen(null)} />}
-      <p className="ctz-note">לחיצה על שורה מציגה את המודעות שבקבוצה. מבוסס על ביצועי המודעות בתקופה שנבחרה.{meet ? ` ${out.note} כשיש במאפיין לפחות ${RANK_BY_MEETINGS_AT} ${out.label} - הדירוג לפי ${out.costLabel}, אחרת לפי עלות לליד.` : ''} "אינדיקציה בלבד": באחת הקבוצות פחות מ-{MIN_LEADS} לידים{meet ? ` או פחות מ-${MIN_MEETINGS} ${out.label}` : ''}, ולכן עוד מוקדם להסיק. זו השוואה בין קבוצות, לא הוכחה שאלמנט מסוים גרם להבדל.</p>
+      <p className="ctz-note">לחיצה על שורה מציגה את המודעות שבקבוצה. מבוסס על ביצועי המודעות בתקופה שנבחרה.{meet ? ` ${out.note} כשיש במאפיין לפחות ${RANK_BY_MEETINGS_AT} ${out.label} - הדירוג לפי ${out.costLabel}, אחרת לפי עלות לליד.` : ''} "מעט נתונים עדיין": באחת הקבוצות פחות מ-{MIN_LEADS} לידים{meet ? ` או פחות מ-${MIN_MEETINGS} ${out.label}` : ''}, ולכן עוד מוקדם להסיק. זו השוואה בין קבוצות, לא הוכחה שאלמנט מסוים גרם להבדל.</p>
     </div>
   )
 }
@@ -195,7 +195,7 @@ export function CreativeHighlights({ projectId, periodKey, onMore }) {
           <div key={f.key} className="cth-item">
             <div className="cth-gap"><b>{f.gap}%</b><span>זול יותר</span></div>
             <div className="cth-txt">
-              <div className="cth-dim">{f.dim}{f.indicative && <span className="ctz-ind">אינדיקציה</span>}</div>
+              <div className="cth-dim">{f.dim}{f.indicative && <span className="ctz-ind">מעט נתונים עדיין</span>}</div>
               <div className="cth-line"><b>{f.best.label}</b></div>
               <div className="cth-vs">{f.costLabel} <bdi>{money(f.best[f.cost])}</bdi>, לעומת <bdi>{money(f.other[f.cost])}</bdi> ב&quot;{f.other.label}&quot;</div>
             </div>
