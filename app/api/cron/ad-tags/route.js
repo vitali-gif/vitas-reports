@@ -6,6 +6,7 @@
  * נמשכים ממטא לפי המזהה. כל מודעה מסווגת פעם אחת בלבד (בערך 5 אגורות).
  *
  * הרשאה: קרון (CRON_SECRET) או אדמין. ?limit=N (עד 100), ?dry=1 מחזיר את הרשימה בלי לסווג.
+ * ?months=N (עד 13) — כמה חודשים אחורה לקחת מודעות (ברירת מחדל 2). 12 = מילוי לניתוח שנתי (ויטלי, 6.11).
  */
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
@@ -46,14 +47,16 @@ export async function GET(req) {
   const url = new URL(req.url)
   const dry = url.searchParams.get('dry') === '1'
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || 40))
+  const months = Math.min(13, Math.max(1, Number(url.searchParams.get('months')) || 2))
   const t0 = Date.now()
   const sb = adminClient()
 
   if (!process.env.ANTHROPIC_API_KEY && !dry) return J({ error: 'ANTHROPIC_API_KEY לא מוגדר' }, 500)
 
   // המודעות של החודש הזה ושל הקודם
-  const now = new Date(), prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 15))
-  const { data: reps, error } = await sb.from('reports').select('month, data, summary').eq('source', 'facebook').in('month', [ym(now), ym(prev)])
+  const now = new Date()
+  const monthList = Array.from({ length: months }, (_, i) => ym(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 15))))
+  const { data: reps, error } = await sb.from('reports').select('month, data, summary').eq('source', 'facebook').in('month', monthList)
   if (error) return J({ error: error.message }, 500)
   const ads = new Map()
   for (const r of reps || []) {
@@ -69,23 +72,30 @@ export async function GET(req) {
   const ids = [...ads.keys()]
   const done = new Set(), retry = new Set()
   for (let i = 0; i < ids.length; i += 200) {
-    const { data } = await sb.from('ad_creative_tags').select('ad_id, image_url, ad_name, tags').in('ad_id', ids.slice(i, i + 200))
+    const { data } = await sb.from('ad_creative_tags').select('ad_id, account, image_url, ad_name, tags').in('ad_id', ids.slice(i, i + 200))
     // לא נחשב "סווג": בלי תמונה ובלי שם (הריצה הראשונה, 5.11), או סיווג מהטקסט בלבד שעוד לא נוסה שוב עם תמונה
     for (const x of data || []) {
       const textOnly = x.tags && x.tags.fromTextOnly
-      if (x.tags && x.tags.unavailable) done.add(x.ad_id)
+      // "לא זמינה" נחשב סגור רק אם נבדק מול החשבון הנכון. 73 מודעות סומנו כך בלי חשבון (5.11) — מטא ענה
+      // "אין הרשאה" כי נשאלו עם הטוקן הלא נכון, לא כי נמחקו (ויטלי: "אנחנו לא מוחקים מודעות, אנחנו עוצרים").
+      if (x.tags && x.tags.unavailable) { if (x.account) done.add(x.ad_id) }
       else if ((x.image_url || x.ad_name) && (!textOnly || x.tags.retried)) done.add(x.ad_id)
       else if (textOnly) retry.add(x.ad_id)
     }
   }
   const todo = ids.filter(id => !done.has(id)).slice(0, limit).map(id => ads.get(id))
   // מודעה שמופיעה רק במספרים (בלי activeAds): החשבון שלה מ-ad_daily, כדי לפנות למטא עם הטוקן הנכון
-  const noAcc = todo.filter(a => !a.account).map(a => a.adId)
-  if (noAcc.length) {
-    const { data: accs } = await sb.from('ad_daily').select('ad_id, account, ad').eq('source', 'facebook').in('ad_id', noAcc).limit(2000)
-    for (const r of accs || []) { const a = ads.get(String(r.ad_id)); if (a && !a.account) { a.account = String(r.account || ''); if (!a.name && r.ad) a.name = r.ad } }
-  }
-  if (dry) return J({ ads: ids.length, tagged: done.size, todo: todo.length })
+  // שורה אחת לכל מודעה: ב-ad_daily יש עשרות שורות לכל מודעה (יום × גיל × מגדר), ולכן שאילתה אחת עם
+  // limit החזירה רק את המודעות הראשונות — והשאר נשאלו במטא בלי חשבון (5.11, 73 מודעות "לא זמינות").
+  const noAcc = todo.filter(a => !a.account)
+  await pool(noAcc, 8, async (a) => {
+    const { data: r } = await sb.from('ad_daily').select('account, ad').eq('source', 'facebook').eq('ad_id', a.adId).limit(1).maybeSingle()
+    if (r) { a.account = String(r.account || ''); if (!a.name && r.ad) a.name = r.ad }
+  })
+  // בלי חשבון אין טעם לשאול את מטא (הטוקן יהיה הלא נכון) — מדלגים, ולא מסמנים "לא זמינה"
+  const noAccount = todo.filter(a => !a.account && !a.full).map(a => a.adId)
+  if (noAccount.length) { for (const id of noAccount) { const i = todo.findIndex(t => t.adId === id); if (i >= 0) todo.splice(i, 1) } }
+  if (dry) return J({ ads: ids.length, tagged: done.size, todo: todo.length, noAccount: noAccount.length, months })
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY.trim() })
   const errors = []
@@ -115,7 +125,7 @@ export async function GET(req) {
       } else errors.push({ adId: a.adId, error: msg.slice(0, 200) })
     }
   })
-  const out = { ads: ids.length, alreadyTagged: done.size, tagged: ok, unavailable, errors: errors.slice(0, 10), left: Math.max(0, ids.length - done.size - todo.length) }
+  const out = { months, ads: ids.length, alreadyTagged: done.size, tagged: ok, unavailable, noAccount: noAccount.length, errors: errors.slice(0, 10), left: Math.max(0, ids.length - done.size - todo.length - noAccount.length) }
   try { await logJob(sb, 'ad-tags', errors.length < todo.length || !todo.length, Date.now() - t0, out) } catch { /* הרישום לא מפיל */ }
   return J(out)
 }
