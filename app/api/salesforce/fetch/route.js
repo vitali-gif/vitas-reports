@@ -22,7 +22,7 @@
 //
 // Env vars: SF_CLIENT_ID, SF_CLIENT_SECRET, SF_REFRESH_TOKEN, SF_LOGIN_URL, SF_API_VERSION
 
-import { requireFetchAccess } from '../../../../lib/auth'
+import { requireFetchAccess, requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { upsertRawRecords } from '../../../../lib/crm/raw-store.js'
 
@@ -745,9 +745,14 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
+  // describe (רשימת השדות של אובייקט ב-Salesforce) — אדמין או קרון בלבד. עד 6.11 היה פתוח בלי בדיקה.
+  if (new URL(request.url).searchParams.get('describe')) {
+    const gate = await requireAdmin(request)
+    if (!gate.ok) return gate.res
+  }
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '')
-  if (process.env.CRON_SECRET && bearer === process.env.CRON_SECRET) {
+  if (process.env.CRON_SECRET && bearer === process.env.CRON_SECRET && !new URL(request.url).searchParams.get('describe')) {
     const { status, body: rb } = await runSync()
     return Response.json(rb, { status })
   }
@@ -755,12 +760,14 @@ export async function GET(request) {
   if (searchParams.get('describe')) {
     try {
       const a = await getAuth()
-      const obj = searchParams.get('describe') === '1' ? 'Opportunity' : searchParams.get('describe')
+      // describe=Lead.utm,campaign — אובייקט + כמה מילות חיפוש מופרדות בפסיק (בלי & — כך אפשר להריץ מה-workflow)
+      const [rawObj, rawTerms] = String(searchParams.get('describe')).split('.')
+      const obj = rawObj === '1' ? 'Opportunity' : rawObj
       const r = await fetch(`${a.instance}/services/data/${SF_API_VERSION}/sobjects/${obj}/describe`, { headers: { Authorization: `Bearer ${a.token}` } })
       const j = await r.json()
-      const term = searchParams.get('find') || ''
+      const terms = [searchParams.get('find') || '', ...String(rawTerms || '').split(',')].map(t => t.trim().toLowerCase()).filter(Boolean)
       const fields = (j.fields || [])
-        .filter(fl => !term || (fl.label && fl.label.includes(term)) || (fl.name && fl.name.toLowerCase().includes(term.toLowerCase())))
+        .filter(fl => !terms.length || terms.some(t => (fl.label || '').toLowerCase().includes(t) || (fl.name || '').toLowerCase().includes(t)))
         .map(fl => ({ name: fl.name, label: fl.label, type: fl.type, picklist: (fl.picklistValues || []).map(p => p.value).slice(0, 40) }))
       return Response.json({ object: obj, count: fields.length, fields })
     } catch (e) { return Response.json({ error: e.message }, { status: 500 }) }

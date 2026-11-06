@@ -36,7 +36,7 @@ on:
         # fireberry-notes: ידני בלבד — מילוי ראשוני של פרויקט חדש (240 שניות לריצה). הסנכרון השוטף
         # רץ כל שעה בתוך prefetch-daily (cron-job.org); כאן הוא דולג ברוב הלילות, ושתי ריצות
         # במקביל עלולות לעבור את מגבלת 100 הקריאות לדקה של Fireberry.
-        options: [all, prefetch-ads, prefetch-crm, health, fireberry-notes, ai-weekly, weekly-accounts, monthly-report, ad-tags, ad-tags-year]
+        options: [all, prefetch-ads, prefetch-crm, health, fireberry-notes, ai-weekly, weekly-accounts, monthly-report, ad-tags, ad-tags-year, sf-lead-fields]
 
 concurrency:
   group: vitas-cron-${{ github.event.schedule || github.event.inputs.target }}
@@ -62,6 +62,9 @@ jobs:
               '10 3 * * *')                    echo 'paths=ad-tags'      >> "$GITHUB_OUTPUT" ;;
               *)                               echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
             esac
+          elif [ "${{ github.event.inputs.target }}" = "sf-lead-fields" ]; then
+            # ידני: אילו שדות שיווק יש על Lead ב-Salesforce (KLOSS) — UTM / קמפיין / מודעה / מקור (6.11)
+            echo 'paths=/api/salesforce/fetch?describe=Lead.utm,campaign,ad_,adid,source,medium,content,click,fb,gclid,form,landing' >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.inputs.target }}" = "ad-tags-year" ]; then
             # ידני: סיווג מודעות מ-12 החודשים האחרונים, 100 בכל ריצה — להריץ כמה פעמים עד ש-left=0.
             # בלי & ב-path: הוא נכנס ל-for של bash ושובר אותו (6.11)
@@ -82,7 +85,7 @@ jobs:
           fi
           fail=0
           for p in ${{ steps.t.outputs.paths }}; do
-            url="https://reports.vitas.co.il/api/cron/$p"
+            case "$p" in /*) url="https://reports.vitas.co.il$p" ;; *) url="https://reports.vitas.co.il/api/cron/$p" ;; esac
             # wait=1: הקרונים עונים מיד וממשיכים ברקע (B16, בשביל cron-job.org שמנתק אחרי
             # 30 שניות). כאן ממתינים לתוצאה המלאה, כדי שהקוד וה-JSON בלוג יהיו של הריצה עצמה.
             case "$p" in *\?*) url="$url&wait=1" ;; *) url="$url?wait=1" ;; esac
@@ -100,7 +103,7 @@ jobs:
                 *) break ;;
               esac
             done
-            head -c 1000 /tmp/out.json 2>/dev/null || true; echo
+            head -c 6000 /tmp/out.json 2>/dev/null || true; echo
             if [ "$code" != "200" ]; then
               fail=1
               echo "::error::$p returned HTTP $code after retries"
