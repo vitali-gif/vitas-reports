@@ -53,6 +53,24 @@ const hM = renderReportHtml(buildReportModel({ project: 'x', key: '2026-10', pre
 eq('pdf: leads + meetings columns', [hM.includes('עלות לפגישה'), hM.includes('>לידים<'), h.includes('עלות לפגישה'), h.includes('>לידים<')], [true, true, false, true])
 eq('ai input: meetings when present', [analysisInput(buildReportModel({ project: 'x', key: '2026-10', prevKey: '2026-09', rows: rowsM, prevRows: [], adTags: tags })).creativeTests.find(t => t.attribute === 'אנשים בתמונה').groups[0].meetings, inp.creativeTests[0].groups[0].meetings], [9, undefined])
 
+// 12 החודשים האחרונים (6.11): loadYearCreativeTests עם sb מדומה, והסעיף בדוח ובקלט הניתוח
+const { loadYearCreativeTests } = await import('../../lib/ad-tags.js')
+const q = (rowsBy) => ({ from: (t) => { const st = { t, f: {}, cols: '' }; const ch = { select: (c) => { st.cols = c; return ch }, eq: (k, v) => { st.f[k] = v; return ch }, in: (k, v) => { st.f[k] = v; return ch }, gte: (k, v) => { st.f[k + '>='] = v; return ch }, then: (res) => res(rowsBy(st)) }; return ch } })
+let monthsAsked = null, fromAsked = null
+const sbMock = q(({ t, f, cols }) => {
+  if (t === 'reports' && cols === 'month') { fromAsked = f['month>=']; return { data: [{ month: '2026-01-01_2026-03-31' }, { month: '2026-02' }, { month: '2026-10' }, { month: '2026-10-01_2026-10-12' }] } }
+  if (t === 'reports' && f.source === 'facebook') { monthsAsked = f.month; return { data: [{ source: 'facebook', month: '2026-10', data: rows[0].data, activeAds: [] }] } }
+  if (t === 'reports' && f.source === 'crm') return { data: [{ source: 'crm', month: '2026-10', adBreakdown: [{ adId: '1', meetings: 6 }, { adId: '2', meetings: 6 }] }] }
+  if (t === 'ad_creative_tags') return { data: Object.entries(tags).map(([ad_id, v]) => ({ ad_id, tags: v.tags, is_video: v.is_video })) }
+  return { data: [] }
+})
+const yr = await loadYearCreativeTests(sbMock, 'p', '2026-10-01_2026-10-31')
+eq('year: window from 2025-11; quarter instead of its month, partial range left out', [fromAsked, [...monthsAsked].sort()], ['2025-11', ['2026-01-01_2026-03-31', '2026-10']])
+eq('year: tests with meetings', [yr.from, yr.to, yr.tests.length > 0, yr.tests[0].hasMeetings], ['2025-11', '2026-10', true, true])
+const hy = renderReportHtml(buildReportModel({ project: 'x', key: '2026-10', prevKey: '2026-09', rows, prevRows: [], adTags: tags, creativeYear: yr }))
+eq('pdf: year section', [hy.includes('מה עבד ב-12 החודשים האחרונים'), h.includes('מה עבד ב-12 החודשים האחרונים')], [true, false])
+eq('ai input: creativeTestsYear', [!!analysisInput(buildReportModel({ project: 'x', key: '2026-10', prevKey: '2026-09', rows, prevRows: [], adTags: tags, creativeYear: yr })).creativeTestsYear, inp.creativeTestsYear], [true, null])
+
 // הסיווג: הבקשה למודל
 let sent = null
 const mock = { beta: { messages: { create: async (req) => { sent = req; return { model: 'm', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ people: 'with', visual: 'lifestyle', property: 'garden', price: 'shown', color: 'warm', angle: 'lifestyle' }) }] } } } } }

@@ -624,7 +624,10 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
       const ids = adsFromRows(rows).map(a => a.adId).slice(0, 500);
       if (ids.length) { const t = await getJson(`/api/ad-tags?projectId=${selectedProject.id}&ids=${ids.join(',')}`); adTags = t?.tags || null; }
     } catch {}
-    return { lib, prevKey, model: lib.buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows, adTags }) };
+    // "מה עבד ב-12 החודשים האחרונים" (6.11) — מחושב בשרת
+    let creativeYear = null;
+    try { const y = await getJson(`/api/ad-tags/year?projectId=${selectedProject.id}&key=${encodeURIComponent(selectedMonth)}`); creativeYear = y?.year || null; } catch {}
+    return { lib, prevKey, model: lib.buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows, adTags, creativeYear }) };
   };
   const handleExport = async () => {
     if (!selectedProject || !selectedMonth) { showToast('בחר פרויקט ותקופה'); return; }
