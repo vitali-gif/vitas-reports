@@ -63,8 +63,9 @@ jobs:
               *)                               echo 'paths=health'       >> "$GITHUB_OUTPUT" ;;
             esac
           elif [ "${{ github.event.inputs.target }}" = "ad-tags-year" ]; then
-            # ידני: סיווג מודעות מ-12 החודשים האחרונים, 100 בכל ריצה — להריץ כמה פעמים עד ש-left=0
-            echo 'paths=ad-tags?months=12&limit=100' >> "$GITHUB_OUTPUT"
+            # ידני: סיווג מודעות מ-12 החודשים האחרונים, 100 בכל ריצה — להריץ כמה פעמים עד ש-left=0.
+            # בלי & ב-path: הוא נכנס ל-for של bash ושובר אותו (6.11)
+            echo 'paths=ad-tags?months=12' >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.inputs.target }}" = "all" ]; then
             echo 'paths=prefetch-ads prefetch-crm health' >> "$GITHUB_OUTPUT"
           else
