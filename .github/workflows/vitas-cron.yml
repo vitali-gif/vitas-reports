@@ -113,7 +113,7 @@ jobs:
             esac
             # wait=1: הקרונים עונים מיד וממשיכים ברקע (B16, בשביל cron-job.org שמנתק אחרי
             # 30 שניות). כאן ממתינים לתוצאה המלאה, כדי שהקוד וה-JSON בלוג יהיו של הריצה עצמה.
-            case "$p" in *\?*) url="$url&wait=1" ;; *) url="$url?wait=1" ;; esac
+            case "$url" in *\?*) url="$url&wait=1" ;; *) url="$url?wait=1" ;; esac
             echo "::group::$p"
             code=000
             # Retry transient failures (HTTP 000 connection drop / 5xx). A single dropped
