@@ -13,7 +13,7 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { adminClient, requireAdmin } from '../../../../lib/auth'
-import { tagCreative, fetchImage } from '../../../../lib/ad-tags.js'
+import { tagCreative, fetchImage, coverKeys, lastMonths } from '../../../../lib/ad-tags.js'
 import { META_GRAPH_VERSION, metaTokenFor } from '../../../../lib/ads/meta-api.js'
 import { logJob } from '../../../../lib/job-log.js'
 
@@ -57,10 +57,19 @@ export async function GET(req) {
   if (!process.env.ANTHROPIC_API_KEY && !dry) return J({ error: 'ANTHROPIC_API_KEY לא מוגדר' }, 500)
 
   // המודעות של החודש הזה ושל הקודם
-  const now = new Date()
-  const monthList = Array.from({ length: months }, (_, i) => ym(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 15))))
-  const { data: reps, error } = await sb.from('reports').select('month, data, summary').eq('source', 'facebook').in('month', monthList)
+  const monthList = lastMonths(ym(new Date()), months)
+  const from = monthList[monthList.length - 1]
+  // לכל פרויקט — הדוחות שמכסים את החודשים בלי כפילות (חלק מהחודשים שמורים רק כרבעון, 6.11)
+  const { data: keyRows, error: kErr } = await sb.from('reports').select('project_id, month').eq('source', 'facebook').gte('month', from)
+  if (kErr) return J({ error: kErr.message }, 500)
+  const byProj = new Map()
+  for (const r of keyRows || []) (byProj.get(r.project_id) || byProj.set(r.project_id, []).get(r.project_id)).push(r.month)
+  const want = new Set()
+  for (const [pid, ks] of byProj) for (const k of coverKeys(ks, from, monthList[0])) want.add(pid + '|' + k)
+  const wantKeys = [...new Set([...want].map(x => x.split('|')[1]))]
+  const { data: repsAll, error } = wantKeys.length ? await sb.from('reports').select('project_id, month, data, summary').eq('source', 'facebook').in('month', wantKeys) : { data: [] }
   if (error) return J({ error: error.message }, 500)
+  const reps = (repsAll || []).filter(r => want.has(r.project_id + '|' + r.month))
   const ads = new Map()
   for (const r of reps || []) {
     for (const a of r.summary?.activeAds || []) {
