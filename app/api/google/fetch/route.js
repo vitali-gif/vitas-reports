@@ -3,7 +3,7 @@
 //   GET  — from Vercel Cron (auth via Authorization: Bearer <CRON_SECRET>)
 // Pulls Google Ads campaign/ad-level metrics via GAQL and writes one report per project per month.
 
-import { requireFetchAccess } from '../../../../lib/auth'
+import { requireFetchAccess, requireAdmin } from '../../../../lib/auth'
 import { GOOGLE_SCHEMA_VERSION } from '../../../../lib/crm/schema-version.js'
 // עזרי Google Ads והניתוב לפרויקטים עברו ל-lib/ads (שלב 2 של docs/daily-ranges-plan.md) — משותפים
 // לעובדות היומיות. הקוד זהה; רק המיקום השתנה.
@@ -588,6 +588,9 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
+  // בדיקת התקינות (ו-?whoami=1 במטא) — אדמין בלבד (6.11). קודם היא הייתה פתוחה לכל אחד וחשפה את רשימת
+  // כל חשבונות המודעות של כל הלקוחות (מטא) ואת מזהי הלקוחות בגוגל + תחילת טוקן גישה.
+  { const gate = await requireAdmin(request); if (!gate.ok) return gate.res }
   // Health check: verify we can get an access token
   try {
     const token = await getAccessToken()
@@ -596,7 +599,7 @@ export async function GET(request) {
       customerIds: (process.env.GOOGLE_ADS_CUSTOMER_IDS || process.env.GOOGLE_ADS_CUSTOMER_ID || ''),
       loginCustomerId: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || null,
       hasDeveloperToken: !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
-      accessTokenPreview: token ? token.slice(0, 20) + '...' : null,
+      accessTokenOk: !!token,
       apiVersion: GOOGLE_ADS_API_VERSION,
     })
   } catch (err) {

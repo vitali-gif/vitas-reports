@@ -1,14 +1,14 @@
 // API route: /api/bmby/debug
-//   GET /api/bmby/debug?key=<ANON_KEY>&project=HI%20PARK&days=30&sample=3
+//   GET /api/bmby/debug?project=HI%20PARK&days=30&sample=3
 //
 // Returns RAW rows from BMBY's 4 SOAP services with NO field filtering.
 // Lets us discover every field BMBY actually exposes.
 //
-// Auth: either
-//   - ?key=<NEXT_PUBLIC_SUPABASE_ANON_KEY>   (public key, fine for read-only debug)
-//   - x-client-key header = anon key
-//   - ?secret=<CRON_SECRET>
+// Auth: requireAdmin — Authorization: Bearer <admin session | CRON_SECRET>.
+//   (Until 6.11 the public anon key was accepted here — closed in the security audit.)
 // Read-only — does NOT write to Supabase.
+
+import { requireAdmin } from '../../../../lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -133,20 +133,11 @@ function nonEmptyRow(row) {
   return out
 }
 
-function isAuthorized(req) {
-  const url = new URL(req.url)
-  // Restricted to CRON_SECRET only — anon key is public so allowing it
-  // would expose raw BMBY data (names, phones) to anyone.
-  const cronSecret = process.env.CRON_SECRET || ''
-  const querySecret = url.searchParams.get('secret') || ''
-  if (cronSecret && querySecret === cronSecret) return true
-  return false
-}
 
 export async function GET(req) {
-  if (!isAuthorized(req)) {
-    return Response.json({ error: 'unauthorized — pass ?secret=<CRON_SECRET>' }, { status: 401 })
-  }
+  // אדמין או קרון (Bearer) — לא ?secret= ב-URL: סוד בכתובת נשמר בלוגים ובהיסטוריית הדפדפן (6.11)
+  const gate = await requireAdmin(req)
+  if (!gate.ok) return gate.res
 
   const url = new URL(req.url)
 

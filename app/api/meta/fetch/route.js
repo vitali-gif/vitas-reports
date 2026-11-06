@@ -3,7 +3,7 @@
 //   GET  — called by Vercel Cron hourly. Authorized by Authorization: Bearer <CRON_SECRET> (Vercel sets this automatically when CRON_SECRET env var is defined).
 // Pulls Meta Ads insights and writes one report per project per month to Supabase.
 
-import { requireFetchAccess } from '../../../../lib/auth'
+import { requireFetchAccess, requireAdmin } from '../../../../lib/auth'
 // עזרי Meta והניתוב לפרויקטים עברו ל-lib/ads (שלב 2 של docs/daily-ranges-plan.md) — משותפים
 // לעובדות היומיות. הקוד זהה; רק המיקום השתנה.
 import { META_GRAPH_VERSION, num, extractLeads, metaFetchAll } from '../../../../lib/ads/meta-api.js'
@@ -602,7 +602,10 @@ export async function GET(request) {
     return Response.json(responseBody, { status })
   }
 
-  // Otherwise: health check (public, safe to expose ad account name)
+  // בדיקת התקינות (ו-?whoami=1 במטא) — אדמין בלבד (6.11). קודם היא הייתה פתוחה לכל אחד וחשפה את רשימת
+  // כל חשבונות המודעות של כל הלקוחות (מטא) ואת מזהי הלקוחות בגוגל + תחילת טוקן גישה.
+  { const gate = await requireAdmin(request); if (!gate.ok) return gate.res }
+  // Otherwise: health check (admin)
   const token = process.env.META_ACCESS_TOKEN
   const adAccountId = (process.env.META_AD_ACCOUNT_IDS || process.env.META_AD_ACCOUNT_ID || '').split(',').map((s) => s.trim()).filter(Boolean)[0]
   if (!token || !adAccountId) {
