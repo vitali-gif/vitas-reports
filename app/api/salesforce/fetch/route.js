@@ -134,7 +134,10 @@ function pairs(recs, keyField, countField) {
 // ===== raw snapshot (שלב 4ב של docs/daily-ranges-plan.md) =====
 // הרשומות הגולמיות שמהן lib/crm/salesforce-summary.js מחקה את כל השאילתות המצרפיות למעלה.
 // נשמרות ב-crm_raw (crm_type=salesforce) לפי Id, מצטברות עם הזמן, ונדרסות בכל משיכה.
-const RAW_LEAD_FIELDS = 'Id, CreatedDate, LastModifiedDate, IsConverted, ConvertedOpportunityId, Status, LeadSource, Branch_Name__c, meetingDate__c, Unqualified_Reason__c, Other_Unqualified_Reason__c, Competitor_Name__c, Name, Phone, MobilePhone, Email, Salesman__r.Name'
+// שדות שיווק (7.11, sf-lead-fields): UTM, שם קמפיין, ומזהה הליד בפייסבוק (leadcap) — דרכו מגיעים למודעה
+// שהביאה את הליד, כדי לחשב ב"מה עובד במודעות" פגישות ועלות לפגישה גם ל-KLOSS.
+const LEAD_MARKETING_FIELDS = 'UTM_Source__c, UTM_Media__c, Campaign_Name__c, leadcap__Facebook_Lead_ID__c'
+const RAW_LEAD_FIELDS = 'Id, CreatedDate, LastModifiedDate, IsConverted, ConvertedOpportunityId, Status, LeadSource, Branch_Name__c, meetingDate__c, Unqualified_Reason__c, Other_Unqualified_Reason__c, Competitor_Name__c, Name, Phone, MobilePhone, Email, Salesman__r.Name, ' + LEAD_MARKETING_FIELDS
 const RAW_OPP_FIELDS = 'Id, CreatedDate, LastModifiedDate, StageName, TotalPrice_Opp_Product__c, ovala__c, Amount, Branch_Name__c, Salesman__r.Name, Buying_Purpose__c, Loss_Reason__c, Other_Loss_Reason__c, Name, Mobile__c'
 const RAW_ITEM_FIELDS = 'Id, OpportunityId, Product2.Name, TotalPrice'
 const RAW_HIST_FIELDS = 'Id, LeadId, Field, CreatedDate, Lead.CreatedDate, Lead.Branch_Name__c, Lead.meetingDate__c'

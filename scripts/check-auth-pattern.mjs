@@ -31,6 +31,9 @@ const PUBLIC_ROUTES = new Set([
   // ציבורי בכוונה — כל אחד רשאי לבקש קישור כניסה. ה-route מוודא שהמייל קיים
   // ב-client_access לפני ששולח משהו, ומוגן בהגבלת קצב (lib/rate-limit.js).
   'app/api/client-auth/route.js',
+  // שאלון הקליטה ללקוח (7.11): ההרשאה היא טוקן אקראי בקישור שאדמין יוצר; קישור שבוטל לא נפתח;
+  // הגבלת קצב לכל IP; מחזיר רק את שם הפרויקט ואת תשובות השאלון.
+  'app/api/public/onboarding-form/route.js',
 ])
 
 // requireMeeting / requireProject הם השומרים של פיצ'ר הישיבות (lib/meetings/store.js).

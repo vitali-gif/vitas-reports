@@ -1,8 +1,9 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowRight, CheckCircle2, Circle, CircleDot, MinusCircle, ChevronDown, Sparkles, X } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Circle, CircleDot, MinusCircle, ChevronDown, Sparkles, X, FileText } from 'lucide-react'
 import { apiFetch } from '../../../lib/api-fetch'
 import { STAGES, OWNERS, STATUSES, stepDone, onboardingSummary } from '../../../lib/onboarding-steps.js'
+import { progress } from '../../../lib/onboarding-form.js'
 
 // "קליטת לקוחות" (ויטלי, 6.11): באיזה שלב כל פרויקט, מי אחראי על מה, ולמה כל שלב חשוב —
 // כדי ששחר (השותף) יבין את התהליך ויוכל לקחת חלק. השלבים ב-lib/onboarding-steps.js, הנתונים ב-/api/onboarding.
@@ -73,6 +74,51 @@ function Step({ step, state, auto, detail, onSave }) {
   )
 }
 
+// שאלון ללקוח (7.11): קישור אישי לפרויקט. התשובות מסמנות כאן שלבים (רק כאלה שלא סומנו ידנית).
+function FormLink({ projectId, onChanged }) {
+  const [f, setF] = useState(undefined)
+  const [msg, setMsg] = useState('')
+  const get = useCallback(() => {
+    apiFetch(`/api/onboarding/form?projectId=${projectId}`, { headers: {} }).then(r => r.json()).then(b => setF(b)).catch(() => setF({ error: 'שגיאה' }))
+  }, [projectId])
+  useEffect(() => { get() }, [get])
+  const link = f?.form?.token ? `${window.location.origin}/onboard/${f.form.token}` : ''
+  const create = async () => {
+    setMsg('')
+    const r = await apiFetch('/api/onboarding/form', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }) }).catch(() => null)
+    const b = r ? await r.json().catch(() => ({})) : {}
+    if (b.token) { get(); try { await navigator.clipboard.writeText(`${window.location.origin}/onboard/${b.token}`); setMsg('הקישור הועתק') } catch { /* */ } }
+    else setMsg(b.error || 'לא הצלחתי ליצור קישור')
+  }
+  const copy = async () => { try { await navigator.clipboard.writeText(link); setMsg('הקישור הועתק') } catch { setMsg(link) } }
+  const revoke = async () => {
+    if (!window.confirm('לבטל את הקישור? הלקוח לא יוכל להיכנס אליו יותר. התשובות שכבר מולאו נשארות.')) return
+    await apiFetch('/api/onboarding/form', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, revoke: true }) }).catch(() => null)
+    get(); setMsg('הקישור בוטל')
+  }
+  if (f === undefined) return null
+  if (f.ready === false) return <div className="onb-card onb-warn">כדי לשלוח שאלון ללקוח צריך להריץ את מיגרציה 032.</div>
+  const p = f.form ? progress(f.form.answers || {}) : null
+  return (
+    <div className="onb-card onb-form">
+      <div className="onb-form-row">
+        <FileText size={18} aria-hidden="true" />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <b>שאלון ללקוח</b>
+          <div className="onb-muted">{f.form ? `${p.done} מתוך ${p.total} שאלות מולאו${f.form.submitted_at ? ' · הלקוח לחץ "סיימתי"' : ''}` : 'הלקוח ממלא בעצמו, והתשובות מסמנות כאן את השלבים'}</div>
+        </div>
+        {f.form ? <>
+          <button type="button" className="onb-btn" onClick={copy}>העתקת קישור</button>
+          <a className="onb-btn" href={link} target="_blank" rel="noreferrer">פתיחה</a>
+          <button type="button" className="onb-btn ghost" onClick={async () => { get(); onChanged && onChanged() }}>רענון</button>
+          <button type="button" className="onb-btn ghost" onClick={revoke}>ביטול</button>
+        </> : <button type="button" className="onb-btn" onClick={create}>יצירת קישור</button>}
+      </div>
+      {msg && <div className="onb-muted" style={{ marginTop: 6 }}>{msg}</div>}
+    </div>
+  )
+}
+
 function Detail({ projectId, onBack }) {
   const [d, setD] = useState(null)
   const [err, setErr] = useState(null)
@@ -99,6 +145,7 @@ function Detail({ projectId, onBack }) {
         <Bar pct={sum.pct} />
         <div className="onb-muted">{sum.currentStage ? `השלב הנוכחי: ${sum.currentStage.title}` : 'הקליטה הושלמה'}</div>
       </div>
+      <FormLink projectId={projectId} onChanged={load} />
       {!d.ready && <div className="onb-card onb-warn">כדי לשמור סימונים צריך להריץ את מיגרציה 030. עד אז מוצגות רק הבדיקות האוטומטיות.</div>}
       {err && <div className="onb-card onb-warn">{err}</div>}
       {STAGES.map((stage, i) => {

@@ -726,3 +726,9 @@ th:hover .sort-ind { opacity: .8; }
 .cth-line { font-size: 14.5px; color: var(--tv-text); }
 .cth-line b { font-weight: 800; }
 .cth-vs { font-size: 12.5px; color: var(--tv-text-muted, #64748b); }
+
+/* §35 שאלון ללקוח בתוך "קליטת לקוחות" — FormLink ב-OnboardingModal (7.11) */
+.onb-form { border-color: var(--tv-brand, #315cf5); background: color-mix(in srgb, var(--tv-brand, #315cf5) 5%, var(--tv-surface, #fff)); }
+.onb-form-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.onb-btn { display: inline-flex; align-items: center; border: 1px solid var(--tv-brand, #315cf5); background: var(--tv-brand, #315cf5); color: #fff; border-radius: 10px; padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.onb-btn.ghost { background: transparent; color: var(--tv-brand, #315cf5); }
