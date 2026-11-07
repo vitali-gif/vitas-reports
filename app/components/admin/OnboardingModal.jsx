@@ -114,6 +114,12 @@ function FormLink({ projectId, onChanged }) {
           <button type="button" className="onb-btn ghost" onClick={revoke}>ביטול</button>
         </> : <button type="button" className="onb-btn" onClick={create}>יצירת קישור</button>}
       </div>
+      {f.files?.length > 0 && (
+        <div className="onb-files">
+          <b>קבצים מהלקוח ({f.files.length})</b>
+          {f.files.map((x, i) => x.url ? <a key={i} href={x.url} target="_blank" rel="noreferrer" dir="auto">{x.name}</a> : <span key={i} dir="auto">{x.name}</span>)}
+        </div>
+      )}
       {msg && <div className="onb-muted" style={{ marginTop: 6 }}>{msg}</div>}
     </div>
   )

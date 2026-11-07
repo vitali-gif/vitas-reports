@@ -732,3 +732,5 @@ th:hover .sort-ind { opacity: .8; }
 .onb-form-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .onb-btn { display: inline-flex; align-items: center; border: 1px solid var(--tv-brand, #315cf5); background: var(--tv-brand, #315cf5); color: #fff; border-radius: 10px; padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; }
 .onb-btn.ghost { background: transparent; color: var(--tv-brand, #315cf5); }
+.onb-files { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-top: 10px; font-size: 13px; }
+.onb-files a { color: var(--tv-brand, #315cf5); }

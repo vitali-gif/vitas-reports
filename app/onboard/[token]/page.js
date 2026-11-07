@@ -1,10 +1,11 @@
 'use client'
-// שאלון הקליטה ללקוח — /onboard/<token> (ויטלי, 7.11). השאלות: lib/onboarding-form.js; שמירה: /api/public/onboarding-form.
+// שאלון הקליטה ללקוח - /onboard/<token> (ויטלי, 7.11). השאלות: lib/onboarding-form.js; שמירה: /api/public/onboarding-form.
 // בלי משתמש: הטוקן שבקישור הוא ההרשאה. שמירה אוטומטית שנייה וחצי אחרי כל שינוי; אפשר לחזור בכל זמן.
 // בלי פיקסלים ובלי סקריפטים חיצוניים בדף הזה.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { FORM, visible, isFilled, progress, ECOM_TYPE } from '../../../lib/onboarding-form.js'
+import { FORM, visible, isFilled, progress, ECOM_TYPE, labelOf, accessMessage } from '../../../lib/onboarding-form.js'
+import { supabase } from '../../../lib/supabase'
 
 const css = `
 .obf { --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --brand:#2563eb; --brand-bg:#eff6ff; --ok:#047857; --ok-bg:#ecfdf5; --bg:#f8fafc;
@@ -43,10 +44,70 @@ const css = `
 .obf-foot-in { max-width:720px; margin:0 auto; display:flex; align-items:center; gap:12px; }
 .obf-save { font-size:13px; color:var(--muted); flex:1; }
 .obf-submit { border:0; background:var(--brand); color:#fff; border-radius:12px; padding:11px 20px; font:inherit; font-weight:800; font-size:15px; cursor:pointer; }
+.obf-msgbox pre { white-space:pre-wrap; background:#f1f5f9; border:1px solid var(--line); border-radius:12px; padding:12px 14px; font:inherit; font-size:13.5px; line-height:1.65; margin:0 0 10px; max-height:420px; overflow:auto; }
+.obf-file { display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:6px; font-size:14px; }
+.obf-file span:first-child { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.obf-muted { color:var(--muted); font-size:12.5px; }
+.obf-x2 { border:0; background:none; color:var(--muted); font-size:18px; cursor:pointer; }
 .obf-msg { max-width:520px; margin:80px auto; background:#fff; border:1px solid var(--line); border-radius:16px; padding:24px; text-align:center; line-height:1.7; }
 `
 
-function Field({ q, value, onChange }) {
+function MessageBox({ answers }) {
+  const text = accessMessage(answers)
+  const [copied, setCopied] = useState(false)
+  const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2500) } catch { /* העתקה ידנית */ } }
+  return (
+    <div className="obf-msgbox">
+      <pre dir="rtl">{text}</pre>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="obf-add" onClick={copy}>{copied ? '✓ הועתק' : 'העתקת ההודעה'}</button>
+        <a className="obf-add" style={{ textDecoration: 'none' }} href={'https://wa.me/?text=' + encodeURIComponent(text)} target="_blank" rel="noreferrer">שליחה בוואטסאפ</a>
+      </div>
+    </div>
+  )
+}
+
+const MAX_MB = 25
+function Files({ token, value, onChange }) {
+  const list = Array.isArray(value) ? value : []
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+  const pick = async (e) => {
+    const files = [...(e.target.files || [])]; e.target.value = ''
+    setErr('')
+    let cur = list
+    for (const f of files) {
+      if (f.size > MAX_MB * 1024 * 1024) { setErr(`${f.name}: גדול מ-${MAX_MB}MB`); continue }
+      setBusy(f.name)
+      const r = await fetch('/api/public/onboarding-form/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, name: f.name, type: f.type, size: f.size }) }).catch(() => null)
+      const b = r ? await r.json().catch(() => ({})) : {}
+      if (!b.path) { setErr(b.error || `${f.name}: ההעלאה נכשלה`); continue }
+      const { error } = await supabase.storage.from(b.bucket).uploadToSignedUrl(b.path, b.uploadToken, f, { contentType: f.type || 'application/octet-stream' })
+      if (error) { setErr(`${f.name}: ההעלאה נכשלה`); continue }
+      cur = [...cur, { name: f.name, path: b.path, size: f.size, type: f.type }]
+      onChange(cur)
+    }
+    setBusy('')
+  }
+  const kb = (n) => (n > 1024 * 1024 ? (n / 1024 / 1024).toFixed(1) + 'MB' : Math.round(n / 1024) + 'KB')
+  return (
+    <div>
+      {list.map((f, i) => (
+        <div key={f.path} className="obf-file"><span dir="auto">{f.name}</span><span className="obf-muted">{kb(f.size)}</span>
+          <button type="button" className="obf-x2" aria-label="הסרה" onClick={() => onChange(list.filter((_, j) => j !== i))}>×</button></div>
+      ))}
+      <label className="obf-add" style={{ display: 'inline-block', cursor: 'pointer' }}>
+        {busy ? `מעלה: ${busy}…` : '+ העלאת קבצים'}
+        <input type="file" multiple hidden disabled={!!busy} accept="image/*,application/pdf,video/mp4,video/quicktime,.zip,.ai,.psd,.svg" onChange={pick} />
+      </label>
+      {err && <p className="obf-help" style={{ color: '#b91c1c', marginTop: 6 }}>{err}</p>}
+    </div>
+  )
+}
+
+function Field({ q, value, onChange, token, answers }) {
+  if (q.type === 'message') return <MessageBox answers={answers} />
+  if (q.type === 'files') return <Files token={token} value={value} onChange={onChange} />
   if (q.type === 'text') return <input type="text" dir="auto" value={value || ''} placeholder={q.placeholder || ''} onChange={e => onChange(e.target.value)} />
   if (q.type === 'long') return <textarea dir="auto" value={value || ''} onChange={e => onChange(e.target.value)} />
   if (q.type === 'one' || q.type === 'yesno') {
@@ -147,8 +208,8 @@ export default function OnboardingFormPage() {
           <div className="obf-meta"><span>{prog.done} מתוך {prog.total} שאלות</span><span>{pct}%</span></div>
         </div>
         <div className="obf-intro">
-          כדי שנוכל להתחיל לעבוד ולהראות לכם את התמונה המלאה, נשמח שתמלאו את השאלון. <b>התשובות נשמרות אוטומטית</b> —
-          אפשר לעצור ולחזור, ולהעביר את הקישור למי שמכיר כל נושא. מה שלא רלוונטי — מדלגים. <b>אין צורך לכתוב כאן סיסמאות או מפתחות.</b>
+          כדי שנוכל להתחיל לעבוד ולהראות לכם את התמונה המלאה, נשמח שתמלאו את השאלון. <b>התשובות נשמרות אוטומטית</b> -
+          אפשר לעצור ולחזור, ולהעביר את הקישור למי שמכיר כל נושא. מה שלא רלוונטי - מדלגים. <b>אין צורך לכתוב כאן סיסמאות או מפתחות.</b>
         </div>
         {FORM.map(sec => {
           const qs = sec.questions.filter(q => visible(q, answers))
@@ -160,9 +221,9 @@ export default function OnboardingFormPage() {
               <p className="obf-why">{sec.why}</p>
               {qs.map(q => (
                 <div key={q.key} className="obf-q">
-                  <span className="obf-label">{q.label}{q.required && !isFilled(q, answers) && <span className="obf-req" aria-label="חשוב">*</span>}</span>
+                  <span className="obf-label">{labelOf(q, answers)}{q.required && !isFilled(q, answers) && <span className="obf-req" aria-label="חשוב">*</span>}</span>
                   {q.help && <p className="obf-help">{q.help}</p>}
-                  <Field q={q} value={answers[q.key]} onChange={v => change(q.key, v)} />
+                  <Field q={q} value={answers[q.key]} onChange={v => change(q.key, v)} token={token} answers={answers} />
                 </div>
               ))}
             </section>
@@ -171,7 +232,7 @@ export default function OnboardingFormPage() {
       </div>
       <div className="obf-foot">
         <div className="obf-foot-in">
-          <span className="obf-save" aria-live="polite">{save.status === 'saving' ? 'שומר…' : save.status === 'error' ? '⚠️ השמירה נכשלה — ננסה שוב בשינוי הבא' : save.status === 'saved' ? '✓ נשמר' : state.submitted ? 'כבר שלחתם — אפשר לעדכן' : 'נשמר אוטומטית'}</span>
+          <span className="obf-save" aria-live="polite">{save.status === 'saving' ? 'שומר…' : save.status === 'error' ? '⚠️ השמירה נכשלה - ננסה שוב בשינוי הבא' : save.status === 'saved' ? '✓ נשמר' : state.submitted ? 'כבר שלחתם - אפשר לעדכן' : 'נשמר אוטומטית'}</span>
           <button type="button" className="obf-submit" onClick={async () => { if (await flush(true)) setState(s => ({ ...s, finished: true })) }}>סיימתי</button>
         </div>
       </div>

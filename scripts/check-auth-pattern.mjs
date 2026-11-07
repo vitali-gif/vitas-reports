@@ -34,6 +34,8 @@ const PUBLIC_ROUTES = new Set([
   // שאלון הקליטה ללקוח (7.11): ההרשאה היא טוקן אקראי בקישור שאדמין יוצר; קישור שבוטל לא נפתח;
   // הגבלת קצב לכל IP; מחזיר רק את שם הפרויקט ואת תשובות השאלון.
   'app/api/public/onboarding-form/route.js',
+  // העלאת קבצים לשאלון (7.11): אותו טוקן, קישור העלאה חתום לתיקיית הפרויקט בדלי פרטי, 25MB, הגבלת קצב.
+  'app/api/public/onboarding-form/upload/route.js',
 ])
 
 // requireMeeting / requireProject הם השומרים של פיצ'ר הישיבות (lib/meetings/store.js).
