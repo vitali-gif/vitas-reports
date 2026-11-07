@@ -51,7 +51,7 @@ eq('businessHoursBetween 10:00→10:30 Israel = 0.5h', businessHoursBetween(sfMs
 
 const R = computeSalesforceSummary({ entities: { leads, opportunities, line_items, lead_history } }, { since: '2026-09-01', until: '2026-09-30' })
 const S = R.summary
-eq('summary basics', [S.crmType, S.totalLeads, S.convertedLeads, S.meetingsScheduled, S.schemaVersion], ['salesforce', 3, 1, 2, 10])
+eq('summary basics', [S.crmType, S.totalLeads, S.convertedLeads, S.meetingsScheduled, S.schemaVersion], ['salesforce', 3, 1, 2, 11])
 eq('byStatus / byBranch via pairs', [S.byStatus, S.byBranch['לא ידוע']?.leads], [{ Qualified: 1, Nurturing: 1, Unqualified: 1 }, 1])
 eq('funnel period', [S.funnel.opportunities, S.funnel.paid, S.funnel.quotes, S.funnel.lost, S.funnel.dealValue, S.funnel.deliveryValue], [3, 1, 2, 1, 12000, 500])
 eq('funnelPeriod meetings from meetingDate window', [S.funnelPeriod.meetings, S.funnelPeriod.noShow], [2, 1])
@@ -89,3 +89,15 @@ eq('computeCrmRow(salesforce)', (() => { const r = computeCrmRow('salesforce', {
 }
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
+
+// פגישות לפי מודעה (7.11): Ad Id מטופס הלידים מגיע ב-UTM_Media__c דרך זאפייר
+{
+  const { sfAdBreakdown } = await import('../../lib/crm/salesforce-summary.js')
+  const L = (id, created, media, meeting, branch = 'באר שבע') => ({ Id: id, CreatedDate: created, UTM_Media__c: media, UTM_Source__c: 'fb', meetingDate__c: meeting, Branch_Name__c: branch })
+  const leads = [L('1', '2026-11-03T10:00:00.000+0000', '120252437562210740', '2026-11-05T09:00:00.000+0000'), L('2', '2026-11-04T10:00:00.000+0000', '120252437562210740', null),
+    L('3', '2026-11-04T10:00:00.000+0000', 'אתר קלוס', null), L('4', '2026-10-20T10:00:00.000+0000', '120252437562210740', null), L('5', '2026-11-04T10:00:00.000+0000', '120252437562210999', null, 'ראשון')]
+  const ab = sfAdBreakdown({ leads }, '2026-11-01', '2026-11-30', { branch: 'באר שבע' })
+  const ok = JSON.stringify(ab) === JSON.stringify([{ adId: '120252437562210740', platform: 'fb', leads: 2, leadsWithId: 2, meetings: 1 }])
+  console.log((ok ? '✓ ' : '✗ ') + 'SF adBreakdown: numeric UTM_Media only, in period, branch only' + (ok ? '' : ': ' + JSON.stringify(ab)))
+  if (!ok) process.exitCode = 1
+}

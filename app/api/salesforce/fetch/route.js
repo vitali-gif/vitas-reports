@@ -25,13 +25,14 @@
 import { requireFetchAccess, requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { upsertRawRecords } from '../../../../lib/crm/raw-store.js'
+import { sfAdBreakdown } from '../../../../lib/crm/salesforce-summary.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const SF_LOGIN_URL = process.env.SF_LOGIN_URL || 'https://login.salesforce.com'
 const SF_API_VERSION = process.env.SF_API_VERSION || 'v60.0'
-const SF_SCHEMA_VERSION = 10
+const SF_SCHEMA_VERSION = 11   // v11: adBreakdown (7.11) — גם ב-lib/crm/schema-version.js
 
 const CHAIN = 'קלוס'
 const STAGE_PAID = 'הזמנה - שולמה מקדמה'
@@ -291,9 +292,9 @@ async function runSync(opts = {}) {
   }
 
   // תמונת מצב גולמית — לא מפילה את הריצה; מדווחת בשדה snapshot.
-  let snapshot = null
+  let snapshot = null, rawWindow = null
   if (opts.snapshot !== false) {
-    try { snapshot = await snapshotSalesforce(supabase, projectsList, await fetchSalesforceRaw(auth, FROM, TO)) }
+    try { rawWindow = await fetchSalesforceRaw(auth, FROM, TO); snapshot = await snapshotSalesforce(supabase, projectsList, rawWindow) }
     catch (e) { snapshot = { error: String(e?.message || e) } }
   }
 
@@ -715,6 +716,10 @@ async function runSync(opts = {}) {
     schemaVersion: SF_SCHEMA_VERSION,
     _cohortDrillErr: cohortDrillErr,
   }
+
+  // פגישות לפי מודעה (7.11): Ad Id מטופס הלידים מגיע ב-UTM_Media__c דרך זאפייר. מחוץ לקטע שממנו נוצר
+  // lib/crm/salesforce-shape.js, ולכן גם computeSalesforceSummary מוסיף אותו בנפרד (sfAdBreakdown).
+  if (rawWindow) { const ab = sfAdBreakdown(rawWindow, since, until); if (ab.length) summary.adBreakdown = ab }
 
   const results = []
   for (const p of projectsList) {
