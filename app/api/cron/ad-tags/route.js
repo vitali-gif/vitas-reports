@@ -16,7 +16,7 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { adminClient, requireAdmin } from '../../../../lib/auth'
-import { tagCreative, fetchImage, coverKeys, lastMonths, verticalOf, TAG_VERSION, imageSize } from '../../../../lib/ad-tags.js'
+import { tagCreative, fetchImage, coverKeys, lastMonths, verticalOf, TAG_VERSION, imageSize, fetchMetaCreative } from '../../../../lib/ad-tags.js'
 import { META_GRAPH_VERSION, metaTokenFor } from '../../../../lib/ads/meta-api.js'
 import { logJob } from '../../../../lib/job-log.js'
 
@@ -39,11 +39,7 @@ async function pool(items, size, fn) {
 // פרטי הקריאייטיב ממטא, למודעה שלא מופיעה ב-activeAds של הדוח
 async function metaCreative(adId, account) {
   const token = metaTokenFor(account || '')
-  const url = `https://graph.facebook.com/${META_GRAPH_VERSION}/${adId}?fields=name,creative{title,body,image_url,thumbnail_url,video_id}&thumbnail_width=800&thumbnail_height=800&access_token=${encodeURIComponent(token)}`
-  const r = await fetch(url).then(x => x.json()).catch(() => ({}))
-  if (r.error) throw new Error('Meta: ' + String(r.error.message || r.error.type || 'error').slice(0, 160))
-  const c = r.creative || {}
-  return { name: r.name || '', title: c.title || '', body: c.body || '', imageUrl: c.image_url || c.thumbnail_url || '', isVideo: !!c.video_id }
+  return fetchMetaCreative(`https://graph.facebook.com/${META_GRAPH_VERSION}`, adId, token, 800)
 }
 
 export async function GET(req) {
@@ -85,7 +81,8 @@ export async function GET(req) {
       ads.set(id, { adId: id, account: '', name: d.adName || '', full: false })
     }
   }
-  const minSpend = Math.max(0, Number(url.searchParams.get('minSpend')) || (months > 2 ? 500 : 0))
+  const msRaw = url.searchParams.get('minSpend')
+  const minSpend = Math.max(0, msRaw != null && msRaw !== '' && Number.isFinite(Number(msRaw)) ? Number(msRaw) : (months > 2 ? 500 : 0))
   if (minSpend > 0) {
     const spendOf = new Map()
     for (const r of reps || []) for (const d of Array.isArray(r.data) ? r.data : []) {

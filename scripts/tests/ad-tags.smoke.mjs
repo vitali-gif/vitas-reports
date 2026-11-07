@@ -125,4 +125,19 @@ const cxMix = crossCreative([{ name: 'A', tests: tD }], ads, { ...tagsD, 3: T('w
 eq('cross across verticals: shared dimensions only', cxMix.combined.map(t => t.key).filter(k => !['people', 'price', 'color', 'format'].includes(k)), [])
 eq('dimensions for furniture include product', dimensionsFor('furniture').map(d => d.key).includes('product'), true)
 
+// קריאייטיב ממטא (6.11): הגודל על השדה creative; סרטון / דינמי — התמונה והטקסט מ-object_story_spec / asset_feed_spec
+const { pickCreative, fetchMetaCreative, metaCreativeFields, imageSize } = await import('../../lib/ad-tags.js')
+eq('fields: size modifier on creative', metaCreativeFields(800).startsWith('name,creative.thumbnail_width(800).thumbnail_height(800){'), true)
+eq('pick: video image + message from object_story_spec', pickCreative({ name: 'n', creative: { thumbnail_url: 't', video_id: 'v', object_story_spec: { video_data: { image_url: 'big', message: 'טקסט' } } } }), { name: 'n', title: '', body: 'טקסט', imageUrl: 'big', thumbUrl: 't', isVideo: true })
+eq('pick: dynamic creative from asset_feed_spec', [pickCreative({ creative: { asset_feed_spec: { images: [{ url: 'a1' }], bodies: [{ text: 'b1' }], titles: [{ text: 'h1' }] } } })].map(x => [x.imageUrl, x.body, x.title])[0], ['a1', 'b1', 'h1'])
+let calls = []
+const fm = async (u) => { calls.push(decodeURIComponent(u)); return { json: async () => (calls.length === 1 ? { error: { message: 'Syntax error "Expected end of string"' } } : { name: 'x', creative: { image_url: 'i' } }) } }
+const fc = await fetchMetaCreative('https://g', '1', 'tok', 800, fm)
+eq('meta: syntax error → retried without the size modifier', [calls.length, calls[1].includes('thumbnail_width'), fc.imageUrl], [2, false, 'i'])
+calls = []
+const fm2 = async (u) => { calls.push(u); return { json: async () => ({ error: { message: 'Unsupported get request. Object does not exist' } }) } }
+eq('meta: deleted ad → throws, no retry', [await fetchMetaCreative('https://g', '1', 'tok', 800, fm2).then(() => 'ok', e => /does not exist/.test(e.message)), calls.length], [true, 1])
+const png = Buffer.alloc(24); png[0] = 0x89; png[1] = 0x50; png.writeUInt32BE(64, 16); png.writeUInt32BE(48, 20)
+eq('imageSize: png header', imageSize({ data: png.toString('base64') }), { w: 64, h: 48 })
+
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
