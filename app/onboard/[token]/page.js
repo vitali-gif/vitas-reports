@@ -222,7 +222,7 @@ export default function OnboardingFormPage() {
               {qs.map(q => (
                 <div key={q.key} className="obf-q">
                   <span className="obf-label">{labelOf(q, answers)}{q.required && !isFilled(q, answers) && <span className="obf-req" aria-label="חשוב">*</span>}</span>
-                  {q.help && <p className="obf-help">{q.help}</p>}
+                  {(q.help || q.type === 'many') && <p className="obf-help">{[q.type === 'many' && 'אפשר לבחור כמה', q.help].filter(Boolean).join(' · ')}</p>}
                   <Field q={q} value={answers[q.key]} onChange={v => change(q.key, v)} token={token} answers={answers} />
                 </div>
               ))}

@@ -30,7 +30,7 @@ eq('progress: counts visible questions only', [p0.done, p1.done > 5, p1.total !=
 
 // חנות אונליין (WANZOO, 7.11)
 const { ECOM_TYPE } = await import('../../lib/onboarding-form.js')
-const e = { biz_type: ECOM_TYPE, store_platform: 'WooCommerce', store_key_done: true, crm: 'אין', pixel_events: ['הוספה לסל', 'רכישה'], target_roas: '4', budget: '20000' }
+const e = { biz_type: ECOM_TYPE, store_platform: 'WooCommerce', site_done: true, crm: 'אין', pixel_events: ['הוספה לסל', 'רכישה'], target_roas: '4', budget: '20000' }
 const se = stepsFromAnswers(e)
 eq('ecom: store section shown, lead questions hidden', [visible(Q.store_platform, e), visible(Q.store_platform, { biz_type: 'נדל"ן' }), visible(Q.lead_sources, e), visible(Q.first_call, e), visible(Q.target_roas, e)], [true, false, false, false, true])
 eq('ecom: steps', [se.crm_which.status, /WooCommerce/.test(se.crm_which.note), se.crm_key.status, se.lead_sources.status, se.meta_tracking.status, se.goals.status, /ROAS: 4/.test(se.goals.note), se.crm_api.status], ['done', true, 'doing', 'na', 'doing', 'done', true, 'na'])
@@ -40,9 +40,13 @@ const { accessMessage, AGENCY, labelOf } = await import('../../lib/onboarding-fo
 const m1 = accessMessage({ channels: ['פייסבוק ואינסטגרם'], ga4: 'לא' })
 eq('access message: meta only, with VITAS ids, no GA4 / google / password', [m1.includes(AGENCY.metaBusinessId), m1.includes(AGENCY.googleMcc), m1.includes('GA4'), /סיסמ/.test(m1)], [true, false, false, false])
 const m2 = accessMessage({ channels: ['גוגל'], lead_transfer: 'זאפייר', biz_type: ECOM_TYPE, store_platform: 'Shopify' })
-eq('access message: google MCC + customer id, zapier invite, store key', [m2.includes(AGENCY.googleMcc), m2.includes('Customer ID'), m2.includes('Invite'), m2.includes('read_orders')], [true, true, true, true])
+eq('access message: google MCC + customer id, zapier invite, store staff access', [m2.includes(AGENCY.googleMcc), m2.includes('Customer ID'), m2.includes('Invite'), m2.includes('Add staff')], [true, true, true, true])
 eq('no long dashes in the form text', JSON.stringify(FORM.map(s2 => [s2.title, s2.why, s2.questions.map(q => [labelOf(q, {}), q.help, q.options])])).match(/[\u2013\u2014]/), null)
 eq('asset label by business type', [labelOf(Q.assets_files, { biz_type: ECOM_TYPE }), labelOf(Q.assets_files, { biz_type: 'נדל"ן' })].map(x => /הדמיות/.test(x)), [false, true])
 eq('files: cleaned, message skipped', [cleanAnswers({ assets_files: [{ name: 'a.png', path: 'p/1-a.png', size: 10, x: 1 }, { name: 'bad' }], access_message: 'x' })], [{ assets_files: [{ name: 'a.png', path: 'p/1-a.png', size: 10, type: '' }] }])
+
+const m3 = accessMessage({ channels: ['פייסבוק ואינסטגרם'], biz_type: ECOM_TYPE, store_platform: 'WooCommerce', email_platform: 'Klaviyo', ga4: 'כן' })
+eq('access message: WordPress Shop Manager + Klaviyo analyst', [m3.includes('Shop Manager'), m3.includes('Klaviyo: Settings'), m3.includes('REST API')], [true, true, false])
+eq('store section: no orders / AOV / top products questions', [Q.orders_month, Q.aov, Q.top_products, Q.store_key_done].every(x => x === undefined), true)
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
