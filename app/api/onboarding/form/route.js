@@ -29,7 +29,20 @@ export async function GET(req) {
     const { data: urls } = await adminClient().storage.from('onboarding-files').createSignedUrls(list.map(x => x.path), 3600)
     files = list.map((x, i) => ({ name: x.name, size: x.size, url: urls?.[i]?.signedUrl || null }))
   }
-  return J({ form, files, ready: true })
+  // מיילים לגישה לדשבורד שהלקוח כתב בשאלון — מי כבר קיבל גישה, ומי עוד לא (הוספה בלחיצה מהחלון)
+  let dashUsers = [], clientId = null
+  const rows = (form?.answers?.dash_users || []).filter(r => r && /\S+@\S+\.\S+/.test(String(r.email || '')))
+  if (rows.length) {
+    const sb = adminClient()
+    const [{ data: proj }, { data: acc }] = await Promise.all([
+      sb.from('projects').select('client_id').eq('id', projectId).maybeSingle(),
+      sb.from('client_access').select('email').eq('project_id', projectId),
+    ])
+    clientId = proj?.client_id || null
+    const have = new Set((acc || []).map(x => String(x.email || '').toLowerCase()))
+    dashUsers = rows.map(r => ({ name: r.name || '', email: String(r.email).trim().toLowerCase(), hasAccess: have.has(String(r.email).trim().toLowerCase()) }))
+  }
+  return J({ form, files, dashUsers, clientId, ready: true })
 }
 
 export async function POST(req) {
