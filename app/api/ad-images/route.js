@@ -11,7 +11,7 @@
  */
 import { NextResponse } from 'next/server'
 import { adminClient, requireProjectAccess } from '../../../lib/auth'
-import { fetchImage } from '../../../lib/ad-tags.js'
+import { fetchImage, fetchMetaCreative } from '../../../lib/ad-tags.js'
 import { META_GRAPH_VERSION, metaTokenFor } from '../../../lib/ads/meta-api.js'
 
 export const dynamic = 'force-dynamic'
@@ -21,11 +21,10 @@ const J = (b, s = 200) => NextResponse.json(b, { status: s, headers: { 'Cache-Co
 async function thumbFor(adId, account) {
   const token = metaTokenFor(account || '')
   if (!token) return null
-  const u = `https://graph.facebook.com/${META_GRAPH_VERSION}/${adId}?fields=creative{thumbnail_url,image_url}&thumbnail_width=240&thumbnail_height=240&access_token=${encodeURIComponent(token)}`
-  const r = await fetch(u).then(x => x.json()).catch(() => null)
-  const c = r?.creative
+  const c = await fetchMetaCreative(`https://graph.facebook.com/${META_GRAPH_VERSION}`, adId, token, 320).catch(() => null)
   if (!c) return null
-  const img = await fetchImage(c.thumbnail_url, { maxBytes: 600 * 1024 }) || await fetchImage(c.image_url, { maxBytes: 600 * 1024 })
+  // לתצוגה: התמונה הממוזערת (320) קודם — התמונה המקורית יכולה לעבור את 600KB
+  const img = await fetchImage(c.thumbUrl, { maxBytes: 600 * 1024 }) || await fetchImage(c.imageUrl, { maxBytes: 600 * 1024 })
   return img ? `data:${img.media_type};base64,${img.data}` : null
 }
 
