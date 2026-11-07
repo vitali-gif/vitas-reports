@@ -41,7 +41,10 @@ export async function POST(req) {
   const sb = adminClient()
   const f = await load(sb, b.token)
   if (!f) return J({ error: 'הקישור לא תקין או שבוטל' }, 404)
-  const answers = { ...(f.answers || {}), ...cleanAnswers(b.answers) }
+  const incoming = cleanAnswers(b.answers)
+  // קבצים: רק נתיבים בתיקייה של הפרויקט הזה (שהונפקו ב-/upload)
+  if (incoming.assets_files) incoming.assets_files = incoming.assets_files.filter(x => x.path.startsWith(f.project_id + '/'))
+  const answers = { ...(f.answers || {}), ...incoming }
   const now = new Date().toISOString()
   const { error } = await sb.from('onboarding_forms').update({ answers, updated_at: now, ...(b.submit ? { submitted_at: now } : {}) }).eq('token', b.token)
   if (error) return J({ error: 'השמירה נכשלה' }, 500)

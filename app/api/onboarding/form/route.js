@@ -21,7 +21,15 @@ export async function GET(req) {
   const { data, error } = await adminClient().from('onboarding_forms').select('token, answers, updated_at, submitted_at, revoked').eq('project_id', projectId).maybeSingle()
   if (MISSING(error)) return J({ form: null, ready: false })
   if (error) return J({ error: error.message }, 500)
-  return J({ form: data && !data.revoked ? data : null, ready: true })
+  const form = data && !data.revoked ? data : null
+  // קבצים שהלקוח העלה — קישורי הורדה חתומים לשעה
+  let files = []
+  const list = form?.answers?.assets_files || []
+  if (list.length) {
+    const { data: urls } = await adminClient().storage.from('onboarding-files').createSignedUrls(list.map(x => x.path), 3600)
+    files = list.map((x, i) => ({ name: x.name, size: x.size, url: urls?.[i]?.signedUrl || null }))
+  }
+  return J({ form, files, ready: true })
 }
 
 export async function POST(req) {
