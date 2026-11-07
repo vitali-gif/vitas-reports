@@ -15,6 +15,7 @@
  * fireberry-notes. הסנכרון השוטף רץ כל שעה בתוך prefetch-daily (cron-job.org) עם 40 שניות —
  * התזמון של GitHub דילג על רוב הריצות בלילה (3 ריצות ב-12 שעות).
  */
+import { safeEqual } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { logJob } from '../../../../lib/job-log.js'
 
@@ -27,7 +28,7 @@ const BUDGET_MS = 240000
 export async function GET(request) {
   const startedAt = Date.now()
   const bearer = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
-  if (!process.env.CRON_SECRET || bearer !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || !safeEqual(bearer, process.env.CRON_SECRET)) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 

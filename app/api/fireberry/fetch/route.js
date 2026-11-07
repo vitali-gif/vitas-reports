@@ -9,7 +9,7 @@
  *    ה-projectId הפתוח. בלי הסינון לפי שם הפרויקט, דוח Fireberry היה נכתב על פרויקט
  *    של BMBY ודורס אותו על אותו מפתח (project, source, month).
  */
-import { requireFetchAccess } from '../../../../lib/auth'
+import { safeEqual, requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { OBJ, queryAll, isConfigured, listLeadNoteIds, getNote, pool } from '../../../../lib/crm/fireberry-api.js'
 import { computeFireberrySummary, toReportRow, filterLeads, fireberryConfigFor } from '../../../../lib/crm/fireberry-summary.js'
@@ -311,7 +311,7 @@ export async function POST(request) {
 export async function GET(request) {
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '').trim()
-  if (process.env.CRON_SECRET && bearer === process.env.CRON_SECRET) {
+  if (process.env.CRON_SECRET && safeEqual(bearer, process.env.CRON_SECRET)) {
     const { status, body } = await runSync()
     return Response.json(body, { status })
   }

@@ -2,6 +2,7 @@
  * /api/cron/prefetch-ads — Meta + Google only (runs in ~20-25s, well under 60s limit)
  * Runs at 07:00 + 14:00 Israel time. BMBY handled separately by /api/cron/prefetch-crm.
  */
+import { safeEqual } from '../../../../lib/auth'
 import { sendAlert } from '../../../../lib/alert'
 import { logJob } from '../../../../lib/job-log'
 import { createClient } from '@supabase/supabase-js'
@@ -63,7 +64,7 @@ async function handle(request) {
   const startedAt = Date.now()
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '').trim()
-  if (!process.env.CRON_SECRET || bearer !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || !safeEqual(bearer, process.env.CRON_SECRET)) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 

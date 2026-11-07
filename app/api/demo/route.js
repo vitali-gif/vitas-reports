@@ -19,7 +19,7 @@
  * ההרצה אידמפוטנטית: אפשר להריץ שוב ושוב, התוצאה זהה.
  * להרצה חודשית אוטומטית ראה scripts/demo/README.md.
  */
-import { requireAdmin, adminClient } from '../../../lib/auth'
+import { safeEqual, requireAdmin, adminClient } from '../../../lib/auth'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { DEMO_DATASET } from '../../../lib/demo-dataset'
@@ -156,7 +156,7 @@ function shiftDates(node, months, post) {
  */
 function checkWriteAuth(req) {
   const bearer = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
-  return !!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET
+  return !!process.env.CRON_SECRET && safeEqual(bearer, process.env.CRON_SECRET)
 }
 
 

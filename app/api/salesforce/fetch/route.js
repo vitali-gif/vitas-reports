@@ -22,7 +22,7 @@
 //
 // Env vars: SF_CLIENT_ID, SF_CLIENT_SECRET, SF_REFRESH_TOKEN, SF_LOGIN_URL, SF_API_VERSION
 
-import { requireFetchAccess, requireAdmin } from '../../../../lib/auth'
+import { safeEqual, requireFetchAccess, requireAdmin } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { upsertRawRecords } from '../../../../lib/crm/raw-store.js'
 import { sfAdBreakdown } from '../../../../lib/crm/salesforce-summary.js'
@@ -741,6 +741,7 @@ export async function POST(request) {
   try { body = await request.json() } catch {}
   const gate = await requireFetchAccess(request, body.projectId)
   if (!gate.ok) return gate.res
+  if (body.month && !/^\d{4}-\d{2}$/.test(String(body.month))) return Response.json({ error: 'invalid month — use YYYY-MM' }, { status: 400 })
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) {
     return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
   }
@@ -760,7 +761,7 @@ export async function GET(request) {
   }
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '')
-  if (process.env.CRON_SECRET && bearer === process.env.CRON_SECRET && !new URL(request.url).searchParams.get('describe')) {
+  if (process.env.CRON_SECRET && safeEqual(bearer, process.env.CRON_SECRET) && !new URL(request.url).searchParams.get('describe')) {
     const { status, body: rb } = await runSync()
     return Response.json(rb, { status })
   }

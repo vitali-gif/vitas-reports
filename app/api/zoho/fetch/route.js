@@ -298,6 +298,7 @@ export async function POST(request) {
   try { body = await request.json() } catch {}
   const gate = await requireFetchAccess(request, body.projectId)
   if (!gate.ok) return gate.res
+  if (body.month && !/^\d{4}-\d{2}$/.test(String(body.month))) return Response.json({ error: 'invalid month — use YYYY-MM' }, { status: 400 })
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) {
     return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
   }

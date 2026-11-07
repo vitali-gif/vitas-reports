@@ -4,6 +4,7 @@
 // (cron_heartbeat.last_run = now) at the end of a successful run; this watchdog alerts
 // if a heartbeat is stale during active hours. Bootstrap-safe: if the table/rows don't
 // exist yet, it does nothing (no false alarms).
+import { safeEqual } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { sendAlert } from '../../../../lib/alert'
 import { computeHealth, renderHealthEmail, israelHour } from '../../../../lib/health'
@@ -34,7 +35,7 @@ const JOBS = [
 export async function GET(request) {
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '').trim()
-  if (!process.env.CRON_SECRET || bearer !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || !safeEqual(bearer, process.env.CRON_SECRET)) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
