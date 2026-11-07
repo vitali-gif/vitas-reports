@@ -105,7 +105,9 @@ export async function GET(req) {
       else if (textOnly) retry.add(x.ad_id)
     }
   }
-  const todo = ids.filter(id => !done.has(id)).slice(0, limit).map(id => ads.get(id))
+  // retag: רק מודעות שכבר סווגו בגרסה ישנה — לא מודעות חדשות שמעולם לא סווגו (7.11: עם minSpend=0 נכנסו
+  // גם ~900 מודעות קטנות שלא היו בהיקף שאושר)
+  const todo = ids.filter(id => !done.has(id) && (!retag || retry.has(id))).slice(0, limit).map(id => ads.get(id))
   // מודעה שמופיעה רק במספרים (בלי activeAds): החשבון שלה מ-ad_daily, כדי לפנות למטא עם הטוקן הנכון
   // שורה אחת לכל מודעה: ב-ad_daily יש עשרות שורות לכל מודעה (יום × גיל × מגדר), ולכן שאילתה אחת עם
   // limit החזירה רק את המודעות הראשונות — והשאר נשאלו במטא בלי חשבון (5.11, 73 מודעות "לא זמינות").
@@ -149,7 +151,7 @@ export async function GET(req) {
       } else errors.push({ adId: a.adId, error: msg.slice(0, 200) })
     }
   })
-  const out = { months, minSpend, retag, ads: ids.length, alreadyTagged: done.size, tagged: ok, unavailable, noAccount: noAccount.length, errors: errors.slice(0, 10), left: Math.max(0, ids.length - done.size - todo.length - noAccount.length) }
+  const out = { months, minSpend, retag, ads: ids.length, alreadyTagged: done.size, tagged: ok, unavailable, noAccount: noAccount.length, errors: errors.slice(0, 10), left: retag ? Math.max(0, retry.size - todo.length) : Math.max(0, ids.length - done.size - todo.length - noAccount.length) }
   try { await logJob(sb, 'ad-tags', errors.length < todo.length || !todo.length, Date.now() - t0, out) } catch { /* הרישום לא מפיל */ }
   return J(out)
 }
