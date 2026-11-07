@@ -4,6 +4,7 @@
  * so we stay well under the 60s Vercel Hobby limit.
  * Jobs: 3 months + 2 ranges = 5 total, concurrency 2, ~25-35s
  */
+import { safeEqual } from '../../../../lib/auth'
 import { sendAlert } from '../../../../lib/alert'
 import { createClient } from '@supabase/supabase-js'
 import { runCron } from '../../../../lib/cron-background'
@@ -61,7 +62,7 @@ async function handle(request) {
   const startedAt = Date.now()
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '').trim()
-  if (!process.env.CRON_SECRET || bearer !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || !safeEqual(bearer, process.env.CRON_SECRET)) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 

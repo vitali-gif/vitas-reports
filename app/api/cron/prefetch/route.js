@@ -1,3 +1,4 @@
+import { safeEqual } from '../../../../lib/auth'
 /**
  * /api/cron/prefetch  — daily cron that pre-populates Supabase cache
  * so the dashboard renders instantly (no live fetch needed) for the
@@ -71,7 +72,7 @@ export async function GET(request) {
   // Validate cron secret
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '').trim()
-  if (!process.env.CRON_SECRET || bearer !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || !safeEqual(bearer, process.env.CRON_SECRET)) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 

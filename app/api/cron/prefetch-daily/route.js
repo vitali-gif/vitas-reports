@@ -18,6 +18,7 @@
  * לכן: (1) heartbeat נכתב מיד אחרי recent — השלב הקריטי; (2) כל שלב מקבל deadline קשיח
  * (HARD_MS) שנאכף גם באמצע משיכה; (3) הרענונים הקצרים של ה-CRM רצים לפני ה-backfill הפתוח.
  */
+import { safeEqual } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { runDailySync } from '../../../../lib/ads/daily-sync.js'
 import { pruneJobLog, logJob, lastRuns } from '../../../../lib/job-log.js'
@@ -42,7 +43,7 @@ async function handle(request) {
   const left = () => HARD_MS - (Date.now() - startedAt)
   const auth = request.headers.get('authorization') || ''
   const bearer = auth.replace(/^Bearer\s+/i, '').trim()
-  if (!process.env.CRON_SECRET || bearer !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || !safeEqual(bearer, process.env.CRON_SECRET)) {
     return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
