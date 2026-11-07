@@ -4,7 +4,7 @@
 // בלי פיקסלים ובלי סקריפטים חיצוניים בדף הזה.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { FORM, visible, isFilled, progress } from '../../../lib/onboarding-form.js'
+import { FORM, visible, isFilled, progress, ECOM_TYPE } from '../../../lib/onboarding-form.js'
 
 const css = `
 .obf { --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --brand:#2563eb; --brand-bg:#eff6ff; --ok:#047857; --ok-bg:#ecfdf5; --bg:#f8fafc;
@@ -156,7 +156,7 @@ export default function OnboardingFormPage() {
           n++
           return (
             <section key={sec.key} className="obf-sec" aria-labelledby={'sec-' + sec.key}>
-              <h2 id={'sec-' + sec.key}><span className="obf-num">{n}</span>{sec.title}</h2>
+              <h2 id={'sec-' + sec.key}><span className="obf-num">{n}</span>{answers.biz_type === ECOM_TYPE && sec.titleEcom ? sec.titleEcom : sec.title}</h2>
               <p className="obf-why">{sec.why}</p>
               {qs.map(q => (
                 <div key={q.key} className="obf-q">

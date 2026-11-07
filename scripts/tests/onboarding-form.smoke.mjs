@@ -28,4 +28,11 @@ eq('steps: empty answers → nothing marked', stepsFromAnswers({}), {})
 const p0 = progress({}), p1 = progress(a)
 eq('progress: counts visible questions only', [p0.done, p1.done > 5, p1.total !== p0.total], [0, true, true])
 
+// חנות אונליין (WANZOO, 7.11)
+const { ECOM_TYPE } = await import('../../lib/onboarding-form.js')
+const e = { biz_type: ECOM_TYPE, store_platform: 'WooCommerce', store_key_done: true, crm: 'אין', pixel_events: ['הוספה לסל', 'רכישה'], target_roas: '4', budget: '20000' }
+const se = stepsFromAnswers(e)
+eq('ecom: store section shown, lead questions hidden', [visible(Q.store_platform, e), visible(Q.store_platform, { biz_type: 'נדל"ן' }), visible(Q.lead_sources, e), visible(Q.first_call, e), visible(Q.target_roas, e)], [true, false, false, false, true])
+eq('ecom: steps', [se.crm_which.status, /WooCommerce/.test(se.crm_which.note), se.crm_key.status, se.lead_sources.status, se.meta_tracking.status, se.goals.status, /ROAS: 4/.test(se.goals.note), se.crm_api.status], ['done', true, 'doing', 'na', 'doing', 'done', true, 'na'])
+
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
