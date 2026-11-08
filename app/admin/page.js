@@ -14,6 +14,7 @@ import UsageModal from '../components/admin/UsageModal.jsx'
 import OnboardingModal from '../components/admin/OnboardingModal.jsx'
 import { track as trackUsage, setUsageContext } from '../../lib/usage-track.js'
 import CreativeTests, { CreativeHighlights } from '../components/report-ui/CreativeTests.jsx'
+import FreshAd from '../components/report-ui/FreshAd.jsx'
 import { AdCopy, AdPlacement } from '../components/report-ui/AdCopy.jsx'
 import { focusModesFor, isPaidLeadSource } from '../../lib/focus.js'
 import SkeletonDashboard from '../../lib/skeleton'
@@ -7001,20 +7002,19 @@ const selectProject = async (client, project) => {
                 {topAds.map((ad, i) => {
                   const metrics = ad.metrics || {};
                   const cpl = metrics.leads > 0 ? metrics.spend / metrics.leads : 0;
-                  const hasVideo = Boolean(ad.videoUrl);
-                  // סרטון בלי קובץ שאפשר לנגן (סרטון של עמוד הפייסבוק — Meta לא מוסר את ה-source לאפליקציה):
-                  // הפוסטר עם כפתור הפעלה שפותח את הסרטון בפייסבוק, במקום תמונה בלי שום סימן שזה סרטון.
-                  const fbVideoLink = !hasVideo && ad.videoId
-                    ? (ad.videoPermalink ? (String(ad.videoPermalink).startsWith('http') ? ad.videoPermalink : 'https://www.facebook.com' + ad.videoPermalink) : 'https://www.facebook.com/watch/?v=' + encodeURIComponent(ad.videoId))
-                    : null;
-                  const previewImg = ad.imageUrl || ad.thumbnailUrl;
-                  // קריאייטיב מקומי של הדמו (/demo/...) מוצג חד; כל מקור חיצוני מטושטש.
-                  const demoBlur = (isDemoProject && !String(previewImg || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined;
                   return (
                     <div key={ad.id || i} className={i >= 5 ? 'card ta-extra' : 'card'} style={vrAds ? {overflow:'hidden',display:'flex',flexDirection:'column'} : {overflow:'hidden',display:'flex',flexDirection:'column',border:'1px solid #e2e8f0',boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}>
                       {/* Media: video if available, else image. עיצוב מחודש: רקע בהיר, המדיה בשלמותה (contain) */}
                       <div className={vrAds ? 'vr-ad-media-box' : undefined} style={vrAds ? undefined : {position:'relative',width:'100%',aspectRatio:'4/5',background:'#0f172a',overflow:'hidden'}}>
-                        {hasVideo ? (
+                        {/* קישור שפג (fbcdn, ~5 ימים) — קישור טרי ממטא (ויטלי, 8.11: HI PARK רבעון 3) */}
+                        <FreshAd projectId={isDemoProject ? null : selectedProject?.id} ad={ad}>{(ad) => {
+                          const hasVideo = Boolean(ad.videoUrl);
+                          const fbVideoLink = !hasVideo && ad.videoId
+                            ? (ad.videoPermalink ? (String(ad.videoPermalink).startsWith('http') ? ad.videoPermalink : 'https://www.facebook.com' + ad.videoPermalink) : 'https://www.facebook.com/watch/?v=' + encodeURIComponent(ad.videoId))
+                            : null;
+                          const previewImg = ad.imageUrl || ad.thumbnailUrl;
+                          const demoBlur = (isDemoProject && !String(previewImg || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined;
+                          return (hasVideo ? (
                           <video
                             src={ad.videoUrl}
                             poster={previewImg || undefined}
@@ -7036,7 +7036,8 @@ const selectProject = async (client, project) => {
                           <img src={previewImg} alt={ad.name} loading="lazy" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',background: vrAds ? 'transparent' : '#000'}} onError={(e)=>{e.currentTarget.style.display='none'; e.currentTarget.parentElement.style.background='linear-gradient(135deg,#1e293b,#334155)'}} />
                         ) : (
                           <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'3em',color:'#64748b'}}>{'\ud83d\udcf7'}</div>
-                        )}
+                        ));
+                        }}</FreshAd>
                         {/* Rank badge */}
                         <div style={{position:'absolute',top:'10px',right:'10px',background:'rgba(15,23,42,0.85)',color:'#fbbf24',fontWeight:800,fontSize:'0.8em',padding:'4px 10px',borderRadius:'20px',letterSpacing:'0.04em'}}>
                           #{i + 1}
