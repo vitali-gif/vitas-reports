@@ -66,19 +66,26 @@ function requestMedia(projectId, adId) {
 
 export default function FreshAd({ projectId, ad, children }) {
   const want = !!projectId && needsFresh(ad)
-  const [media, setMedia] = useState(null)
+  const [media, setMedia] = useState(undefined)   // undefined = עוד מחכים, null = מטא לא החזיר
   useEffect(() => {
     if (!want) return undefined
     let live = true
+    setMedia(undefined)
     requestMedia(projectId, ad.id).then(v => { if (live) setMedia(v) })
     return () => { live = false }
   }, [want, projectId, ad && ad.id])
-  if (!want || !media) return children(ad)
+  if (!want || media === null) return children(ad)
+  // בזמן ההמתנה לא מציגים את הקישור שפג: התמונה נכשלת מיד, ה-onError של הכרטיס מסתיר אותה
+  // ומשאיר רקע כהה — וזה נשאר גם אחרי שהקישור החדש מגיע (ויטלי, 8.11: המודעות הסטטיות ריקות).
+  const live = (u) => (u && !fbUrlExpired(u) ? u : '')
+  if (media === undefined) {
+    return children({ ...ad, videoUrl: live(ad.videoUrl), imageUrl: live(ad.imageUrl), thumbnailUrl: live(ad.thumbnailUrl) })
+  }
   return children({
     ...ad,
-    videoUrl: media.videoUrl || (fbUrlExpired(ad.videoUrl) ? '' : ad.videoUrl) || '',
+    videoUrl: media.videoUrl || live(ad.videoUrl),
     videoPermalink: media.permalink || ad.videoPermalink,
-    imageUrl: media.imageUrl || ad.imageUrl,
-    thumbnailUrl: media.imageUrl || ad.thumbnailUrl,
+    imageUrl: media.imageUrl || live(ad.imageUrl),
+    thumbnailUrl: media.imageUrl || live(ad.thumbnailUrl),
   })
 }

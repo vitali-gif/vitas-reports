@@ -39,7 +39,7 @@ export async function GET(req) {
   const staff = new Set((admins || []).map(a => String(a.email || '').toLowerCase()))
   const clientSessions = (sessions || []).filter(s => {
     const e = String(s.email || '').toLowerCase()
-    return e && !staff.has(e) && !e.startsWith('qa@')
+    return e && !staff.has(e) && !e.startsWith('qa@') && !/gordel/i.test(e)  // גורדל — צוות, לא לקוח (8.11)
   })
   const since30 = Date.now() - 30 * 864e5
   const usage = {

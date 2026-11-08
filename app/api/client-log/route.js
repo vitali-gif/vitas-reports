@@ -26,6 +26,9 @@ const LOG_IGNORED = new Set(['qa@vitas.co.il', ...String(process.env.CLIENT_LOG_
 // לא נספרים גם (ויטלי, 6.11: "תסנן את הפעולות שלי ושל גורדל ואת המייל הפרטי שלי"): כל מייל בטבלת
 // admins, וכל כינוי של המייל הפרטי (vitalidisel+משהו@gmail.com — משתמשי בדיקה שלו).
 const OWNER_ALIAS = /^vitalidisel(\+[^@]*)?@gmail\.com$/
+// גורדל לא בטבלת admins (יש לו גישת לקוח ל-7 פרויקטים), ולכן עד 8.11 הכניסות שלו עדיין הוצגו
+const STAFF_LIKE = '%gordel%'
+const STAFF_RE = /gordel/i
 let _admins = { at: 0, set: new Set() }
 async function adminEmails() {
   if (Date.now() - _admins.at < 5 * 60 * 1000) return _admins.set
@@ -35,12 +38,12 @@ async function adminEmails() {
 }
 async function isIgnored(email) {
   const e = String(email || '').toLowerCase().trim()
-  return LOG_IGNORED.has(e) || OWNER_ALIAS.test(e) || (await adminEmails()).has(e)
+  return LOG_IGNORED.has(e) || OWNER_ALIAS.test(e) || STAFF_RE.test(e) || (await adminEmails()).has(e)
 }
 // מסנן לשאילתה: הרשימה המדויקת + כל הכינויים של המייל הפרטי. סינכרוני בכוונה — await על
 // query builder של Supabase מריץ אותו; את הרשימה מביאים קודם (ignoreList).
 async function ignoreList() { return [...new Set([...LOG_IGNORED, ...(await adminEmails()), 'vitalidisel@gmail.com'])] }
-const excludeIgnored = (q, list) => q.not('email', 'in', `(${list.map(e => `"${e.replace(/"/g, '')}"`).join(',')})`).not('email', 'ilike', 'vitalidisel+%@gmail.com')
+const excludeIgnored = (q, list) => q.not('email', 'in', `(${list.map(e => `"${e.replace(/"/g, '')}"`).join(',')})`).not('email', 'ilike', 'vitalidisel+%@gmail.com').not('email', 'ilike', STAFF_LIKE)
 
 // POST â log session events from client dashboard
 // פעולות בתוך הכניסה (lib/usage-track.js, מיגרציה 029): רק השמות והשדות האלה נשמרים, טקסט קצר בלבד.
