@@ -10,13 +10,9 @@
  */
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../../lib/api-fetch'
+import { fbUrlExpired } from '../../../lib/fb-url.js'
 
-/** true אם הקישור מ-fbcdn פג (או יפוג ב-10 הדקות הקרובות). קישור בלי oe= נחשב תקף. */
-export function fbUrlExpired(u, now = Date.now()) {
-  const m = /[?&]oe=([0-9A-Fa-f]{6,10})(?:&|$)/.exec(String(u || ''))
-  if (!m) return false
-  return parseInt(m[1], 16) * 1000 < now + 10 * 60 * 1000
-}
+export { fbUrlExpired }
 
 export function needsFresh(ad) {
   if (!ad || !ad.id || !/^\d{5,25}$/.test(String(ad.id))) return false

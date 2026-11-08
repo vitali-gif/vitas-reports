@@ -628,7 +628,13 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     // "מה עבד ב-12 החודשים האחרונים" (6.11) — מחושב בשרת
     let creativeYear = null;
     try { const y = await getJson(`/api/ad-tags/year?projectId=${selectedProject.id}&key=${encodeURIComponent(selectedMonth)}`); creativeYear = y?.year || null; } catch {}
-    return { lib, prevKey, model: lib.buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows, adTags, creativeYear }) };
+    const model = lib.buildReportModel({ project: selectedProject.name, client: selectedClient?.name, key: selectedMonth, prevKey, rows, prevRows, adTags, creativeYear });
+    // תמונות מודעות שהקישור שלהן פג — קישור טרי ממטא (8.11; lib/fb-url.js)
+    try {
+      const { refreshModelAdImages } = await import('../../lib/fb-url.js');
+      await refreshModelAdImages(model, async (ids) => (await getJson(`/api/ad-media?projectId=${pid}&ids=${ids.slice(0, 10).join(',')}`))?.media || {});
+    } catch {}
+    return { lib, prevKey, model };
   };
   const handleExport = async () => {
     if (!selectedProject || !selectedMonth) { showToast('בחר פרויקט ותקופה'); return; }
@@ -4870,13 +4876,15 @@ const selectProject = async (client, project) => {
                       <div className="rec-ad-card rec-ad-best">
                         <div className="rec-ad-badge">✅ קריאטיב מנצח</div>
                         <div className="rec-ad-name">{rec.assets.best.adName}</div>
-                        {rec.assets.best.videoUrl ? (
-                          <video src={rec.assets.best.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={rec.assets.best.imageUrl || undefined} />
-                        ) : rec.assets.best.imageUrl ? (
-                          <img src={rec.assets.best.imageUrl} className="rec-ad-media" alt={rec.assets.best.adName} loading="lazy" style={(isDemoProject && !String(rec.assets.best.imageUrl || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined} />
+                        <FreshAd projectId={isDemoProject ? null : selectedProject?.id} ad={{ id: rec.assets.best.adId, videoUrl: rec.assets.best.videoUrl, imageUrl: rec.assets.best.imageUrl }}>{(x) => (
+                          x.videoUrl ? (
+                          <video key={x.videoUrl} src={x.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={x.imageUrl || undefined} />
+                        ) : x.imageUrl ? (
+                          <img key={x.imageUrl} src={x.imageUrl} className="rec-ad-media" alt={rec.assets.best.adName} loading="lazy" style={(isDemoProject && !String(x.imageUrl || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined} />
                         ) : (
                           <div className="rec-ad-noimg">אין תמונה זמינה</div>
-                        )}
+                        )
+                        )}</FreshAd>
                         {rec.assets.best.title && <div className="rec-ad-title">{rec.assets.best.title}</div>}
                         {rec.assets.best.body && <div className="rec-ad-body">{rec.assets.best.body}</div>}
                         {rec.assets.best.permalink && <a href={rec.assets.best.permalink} target="_blank" rel="noopener noreferrer" className="rec-ad-link">פתח בפייסבוק ↗</a>}
@@ -4886,13 +4894,15 @@ const selectProject = async (client, project) => {
                       <div className="rec-ad-card rec-ad-worst">
                         <div className="rec-ad-badge">❌ קריאטיב מבוזבז</div>
                         <div className="rec-ad-name">{rec.assets.worst.adName}</div>
-                        {rec.assets.worst.videoUrl ? (
-                          <video src={rec.assets.worst.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={rec.assets.worst.imageUrl || undefined} />
-                        ) : rec.assets.worst.imageUrl ? (
-                          <img src={rec.assets.worst.imageUrl} className="rec-ad-media" alt={rec.assets.worst.adName} loading="lazy" style={(isDemoProject && !String(rec.assets.worst.imageUrl || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined} />
+                        <FreshAd projectId={isDemoProject ? null : selectedProject?.id} ad={{ id: rec.assets.worst.adId, videoUrl: rec.assets.worst.videoUrl, imageUrl: rec.assets.worst.imageUrl }}>{(x) => (
+                          x.videoUrl ? (
+                          <video key={x.videoUrl} src={x.videoUrl} className="rec-ad-media" controls muted playsInline preload="metadata" poster={x.imageUrl || undefined} />
+                        ) : x.imageUrl ? (
+                          <img key={x.imageUrl} src={x.imageUrl} className="rec-ad-media" alt={rec.assets.worst.adName} loading="lazy" style={(isDemoProject && !String(x.imageUrl || '').startsWith('/demo/')) ? {filter:'blur(8px)'} : undefined} />
                         ) : (
                           <div className="rec-ad-noimg">אין תמונה זמינה</div>
-                        )}
+                        )
+                        )}</FreshAd>
                         {rec.assets.worst.title && <div className="rec-ad-title">{rec.assets.worst.title}</div>}
                         {rec.assets.worst.body && <div className="rec-ad-body">{rec.assets.worst.body}</div>}
                         {rec.assets.worst.permalink && <a href={rec.assets.worst.permalink} target="_blank" rel="noopener noreferrer" className="rec-ad-link">פתח בפייסבוק ↗</a>}
