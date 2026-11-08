@@ -1262,11 +1262,19 @@ const loadClients = async () => {
     }
     // by-project (service_role) returns a LIGHT index; never times out. Revalidate in background.
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    const res = await apiFetch(`/api/reports/by-project?projectId=${projectId}`, {
-      headers: {},
-    }).catch(() => null);
+    // ניסיון שני אחרי שנייה וחצי (8.11: לקוחה של BCure קיבלה "דשבורד ריק" — הקריאה הראשונה נכשלה,
+    // וארבע שניות אחר כך הדשבורד עבד). רק אם גם השני נכשל — זו באמת תקלה, ומדווחים עם קוד השגיאה.
+    const readIndex = () => apiFetch(`/api/reports/by-project?projectId=${projectId}`, { headers: {} }).catch(() => null);
+    let res = await readIndex();
     let data = null;
     if (res && res.ok) data = await res.json().catch(() => null);
+    let failStatus = data ? null : (res ? res.status : 'network');
+    if (!data && reportsPidRef.current === projectId) {
+      await new Promise(r => setTimeout(r, 1500));
+      res = await readIndex();
+      if (res && res.ok) data = await res.json().catch(() => null);
+      failStatus = data ? null : (res ? res.status : 'network');
+    }
     // מעבר מהיר בין פרויקטים (E2E "כל פרויקט בסיידבר נפתח", 28-29.10): האינדקס של BCure (כבד)
     // חזר אחרי זה של ISMOOTH ודרס את ה-state — המסך סינן לפי ISMOOTH ולא מצא שורות, והציג
     // "אין נתונים עדיין". תשובה של פרויקט שכבר לא על המסך נשמרת רק במטמון.
@@ -1295,7 +1303,7 @@ const loadClients = async () => {
     }
     // data === null ⇒ read FAILED. Keep whatever is on screen (cache or prior) — never blank.
     setPeriodLoading(false);
-    return { hasData: !!((cached && cached.length) || (data && data.length > 0)), failed: !data };
+    return { hasData: !!((cached && cached.length) || (data && data.length > 0)), failed: !data, failStatus };
   };
 
   // Lazy-load the heavy `data` only for the month-keys actually needed (viewed period +
@@ -1596,7 +1604,7 @@ const selectProject = async (client, project) => {
         if (!window.__vitasNoDataAlerted.has(project.id)) {
           window.__vitasNoDataAlerted.add(project.id);
           apiFetch('/api/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event: 'no_data', email: (session && session.user && session.user.email) || null, clientName: (client && client.name) || null, projectName: (project && project.name) || null, projectId: project.id, reason: _loadRes.failed ? 'by-project read failed' : 'no reports for project' }) }).catch(() => {});
+            body: JSON.stringify({ event: 'no_data', email: (session && session.user && session.user.email) || null, clientName: (client && client.name) || null, projectName: (project && project.name) || null, projectId: project.id, reason: _loadRes.failed ? `by-project read failed (${_loadRes.failStatus || '?'}, after retry)` : 'no reports for project' }) }).catch(() => {});
         }
       } catch {}
     }
