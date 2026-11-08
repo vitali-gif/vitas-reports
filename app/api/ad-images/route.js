@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server'
 import { adminClient, requireProjectAccess } from '../../../lib/auth'
 import { fetchImage, fetchMetaCreative } from '../../../lib/ad-tags.js'
 import { META_GRAPH_VERSION, metaTokenFor } from '../../../lib/ads/meta-api.js'
+import { ownedAds, fillAccounts } from '../../../lib/ad-ownership.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -28,30 +29,6 @@ async function thumbFor(adId, account) {
   return img ? `data:${img.media_type};base64,${img.data}` : null
 }
 
-// המודעות של הפרויקט (מזהה → חשבון), במטמון של 10 דקות לכל instance: חלון אחד טוען 12 תמונות בכל
-// בקשה, ודוחות הפייסבוק של שנה שלמה הם עד ~11MB (KLOSS) — לא לקרוא אותם שוב בכל בקשה.
-const _own = new Map()
-async function ownedAds(sb, projectId) {
-  const hit = _own.get(projectId)
-  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit
-  // עד 6.11: 24 הדוחות האחרונים — אבל רובם טווחים יומיים ושבועיים של החודשיים האחרונים, ולכן מודעות
-  // מ"12 החודשים האחרונים" נפסלו ולא הוצגו (ויטלי: "אני לא רואה את רוב המודעות"). עכשיו: חודשים
-  // ('2026-05') וטווחים שמתחילים ב-1 לחודש (חודש מלא, רבעון), 13 חודשים אחורה.
-  const now = new Date()
-  const since = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7)
-  const { data: reps, error } = await sb.from('reports').select('data, summary->activeAds').eq('project_id', projectId).eq('source', 'facebook')
-    .gte('month', since).or('month.like.____-__,month.like.____-__-01_*').limit(80)
-  if (error) throw new Error(error.message)
-  const ids = new Set(), accountOf = {}
-  for (const r of reps || []) {
-    for (const d of Array.isArray(r.data) ? r.data : []) if (d && d.adId) { ids.add(String(d.adId)); if (d.account && !accountOf[d.adId]) accountOf[String(d.adId)] = String(d.account) }
-    for (const a of Array.isArray(r.activeAds) ? r.activeAds : []) if (a && a.id && a.account && !accountOf[a.id]) accountOf[String(a.id)] = String(a.account)
-  }
-  const out = { ids, accountOf, at: Date.now() }
-  _own.set(projectId, out)
-  return out
-}
-
 export async function GET(req) {
   const url = new URL(req.url)
   const projectId = url.searchParams.get('projectId')
@@ -65,12 +42,7 @@ export async function GET(req) {
   const accountOf = own.accountOf
   const allowed = ids.filter(id => own.ids.has(id))
   if (!allowed.length) return J({ images: {} })
-  // החשבון של כל מודעה (לטוקן הנכון): מ-activeAds, ואם אין — מ-ad_daily
-  const missing = allowed.filter(id => !accountOf[id])
-  if (missing.length) {
-    const { data: acc } = await sb.from('ad_daily').select('ad_id, account').eq('source', 'facebook').in('ad_id', missing).limit(500)
-    for (const x of acc || []) if (!accountOf[x.ad_id]) accountOf[String(x.ad_id)] = String(x.account || '')
-  }
+  await fillAccounts(sb, own, allowed)  // החשבון של כל מודעה (לטוקן הנכון)
   const out = {}
   await Promise.all(allowed.map(async id => { const d = await thumbFor(id, accountOf[id]).catch(() => null); if (d) out[id] = d }))
   return J({ images: out })
