@@ -734,3 +734,5 @@ th:hover .sort-ind { opacity: .8; }
 .onb-btn.ghost { background: transparent; color: var(--tv-brand, #315cf5); }
 .onb-files { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-top: 10px; font-size: 13px; }
 .onb-files a { color: var(--tv-brand, #315cf5); }
+
+.onb-user { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--tv-border, #e2e8f0); border-radius: 10px; padding: 3px 4px 3px 8px; }

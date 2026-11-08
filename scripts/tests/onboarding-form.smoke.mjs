@@ -49,4 +49,7 @@ const m3 = accessMessage({ channels: ['פייסבוק ואינסטגרם'], biz_
 eq('access message: WordPress Shop Manager + Klaviyo analyst', [m3.includes('Shop Manager'), m3.includes('Klaviyo: Settings'), m3.includes('REST API')], [true, true, false])
 eq('store section: no orders / AOV / top products questions', [Q.orders_month, Q.aov, Q.top_products, Q.store_key_done].every(x => x === undefined), true)
 
+const sw = stepsFromAnswers({ biz_type: ECOM_TYPE, store_platform: 'WooCommerce', crm: 'BMBY' })
+eq('ecom with a CRM: store kept in the CRM step note', sw.crm_which.note, 'מהשאלון: חנות: WooCommerce · CRM: BMBY')
+
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')

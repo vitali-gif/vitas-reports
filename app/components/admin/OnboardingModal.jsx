@@ -91,6 +91,15 @@ function FormLink({ projectId, onChanged }) {
     else setMsg(b.error || 'לא הצלחתי ליצור קישור')
   }
   const copy = async () => { try { await navigator.clipboard.writeText(link); setMsg('הקישור הועתק') } catch { setMsg(link) } }
+  // מייל מהשאלון ← גישה לפרויקט הזה בלבד + קישור כניסה במייל (אותו מסלול כמו "גישת לקוחות")
+  const grant = async (email) => {
+    if (!f.clientId) { setMsg('לא נמצא הלקוח של הפרויקט'); return }
+    if (!window.confirm(`לתת ל-${email} גישה לפרויקט הזה ולשלוח לו מייל כניסה?`)) return
+    const r = await apiFetch('/api/client-access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, client_id: f.clientId, project_ids: [projectId], notify: true }) }).catch(() => null)
+    const b = r ? await r.json().catch(() => ({})) : {}
+    if (r && r.ok && !b.error) { setMsg(`${email} קיבל גישה`); get(); onChanged && onChanged() }
+    else setMsg('לא הצלחתי לתת גישה' + (b.error ? `: ${b.error}` : ''))
+  }
   const revoke = async () => {
     if (!window.confirm('לבטל את הקישור? הלקוח לא יוכל להיכנס אליו יותר. התשובות שכבר מולאו נשארות.')) return
     await apiFetch('/api/onboarding/form', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, revoke: true }) }).catch(() => null)
@@ -114,6 +123,18 @@ function FormLink({ projectId, onChanged }) {
           <button type="button" className="onb-btn ghost" onClick={revoke}>ביטול</button>
         </> : <button type="button" className="onb-btn" onClick={create}>יצירת קישור</button>}
       </div>
+      {f.dashUsers?.length > 0 && (
+        <div className="onb-files">
+          <b>גישה לדשבורד מהשאלון</b>
+          {f.dashUsers.map(u => (
+            <span key={u.email} className="onb-user">
+              <span dir="ltr">{u.email}</span>
+              {u.hasAccess ? <span className="onb-muted">✓ יש גישה</span>
+                : <button type="button" className="onb-btn" onClick={() => grant(u.email)}>הוספה + מייל כניסה</button>}
+            </span>
+          ))}
+        </div>
+      )}
       {f.files?.length > 0 && (
         <div className="onb-files">
           <b>קבצים מהלקוח ({f.files.length})</b>
