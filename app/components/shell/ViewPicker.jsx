@@ -29,7 +29,7 @@ export default function ViewPicker({ title = 'תצוגות', value, options = []
       >
         <ChevronDown size={16} aria-hidden="true" />
         <span className="vpick-trigger-label">{title}</span>
-        <span className="vpick-trigger-value"><bdi>{active?.label || '—'}</bdi></span>
+        <span className="vpick-trigger-value"><bdi>{active?.label || '-'}</bdi></span>
       </button>
 
       <BottomSheet open={open} title={title} onClose={() => setOpen(false)}>

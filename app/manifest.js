@@ -12,13 +12,13 @@ export default function manifest() {
     dir: 'rtl',
     icons: [
       {
-        src: '/brand/cluzo/icon-192.png',
+        src: '/brand/cluzo/icon-192.png?v=2',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any maskable',
       },
       {
-        src: '/brand/cluzo/icon-512.png',
+        src: '/brand/cluzo/icon-512.png?v=2',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any maskable',

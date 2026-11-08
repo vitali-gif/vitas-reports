@@ -29,22 +29,22 @@ import {
 } from 'lucide-react';
 
 const fmtDateTime = (iso, tz = 'Asia/Jerusalem') => {
-  if (!iso) return '—';
+  if (!iso) return '-';
   try {
     return new Intl.DateTimeFormat('he-IL', { timeZone: tz, dateStyle: 'short', timeStyle: 'short' }).format(new Date(iso));
-  } catch { return '—'; }
+  } catch { return '-'; }
 };
 const fmtDate = (iso, tz = 'Asia/Jerusalem') => {
-  if (!iso) return '—';
+  if (!iso) return '-';
   try { return new Intl.DateTimeFormat('he-IL', { timeZone: tz, dateStyle: 'short' }).format(new Date(iso)); }
-  catch { return '—'; }
+  catch { return '-'; }
 };
 const fmtTimeRange = (start, end, tz = 'Asia/Jerusalem') => {
-  if (!start) return '—';
+  if (!start) return '-';
   try {
     const f = new Intl.DateTimeFormat('he-IL', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
-    return end ? `${f.format(new Date(start))} – ${f.format(new Date(end))}` : f.format(new Date(start));
-  } catch { return '—'; }
+    return end ? `${f.format(new Date(start))} - ${f.format(new Date(end))}` : f.format(new Date(start));
+  } catch { return '-'; }
 };
 const todayIL = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
 /** ראשי תיבות לעיגול הנמען. כתובת אימייל — האות הראשונה של החלק שלפני ה-@. */
@@ -138,7 +138,7 @@ export function ConnectionsScreen({ onBack }) {
             </div>
           ))}
         </div>
-        <Note>חיבור היומנים עדיין לא מומש — אין הרשאות ספק מוגדרות במערכת, ולכן הכפתורים מושבתים. בינתיים אפשר ליצור ישיבה ולהדביק בה קישור לפגישה שנוצרה ביומן שלך.</Note>
+        <Note>חיבור היומנים עדיין לא מומש - אין הרשאות ספק מוגדרות במערכת, ולכן הכפתורים מושבתים. בינתיים אפשר ליצור ישיבה ולהדביק בה קישור לפגישה שנוצרה ביומן שלך.</Note>
       </div>
 
       <div className="vmeet-panel">
@@ -202,7 +202,7 @@ export function MeetingsList({ data, onOpen, onNew, onConnections, canEdit }) {
                     <td>{t.title}</td>
                     <td>{t.assignee_email || t.assignee_label || <em className="vmeet-todo">להשלמה</em>}</td>
                     <td>{t.due_at || <em className="vmeet-todo">להשלמה</em>}</td>
-                    <td>{t.review_at || '—'}</td>
+                    <td>{t.review_at || '-'}</td>
                     <td>{t.status === 'needs_details' ? <em className="vmeet-todo">דורשת השלמה</em> : t.status}</td>
                   </tr>
                 ))}
@@ -337,7 +337,7 @@ export function MeetingForm({ projectId, projectLabel, onCancel, onCreated }) {
             <SectionTitle icon={FileText}>פרטי הישיבה</SectionTitle>
             <div className="vmeet-grid">
               <label className="vmeet-field vmeet-span2"><span className="vmeet-label">פרויקט</span>
-                <input type="text" value={projectLabel || '—'} readOnly /></label>
+                <input type="text" value={projectLabel || '-'} readOnly /></label>
               <label className="vmeet-field vmeet-span2"><span className="vmeet-label">כותרת הישיבה</span>
                 <input type="text" value={f.title} onChange={set('title')} dir="rtl" placeholder="ישיבת שיווק חודשית" /></label>
               <label className="vmeet-field"><span className="vmeet-label">תאריך</span>
@@ -356,12 +356,12 @@ export function MeetingForm({ projectId, projectLabel, onCancel, onCreated }) {
               hint="שורה לכל נושא" />
             <label className="vmeet-field"><span className="vmeet-label">קישור לפגישה (אופציונלי)</span>
               <input type="url" value={f.joinUrl} onChange={set('joinUrl')} dir="ltr" placeholder="https://" /></label>
-            <Note>הסקיצה מציגה בחירת יומן ושירות פגישה (Teams / Meet / Zoom). החיבורים האלה עדיין לא מומשו, ולכן אין כאן בחירה שלא תעשה דבר — אפשר להדביק קישור לפגישה שנוצרה ביומן שלך.</Note>
+            <Note>הסקיצה מציגה בחירת יומן ושירות פגישה (Teams / Meet / Zoom). החיבורים האלה עדיין לא מומשו, ולכן אין כאן בחירה שלא תעשה דבר - אפשר להדביק קישור לפגישה שנוצרה ביומן שלך.</Note>
           </div>
 
           <div className="vmeet-panel">
             <SectionTitle icon={PlayCircle} extra={<span className="vmeet-status">לא נתמך בשלב זה</span>}>הקלטה ותמלול</SectionTitle>
-            <p className="vmeet-hint">יצירת הזמנה אינה מפעילה הקלטה. איסוף אוטומטי של הקלטה ותמלול מהספק אינו זמין — אפשר לצרף קובץ תמלול למסך הישיבה גם אחרי הפגישה.</p>
+            <p className="vmeet-hint">יצירת הזמנה אינה מפעילה הקלטה. איסוף אוטומטי של הקלטה ותמלול מהספק אינו זמין - אפשר לצרף קובץ תמלול למסך הישיבה גם אחרי הפגישה.</p>
           </div>
         </div>
 
@@ -374,7 +374,7 @@ export function MeetingForm({ projectId, projectLabel, onCancel, onCreated }) {
               <div><Users size={17} aria-hidden="true" /><div>
                 <dt>מוזמנים</dt><dd>{inviteeCount} מוזמנים</dd></div></div>
               <div><Clock size={17} aria-hidden="true" /><div>
-                <dt>מועד</dt><dd>{f.date ? `${f.date} · ${f.start}–${f.end}` : '—'}</dd></div></div>
+                <dt>מועד</dt><dd>{f.date ? `${f.date} · ${f.start}-${f.end}` : '-'}</dd></div></div>
             </dl>
           </div>
           <div className="vmeet-panel vmeet-tip">
@@ -436,7 +436,7 @@ export function MeetingDetail({ meetingId, onBack, canEdit, reload }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
-      if (j.duplicate) setErr('הקובץ הזה כבר הועלה לישיבה — לא נוצרו מקטעים כפולים.');
+      if (j.duplicate) setErr('הקובץ הזה כבר הועלה לישיבה - לא נוצרו מקטעים כפולים.');
       await load();
     } catch (e) { setErr(e.message || String(e)); }
     finally { setBusy(''); if (fileRef.current) fileRef.current.value = ''; }
@@ -565,7 +565,7 @@ export function MeetingDetail({ meetingId, onBack, canEdit, reload }) {
             <p className="vmeet-ok"><CheckCircle2 size={16} aria-hidden="true" />
               {transcript.filename || 'תמלול'} · {transcript.segment_count} מקטעים</p>
           ) : (
-            <p>אין עדיין תמלול. איסוף אוטומטי מהספקים אינו זמין בשלב הזה — אפשר לצרף קובץ TXT, VTT או SRT.</p>
+            <p>אין עדיין תמלול. איסוף אוטומטי מהספקים אינו זמין בשלב הזה - אפשר לצרף קובץ TXT, VTT או SRT.</p>
           )}
           {canEdit && (
             <div className="vmeet-actions">

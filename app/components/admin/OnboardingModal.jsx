@@ -7,7 +7,7 @@ import { progress } from '../../../lib/onboarding-form.js'
 
 // "קליטת לקוחות" (ויטלי, 6.11): באיזה שלב כל פרויקט, מי אחראי על מה, ולמה כל שלב חשוב —
 // כדי ששחר (השותף) יבין את התהליך ויוכל לקחת חלק. השלבים ב-lib/onboarding-steps.js, הנתונים ב-/api/onboarding.
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', year: '2-digit' }) : '—')
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', year: '2-digit' }) : '-')
 const STATUS_ICON = { done: CheckCircle2, doing: CircleDot, na: MinusCircle, todo: Circle }
 
 function autoText(key, detail) {
@@ -42,7 +42,7 @@ function Step({ step, state, auto, detail, onSave }) {
           {autoOk && !state?.status && <span className="onb-auto"><Sparkles size={12} aria-hidden="true" />זוהה אוטומטית</span>}
           <ChevronDown size={16} aria-hidden="true" className={open ? 'onb-chev on' : 'onb-chev'} />
         </button>
-        <span className={`onb-owner onb-owner-${owner || 'none'}`}>{OWNERS[owner] || '—'}</span>
+        <span className={`onb-owner onb-owner-${owner || 'none'}`}>{OWNERS[owner] || '-'}</span>
       </div>
       {open && (
         <div className="onb-step-body">
@@ -58,7 +58,7 @@ function Step({ step, state, auto, detail, onSave }) {
             </label>
             <label>אחראי
               <select value={owner || ''} onChange={e => onSave(step.key, { owner: e.target.value || null })}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {Object.entries(OWNERS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </label>
@@ -190,7 +190,7 @@ function Detail({ projectId, onBack }) {
           </section>
         )
       })}
-      <p className="onb-muted" style={{ lineHeight: 1.6 }}>לחיצה על שם השלב פותחת הסבר — למה הוא חשוב ומה עושים. "זוהה אוטומטית" מסומן לפי הנתונים בדשבורד; אפשר תמיד לשנות ידנית.</p>
+      <p className="onb-muted" style={{ lineHeight: 1.6 }}>לחיצה על שם השלב פותחת הסבר - למה הוא חשוב ומה עושים. "זוהה אוטומטית" מסומן לפי הנתונים בדשבורד; אפשר תמיד לשנות ידנית.</p>
     </div>
   )
 }

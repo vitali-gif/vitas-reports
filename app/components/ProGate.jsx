@@ -31,9 +31,9 @@ export function ProLock({
   bullets = [],
   contact = 'vitali@vitas.co.il',
 }) {
-  const subject = encodeURIComponent(`שדרוג ל-PRO — ${title}`)
+  const subject = encodeURIComponent(`שדרוג ל-PRO - ${title}`)
   return (
-    <div className="pro-lock" role="region" aria-label={`${title} — פיצ'ר PRO`}>
+    <div className="pro-lock" role="region" aria-label={`${title} - פיצ'ר PRO`}>
       <div className="pro-lock-card">
         <span className="pro-lock-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -52,7 +52,7 @@ export function ProLock({
         )}
 
         <a className="pro-lock-cta" href={`mailto:${contact}?subject=${subject}`}>
-          לשדרוג — דברו איתנו
+          לשדרוג - דברו איתנו
         </a>
         <p className="pro-lock-note">
           הפיצ'ר פתוח למנויי PRO. הדוחות, ה-CRM והקמפיינים שלכם ממשיכים לעבוד כרגיל.
@@ -75,11 +75,11 @@ export function MeetingsProLock() {
   return (
     <ProLock
       title="ישיבות שיווק"
-      lead="ניהול ישיבות השיווק והמכירות מול VITAS — במקום אחד, עם מעקב אחרי מה שסוכם."
+      lead="ניהול ישיבות השיווק והמכירות מול VITAS - במקום אחד, עם מעקב אחרי מה שסוכם."
       bullets={[
         'סיכום של כל ישיבה: נקודות מרכזיות, החלטות ושאלות פתוחות',
         'המשימות שיצאו מהישיבה, עם אחראי ותאריך יעד',
-        'מועד בדיקה לכל משימה — מה עולה שוב בישיבה הבאה',
+        'מועד בדיקה לכל משימה - מה עולה שוב בישיבה הבאה',
         'שליחת הסיכום במייל למי שצריך לראות אותו',
       ]}
     />

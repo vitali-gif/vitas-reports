@@ -139,7 +139,7 @@ export async function GET(request) {
   if (adsRes.status === 'rejected') problems.ads = String(adsRes.reason?.message || adsRes.reason)
 
   const hasCrm = !!(raw && raw.total)
-  if (compare && (!hasCrm)) return J({ error: 'no_snapshot', hint: 'crm_raw has no records for this project yet — the next BMBY cron run fills it', problems }, 404)
+  if (compare && (!hasCrm)) return J({ error: 'no_snapshot', hint: 'crm_raw has no records for this project yet - the next BMBY cron run fills it', problems }, 404)
 
   const cacheKey = crmLoad ? crmLoad.cacheKey : null
   let shaped = crmLoad ? crmLoad.shaped : null

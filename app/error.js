@@ -37,7 +37,7 @@ export default function Error({ error, reset }) {
           משהו השתבש בטעינת הדוח
         </h2>
         <p style={{ margin: '0 0 24px', fontSize: 14, lineHeight: 1.6, color: 'var(--text-3, #5E6478)' }}>
-          זו תקלה זמנית ולא בעיה בנתונים שלך. נסה לטעון מחדש — ואם זה חוזר, כתוב לנו.
+          זו תקלה זמנית ולא בעיה בנתונים שלך. נסה לטעון מחדש - ואם זה חוזר, כתוב לנו.
         </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => reset()} style={{

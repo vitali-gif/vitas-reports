@@ -10,10 +10,10 @@ const CRM_VIEWS = { sources: 'מקורות הגעה', response: 'זמני תגו
 const DEVICES = { mobile: 'טלפון', tablet: 'טאבלט', desktop: 'מחשב' }
 const EVENT_LABEL = { tab: 'טאב', crm_view: 'CRM', period: 'תקופה', compare: 'השוואה', section: 'צפה', help: 'איך זה עוזר לך', ai_open: 'ניתוח דוח', modal: 'פתח רשימת לידים' }
 
-const fmtMin = (sec) => { if (sec == null) return '—'; const m = Math.round(sec / 60); return m < 60 ? `${m} דק׳` : `${Math.floor(m / 60)} שע׳ ${m % 60} דק׳` }
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—')
+const fmtMin = (sec) => { if (sec == null) return '-'; const m = Math.round(sec / 60); return m < 60 ? `${m} דק׳` : `${Math.floor(m / 60)} שע׳ ${m % 60} דק׳` }
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-')
 function ago(iso) {
-  if (!iso) return '—'
+  if (!iso) return '-'
   const d = (Date.now() - new Date(iso).getTime()) / 864e5
   if (d < 1 / 24) return 'עכשיו'
   if (d < 1) return `לפני ${Math.round(d * 24)} שע׳`
@@ -39,19 +39,19 @@ function insights(u) {
   const out = []
   const devTotal = Object.values(u.devices || {}).reduce((a, b) => a + b, 0)
   const mobile = (u.devices?.mobile || 0) / (devTotal || 1)
-  if (devTotal >= 2 && mobile >= 0.6) out.push('נכנס בעיקר מהטלפון — כדאי לבדוק שהסעיפים שהוא רואה נוחים בטלפון')
-  if (u.sessions >= 3 && u.activeSec != null && u.activeSessions && u.activeSec / u.activeSessions < 90) out.push('כניסות קצרות (פחות מדקה וחצי בממוצע) — כנראה מחפש מספר אחד. אולי כדאי לשים אותו בראש המסך או לשלוח בדוח שבועי')
+  if (devTotal >= 2 && mobile >= 0.6) out.push('נכנס בעיקר מהטלפון - כדאי לבדוק שהסעיפים שהוא רואה נוחים בטלפון')
+  if (u.sessions >= 3 && u.activeSec != null && u.activeSessions && u.activeSec / u.activeSessions < 90) out.push('כניסות קצרות (פחות מדקה וחצי בממוצע) - כנראה מחפש מספר אחד. אולי כדאי לשים אותו בראש המסך או לשלוח בדוח שבועי')
   const tabs = Object.fromEntries(u.tabs || [])
   const seenTabs = Object.keys(tabs)
-  if (seenTabs.length && seenTabs.every(t => t === 'all')) out.push('לא עובר בין טאבים — רואה רק את "הכל"')
+  if (seenTabs.length && seenTabs.every(t => t === 'all')) out.push('לא עובר בין טאבים - רואה רק את "הכל"')
   if (seenTabs.length && !tabs.crm && u.sections?.length) out.push('לא פתח את טאב ה-CRM')
-  if ((u.periods?.range || 0) > (u.periods?.month || 0) && u.periods.range >= 2) out.push('בוחר טווחי תאריכים יותר מחודשים — אולי כדאי טווח ברירת מחדל אחר')
+  if ((u.periods?.range || 0) > (u.periods?.month || 0) && u.periods.range >= 2) out.push('בוחר טווחי תאריכים יותר מחודשים - אולי כדאי טווח ברירת מחדל אחר')
   if (u.sections?.length >= 5 && !(u.help || []).length) out.push('לא לחץ על "איך זה עוזר לך?"')
   if ((u.help || []).length) out.push(`ביקש הסבר על: ${(u.help || []).slice(0, 3).map(h => h[0]).join(', ')}`)
   const times = (n) => (n === 1 ? 'פעם אחת' : `${n} פעמים`)
   if (u.compare) out.push(`השתמש בהשוואה ${times(u.compare)}`)
   if (u.modals) out.push(`פתח רשימות לידים ${times(u.modals)}`)
-  if (u.lastAt && (Date.now() - new Date(u.lastAt).getTime()) / 864e5 > 14) out.push('לא נכנס יותר משבועיים — אולי שווה לשלוח לו תזכורת או דוח')
+  if (u.lastAt && (Date.now() - new Date(u.lastAt).getTime()) / 864e5 > 14) out.push('לא נכנס יותר משבועיים - אולי שווה לשלוח לו תזכורת או דוח')
   return out
 }
 
@@ -60,7 +60,7 @@ const chip = { display: 'inline-block', background: 'var(--tv-surface-2,#f1f5f9)
 const muted = { color: 'var(--tv-text-muted,#64748b)', fontSize: 12 }
 
 function Bars({ list, map, max = 6 }) {
-  if (!list || !list.length) return <div style={muted}>—</div>
+  if (!list || !list.length) return <div style={muted}>-</div>
   const top = list.slice(0, max), m = Math.max(...top.map(x => x[1]))
   return (
     <div style={{ display: 'grid', gap: 4 }}>
@@ -102,13 +102,13 @@ function Timeline({ email, days }) {
               <span key={i} style={{ ...chip, ...(e.name === 'tab' ? { background: 'var(--tv-brand-soft,#eef2ff)', color: 'var(--tv-brand,#315cf5)', fontWeight: 600 } : {}), ...(e.name === 'help' ? { background: '#fff7e6', color: '#92400e' } : {}) }} title={fmtDate(e.at)}>
                 {EVENT_LABEL[e.name] || e.name}{eventText(e) ? `: ${eventText(e)}` : ''}
               </span>
-            )) : <span style={muted}>לא נרשמו פעולות — נכנס ויצא</span>}
+            )) : <span style={muted}>לא נרשמו פעולות - נכנס ויצא</span>}
           </div>
         </div>
       ))}
       {before > 0 && (
         <div style={{ ...muted, borderInlineStart: '3px solid var(--tv-border,#e2e8f0)', paddingInlineStart: 10 }}>
-          {tracked.length ? 'ועוד' : ''} {before} כניסות מלפני הפעלת המעקב (6.11). בהן ידוע רק מתי נכנס — לא כמה זמן עבד ומה עשה.
+          {tracked.length ? 'ועוד' : ''} {before} כניסות מלפני הפעלת המעקב (6.11). בהן ידוע רק מתי נכנס - לא כמה זמן עבד ומה עשה.
         </div>
       )}
     </div>
@@ -128,11 +128,11 @@ function SessionsTable() {
         <tbody>{rows.map(s => (
           <tr key={s.id} style={{ borderBottom: '1px solid var(--tv-divider,#f1f5f9)' }}>
             <td style={{ padding: 10, direction: 'ltr', textAlign: 'left', fontFamily: 'monospace', fontSize: 12 }}>{s.email}</td>
-            <td style={{ padding: 10, fontWeight: 600 }}>{s.client_name || '—'}</td>
+            <td style={{ padding: 10, fontWeight: 600 }}>{s.client_name || '-'}</td>
             <td style={{ padding: 10, ...muted }}>{fmtDate(s.logged_in_at)}</td>
             <td style={{ padding: 10, fontWeight: 600 }}>{s.active_sec != null ? fmtMin(s.active_sec) : <span style={muted} title="כניסה מלפני הפעלת המעקב (6.11)">לא נמדד</span>}</td>
-            <td style={{ padding: 10, ...muted }}>{DEVICES[s.device] || '—'}</td>
-            <td style={{ padding: 10, ...muted }}>{s.selected_project || '—'}</td>
+            <td style={{ padding: 10, ...muted }}>{DEVICES[s.device] || '-'}</td>
+            <td style={{ padding: 10, ...muted }}>{s.selected_project || '-'}</td>
             <td style={{ padding: 10 }}>{s.isActive ? <span style={{ background: 'rgba(16,185,129,0.12)', color: '#059669', borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>● פעיל כעת</span> : <span style={muted}>יצא</span>}</td>
           </tr>))}
         </tbody>
@@ -188,7 +188,7 @@ export default function UsageModal({ onClose }) {
         ) : (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
-              {[['משתמשים שנכנסו', totals.users], ['כניסות', totals.sessions], ['זמן עבודה (כולם)', fmtMin(totals.active)], ['מהטלפון', totals.devices ? Math.round(totals.mobile / totals.devices * 100) + '%' : '—']].map(([l, v]) => (
+              {[['משתמשים שנכנסו', totals.users], ['כניסות', totals.sessions], ['זמן עבודה (כולם)', fmtMin(totals.active)], ['מהטלפון', totals.devices ? Math.round(totals.mobile / totals.devices * 100) + '%' : '-']].map(([l, v]) => (
                 <div key={l} style={card}><div style={muted}>{l}</div><div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>{v}</div></div>
               ))}
             </div>
@@ -208,7 +208,7 @@ export default function UsageModal({ onClose }) {
                   <div key={u.email} style={card}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
                       <div>
-                        <span style={{ fontWeight: 800 }}>{u.client || '—'}</span>
+                        <span style={{ fontWeight: 800 }}>{u.client || '-'}</span>
                         <span style={{ ...muted, direction: 'ltr', unicodeBidi: 'isolate', marginInlineStart: 8, fontFamily: 'monospace' }}>{u.email}</span>
                       </div>
                       <div style={muted}>כניסה אחרונה: {ago(u.lastAt)}</div>
@@ -238,8 +238,8 @@ export default function UsageModal({ onClose }) {
               })}
             </div>
             <p style={{ ...muted, marginTop: 12, lineHeight: 1.6 }}>
-              זמן עבודה: רק כשהמסך פתוח והייתה פעולה (גלילה, לחיצה) בשתי הדקות האחרונות — לשונית שנשכחה פתוחה לא נספרת. נמדד מ-6.11; בכניסות ישנות יותר ידוע רק מתי נכנס.
-              לא נשמרים פרטי לידים — רק טאבים, תקופות, שמות סעיפים ולחיצות. משתמשי בדיקה לא נספרים.
+              זמן עבודה: רק כשהמסך פתוח והייתה פעולה (גלילה, לחיצה) בשתי הדקות האחרונות - לשונית שנשכחה פתוחה לא נספרת. נמדד מ-6.11; בכניסות ישנות יותר ידוע רק מתי נכנס.
+              לא נשמרים פרטי לידים - רק טאבים, תקופות, שמות סעיפים ולחיצות. משתמשי בדיקה לא נספרים.
             </p>
           </>
         )}

@@ -33,11 +33,11 @@ export default function CreativeCrossModal({ periodKey, onClose }) {
   const totalAds = useMemo(() => (data?.projects || []).reduce((s, p) => s + p.ads, 0), [data])
   return (
     <div className="modal-overlay active" onClick={e => { if (e.target === e.currentTarget) onClose() }} style={{ zIndex: 9999 }}>
-      <div className="modal ctz-modal" style={{ maxWidth: 900 }} role="dialog" aria-label="מה עובד במודעות — כל הלקוחות">
+      <div className="modal ctz-modal" style={{ maxWidth: 900 }} role="dialog" aria-label="מה עובד במודעות - כל הלקוחות">
         <div className="ctz-modal-head">
           <div>
             <div className="ctz-modal-kicker">אדמין בלבד · 12 חודשים{data?.from ? ` · ${ym(data.from)} עד ${ym(data.to)}` : ''}</div>
-            <h3>מה עובד במודעות — כל הלקוחות{data ? ` · ${totalAds} מודעות ב-${data.projects.length} פרויקטים` : ''}</h3>
+            <h3>מה עובד במודעות - כל הלקוחות{data ? ` · ${totalAds} מודעות ב-${data.projects.length} פרויקטים` : ''}</h3>
           </div>
           <button type="button" className="ctz-x" onClick={onClose} aria-label="סגירה"><X size={20} /></button>
         </div>
@@ -78,7 +78,7 @@ export default function CreativeCrossModal({ periodKey, onClose }) {
             })}
           </div>
         )}
-        <p className="ctz-note">ממצא שחוזר בכמה פרויקטים (למשל "הכי טוב ב-4 מתוך 5") חזק יותר מממצא של פרויקט אחד. הדירוג המשותף לפי עלות לליד — פגישות ורכישות נמדדות אחרת בכל CRM. ריחוף על "ניצח ב" מראה באילו פרויקטים.</p>
+        <p className="ctz-note">ממצא שחוזר בכמה פרויקטים (למשל "הכי טוב ב-4 מתוך 5") חזק יותר מממצא של פרויקט אחד. הדירוג המשותף לפי עלות לליד - פגישות ורכישות נמדדות אחרת בכל CRM. ריחוף על "ניצח ב" מראה באילו פרויקטים.</p>
       </div>
     </div>
   )

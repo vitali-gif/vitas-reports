@@ -203,7 +203,7 @@ async function handle(request) {
     const failList = failed.slice(0, 30).map(f => `<li>${_describe(f)}</li>`).join('')
     const html = `
       <div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
-        <h2>⚠️ קרון מודעות (Meta/Google) — ${failed.length} משימות נכשלו</h2>
+        <h2>⚠️ קרון מודעות (Meta/Google) - ${failed.length} משימות נכשלו</h2>
         <p>${fmt}</p>
         <ul>${failList}</ul>
         <p style="color:#888;font-size:12px">Cluzo by Vitas · ניטור אוטומטי</p>
@@ -240,7 +240,7 @@ async function handle(request) {
         } catch (e) { /* one project's failure must not abort budget alerts for the rest */ }
       }
       if (crossings.length) {
-        const rows = crossings.map(c => `<li><b>${c.project}</b> — ${c.pct}% \u05de\u05d4\u05ea\u05e7\u05e6\u05d9\u05d1 (\u20aa${Math.round(c.spend).toLocaleString('he-IL')} / \u20aa${Number(c.budget).toLocaleString('he-IL')}) \u00b7 \u05e1\u05e4\u05d9\u05dd: ${c.newly.join('%, ')}%</li>`).join('')
+        const rows = crossings.map(c => `<li><b>${c.project}</b> - ${c.pct}% \u05de\u05d4\u05ea\u05e7\u05e6\u05d9\u05d1 (\u20aa${Math.round(c.spend).toLocaleString('he-IL')} / \u20aa${Number(c.budget).toLocaleString('he-IL')}) \u00b7 \u05e1\u05e4\u05d9\u05dd: ${c.newly.join('%, ')}%</li>`).join('')
         const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right"><h2>\ud83d\udcb0 \u05d4\u05ea\u05e8\u05d0\u05ea \u05ea\u05e7\u05e6\u05d9\u05d1 \u05d7\u05d5\u05d3\u05e9\u05d9 (${ym})</h2><ul>${rows}</ul><p style="color:#888;font-size:12px">VITAS Reports</p></div>`
         await sendAlert({ subject: `\ud83d\udcb0 Cluzo \u05ea\u05e7\u05e6\u05d9\u05d1: ` + crossings.map(c => `${c.project} ${c.pct}%`).join(', '), html })
       }

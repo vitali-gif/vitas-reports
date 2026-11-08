@@ -212,7 +212,7 @@ export async function GET(req) {
 
 export async function POST(req) {
   if (!checkWriteAuth(req)) {
-    return NextResponse.json({ error: 'Unauthorized — requires CRON_SECRET bearer token' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized - requires CRON_SECRET bearer token' }, { status: 401 })
   }
 
   const body = await req.json().catch(() => ({}))
@@ -220,7 +220,7 @@ export async function POST(req) {
 
   if (action === 'unseed') return unseed()
   if (action !== 'seed') {
-    return NextResponse.json({ error: "unknown action — use 'seed' or 'unseed'" }, { status: 400 })
+    return NextResponse.json({ error: "unknown action - use 'seed' or 'unseed'" }, { status: 400 })
   }
 
   const meta = DEMO_DATASET.meta

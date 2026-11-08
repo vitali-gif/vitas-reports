@@ -38,7 +38,7 @@ export async function POST(request) {
 
   const ils = n => '₪' + Math.round(n).toLocaleString('he-IL')
   const html = `<div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
-    <h2>💰 מצב תקציב חודשי — ${pr.name} (${ym})</h2>
+    <h2>💰 מצב תקציב חודשי - ${pr.name} (${ym})</h2>
     <table style="border-collapse:collapse;font-size:15px">
       <tr><td style="padding:4px 12px">תקציב חודשי</td><td style="padding:4px 12px"><b>${budget ? ils(budget) : 'לא הוגדר'}</b></td></tr>
       <tr><td style="padding:4px 12px">נוצל עד כה (פייסבוק+גוגל)</td><td style="padding:4px 12px"><b>${ils(spend)}</b></td></tr>
@@ -48,6 +48,6 @@ export async function POST(request) {
     <p style="color:#888;font-size:12px">Cluzo by Vitas · ${body.budget != null ? 'תקציב לדוגמה (לא נשמר)' : 'מצב נוכחי'}</p>
   </div>`
 
-  const res = await sendAlert({ subject: `💰 מצב תקציב — ${pr.name} (${ym})${pct != null ? ` · ${pct}%` : ''}`, html })
+  const res = await sendAlert({ subject: `💰 מצב תקציב - ${pr.name} (${ym})${pct != null ? ` · ${pct}%` : ''}`, html })
   return Response.json({ ok: res.ok, emailStatus: res.status, ym, budget, spend, pct })
 }
