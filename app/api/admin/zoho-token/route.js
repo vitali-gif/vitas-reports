@@ -18,7 +18,7 @@ export async function POST(req) {
   if (!gate.ok) return gate.res
   const body = await req.json().catch(() => ({}))
   const code = String(body.code || '').trim()
-  if (!/^1000\.[A-Za-z0-9.]{20,300}$/.test(code)) return J({ error: 'הקוד צריך להתחיל ב-1000. — להעתיק אותו שוב מ-Zoho' }, 400)
+  if (!/^1000\.[A-Za-z0-9.]{20,300}$/.test(code)) return J({ error: 'הקוד צריך להתחיל ב-1000. - להעתיק אותו שוב מ-Zoho' }, 400)
   if (!process.env.ZOHO_CLIENT_ID || !process.env.ZOHO_CLIENT_SECRET) return J({ error: 'ZOHO_CLIENT_ID או ZOHO_CLIENT_SECRET חסרים ב-Vercel' }, 500)
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -27,7 +27,7 @@ export async function POST(req) {
   }).catch(() => null)
   const j = res ? await res.json().catch(() => ({})) : {}
   if (!j.refresh_token) {
-    const why = j.error === 'invalid_code' ? 'הקוד פג או כבר נוצל — לייצר קוד חדש ב-Zoho ולהדביק תוך 10 דקות'
+    const why = j.error === 'invalid_code' ? 'הקוד פג או כבר נוצל - לייצר קוד חדש ב-Zoho ולהדביק תוך 10 דקות'
       : j.error === 'invalid_client' ? 'ה-Client Secret ב-Vercel לא תואם ל-Client ID (או שהקוד נוצר ב-Client אחר)'
       : (j.error ? `Zoho: ${String(j.error).slice(0, 100)}` : 'Zoho לא ענה')
     return J({ error: why }, 400)

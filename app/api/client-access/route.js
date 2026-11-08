@@ -80,9 +80,9 @@ async function sendInviteEmail(toEmail, link, clientName) {
   </div>
   <p style="margin:0;font-size:13px;color:#52627A;line-height:1.7">
     הקישור לשימוש חד-פעמי. בלחיצה תיכנס לדוח ותתבקש לבחור סיסמה משלך לכניסות הבאות.<br>
-    אם הקישור פג תוקף — במסך הכניסה ב-<a href="${siteUrl}/client" style="color:#315CF5">${siteUrl}/client</a> לוחצים "שלחו לי קישור כניסה".
+    אם הקישור פג תוקף - במסך הכניסה ב-<a href="${siteUrl}/client" style="color:#315CF5">${siteUrl}/client</a> לוחצים "שלחו לי קישור כניסה".
   </p>
-  <p style="margin:18px 0 0;font-size:12px;color:#64748B;line-height:1.6;text-align:center">אם לא ביקשת גישה — ניתן להתעלם ממייל זה.</p>
+  <p style="margin:18px 0 0;font-size:12px;color:#64748B;line-height:1.6;text-align:center">אם לא ביקשת גישה - ניתן להתעלם ממייל זה.</p>
 </td></tr>
 <tr><td style="background:#F5F7FC;padding:16px 24px;border-top:1px solid #DCE3EF">
   <p style="margin:0;font-size:11px;color:#64748B;text-align:center">VITAS Digital Marketing &bull; vitas.co.il</p>
@@ -96,7 +96,7 @@ async function sendInviteEmail(toEmail, link, clientName) {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'Cluzo by Vitas <noreply@vitas.co.il>', to: [toEmail], subject: `גישה לדוח${clientName ? ` — ${clientName}` : ''}`, html }),
+      body: JSON.stringify({ from: 'Cluzo by Vitas <noreply@vitas.co.il>', to: [toEmail], subject: `גישה לדוח${clientName ? ` - ${clientName}` : ''}`, html }),
     })
     const data = await res.json()
     if (!res.ok) return { ok: false, error: data.message || JSON.stringify(data) }

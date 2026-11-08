@@ -298,9 +298,9 @@ export async function POST(request) {
   try { body = await request.json() } catch {}
   const gate = await requireFetchAccess(request, body.projectId)
   if (!gate.ok) return gate.res
-  if (body.month && !/^\d{4}-\d{2}$/.test(String(body.month))) return Response.json({ error: 'invalid month — use YYYY-MM' }, { status: 400 })
+  if (body.month && !/^\d{4}-\d{2}$/.test(String(body.month))) return Response.json({ error: 'invalid month - use YYYY-MM' }, { status: 400 })
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) {
-    return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
+    return Response.json({ error: 'invalid date format - use YYYY-MM-DD' }, { status: 400 })
   }
   try {
     const { status, body: responseBody } = await runSync({ month: body.month, since: body.since, until: body.until, projectId: body.projectId, dealsRefreshDays: gate.admin ? body.dealsRefreshDays : undefined, snapshot: gate.admin && body.snapshot === false ? false : undefined })

@@ -39,7 +39,7 @@ function SearchAdText({ text, name }) {
   return (
     <div className="gs-ad">
       <span className="adc-label">קופי</span>
-      <div className="gs-ad-main" dir="auto">{parts[0] || '—'}</div>
+      <div className="gs-ad-main" dir="auto">{parts[0] || '-'}</div>
       {parts.length > 1 && (
         <details className="gs-ad-more">
           <summary>{'עוד ' + (parts.length - 1) + (parts.length === 2 ? ' תיאור' : ' תיאורים')}</summary>
@@ -812,12 +812,12 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
     if (failed) { showToast('שגיאה: ' + failed); return }
     setCaEmail(''); setCaProjectIds([]); setCaResendPassword(false)
     const who = clientNames.join(', ')
-    if (!notify) { showToast(`✓ הגישה של ${last.email} עודכנה (${total} פרויקטים · ${who}) — בלי מייל`); return }
+    if (!notify) { showToast(`✓ הגישה של ${last.email} עודכנה (${total} פרויקטים · ${who}) - בלי מייל`); return }
     if (last.inviteLink) {
       setAccessCreds({ email: last.email, inviteLink: last.inviteLink, loginUrl: last.loginUrl, emailSent: last.emailSent, clientName: who })
     }
-    if (last.emailSent) showToast(`✓ גישה נוספה (${total} פרויקטים · ${who}) — קישור כניסה אחד נשלח במייל`)
-    else showToast('⚠️ המייל לא נשלח — הקישור מוצג להעברה ידנית')
+    if (last.emailSent) showToast(`✓ גישה נוספה (${total} פרויקטים · ${who}) - קישור כניסה אחד נשלח במייל`)
+    else showToast('⚠️ המייל לא נשלח - הקישור מוצג להעברה ידנית')
   }
 
   const deleteClientAccess = async (email, clientId) => {
@@ -2662,8 +2662,8 @@ const selectProject = async (client, project) => {
                     <tr key={u.name}>
                       <td style={{fontWeight:600}}>{u.name}</td>
                       <td>{u.count}</td>
-                      <td style={{fontWeight:600,color:'var(--accent)'}}>{u.count > 0 ? fmt(u.bizAvg) : '—'}</td>
-                      {vrResp && <td>{u.count === 0 ? '—' : u.bizMedian != null ? fmt(u.bizMedian) : 'אין נתון'}</td>}
+                      <td style={{fontWeight:600,color:'var(--accent)'}}>{u.count > 0 ? fmt(u.bizAvg) : '-'}</td>
+                      {vrResp && <td>{u.count === 0 ? '-' : u.bizMedian != null ? fmt(u.bizMedian) : 'אין נתון'}</td>}
                       {vrResp && <td>{u.pending != null ? u.pending : 'אין נתון'}</td>}
                     </tr>
                   ))}
@@ -2925,11 +2925,11 @@ const selectProject = async (client, project) => {
                 <tbody>
                   {meetings.map((m, i) => (
                     <tr key={i} onClick={m.cid ? () => openLeadNotes(m) : undefined} title={m.cid ? 'לחץ לכל היסטוריית ההערות של הליד' : ''} style={m.cid ? {cursor:'pointer'} : undefined}>
-                      <td className="vrm-name">{m.cid ? <NotebookPen size={14} aria-hidden="true" /> : null}{m.name || '—'}</td>
-                      <td className="vrm-phone">{m.phone || '—'}</td>
-                      <td className="vrm-source"><SourceMark name={m.source || ''} />{m.source || '—'}</td>
+                      <td className="vrm-name">{m.cid ? <NotebookPen size={14} aria-hidden="true" /> : null}{m.name || '-'}</td>
+                      <td className="vrm-phone">{m.phone || '-'}</td>
+                      <td className="vrm-source"><SourceMark name={m.source || ''} />{m.source || '-'}</td>
                       <td className="vrm-date">{fmtDate(m.date)}</td>
-                      <td className="vrm-desc">{m.description || '—'}</td>
+                      <td className="vrm-desc">{m.description || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -2954,11 +2954,11 @@ const selectProject = async (client, project) => {
             <tbody>
               {meetings.map((m, i) => (
                 <tr key={i} onClick={m.cid ? () => openLeadNotes(m) : undefined} title={m.cid ? 'לחץ לכל היסטוריית ההערות של הליד' : ''} style={m.cid ? {cursor:'pointer'} : undefined}>
-                  <td style={{fontWeight:600,whiteSpace:'nowrap'}}>{m.name || '—'}{m.cid ? <span style={{marginRight:6,fontSize:11,color:'#94a3b8',fontWeight:400}}>{'\u{1F5D2}'}</span> : null}</td>
-                  <td style={{whiteSpace:'nowrap',direction:'ltr',textAlign:'right'}}>{m.phone || '—'}</td>
-                  <td style={{whiteSpace:'nowrap'}}>{m.source || '—'}</td>
+                  <td style={{fontWeight:600,whiteSpace:'nowrap'}}>{m.name || '-'}{m.cid ? <span style={{marginRight:6,fontSize:11,color:'#94a3b8',fontWeight:400}}>{'\u{1F5D2}'}</span> : null}</td>
+                  <td style={{whiteSpace:'nowrap',direction:'ltr',textAlign:'right'}}>{m.phone || '-'}</td>
+                  <td style={{whiteSpace:'nowrap'}}>{m.source || '-'}</td>
                   <td style={{whiteSpace:'nowrap'}}>{fmtDate(m.date)}</td>
-                  <td style={{whiteSpace:'pre-wrap',lineHeight:1.5,maxWidth:520,minWidth:220}}>{m.description || '—'}</td>
+                  <td style={{whiteSpace:'pre-wrap',lineHeight:1.5,maxWidth:520,minWidth:220}}>{m.description || '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -3066,7 +3066,7 @@ const selectProject = async (client, project) => {
         XLSX.writeFile(wb, 'עלות-לפי-מודעה_' + (selectedMonth || '') + '.xlsx');
       };
       const money = (v) => '₪' + Math.round(v || 0).toLocaleString('he-IL');
-      const cost = (sp, cnt) => (sp && cnt) ? money(sp / cnt) : '—';
+      const cost = (sp, cnt) => (sp && cnt) ? money(sp / cnt) : '-';
       const num = (v) => (v || 0).toLocaleString('he-IL');
       const toggle = (path) => setExpandedAdTree(prev => { const nx = new Set(prev); if (nx.has(path)) nx.delete(path); else nx.add(path); return nx; });
       const thSticky = { position: 'sticky', top: 0, zIndex: 1, background: '#f1f5f9' };
@@ -3102,7 +3102,7 @@ const selectProject = async (client, project) => {
                     {r.depth>=1 && r.trail.length>0 ? <div style={{direction:'rtl',paddingRight:(r.depth*22+23)+'px',fontSize:'0.68em',color:'#94a3b8',marginTop:3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:340,unicodeBidi:'plaintext'}}>{r.trail.join('  ›  ')}</div> : null}
                     {r.depth===2 && r.sources && r.sources.length>0 ? <div style={{direction:'rtl',paddingRight:(r.depth*22+23)+'px',fontSize:'0.68em',color:'#2563eb',fontWeight:600,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:340,unicodeBidi:'plaintext'}}>{'מקור: ' + r.sources.join(' · ')}</div> : null}
                   </td>
-                  <td style={{whiteSpace:'nowrap',fontWeight:600}}>{r.spend ? money(r.spend) : '—'}</td>
+                  <td style={{whiteSpace:'nowrap',fontWeight:600}}>{r.spend ? money(r.spend) : '-'}</td>
                   <td style={{fontWeight:600}}>{num(r.leads)}</td>
                   <td style={{whiteSpace:'nowrap',color:'#64748b'}}>{cost(r.spend, r.leads)}</td>
                   <td>{num(r.meetings)}</td>
@@ -3117,7 +3117,7 @@ const selectProject = async (client, project) => {
               })}
               <tr style={{fontWeight:800,background:'#eef2ff',borderTop:'2px solid #c7d2fe'}}>
                 <td style={{textAlign:'right',borderRight:'3px solid #6366f1'}}>{'סה"כ'}</td>
-                <td style={{whiteSpace:'nowrap'}}>{gt.spend ? money(gt.spend) : '—'}</td>
+                <td style={{whiteSpace:'nowrap'}}>{gt.spend ? money(gt.spend) : '-'}</td>
                 <td>{num(gt.leads)}</td>
                 <td style={{whiteSpace:'nowrap'}}>{cost(gt.spend, gt.leads)}</td>
                 <td>{num(gt.meetings)}</td>
@@ -3227,8 +3227,8 @@ const selectProject = async (client, project) => {
           { key: 'sfLost',   label: 'לא רכשו',           of: 'sfOpp',   ofLabel: 'מההזדמנויות', leak: true },
         ];
         flowDesc = 'מחשיפה ועד תשלום מקדמה';
-        scopeNote = 'הלידים שנוצרו בתקופה ומה קרה להם — התוצאות עשויות להתעדכן בהמשך. ' + MEDIA_NOTE
-          + ' "לא הגיעו לפגישה" נמדד מהפגישות שנקבעו ו"לא רכשו" מההזדמנויות — שניהם ענפים ולא תחנות ברצף.';
+        scopeNote = 'הלידים שנוצרו בתקופה ומה קרה להם - התוצאות עשויות להתעדכן בהמשך. ' + MEDIA_NOTE
+          + ' "לא הגיעו לפגישה" נמדד מהפגישות שנקבעו ו"לא רכשו" מההזדמנויות - שניהם ענפים ולא תחנות ברצף.';
         cohortCfg = null; // אין פילוח ערוץ, ולכן אין תצוגת קוהורט בטאבי Facebook/Google
       } else if (_crmType === 'zoho') {
         // אריקה כרמל: לידים ← הזדמנויות ← רכישות, עם ענף ביטולים. שמות התחנות זהים
@@ -3316,7 +3316,7 @@ const selectProject = async (client, project) => {
 
       // "0.035%" חסר משמעות בדיוק כמו אחוז בלי n. מתחת לחצי אחוז עוברים ל"1 מכל N".
       const fmtPct = (x) => {
-        if (x == null) return '—';
+        if (x == null) return '-';
         if (x >= 10) return x.toFixed(0) + '%';
         if (x >= 1) return x.toFixed(1) + '%';
         if (x >= 0.5) return x.toFixed(2) + '%';
@@ -3387,8 +3387,8 @@ const selectProject = async (client, project) => {
           denominatorLabel: r.of ? (r.ofLabel + (r.denom != null ? ' (' + formatNum(r.denom) + ')' : '')) : (r.ofLabel === 'ראש המשפך' ? '' : (r.ofLabel || '')),
         }));
         const notes = [scopeNote];
-        if (anyWeak) notes.push('~ אחוז על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו.');
-        if (missing.length > 0) notes.push('"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — אין מקור נתונים לשלב הזה בטווח הנבחר.');
+        if (anyWeak) notes.push('~ אחוז על מכנה קטן מ-' + MIN_N + ' - רועש מכדי להסיק ממנו.');
+        if (missing.length > 0) notes.push('"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' - אין מקור נתונים לשלב הזה בטווח הנבחר.');
         if (!_noChannelSplit && funnelChannel === 'all' && chF && chG) notes.push('תצוגת "הכל" מערבבת טופס מיידי ודף נחיתה; להשוואה אמיתית בחר ערוץ בודד.');
         const actions = (!_noChannelSplit && (chF || chG)) ? (
           <div className="client-tabs vr-inline-tabs" role="tablist" aria-label="ערוץ המשפך">
@@ -3475,8 +3475,8 @@ const selectProject = async (client, project) => {
             {rows.filter(r => r.leak).map(r => (
               <div key={r.key}><span style={{ color: LEAK, fontWeight: 700 }}>{'▼ ' + r.label}</span>{' הוא ענף ולא שלב: הוא נמדד ' + r.ofLabel + ', ולא מהשלב שלפניו.'}</div>
             ))}
-            {anyWeak && <div><b style={{ color: '#b45309' }}>~</b>{' אחוז שחושב על מכנה קטן מ-' + MIN_N + ' — רועש מכדי להסיק ממנו, ולא להתייחס אליו כעובדה.'}</div>}
-            {missing.length > 0 && <div>{'"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' — חסר מקור נתונים לשלב הזה בטווח הנבחר.'}</div>}
+            {anyWeak && <div><b style={{ color: '#b45309' }}>~</b>{' אחוז שחושב על מכנה קטן מ-' + MIN_N + ' - רועש מכדי להסיק ממנו, ולא להתייחס אליו כעובדה.'}</div>}
+            {missing.length > 0 && <div>{'"אין נתון" אינו אפס: ' + missing.map(x => x.label).join(', ') + ' - חסר מקור נתונים לשלב הזה בטווח הנבחר.'}</div>}
           </div>
         </div>
       );
@@ -3593,7 +3593,7 @@ const selectProject = async (client, project) => {
     // קמפיינים כלל (yad2, מקורבים, אתר החברה).
     // אחוז מסך הלידים של התקופה (ויטלי, 29.9 — ש.ברוך): כמה מכלל הלידים הגיעו מהמקור /
     // הקמפיין / המודעה. המכנה הוא סה"כ הלידים בשורת הסיכום של אותה טבלה.
-    const _share = (n) => { const t = crmData?.totals?.totalLeads || 0; return t > 0 ? ((n || 0) / t * 100).toFixed(1) + '%' : '—'; };
+    const _share = (n) => { const t = crmData?.totals?.totalLeads || 0; return t > 0 ? ((n || 0) / t * 100).toFixed(1) + '%' : '-'; };
     const _renderAdRows = (srcName, padStart) => _adsFor(srcName).map(ad => {
       const _s = ad.totalLeads > 0 ? (ad.meetingsScheduled / ad.totalLeads * 100).toFixed(1) : '0.0';
       const _c = ad.totalLeads > 0 ? (ad.meetingsCompleted / ad.totalLeads * 100).toFixed(1) : '0.0';
@@ -3613,11 +3613,11 @@ const selectProject = async (client, project) => {
           <td>{_c}%</td>
           {/* ביטולים ושווי כספי אינם נשמרים ברמת המודעה. "—" ולא 0, כדי שלא ייראה
               כאילו נמדד ויצא אפס. */}
-          <td style={{color:'#cbd5e1'}} title="לא נמדד ברמת המודעה">—</td>
+          <td style={{color:'#cbd5e1'}} title="לא נמדד ברמת המודעה">-</td>
           <td>{formatNum(ad.registrations)}</td>
-          <td style={{color:'#cbd5e1'}} title="לא נמדד ברמת המודעה">—</td>
+          <td style={{color:'#cbd5e1'}} title="לא נמדד ברמת המודעה">-</td>
           <td>{formatNum(ad.contracts)}</td>
-          <td style={{color:'#cbd5e1'}} title="לא נמדד ברמת המודעה">—</td>
+          <td style={{color:'#cbd5e1'}} title="לא נמדד ברמת המודעה">-</td>
         </tr>);
     });
 
@@ -3741,7 +3741,7 @@ const selectProject = async (client, project) => {
         );
       }
       return (
-        <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} — הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
+        <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} - הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
           <div className="kpi-top">
             <div className="kpi-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -3847,13 +3847,13 @@ const selectProject = async (client, project) => {
                     const r = sp > 0 ? (c.netRevenue / sp) : 0;
                     return (<tr key={c.channel}>
                       <td style={{fontWeight:600}}>{c.channel}</td>
-                      <td>{sp > 0 ? formatCurrency(sp) : '—'}</td>
+                      <td>{sp > 0 ? formatCurrency(sp) : '-'}</td>
                       <td>{formatNum(c.leads)}</td>
                       <td>{formatNum(c.opportunities)}</td>
                       <td>{formatNum(c.purchased)}</td>
                       <td>{formatCurrency(c.netRevenue || 0)}</td>
                       <td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate || 0) + '%'}</td>
-                      <td style={{fontWeight:600, color: r >= 1 ? 'var(--emerald)' : sp > 0 ? 'var(--rose)' : 'inherit'}}>{sp > 0 ? r.toFixed(2) + 'x' : '—'}</td>
+                      <td style={{fontWeight:600, color: r >= 1 ? 'var(--emerald)' : sp > 0 ? 'var(--rose)' : 'inherit'}}>{sp > 0 ? r.toFixed(2) + 'x' : '-'}</td>
                     </tr>);
                   })}
                 </tbody>
@@ -3889,7 +3889,7 @@ const selectProject = async (client, project) => {
           {crmKpi('\u05e1\u05d4"\u05db \u05dc\u05d9\u05d3\u05d9\u05dd', formatNum(ct.totalLeads), 'cyan', ct.totalLeads, cp?.totalLeads, false, null, _crmLeads?.allLeads, _vrLeadsNote)}
           {crmKpi('\u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d9\u05dd', formatNum(ct.relevantLeads), 'green', ct.relevantLeads, cp?.relevantLeads)}
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05ea\u05d5\u05d0\u05de\u05d5', formatNum(ct.meetingsScheduled), 'purple', ct.meetingsScheduled, cp?.meetingsScheduled, false, 'תואמו = כל הפגישות שנקבעו החודש.\nנספר לפי תאריך התיאום (מתי נקבעה הפגישה), בכל סטטוס: עתידיות + שבוצעו + שבוטלו.\nהשורה למטה: כמה מלידים שנכנסו החודש (חדשים) וכמה מלידים מחודשים קודמים.', _crmLeads?.meetingsScheduled, (ct.meetingsScheduledSplit && (ct.meetingsScheduledSplit.fromNewLeads+ct.meetingsScheduledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsScheduledSplit.fromNewLeads+' · קודמים '+ct.meetingsScheduledSplit.fromOldLeads) : null))}
-          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה — רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, [(ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null), _vrHeldNote].filter(Boolean).join(' · ') || undefined)}
+          {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה - רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, [(ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null), _vrHeldNote].filter(Boolean).join(' · ') || undefined)}
           {crmKpi('פגישות עתידיות', formatNum(ct.meetingsUpcoming||0), 'cyan', ct.meetingsUpcoming||0, cp?.meetingsUpcoming, false, 'עתידיות = פגישות שנקבעו וטרם התקיימו.\nמועד הפגישה עתידי (אחרי היום) והיא עדיין פתוחה. כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsUpcoming, (ct.meetingsUpcomingSplit && (ct.meetingsUpcomingSplit.fromNewLeads+ct.meetingsUpcomingSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsUpcomingSplit.fromNewLeads+' · קודמים '+ct.meetingsUpcomingSplit.fromOldLeads) : null))}
           {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled||0), 'red', ct.meetingsCancelled||0, cp?.meetingsCancelled, false, 'בוטלו = פגישות שנקבעו החודש ובוטלו.\nנספר לפי תאריך התיאום, כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsCancelled, (ct.meetingsCancelledSplit && (ct.meetingsCancelledSplit.fromNewLeads+ct.meetingsCancelledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCancelledSplit.fromNewLeads+' · קודמים '+ct.meetingsCancelledSplit.fromOldLeads) : null))}
           {/* Fireberry לא מדווח הרשמות וחוזים — כרטיסי אפס קבועים רק מבלבלים. */}
@@ -4054,7 +4054,7 @@ const selectProject = async (client, project) => {
                   <td>{'\u05e1\u05d4"\u05db'}</td>
                   <td />
                   <td>{formatNum(ct.totalLeads)}</td>
-                  <td>{ct.totalLeads > 0 ? '100%' : '—'}</td>
+                  <td>{ct.totalLeads > 0 ? '100%' : '-'}</td>
                   <td>{formatNum(ct.relevantLeads)}</td>
                   <td>{formatNum(ct.irrelevantLeads)}</td>
                   <td>{formatNum(ct.meetingsScheduled)}</td>
@@ -4365,7 +4365,7 @@ const selectProject = async (client, project) => {
         );
       }
       return (
-        <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} — הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
+        <div className={`kpi ${v2cls}`} key={label} style={_hasNames ? {cursor:'pointer'} : undefined} onClick={_hasNames ? () => setNamedLeadsModal({title: label, names: namesArr}) : undefined} role={_hasNames ? 'button' : undefined} tabIndex={_hasNames ? 0 : undefined} aria-label={_hasNames ? `${label} - הצג רשימת לידים` : undefined} onKeyDown={_hasNames ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNamedLeadsModal({title: label, names: namesArr}); } } : undefined}>
           <div className="kpi-top">
             <div className="kpi-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -5150,8 +5150,8 @@ const selectProject = async (client, project) => {
                       {ruleDialog.ruleType === 'cpl_combo' && (
                         <>
                           <p><strong>ייווצרו 2 כללים אוטומטיים ב-Meta עבור {selectedProject?.name}:</strong></p>
-                          <p>1️⃣ <strong>התראה</strong> כשקמפיין עובר CPL מסוים (Meta לא מאפשרת השהיית מודעה בודדת לפי עלות תחת "מיטוב תקציב קמפיין", לכן זו התראה ברמת קמפיין — ואתה מחליט).</p>
-                          <p>2️⃣ <strong>השהיה אוטומטית</strong> של כל מודעה שבזבזה מעל סכום מסוים <strong>בלי אף ליד</strong> (פעולה בטוחה — מכבה רק "משקל מת").</p>
+                          <p>1️⃣ <strong>התראה</strong> כשקמפיין עובר CPL מסוים (Meta לא מאפשרת השהיית מודעה בודדת לפי עלות תחת "מיטוב תקציב קמפיין", לכן זו התראה ברמת קמפיין - ואתה מחליט).</p>
+                          <p>2️⃣ <strong>השהיה אוטומטית</strong> של כל מודעה שבזבזה מעל סכום מסוים <strong>בלי אף ליד</strong> (פעולה בטוחה - מכבה רק "משקל מת").</p>
                           <div className="rule-dialog-input">
                             <label>1️⃣ סף CPL להתראה (₪):</label>
                             <input type="number" min={10}
@@ -5160,7 +5160,7 @@ const selectProject = async (client, project) => {
                             />
                           </div>
                           <div className="rule-dialog-input">
-                            <label>2️⃣ סף בזבוז להשהיה — הוצאה ללא אף ליד (₪):</label>
+                            <label>2️⃣ סף בזבוז להשהיה - הוצאה ללא אף ליד (₪):</label>
                             <input type="number" min={50}
                               value={ruleDialog.params.wasteThreshold}
                               onChange={e => setRuleDialog({...ruleDialog, params: {...ruleDialog.params, wasteThreshold: Number(e.target.value)}})}
@@ -5206,9 +5206,9 @@ const selectProject = async (client, project) => {
                         return (
                         <>
                           <p><strong>ניתוב תקציב ניטרלי (הסה"כ החודשי לא משתנה) עבור {selectedProject?.name}:</strong></p>
-                          <p>📈 ביום <strong>{dn[gd]}</strong> (היום הרווחי) — מעלה תקציב ב-<strong>{pc}%</strong>.</p>
-                          <p>📉 ביום <strong>{dn[cd]}</strong> (היום החלש) — מקצץ תקציב ב-<strong>{pc}%</strong>, כדי לקזז.</p>
-                          <p style={{fontSize:'0.85em',opacity:0.8}}>כל שינוי חוזר למצב הרגיל למחרת — לכן התקציב לא מצטבר, והסכום החודשי נשאר זהה. הכסף פשוט עובר מהיום החלש ליום הרווחי. (ייווצרו 4 כללים מקושרים ב-Meta.)</p>
+                          <p>📈 ביום <strong>{dn[gd]}</strong> (היום הרווחי) - מעלה תקציב ב-<strong>{pc}%</strong>.</p>
+                          <p>📉 ביום <strong>{dn[cd]}</strong> (היום החלש) - מקצץ תקציב ב-<strong>{pc}%</strong>, כדי לקזז.</p>
+                          <p style={{fontSize:'0.85em',opacity:0.8}}>כל שינוי חוזר למצב הרגיל למחרת - לכן התקציב לא מצטבר, והסכום החודשי נשאר זהה. הכסף פשוט עובר מהיום החלש ליום הרווחי. (ייווצרו 4 כללים מקושרים ב-Meta.)</p>
                           <div className="rule-dialog-input">
                             <label>אחוז הניתוב (%):</label>
                             <input type="number" min={5} max={90}
@@ -5285,7 +5285,7 @@ const selectProject = async (client, project) => {
             const _otherUnqualF = _ob === 'all' ? _otherUnqual : _otherUnqual.filter(n => n.branch === _ob)
             const toggleBranch = (b) => setExpandedFunnelCh(prev => { const n = new Set(prev); if (n.has(b)) n.delete(b); else n.add(b); return n; })
             const ICO = (cls, d) => (<div className={"ico " + cls}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg></div>)
-            const pctOf = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 + '%' : '—'
+            const pctOf = (a, b) => b > 0 ? Math.round(a / b * 1000) / 10 + '%' : '-'
 
             const _spend = ((fbTotals && fbTotals.spend) || 0) + ((gTotals && gTotals.spend) || 0)
             const _leads = _f.leads || 0
@@ -5331,21 +5331,21 @@ const selectProject = async (client, project) => {
                   {CARD('תקציב שנוצל', formatCurrency(_spend), 'indigo', Wallet, 'סך ההוצאה על מדיה (פייסבוק + גוגל) בטווח הנבחר. יתמלא כשיחוברו חשבונות הפרסום.')}
                   {CARD('סה"כ לידים', formatNum(_leads), 'emerald', Users, 'כל הלידים שנוצרו ב-Salesforce בטווח הנבחר, מסוננים לרשת "קלוס", לפי תאריך היצירה. כולל לידים שכבר הומרו. אחוז ההמרה מקליקים יוצג אוטומטית כשיחוברו חשבונות הפרסום.', _clicks > 0 ? pctOf(_leads, _clicks) + ' מהקליקים' : null)}
                   {focusApplied
-                    ? CARD('עלות לליד ממומן', _spend > 0 && _paidLeads > 0 ? formatCurrency(_cplPaid) : '—', 'violet', Tag, 'תקציב VITAS חלקי הלידים שהגיעו מהמודעות בלבד (פייסבוק, גוגל, עמודי נחיתה, אינסטגרם). לידים אורגניים — אתר החברה, מוקד טלפוני, המלצת חבר — לא נספרים, כדי שהעלות תשקף את הקמפיינים. השורה התחתונה: העלות על כל הלידים של הסניף.', `${formatNum(_paidLeads)} ממומנים · ${_spend > 0 ? formatCurrency(_cpl) : '—'} על כל הלידים`)
-                    : CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '—', 'violet', Tag, 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.')}
+                    ? CARD('עלות לליד ממומן', _spend > 0 && _paidLeads > 0 ? formatCurrency(_cplPaid) : '-', 'violet', Tag, 'תקציב VITAS חלקי הלידים שהגיעו מהמודעות בלבד (פייסבוק, גוגל, עמודי נחיתה, אינסטגרם). לידים אורגניים - אתר החברה, מוקד טלפוני, המלצת חבר - לא נספרים, כדי שהעלות תשקף את הקמפיינים. השורה התחתונה: העלות על כל הלידים של הסניף.', `${formatNum(_paidLeads)} ממומנים · ${_spend > 0 ? formatCurrency(_cpl) : '-'} על כל הלידים`)
+                    : CARD('עלות ממוצעת לליד', _spend > 0 ? formatCurrency(_cpl) : '-', 'violet', Tag, 'תקציב שנוצל חלקי סך הלידים. מוצג רק כשיש נתוני מדיה.')}
                   {CARD('טרם טופלו / חדשים', formatNum(_untreated), 'indigo', ClipboardList, 'לידים שסטטוסם עדיין "חדש" (New) ולא נגעו בהם.')}
                   {CARD('פגישות שנקבעו', formatNum(_meet), 'violet', CalendarCheck, 'סכום שלושת סטטוסי הפגישה: "תואמה פגישה בסניף" (טרם התקיימה) + "הומר" (הגיע) + "לא הגיעו לפגישה". נספר לפי סטטוס ולא לפי תאריך הפגישה, כי ליד שנוצר החודש יכול להחזיק פגישה לחודש הבא. השורה התחתונה: אחוז מסך הלידים.', pctOf(_meet, _leads) + ' מהלידים')}
-                  {CARD('פגישות עתידיות', formatNum(_sched), 'indigo', CalendarClock, 'לידים בסטטוס "תואמה פגישה בסניף" — הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.')}
-                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'sky', UserCheck, 'לידים בסטטוס "הומר" (Qualified) — הגיעו לפגישה בפועל. אחוז מהפגישות שנקבעו: ' + pctOf(_arrived2, _meet) + '. השורה התחתונה: אחוז מסך הלידים.', pctOf(_arrived2, _leads) + ' מהלידים')}
-                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'terra', UserX, 'לידים בסטטוס "לא הגיעו לפגישה" — פגישות שנקבעו ולא התקיימו. השורה התחתונה: שיעור הביטול מתוך הפגישות שנקבעו.', pctOf(_noShow, _meet) + ' מהפגישות')}
-                  {CARD('עברו להזדמנות', formatNum(_opps), 'emerald', Handshake, 'מתוך הלידים שנוצרו החודש — כמה נפתחה להם הזדמנות (הגיעו לפגישה ונפתח תיק). לא כולל הזדמנויות מלידים של חודשים קודמים. השורה התחתונה: אחוז מסך הלידים.', pctOf(_opps, _leads) + ' מהלידים')}
-                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'sky', FileText, 'מתוך הלידים של החודש — כמה קיבלו הצעת מחיר (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps) + '. השורה התחתונה: אחוז מסך הלידים.', pctOf(_quotes, _leads) + ' מהלידים')}
-                  {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), 'terra', Tag, 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של הזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" — פוטנציאל שטרם נסגר. לשם השוואה, בשדה Amount הסטנדרטי של Salesforce הסכום הוא ' + formatCurrencyCompact(_quotesAmount) + ' (כולל הובלה ותוספות).')}
-                  {CARD('שילמו מקדמה', formatNum(_paid), 'amber', CheckCircle2, 'מתוך הלידים של החודש — כמה כבר שילמו מקדמה (רכשו). לא כולל עסקאות שנסגרו החודש מלידים קודמים. השורה התחתונה: אחוז מסך הלידים.', pctOf(_paid, _leads) + ' מהלידים')}
-                  {CARD('עלות פגישה שהגיעה', _spend > 0 ? formatCurrency(_costArrived) : '—', 'indigo', Users, 'תקציב שנוצל חלקי מספר הלידים שהגיעו לפגישה בפועל (סטטוס "הומר"). מוצג רק כשיש נתוני מדיה.')}
-                  {CARD('עלות לקוח', _spend > 0 ? formatCurrency(_costCustomer) : '—', 'amber', Wallet, 'תקציב שנוצל חלקי מספר ההזמנות ששולמה בהן מקדמה — כמה עולה לנו לקוח משלם. מוצג רק כשיש נתוני מדיה.')}
+                  {CARD('פגישות עתידיות', formatNum(_sched), 'indigo', CalendarClock, 'לידים בסטטוס "תואמה פגישה בסניף" - הפגישה נקבעה אך טרם התקיימה. זהו פייפליין שממתין.')}
+                  {CARD('הגיעו לפגישה', formatNum(_arrived2), 'sky', UserCheck, 'לידים בסטטוס "הומר" (Qualified) - הגיעו לפגישה בפועל. אחוז מהפגישות שנקבעו: ' + pctOf(_arrived2, _meet) + '. השורה התחתונה: אחוז מסך הלידים.', pctOf(_arrived2, _leads) + ' מהלידים')}
+                  {CARD('לא הגיעו לפגישה', formatNum(_noShow), 'terra', UserX, 'לידים בסטטוס "לא הגיעו לפגישה" - פגישות שנקבעו ולא התקיימו. השורה התחתונה: שיעור הביטול מתוך הפגישות שנקבעו.', pctOf(_noShow, _meet) + ' מהפגישות')}
+                  {CARD('עברו להזדמנות', formatNum(_opps), 'emerald', Handshake, 'מתוך הלידים שנוצרו החודש - כמה נפתחה להם הזדמנות (הגיעו לפגישה ונפתח תיק). לא כולל הזדמנויות מלידים של חודשים קודמים. השורה התחתונה: אחוז מסך הלידים.', pctOf(_opps, _leads) + ' מהלידים')}
+                  {CARD('קיבלו הצעת מחיר', formatNum(_quotes), 'sky', FileText, 'מתוך הלידים של החודש - כמה קיבלו הצעת מחיר (כולל מי שכבר שילם מקדמה). אחוז מההזדמנויות: ' + pctOf(_quotes, _opps) + '. השורה התחתונה: אחוז מסך הלידים.', pctOf(_quotes, _leads) + ' מהלידים')}
+                  {CARD('שווי הצעות המחיר', formatCurrencyCompact(_quotesVal), 'terra', Tag, 'סכום שדה "סכום מחיר (הזדמנות מוצר)" של הזדמנויות שנמצאות כרגע בשלב "קיבל הצעת מחיר" - פוטנציאל שטרם נסגר. לשם השוואה, בשדה Amount הסטנדרטי של Salesforce הסכום הוא ' + formatCurrencyCompact(_quotesAmount) + ' (כולל הובלה ותוספות).')}
+                  {CARD('שילמו מקדמה', formatNum(_paid), 'amber', CheckCircle2, 'מתוך הלידים של החודש - כמה כבר שילמו מקדמה (רכשו). לא כולל עסקאות שנסגרו החודש מלידים קודמים. השורה התחתונה: אחוז מסך הלידים.', pctOf(_paid, _leads) + ' מהלידים')}
+                  {CARD('עלות פגישה שהגיעה', _spend > 0 ? formatCurrency(_costArrived) : '-', 'indigo', Users, 'תקציב שנוצל חלקי מספר הלידים שהגיעו לפגישה בפועל (סטטוס "הומר"). מוצג רק כשיש נתוני מדיה.')}
+                  {CARD('עלות לקוח', _spend > 0 ? formatCurrency(_costCustomer) : '-', 'amber', Wallet, 'תקציב שנוצל חלקי מספר ההזמנות ששולמה בהן מקדמה - כמה עולה לנו לקוח משלם. מוצג רק כשיש נתוני מדיה.')}
                   {CARD('שווי העסקאות', formatCurrencyCompact(_dealVal), 'rose', Trophy, 'סכום "סכום מחיר (הזדמנות מוצר)" של ההזמנות ששולמה בהן מקדמה. ההובלה וההרכבה בנפרד. בשדה Amount הסטנדרטי: ' + formatCurrencyCompact(_dealAmount) + '.')}
-                  {CARD('החליטו לא לרכוש', formatNum(_lost), 'violet', Ban, 'מתוך הלידים של החודש — כמה מההזדמנויות נסגרו ללא רכישה. אחוז מההזדמנויות: ' + pctOf(_lost, _opps))}
+                  {CARD('החליטו לא לרכוש', formatNum(_lost), 'violet', Ban, 'מתוך הלידים של החודש - כמה מההזדמנויות נסגרו ללא רכישה. אחוז מההזדמנויות: ' + pctOf(_lost, _opps))}
                 </div>
               </ReportSection>
             )
@@ -5402,7 +5402,7 @@ const selectProject = async (client, project) => {
             // הניסוחים בשתי המסגרות מגיעים מילה במילה מה-DESIGN-SPEC.
             const cohortFunnel = funnelBars(
               'מה קרה ללידים של החודש', 'לידים של התקופה', 'cohort',
-              'מעקב אחר הלידים שנוצרו בתקופה — התוצאות עשויות להתעדכן בהמשך.',
+              'מעקב אחר הלידים שנוצרו בתקופה - התוצאות עשויות להתעדכן בהמשך.',
               [
                 { label: 'לידים', v: _fc.leads || 0, fill: 'leads' },
                 { label: 'תיאמו פגישה', v: _fc.meetings || 0, fill: 'meetings' },
@@ -5416,7 +5416,7 @@ const selectProject = async (client, project) => {
             // showStepPct=false בכוונה: זהו דוח פעילות ולא מסלול מעבר של אותם אנשים,
             // ולכן אסור לייצר ממנו שיעור המרה מחלוקת שתי שורות סמוכות (DESIGN-SPEC).
             const periodFunnel = funnelBars(
-              'דוח ביצועים — פעילות החודש', 'פעילות בתקופה', 'period',
+              'דוח ביצועים - פעילות החודש', 'פעילות בתקופה', 'period',
               'כולל פעילות על לידים שנוצרו בחודשים קודמים.',
               [
                 { label: 'לידים שנוצרו', v: _fp.leads || 0, fill: 'leads' },
@@ -5530,13 +5530,13 @@ const selectProject = async (client, project) => {
                           <td style={{fontWeight:600}}>{formatNum(oPaid)}</td>
                           <td>{formatCurrencyCompact(oValue)}</td>
                           <td style={{color:'var(--violet)',fontWeight:600}}>{oConv}%</td>
-                          <td className="sub">{oTop || '—'}</td>
+                          <td className="sub">{oTop || '-'}</td>
                         </tr>
                         {open && (<tr className="vr-kloss-row-open"><td colSpan={9} className="vr-kloss-detail-cell" style={{background:'#f8fafc',padding:'18px 20px'}}>
                           <div className="vr-kloss-detail" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(340px,100%),1fr))',gap:20,width:'100%'}}>
                             <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'16px 18px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>אנשי מכירות</div>
-                              {_sm.length === 0 ? <div className="sub">—</div> : (
+                              {_sm.length === 0 ? <div className="sub">-</div> : (
                                 <table className="data-table" style={{width:'100%'}}>
                                   <thead><tr><th>שם</th><th>הזדמנויות</th><th>הצעות</th><th>עסקאות</th><th>שווי</th><th>% לעסקה</th></tr></thead>
                                   <tbody>{_sm.map(a => (
@@ -5554,7 +5554,7 @@ const selectProject = async (client, project) => {
                             </div>
                             <div style={{background:'#fff',border:'1px solid #e8eaf0',borderRadius:10,padding:'16px 18px',overflowX:'auto'}}>
                               <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>מוצרים מובילים</div>
-                              {_pr.length === 0 ? <div className="sub">—</div> : (
+                              {_pr.length === 0 ? <div className="sub">-</div> : (
                                 <table className="data-table" style={{width:'100%'}}>
                                   <thead><tr><th>מוצר</th><th>כמות</th><th>שווי כולל</th></tr></thead>
                                   <tbody>{_pr.map(pr => (
@@ -5598,7 +5598,7 @@ const selectProject = async (client, project) => {
                 {/* בלי המשפט הזה הכרטיסים נראים כמו השוואת נפחים על סקאלה משותפת, והם לא:
                     בר "לידים" מלא בכל סניף, גם בסניף עם עשרה לידים וגם בסניף עם מאתיים. */}
                 <p className="vr-caption" style={{margin:'0 2px 14px',fontSize:12.5,color:'#66748f'}}>
-                  אורך הבר בכל כרטיס מנורמל ללידים של אותו סניף — כלומר הכרטיסים משווים שיעורי מעבר, לא נפחים. להשוואת נפחים יש את הטבלה שלמעלה.
+                  אורך הבר בכל כרטיס מנורמל ללידים של אותו סניף - כלומר הכרטיסים משווים שיעורי מעבר, לא נפחים. להשוואת נפחים יש את הטבלה שלמעלה.
                 </p>
                 {/* הכרטיסים היו בנויים כולם מ-inline styles, ולכן עטיפה ב-.vr-ui לא שינתה
                     אותם — מה שוויטלי ראה (21.9) כ"הסקשן הזה לא עוצב". עכשיו הם מחלקות
@@ -5654,7 +5654,7 @@ const selectProject = async (client, project) => {
                   {opts.samples ? (
                     <div className="sub" style={{padding:'0 2px 8px',fontSize:12,display:'flex',alignItems:'center',gap:6}}>
                       <span aria-hidden="true" style={{display:'inline-block',width:10,height:10,borderRadius:3,background:color,opacity:0.3}} />
-                      {'פחות מ־' + (opts.minSample || 0) + ' לידים — נתון בנפח נמוך'}
+                      {'פחות מ־' + (opts.minSample || 0) + ' לידים - נתון בנפח נמוך'}
                     </div>
                   ) : null}
                   <div style={{display:'flex',alignItems:'flex-end',gap:opts.tight?3:8,padding:'6px 2px',minHeight:130,overflowX:'auto'}}>
@@ -5678,7 +5678,7 @@ const selectProject = async (client, project) => {
             const _dayItems = (arr) => _tdays.map((d, i) => ({ label: d, value: (arr || [])[i] || 0 }))
             const _hourItems = (arr, nullable) => Array.from({length:24}, (_, h) => ({ label: h, value: nullable ? ((arr||[])[h]) : ((arr||[])[h] || 0) }))
             const _respColors = ['#10b981','#22c55e','#84cc16','#eab308','#f59e0b','#ef4444']
-            const timingSec = (!_timing.data) ? (<div className="section"><div className="sub" style={{padding:'10px 4px'}}>אין נתונים — לחצו "רענן CRM" למשיכת נתוני הזמנים.</div></div>) : (<>
+            const timingSec = (!_timing.data) ? (<div className="section"><div className="sub" style={{padding:'10px 4px'}}>אין נתונים - לחצו "רענן CRM" למשיכת נתוני הזמנים.</div></div>) : (<>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'2px 4px 14px'}}>
                 <label htmlFor="sf-time-branch" style={{fontSize:13,fontWeight:600,color:'#334155'}}>זמנים לפי:</label>
                 <select id="sf-time-branch" value={_tb} onChange={(e)=>setSfTimeBranch(e.target.value)} style={{fontSize:13,padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',color:'#0f172a'}}>
@@ -5698,7 +5698,7 @@ const selectProject = async (client, project) => {
                 const _peakConv = Math.max(0, ..._cv.filter(c => c.m >= 5).map(c => c.pc))
                 return (
                   <div className="section">
-                    <div className="section-head">{ICO('emerald', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z")}<h2>היום המבוקש לפגישה ← עסקה</h2><span className="sub">ביקוש לפגישה, כמה רכשו, ואחוז המרה לעסקה — לכל יום</span></div>
+                    <div className="section-head">{ICO('emerald', "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z")}<h2>היום המבוקש לפגישה ← עסקה</h2><span className="sub">ביקוש לפגישה, כמה רכשו, ואחוז המרה לעסקה - לכל יום</span></div>
                     <div style={{display:'flex',gap:16,fontSize:12,margin:'0 2px 10px',color:'#475569',flexWrap:'wrap'}}>
                       <span><span style={{display:'inline-block',width:10,height:10,background:'#3b82f6',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>פגישות</span>
                       <span><span style={{display:'inline-block',width:10,height:10,background:'#10b981',borderRadius:3,marginInlineEnd:5,verticalAlign:'-1px'}}></span>עסקאות</span>
@@ -5726,7 +5726,7 @@ const selectProject = async (client, project) => {
                 )
               })()}
               <h3 style={{margin:'14px 4px 2px',fontSize:15,color:'#0f172a'}}>המרה וזמן טיפול</h3>
-              {_tBar('אחוז המרה לתיאום פגישה לפי שעת מגע ראשון', 'מתוך הלידים שטופלו בשעה זו — לכמה נקבעה פגישה (שעות עם מעט לידים מוזנחות)', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true, samples: (_td.convLeads || []), minSample: 10 })}
+              {_tBar('אחוז המרה לתיאום פגישה לפי שעת מגע ראשון', 'מתוך הלידים שטופלו בשעה זו - לכמה נקבעה פגישה (שעות עם מעט לידים מוזנחות)', ['teal', "M3 3v18h18M7 14l4-4 3 3 5-6"], _hourItems(_td.conv, true), '#0d9488', { highlightMax: true, takeaway: 'שעת ההמרה הגבוהה', suffix: '%', tight: true, samples: (_td.convLeads || []), minSample: 10 })}
               {(() => {
                 const _rz = _td.resp || [], _rm = _td.respMeet || []
                 const _cd = _tRespLabels.map((lb, i) => { const L = _rz[i]||0, M = _rm[i]||0; return { lb, L, M, pc: L>0?Math.round(M/L*100):0 } })
@@ -5906,7 +5906,7 @@ const selectProject = async (client, project) => {
                     </div>
                     <div style={{background:'#fff',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px'}}>
                       <div style={{fontSize:12,fontWeight:700,color:'#64748b',marginBottom:8}}>פירוט "אחר" · לחצו לפרטי קשר ({formatNum(notes.length)})</div>
-                      {notes.length === 0 ? <div className="sub">—</div> : (
+                      {notes.length === 0 ? <div className="sub">-</div> : (
                         <div style={{maxHeight:320,overflowY:'auto'}}>
                           {notes.map((n, i2) => (
                             <div key={i2} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSfNoteModal({ ...n, kind }); } }} onClick={() => setSfNoteModal({ ...n, kind })} style={{padding:'8px 10px',borderBottom:'1px solid var(--border)',cursor:'pointer',borderRadius:6}} onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
@@ -5932,8 +5932,8 @@ const selectProject = async (client, project) => {
                 <span className="sub" style={{fontSize:12,color:'#94a3b8'}}>לידים ─(אי המרה)─▶ הזדמנויות ─(נסגר ללא הצלחה)─▶ רכשו</span>
                 <span style={{marginInlineStart:'auto',fontSize:11,color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:6,padding:'3px 9px',whiteSpace:'nowrap'}}>מבוסס פעילות החודש · לא מושפע מהבחירה למעלה</span>
               </div>
-              {_objBlock('נשירת ליד — סיבת אי המרה', 'לידים שלא הומרו החודש · ' + _objScope, ['amber', "M18 6 6 18M6 6l12 12"], _unqR, _unqT, _otherUnqualF, 'lead', '#eda100')}
-              {_objBlock('נשירת הזדמנות — נסגר ללא הצלחה', 'הזדמנויות שנסגרו ללא הצלחה החודש · ' + _objScope, ['rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"], _lossR, _lossT, _otherLossF, 'opp', '#e24b4a')}
+              {_objBlock('נשירת ליד - סיבת אי המרה', 'לידים שלא הומרו החודש · ' + _objScope, ['amber', "M18 6 6 18M6 6l12 12"], _unqR, _unqT, _otherUnqualF, 'lead', '#eda100')}
+              {_objBlock('נשירת הזדמנות - נסגר ללא הצלחה', 'הזדמנויות שנסגרו ללא הצלחה החודש · ' + _objScope, ['rose', "M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"], _lossR, _lossT, _otherLossF, 'opp', '#e24b4a')}
             </>)
 
             return (<>
@@ -5997,9 +5997,9 @@ const selectProject = async (client, project) => {
     const _spCamp = (ch,camp) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return _fbQnSpend; return _fbCampSpend[_normName(camp)]||0 }
     const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), t=_nn(adset); if(!t||t.indexOf('ללא')>=0) return null; const exact=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset)===t); if(exact.length) return {spend:exact.reduce((a,x)=>a+x.spend,0)}; const m=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset).includes(t)); return m.length===1 ? {spend:m[0].spend} : null }
     const _spAd = (ch,camp,adset,label) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), a=_nn(adset); const L=_nn(label); if(!L) return null; const inA=x=>(!a||a.indexOf('ללא')>=0||_nn(x.adset).includes(a)); let m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L && inA(x)); if(m.length) return {spend:m.reduce((z,x)=>z+x.spend,0)}; m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L); if(m.length===1) return {spend:m[0].spend}; const tok=(_nn(label).match(/ad\d+/)||[])[0]; if(tok){ const m2=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName).indexOf(tok)===0 && inA(x)); if(m2.length===1) return {spend:m2[0].spend}; } return null }
-    const _naT = 'לא זמין — נתוני הוצאה ו-ROAS קיימים ל-Facebook בלבד'
-    const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">—</span></td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
-    const _roasCell = (rev, res, fs) => { const sp=res==null?null:(typeof res==='object'?res.spend:res); if(sp==null||sp<=0) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">—</span></td>; const r=(rev||0)/sp; return <td style={{fontSize:fs,whiteSpace:'nowrap',fontWeight:600,color:r>=1?'var(--emerald)':'var(--rose)'}}>{r.toFixed(2)}x</td> }
+    const _naT = 'לא זמין - נתוני הוצאה ו-ROAS קיימים ל-Facebook בלבד'
+    const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">-</span></td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
+    const _roasCell = (rev, res, fs) => { const sp=res==null?null:(typeof res==='object'?res.spend:res); if(sp==null||sp<=0) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">-</span></td>; const r=(rev||0)/sp; return <td style={{fontSize:fs,whiteSpace:'nowrap',fontWeight:600,color:r>=1?'var(--emerald)':'var(--rose)'}}>{r.toFixed(2)}x</td> }
             const _agents = _zs.agentPerformance || []
             const toggleAgent = (ag) => setExpandedAgents(prev => { const n = new Set(prev); if (n.has(ag)) n.delete(ag); else n.add(ag); return n; })
 
@@ -6196,7 +6196,7 @@ const selectProject = async (client, project) => {
                           <td style={{fontWeight:700}}>{formatNum(_fn.opportunities||0)}</td>
                           <td style={{fontWeight:700}}>{formatNum(_fn.purchased||0)}</td>
                           <td style={{fontWeight:700,color:'var(--violet)'}}>{(_fn.conversionRate||0)+'%'}</td>
-                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}} title={'Facebook ' + formatCurrency(_fbTotalSpend) + ' + Google ' + formatCurrency(_gTotalSpend)}>{formatCurrency(_totalAdSpend)}</td><td style={{fontWeight:700}} title="הכנסות מכל הערוצים חלקי התקציב הכולל (Facebook + Google)">{_totalAdSpend>0 ? ((_fn.netRevenue||0)/_totalAdSpend).toFixed(2)+'x' : '—'}</td>
+                          <td style={{fontWeight:700}}>{formatCurrency(_fn.netRevenue||0)}</td><td style={{fontWeight:700}} title={'Facebook ' + formatCurrency(_fbTotalSpend) + ' + Google ' + formatCurrency(_gTotalSpend)}>{formatCurrency(_totalAdSpend)}</td><td style={{fontWeight:700}} title="הכנסות מכל הערוצים חלקי התקציב הכולל (Facebook + Google)">{_totalAdSpend>0 ? ((_fn.netRevenue||0)/_totalAdSpend).toFixed(2)+'x' : '-'}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -6342,7 +6342,7 @@ const selectProject = async (client, project) => {
           {crmTotals && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts,
             (vrAds && activeT.spend > 0) ? [ (crmTotals?.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(crmTotals.contractValue) : null, (crmTotals?.contracts || 0) > 0 ? 'עלות לחוזה ' + formatCurrency(activeT.spend / crmTotals.contracts) : null ].filter(Boolean).join(' · ') || undefined : undefined) : null}
           {!vrAds && activeT.spend > 0 && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
-          {!vrAds && activeT.spend > 0 && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '—', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
+          {!vrAds && activeT.spend > 0 && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '-', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
           </>)}
         </div>
 
@@ -6446,7 +6446,7 @@ const selectProject = async (client, project) => {
                           <td>{formatCurrency(o.spend || 0)}</td>
                           <td>{pc.toFixed(1)}%</td>
                           <td>{formatNum(Math.round(o.leads || 0))}</td>
-                          <td style={{ color: '#7c3aed' }}>{(o.leads || 0) > 0 ? formatCurrency(o.cpl || 0) : '—'}</td>
+                          <td style={{ color: '#7c3aed' }}>{(o.leads || 0) > 0 ? formatCurrency(o.cpl || 0) : '-'}</td>
                           <td>{formatNum(o.clicks || 0)}</td>
                           <td>{(o.ctr || 0).toFixed(2)}%</td>
                         </tr>
@@ -6457,7 +6457,7 @@ const selectProject = async (client, project) => {
                       <td>{formatCurrency(_tot)}</td>
                       <td>100%</td>
                       <td>{formatNum(Math.round(_totLeads))}</td>
-                      <td style={{ color: '#7c3aed' }}>{_totLeads > 0 ? formatCurrency(_tot / _totLeads) : '—'}</td>
+                      <td style={{ color: '#7c3aed' }}>{_totLeads > 0 ? formatCurrency(_tot / _totLeads) : '-'}</td>
                       <td colSpan={2}></td>
                     </tr>
                   </tbody>
@@ -7150,11 +7150,11 @@ const selectProject = async (client, project) => {
           // B2 (1.10): לקבוצות נכסים אין נתונים יומיים. בטווח מותאם המדדים מגיעים מהתקופה השמורה
           // הקרובה (lib/ads/range-rows.js) — וכשהיא שונה מהטווח שנבחר, אומרים את זה במפורש.
           const _agPeriod = (gReports.find(r => r.summary && r.summary.assetGroupsPeriod) || {}).summary?.assetGroupsPeriod;
-          const _agPeriodLabel = (() => { if (!_agPeriod || gReports.some(r => r.month === _agPeriod)) return null; const f = (d) => d.slice(8, 10) + '.' + d.slice(5, 7); if (/^\d{4}-\d{2}$/.test(_agPeriod)) return _agPeriod.slice(5, 7) + '/' + _agPeriod.slice(0, 4); const [a, b] = _agPeriod.split('_'); return a && b ? f(a) + '–' + f(b) : null; })();
+          const _agPeriodLabel = (() => { if (!_agPeriod || gReports.some(r => r.month === _agPeriod)) return null; const f = (d) => d.slice(8, 10) + '.' + d.slice(5, 7); if (/^\d{4}-\d{2}$/.test(_agPeriod)) return _agPeriod.slice(5, 7) + '/' + _agPeriod.slice(0, 4); const [a, b] = _agPeriod.split('_'); return a && b ? f(a) + '-' + f(b) : null; })();
           return (
             <div className="section section-asset-gallery">
               <div className="section-head"><div className="ico amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div><h2>קריאייטיב Google PMax</h2><span className="sub">{dashTab === 'all' ? ('Top ' + groups.length + ' \u00b7 \u05d3\u05d9\u05e8\u05d5\u05d2 \u05dc\u05e4\u05d9 \u05dc\u05d9\u05d3\u05d9\u05dd \u00b7 \u05db\u05dc \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d4\u05e0\u05db\u05e1\u05d9\u05dd \u05d1\u05d8\u05d0\u05d1 Google') : ('\u05db\u05dc \u05e7\u05d1\u05d5\u05e6\u05d5\u05ea \u05d4\u05e0\u05db\u05e1\u05d9\u05dd \u05e9\u05d4\u05d5\u05e6\u05d9\u05d0\u05d5 \u05d1\u05ea\u05e7\u05d5\u05e4\u05d4 (' + groups.length + ')')}</span></div>
-              {_agPeriodLabel && <div className="vr-note" style={{fontSize:12,color:'var(--text-secondary)',margin:'-4px 0 10px'}}>{'מדדי קבוצות הנכסים לתקופה ' + _agPeriodLabel + ' — לגוגל אין פירוט יומי ברמת קבוצת נכסים'}</div>}
+              {_agPeriodLabel && <div className="vr-note" style={{fontSize:12,color:'var(--text-secondary)',margin:'-4px 0 10px'}}>{'מדדי קבוצות הנכסים לתקופה ' + _agPeriodLabel + ' - לגוגל אין פירוט יומי ברמת קבוצת נכסים'}</div>}
               <div className={vrAds ? 'vr-ad-grid' : undefined} style={vrAds ? undefined : {display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))',gap:'16px'}}>
                 {groups.map((ag, i) => {
                   // Handle both old field names (imageUrl, type) and new GAQL names (image_url, field_type)
@@ -7417,7 +7417,7 @@ const selectProject = async (client, project) => {
           {view === 'dashboard' && selectedProject && (<>
                         {isDemoProject && (
               <div style={{background:'linear-gradient(135deg,#4338ca,#6366f1)',color:'white',padding:'8px 20px',fontSize:13,fontWeight:700,textAlign:'center',letterSpacing:'0.04em'}}>
-                🎯 מצב הדגמה — הנתונים בדויים לצורך הצגה בלבד
+                🎯 מצב הדגמה - הנתונים בדויים לצורך הצגה בלבד
               </div>
             )}
             <TitleBar
@@ -7445,7 +7445,7 @@ const selectProject = async (client, project) => {
                 {/* משיכה חיה מהספקים — רק בלחיצה. כל שאר הטעינות מהשרת, כמו אצל הלקוח. */}
                 <button type="button" disabled={refreshing || !selectedMonth}
                   onClick={() => triggerFetch(selectedMonth?.includes('_') ? { since: selectedMonth.split('_')[0], until: selectedMonth.split('_')[1] } : { month: selectedMonth }, { live: true })}
-                  title="משיכה חיה מ-Meta / Google / CRM לתקופה שנבחרה (10–60 שניות). בדרך כלל לא צריך: הקרונים מרעננים כל שעתיים."
+                  title="משיכה חיה מ-Meta / Google / CRM לתקופה שנבחרה (10-60 שניות). בדרך כלל לא צריך: הקרונים מרעננים כל שעתיים."
                   style={{fontSize:12,color:'var(--text-secondary)',background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'3px 10px',cursor: refreshing ? 'wait' : 'pointer',opacity: refreshing ? 0.6 : 1,fontFamily:'inherit'}}>
                   {refreshing ? '⏳ מושך...' : '🔄 משיכה חיה'}
                 </button>
@@ -7465,7 +7465,7 @@ const selectProject = async (client, project) => {
                     <span className="vr-budget-total"><bdi>{formatCurrency(budget)}</bdi></span>
                   </div></div>
                 ) : (
-                  <div style={{padding:'8px 20px',fontSize:14,fontWeight:600,borderBottom:'1px solid var(--border,#e2e8f0)'}}>💰 תקציב חודשי — {formatCurrency(budget)}</div>
+                  <div style={{padding:'8px 20px',fontSize:14,fontWeight:600,borderBottom:'1px solid var(--border,#e2e8f0)'}}>💰 תקציב חודשי - {formatCurrency(budget)}</div>
                 )) : null;
               }
               const _spend = reports.filter(r => r.month === ym && (r.source==='facebook' || (r.source||'').startsWith('google'))).reduce((a,r)=>a+(r.summary?.spend||0),0);
@@ -7592,8 +7592,8 @@ const selectProject = async (client, project) => {
               {objModal.leads.map((L, i) => (
                 <li key={i} style={{padding:'10px 2px',borderBottom:'1px solid var(--border)'}}>
                   <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline'}}>
-                    <span style={{fontWeight:600,unicodeBidi:'plaintext'}}>{L.name || '—'}</span>
-                    <span style={{direction:'ltr',color:'#475569',fontSize:13,whiteSpace:'nowrap'}}>{L.phone || '—'}</span>
+                    <span style={{fontWeight:600,unicodeBidi:'plaintext'}}>{L.name || '-'}</span>
+                    <span style={{direction:'ltr',color:'#475569',fontSize:13,whiteSpace:'nowrap'}}>{L.phone || '-'}</span>
                   </div>
                   <div style={{fontSize:12,color:'#64748b',marginTop:4,display:'flex',flexWrap:'wrap',gap:'4px 12px'}}>
                     <span style={{unicodeBidi:'plaintext'}}>{'\u{1F4E5} ' + (L.source || 'ללא מקור')}</span>
@@ -7674,7 +7674,7 @@ const selectProject = async (client, project) => {
                   <div key={i} style={{border:'1px solid var(--border,#e2e8f0)',borderRadius:10,padding:'10px 12px',background:'#fff'}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                       <span style={{width:22,height:22,borderRadius:'50%',background:'var(--indigo-50,#eef2ff)',color:'var(--indigo,#6366f1)',display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</span>
-                      <span style={{fontWeight:700,fontSize:14}}>{decodeHtmlEntities(L.name) || '—'}</span>
+                      <span style={{fontWeight:700,fontSize:14}}>{decodeHtmlEntities(L.name) || '-'}</span>
                       {L.phone ? <a href={'tel:'+L.phone} style={{fontSize:12.5,color:'var(--violet,#7c3aed)',unicodeBidi:'plaintext',textDecoration:'none'}}>{L.phone}</a> : null}
                       <span style={{flex:1}}></span>
                       {L.status ? <span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#f1f5f9',color:'#475569',whiteSpace:'nowrap'}}>{L.status}</span> : null}
@@ -7718,7 +7718,7 @@ const selectProject = async (client, project) => {
               <h3 style={{margin:0,fontSize:16,fontWeight:700}}>{sfNoteModal.contactName || sfNoteModal.name || 'פרטי לקוח'}</h3>
               <button onClick={() => setSfNoteModal(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,lineHeight:1,color:'#64748b',padding:'0 4px'}}>&times;</button>
             </div>
-            <div style={{fontSize:12,color:'#94a3b8',marginBottom:14}}>{sfNoteModal.kind === 'lead' ? 'נשירת ליד — סיבת אי המרה' : 'נשירת הזדמנות — נסגר ללא הצלחה'}</div>
+            <div style={{fontSize:12,color:'#94a3b8',marginBottom:14}}>{sfNoteModal.kind === 'lead' ? 'נשירת ליד - סיבת אי המרה' : 'נשירת הזדמנות - נסגר ללא הצלחה'}</div>
             <div style={{overflowY:'auto',flex:1}}>
               <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'10px 12px',marginBottom:14}}>
                 <div style={{fontSize:11,fontWeight:700,color:'#991b1b',marginBottom:4}}>ההערה שנכתבה{sfNoteModal.reason ? ' · ' + sfNoteModal.reason : ''}</div>
@@ -7727,20 +7727,20 @@ const selectProject = async (client, project) => {
               <table className="data-table" style={{width:'100%',fontSize:13}}>
                 <tbody>
                   {(sfNoteModal.name && sfNoteModal.contactName && sfNoteModal.name !== sfNoteModal.contactName) ? (<tr><td style={{color:'#64748b'}}>שם הזדמנות</td><td style={{fontWeight:600}}>{sfNoteModal.name}</td></tr>) : null}
-                  <tr><td style={{color:'#64748b'}}>טלפון</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{sfNoteModal.phone ? (<a href={'tel:'+sfNoteModal.phone} style={{color:'var(--violet,#7c3aed)'}}>{sfNoteModal.phone}</a>) : '—'}</td></tr>
-                  <tr><td style={{color:'#64748b'}}>אימייל</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{sfNoteModal.email || '—'}</td></tr>
-                  <tr><td style={{color:'#64748b'}}>סניף</td><td>{sfNoteModal.branch || '—'}</td></tr>
-                  <tr><td style={{color:'#64748b'}}>איש מכירות</td><td>{sfNoteModal.salesman || '—'}</td></tr>
+                  <tr><td style={{color:'#64748b'}}>טלפון</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{sfNoteModal.phone ? (<a href={'tel:'+sfNoteModal.phone} style={{color:'var(--violet,#7c3aed)'}}>{sfNoteModal.phone}</a>) : '-'}</td></tr>
+                  <tr><td style={{color:'#64748b'}}>אימייל</td><td style={{fontWeight:600,direction:'ltr',textAlign:'right'}}>{sfNoteModal.email || '-'}</td></tr>
+                  <tr><td style={{color:'#64748b'}}>סניף</td><td>{sfNoteModal.branch || '-'}</td></tr>
+                  <tr><td style={{color:'#64748b'}}>איש מכירות</td><td>{sfNoteModal.salesman || '-'}</td></tr>
                   {sfNoteModal.kind === 'lead'
                     ? (<>
-                        <tr><td style={{color:'#64748b'}}>סטטוס</td><td>{sfNoteModal.status || '—'}</td></tr>
-                        <tr><td style={{color:'#64748b'}}>מקור</td><td>{sfNoteModal.source || '—'}</td></tr>
+                        <tr><td style={{color:'#64748b'}}>סטטוס</td><td>{sfNoteModal.status || '-'}</td></tr>
+                        <tr><td style={{color:'#64748b'}}>מקור</td><td>{sfNoteModal.source || '-'}</td></tr>
                       </>)
                     : (<>
-                        <tr><td style={{color:'#64748b'}}>שלב</td><td>{sfNoteModal.stage || '—'}</td></tr>
-                        <tr><td style={{color:'#64748b'}}>שווי</td><td style={{fontWeight:600}}>{sfNoteModal.value ? formatCurrency(sfNoteModal.value) : '—'}</td></tr>
+                        <tr><td style={{color:'#64748b'}}>שלב</td><td>{sfNoteModal.stage || '-'}</td></tr>
+                        <tr><td style={{color:'#64748b'}}>שווי</td><td style={{fontWeight:600}}>{sfNoteModal.value ? formatCurrency(sfNoteModal.value) : '-'}</td></tr>
                       </>)}
-                  <tr><td style={{color:'#64748b'}}>תאריך</td><td>{sfNoteModal.date || '—'}</td></tr>
+                  <tr><td style={{color:'#64748b'}}>תאריך</td><td>{sfNoteModal.date || '-'}</td></tr>
                 </tbody>
               </table>
             </div>

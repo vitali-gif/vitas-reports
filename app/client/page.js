@@ -217,7 +217,7 @@ export default function ClientPage() {
       if (res.status === 401) {
         await supabase.auth.signOut().catch(() => {})
         setStep('login')
-        showToast('החיבור פג תוקף — התחבר שוב')
+        showToast('החיבור פג תוקף - התחבר שוב')
         return
       }
       if (!res.ok) { setStep('error'); return }
@@ -255,7 +255,7 @@ export default function ClientPage() {
     } catch (err) {
       if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
         setStep('login')
-        showToast('הטעינה נתקעה — נסה להיכנס שוב')
+        showToast('הטעינה נתקעה - נסה להיכנס שוב')
       } else {
         setStep('error')
       }

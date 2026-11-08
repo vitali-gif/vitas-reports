@@ -281,7 +281,7 @@ export async function POST(request) {
   const gate = await requireFetchAccess(request, body.projectId)
   if (!gate.ok) return gate.res
   if ((body.since && !isValidDate(body.since)) || (body.until && !isValidDate(body.until))) {
-    return Response.json({ error: 'invalid date format — use YYYY-MM-DD' }, { status: 400 })
+    return Response.json({ error: 'invalid date format - use YYYY-MM-DD' }, { status: 400 })
   }
   // windows — רשימת חלונות לחישוב מהתמונה בבקשה אחת (הקרון). כל חלון: month או since+until.
   let windows

@@ -8,8 +8,8 @@ const PRESET_LABELS = {
   today: 'היום', yesterday: 'אתמול',
   last7: '7 ימים אחרונים', last14: '14 ימים אחרונים',
   currentMonth: 'החודש הנוכחי', lastMonth: 'חודש שעבר',
-  q1: 'Q1 — רבעון ראשון', q2: 'Q2 — רבעון שני',
-  q3: 'Q3 — רבעון שלישי', q4: 'Q4 — רבעון רביעי',
+  q1: 'Q1 - רבעון ראשון', q2: 'Q2 - רבעון שני',
+  q3: 'Q3 - רבעון שלישי', q4: 'Q4 - רבעון רביעי',
   custom: 'טווח מותאם אישית',
 }
 
@@ -21,10 +21,10 @@ const PRESET_LIST = [
   { key: 'currentMonth',  label: 'החודש הנוכחי' },
   { key: 'lastMonth',     label: 'חודש שעבר' },
   { separator: true },
-  { key: 'q1',            label: 'Q1 — ינואר–מרץ' },
-  { key: 'q2',            label: 'Q2 — אפריל–יוני' },
-  { key: 'q3',            label: 'Q3 — יולי–ספטמבר' },
-  { key: 'q4',            label: 'Q4 — אוקטובר–דצמבר' },
+  { key: 'q1',            label: 'Q1 - ינואר-מרץ' },
+  { key: 'q2',            label: 'Q2 - אפריל-יוני' },
+  { key: 'q3',            label: 'Q3 - יולי-ספטמבר' },
+  { key: 'q4',            label: 'Q4 - אוקטובר-דצמבר' },
   { separator: true },
   { key: 'custom',        label: 'טווח מותאם אישית' },
 ]

@@ -107,7 +107,7 @@ export async function GET(request) {
   result.verdict = {
     canCreateRules,
     summary: canCreateRules
-      ? '✓ All set — token has ads_management. Can create automated rules.'
+      ? '✓ All set - token has ads_management. Can create automated rules.'
       : '✗ Missing ads_management permission on the token. Need to re-authorize the app in Facebook with ads_management scope.',
   }
 

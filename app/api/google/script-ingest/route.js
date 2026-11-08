@@ -42,7 +42,7 @@ export async function POST(request) {
   const expected = process.env.GOOGLE_SCRIPT_SECRET
   const provided = request.headers.get('x-script-secret') || ''
   if (!expected || !safeEqual(provided, expected)) {
-    return Response.json({ error: 'Unauthorized — invalid x-script-secret header' }, { status: 401 })
+    return Response.json({ error: 'Unauthorized - invalid x-script-secret header' }, { status: 401 })
   }
 
   let payload

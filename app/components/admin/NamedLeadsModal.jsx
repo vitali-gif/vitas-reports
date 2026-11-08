@@ -46,7 +46,7 @@ export default function NamedLeadsModal({ title, names, isClientView, onClose })
                 <span className="nlm-av" aria-hidden="true">{initial(e.name)}</span>
                 <div className="nlm-main">
                   <div className="nlm-top">
-                    <span className="nlm-name">{e.name || '—'}{e.value ? <span className="nlm-val"> ₪{Number(e.value).toLocaleString('he-IL')}</span> : null}</span>
+                    <span className="nlm-name">{e.name || '-'}{e.value ? <span className="nlm-val"> ₪{Number(e.value).toLocaleString('he-IL')}</span> : null}</span>
                     {e.phone ? <a className="nlm-phone" href={`tel:${e.phone}`} dir="ltr"><Phone size={13} aria-hidden="true" />{e.phone}</a> : null}
                   </div>
                   {e.source ? <div className="nlm-src">{e.source}</div> : null}

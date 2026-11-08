@@ -122,13 +122,13 @@ export default function CreativeTests({ rows, projectId, isAdmin = false, period
         {tests.map(t => (
           <div key={t.key} className="ctz-card">
             <div className="ctz-head"><h3>{t.label}</h3>{t.indicative && <span className="ctz-ind">מעט נתונים עדיין</span>}</div>
-            <div className="ctz-rank">{t.rankBy !== 'lead' ? `דירוג לפי ${out.costLabel}` : meet ? `דירוג לפי עלות לליד — עוד מעט ${out.label} להשוואה` : 'דירוג לפי עלות לליד'}</div>
+            <div className="ctz-rank">{t.rankBy !== 'lead' ? `דירוג לפי ${out.costLabel}` : meet ? `דירוג לפי עלות לליד - עוד מעט ${out.label} להשוואה` : 'דירוג לפי עלות לליד'}</div>
             <div className="ctz-scroll"><table className="ctz-table">
               <thead><tr><th></th><th className="ctz-opt">מודעות</th><th>לידים</th><th className="ctz-opt">CTR</th><th className="ctz-opt">CPC</th><th>עלות לליד</th>{meet && <><th>{out.label}</th><th>{out.costLabel}</th></>}</tr></thead>
               <tbody>{t.groups.map((g, i) => {
                 const best = i === 0 && (t.rankBy !== 'lead' ? g[out.cost] != null : g.cpl != null)
                 return (
-                <tr key={g.value} className={best ? 'ctz-row best' : 'ctz-row'} tabIndex={0} role="button" aria-label={`${g.label} — הצגת המודעות`}
+                <tr key={g.value} className={best ? 'ctz-row best' : 'ctz-row'} tabIndex={0} role="button" aria-label={`${g.label} - הצגת המודעות`}
                   onClick={() => setOpen({ test: t, group: g })} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen({ test: t, group: g }) } }}>
                   <td className="ctz-name"><span className="ctz-name-in">{g.label}<ChevronLeft size={14} aria-hidden="true" className="ctz-go" /></span>{best && <span className="ctz-best">הכי טוב</span>}</td>
                   <td className="ctz-opt">{g.ads}</td>

@@ -247,7 +247,7 @@ async function handle(request) {
   // Collect projects whose CRM write was skipped because the fetch looked broken.
   const brokenProjects = []
   for (const r of results) for (const pr of (r.projects || [])) {
-    if (pr && pr.skippedBroken) brokenProjects.push(`${pr.project} — ${r.label}`)
+    if (pr && pr.skippedBroken) brokenProjects.push(`${pr.project} - ${r.label}`)
   }
 
   // Email alert if anything failed or any report was skipped as broken.
@@ -257,7 +257,7 @@ async function handle(request) {
     const brokenList = brokenProjects.map(b => `<li>${b}</li>`).join('')
     const html = `
       <div style="font-family:Arial,sans-serif;direction:rtl;text-align:right">
-        <h2>⚠️ קרון CRM (BMBY) — בעיה בהרצה</h2>
+        <h2>⚠️ קרון CRM (BMBY) - בעיה בהרצה</h2>
         <p>${fmt} · ${failed.length} כשלים · ${brokenProjects.length} דוחות שבורים שדולגו</p>
         ${brokenProjects.length ? `<h3>דוחות שבורים שלא נשמרו (נשמר הקודם הטוב):</h3><ul>${brokenList}</ul>` : ''}
         ${failed.length ? `<h3>משימות שנכשלו:</h3><ul>${failList}</ul>` : ''}

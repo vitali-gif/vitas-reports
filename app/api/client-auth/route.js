@@ -58,7 +58,7 @@ async function sendMagicLinkEmail(toEmail, magicLink) {
 
           <p style="margin:20px 0 0;font-size:12px;color:#64748B;line-height:1.6;text-align:center">
             הקישור בתוקף ל-24 שעות.<br>
-            אם לא ביקשת כניסה — ניתן להתעלם ממייל זה.
+            אם לא ביקשת כניסה - ניתן להתעלם ממייל זה.
           </p>
         </td></tr>
 
@@ -82,7 +82,7 @@ async function sendMagicLinkEmail(toEmail, magicLink) {
       body: JSON.stringify({
         from: 'Cluzo by Vitas <noreply@vitas.co.il>',
         to: [toEmail],
-        subject: 'קישור כניסה לדוח — Cluzo by Vitas',
+        subject: 'קישור כניסה לדוח - Cluzo by Vitas',
         html,
       }),
     })

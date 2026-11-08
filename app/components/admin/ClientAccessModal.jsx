@@ -59,7 +59,7 @@ export function ClientAccessModal({
             <button type="button" className="cza-link" onClick={() => setProjectIds(allOn ? [] : allIds)}>{allOn ? 'נקה הכל' : 'בחר הכל'}</button>
           </div>
           <div className="cza-clients">
-            {groups.length === 0 && <div className="cza-empty">אין פרויקטים להצגה. אם זה הטלפון — ודא שאתה מחובר כאדמין.</div>}
+            {groups.length === 0 && <div className="cza-empty">אין פרויקטים להצגה. אם זה הטלפון - ודא שאתה מחובר כאדמין.</div>}
             {groups.map(cl => {
               const ids = cl.projects.map(p => p.id)
               const n = ids.filter(id => projectIds.includes(id)).length

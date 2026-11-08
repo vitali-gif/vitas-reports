@@ -182,7 +182,7 @@ export default function DateRangePicker({
     [presets, value.presetId]
   );
   const triggerText = triggerLabel ?? (
-    value.from && value.to ? `${fmtLong(value.from)} — ${fmtLong(value.to)}` : 'בחר טווח תאריכים'
+    value.from && value.to ? `${fmtLong(value.from)} - ${fmtLong(value.to)}` : 'בחר טווח תאריכים'
   );
 
   /* ---- Render ---- */
@@ -230,12 +230,12 @@ export default function DateRangePicker({
             <div className="drp-banner">
               <button type="button" className={`drp-field ${editing==='from'?'is-focused':''}`} onClick={() => setEditing('from')}>
                 <span className="drp-field-lbl">מתאריך</span>
-                <span className="drp-field-val">{fmtLong(draftFrom) || '—'}</span>
+                <span className="drp-field-val">{fmtLong(draftFrom) || '-'}</span>
               </button>
               <span className="drp-arrow">←</span>
               <button type="button" className={`drp-field ${editing==='to'?'is-focused':''}`} onClick={() => setEditing('to')}>
                 <span className="drp-field-lbl">עד תאריך</span>
-                <span className="drp-field-val">{fmtLong(draftTo) || '—'}</span>
+                <span className="drp-field-val">{fmtLong(draftTo) || '-'}</span>
               </button>
             </div>
 

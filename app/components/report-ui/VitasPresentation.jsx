@@ -46,14 +46,14 @@ export function MetricCard({ label, value, description, tone = 'indigo', icon: I
   const hintId = useId();
   const clickable = typeof onClick === 'function';
   const a11y = clickable ? {
-    role: 'button', tabIndex: 0, 'aria-label': `${label} — הצג רשימת לידים`, onClick,
+    role: 'button', tabIndex: 0, 'aria-label': `${label} - הצג רשימת לידים`, onClick,
     onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } },
   } : {};
   return <article className={`vr-metric ${toneClass(tone)}${clickable ? ' vr-metric-clickable' : ''}${className ? ' ' + className : ''}`} {...a11y}>
     <div className="vr-metric-top">
       {Icon && <span className="vr-metric-icon"><Icon aria-hidden="true" size={22} strokeWidth={1.7} /></span>}
       <h3>{label}</h3>
-      {badge && <span className="vr-metric-badge" title={badgeTitle || undefined}><bdi>{badge}</bdi>{badgeTitle && <span className="vr-sr-only">{' — ' + badgeTitle}</span>}</span>}
+      {badge && <span className="vr-metric-badge" title={badgeTitle || undefined}><bdi>{badge}</bdi>{badgeTitle && <span className="vr-sr-only">{' - ' + badgeTitle}</span>}</span>}
     </div>
     <p className="vr-metric-value"><bdi>{value ?? 'אין נתון'}</bdi></p>
     {/* שורת ההשוואה. title לבדו לא קיים במגע, ולכן היא מוצגת כטקסט. */}
@@ -112,8 +112,8 @@ export function ReportTable({ caption, columns, rows, expandedIds = [], onToggle
       {columns.map((column, i) => <td key={column.key} className={column.numeric ? 'vr-numeric' : ''}>
         {i === 0 ? <span className={`vr-row-name vr-level-${Math.min(level, 2)}`}>
           {canExpand && <button type="button" className="vr-icon-button" aria-expanded={open} aria-label={`${open ? 'סגור' : 'פתח'} פירוט ${row.accessibleLabel || ''}`} onClick={() => onToggle(row.id)}>{open ? <ChevronDown size={16} /> : <ChevronLeft size={16} />}</button>}
-          {row.cells[column.key] ?? '—'}
-        </span> : <bdi>{row.cells[column.key] ?? '—'}</bdi>}
+          {row.cells[column.key] ?? '-'}
+        </span> : <bdi>{row.cells[column.key] ?? '-'}</bdi>}
       </td>)}
     </tr>, ...(open && canExpand ? renderRows(row.children, level + 1) : [])];
   });
