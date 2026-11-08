@@ -10,13 +10,9 @@
  */
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../../lib/api-fetch'
+import { fbUrlExpired } from '../../../lib/fb-url.js'
 
-/** true אם הקישור מ-fbcdn פג (או יפוג ב-10 הדקות הקרובות). קישור בלי oe= נחשב תקף. */
-export function fbUrlExpired(u, now = Date.now()) {
-  const m = /[?&]oe=([0-9A-Fa-f]{6,10})(?:&|$)/.exec(String(u || ''))
-  if (!m) return false
-  return parseInt(m[1], 16) * 1000 < now + 10 * 60 * 1000
-}
+export { fbUrlExpired }
 
 export function needsFresh(ad) {
   if (!ad || !ad.id || !/^\d{5,25}$/.test(String(ad.id))) return false
@@ -66,19 +62,26 @@ function requestMedia(projectId, adId) {
 
 export default function FreshAd({ projectId, ad, children }) {
   const want = !!projectId && needsFresh(ad)
-  const [media, setMedia] = useState(null)
+  const [media, setMedia] = useState(undefined)   // undefined = עוד מחכים, null = מטא לא החזיר
   useEffect(() => {
     if (!want) return undefined
     let live = true
+    setMedia(undefined)
     requestMedia(projectId, ad.id).then(v => { if (live) setMedia(v) })
     return () => { live = false }
   }, [want, projectId, ad && ad.id])
-  if (!want || !media) return children(ad)
+  if (!want || media === null) return children(ad)
+  // בזמן ההמתנה לא מציגים את הקישור שפג: התמונה נכשלת מיד, ה-onError של הכרטיס מסתיר אותה
+  // ומשאיר רקע כהה — וזה נשאר גם אחרי שהקישור החדש מגיע (ויטלי, 8.11: המודעות הסטטיות ריקות).
+  const live = (u) => (u && !fbUrlExpired(u) ? u : '')
+  if (media === undefined) {
+    return children({ ...ad, videoUrl: live(ad.videoUrl), imageUrl: live(ad.imageUrl), thumbnailUrl: live(ad.thumbnailUrl) })
+  }
   return children({
     ...ad,
-    videoUrl: media.videoUrl || (fbUrlExpired(ad.videoUrl) ? '' : ad.videoUrl) || '',
+    videoUrl: media.videoUrl || live(ad.videoUrl),
     videoPermalink: media.permalink || ad.videoPermalink,
-    imageUrl: media.imageUrl || ad.imageUrl,
-    thumbnailUrl: media.imageUrl || ad.thumbnailUrl,
+    imageUrl: media.imageUrl || live(ad.imageUrl),
+    thumbnailUrl: media.imageUrl || live(ad.thumbnailUrl),
   })
 }
