@@ -12,7 +12,8 @@ import { TIKTOK_AUTH_URL, tiktokExchangeCode, tiktokAdvertisers, tiktokDailySpen
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 const J = (b, s = 200) => NextResponse.json(b, { status: s, headers: { 'Cache-Control': 'no-store' } })
-const creds = () => ({ appId: process.env.TIKTOK_APP_ID || '', secret: process.env.TIKTOK_APP_SECRET || '' })
+// trim: ערך שהודבק ב-Vercel עם רווח או שורה חדשה בסוף נדחה ע"י TikTok כ"secret incorrect" (9.11)
+const creds = () => ({ appId: String(process.env.TIKTOK_APP_ID || '').trim(), secret: String(process.env.TIKTOK_APP_SECRET || '').trim() })
 const ymd = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(d)
 
 export async function GET(req) {
