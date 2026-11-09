@@ -3301,7 +3301,9 @@ const selectProject = async (client, project) => {
           { key: 'deal',  label: 'חוזים',            of: 'held',  ofLabel: 'מהפגישות שהתקיימו' },
         ];
         // Fireberry (אלפא) לא מדווח הרשמות וחוזים — שתי תחנות של אפס היו נראות כנפילה של 100%.
-        const _noDeals = _crmType === 'fireberry';
+        // Fireberry (אלפא) מדווח הרשמות וחוזים לפי סטטוס הליד מאז 9.11. אם אין אף אחד מהם בתקופה — בלי שתי התחנות,
+        // אחרת שתי תחנות של אפס נראות כנפילה של 100%.
+        const _noDeals = _crmType === 'fireberry' && !(V.reg > 0 || V.deal > 0);
         if (_noDeals) STAGES = STAGES.filter(st => st.key !== 'reg' && st.key !== 'deal');
         flowDesc = _noDeals ? 'מחשיפה ועד פגישה' : 'מחשיפה ועד חוזה';
         scopeNote = 'לידים שנכנסו בתקופה. ' + MEDIA_NOTE
@@ -3892,9 +3894,10 @@ const selectProject = async (client, project) => {
           {crmKpi('\u05e4\u05d2\u05d9\u05e9\u05d5\u05ea \u05d1\u05d5\u05e6\u05e2\u05d5', formatNum(ct.meetingsCompleted), 'orange', ct.meetingsCompleted, cp?.meetingsCompleted, false, 'בוצעו = פגישות שהתקיימו בפועל.\nנספר לפי תאריך הפגישה - רק כאלה שסומנו כבוצעו, כולל פגישות מלידים של חודשים קודמים.', _crmLeads?.meetingsCompleted, [(ct.meetingsCompletedSplit && (ct.meetingsCompletedSplit.fromNewLeads+ct.meetingsCompletedSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCompletedSplit.fromNewLeads+' · קודמים '+ct.meetingsCompletedSplit.fromOldLeads) : null), _vrHeldNote].filter(Boolean).join(' · ') || undefined)}
           {crmKpi('פגישות עתידיות', formatNum(ct.meetingsUpcoming||0), 'cyan', ct.meetingsUpcoming||0, cp?.meetingsUpcoming, false, 'עתידיות = פגישות שנקבעו וטרם התקיימו.\nמועד הפגישה עתידי (אחרי היום) והיא עדיין פתוחה. כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsUpcoming, (ct.meetingsUpcomingSplit && (ct.meetingsUpcomingSplit.fromNewLeads+ct.meetingsUpcomingSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsUpcomingSplit.fromNewLeads+' · קודמים '+ct.meetingsUpcomingSplit.fromOldLeads) : null))}
           {crmKpi('פגישות שבוטלו', formatNum(ct.meetingsCancelled||0), 'red', ct.meetingsCancelled||0, cp?.meetingsCancelled, false, 'בוטלו = פגישות שנקבעו החודש ובוטלו.\nנספר לפי תאריך התיאום, כולל פגישות מלידים ותיקים.', _crmLeads?.meetingsCancelled, (ct.meetingsCancelledSplit && (ct.meetingsCancelledSplit.fromNewLeads+ct.meetingsCancelledSplit.fromOldLeads)>0 ? ('חדשים '+ct.meetingsCancelledSplit.fromNewLeads+' · קודמים '+ct.meetingsCancelledSplit.fromOldLeads) : null))}
-          {/* Fireberry לא מדווח הרשמות וחוזים — כרטיסי אפס קבועים רק מבלבלים. */}
-          {!_crmIsFireberry && crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations, _vrRegNote)}
-          {!_crmIsFireberry && crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts, _vrDealNote)}
+          {/* Fireberry (9.11): הרשמות וחוזים לפי סטטוס הליד (lib/crm/fireberry-summary.js) */}
+          {crmKpi('\u05d4\u05e8\u05e9\u05de\u05d5\u05ea', formatNum(ct.registrations), 'green', ct.registrations, cp?.registrations, false, null, _crmLeads?.registrations, _vrRegNote)}
+          {crmKpi('\u05d7\u05d5\u05d6\u05d9\u05dd', formatNum(ct.contracts), 'pink', ct.contracts, cp?.contracts, false, null, _crmLeads?.contracts, _vrDealNote)}
+          {_crmIsFireberry && crmKpi('סגרו וביטלו', formatNum(ct.contractsCancelled || 0), 'red', ct.contractsCancelled || 0, cp?.contractsCancelled, false, 'לידים שסגרו עסקה וביטלו (סטטוס "לקוח סגר וביטל").\nלא נספרים בחוזים.', _crmLeads?.contractsCancelled)}
           {!vrCrm && _platformSpend > 0 ? crmKpi('סה"כ תקציב', formatCurrency(_platformSpend), 'cyan', _platformSpend, null, true) : null}
           {!vrCrm && ct.totalLeads > 0 && _platformSpend > 0 ? crmKpi('עלות לליד', formatCurrency(_platformSpend / ct.totalLeads), 'purple', _platformSpend / ct.totalLeads, null, true) : null}
           {!vrCrm && ct.meetingsCompleted > 0 && _platformSpend > 0 ? crmKpi('עלות לפגישה שבוצעה', formatCurrency(_platformSpend / ct.meetingsCompleted), 'purple', _platformSpend / ct.meetingsCompleted, null, true) : null}
@@ -4232,8 +4235,8 @@ const selectProject = async (client, project) => {
         // ⚡ Fast path: if heavy CRM rows aren't loaded yet, use the cron-computed summary
         // totals (unfiltered) so the 'all' tab CRM cards show instantly instead of 0.
         if (!crmTotals && dashTab === 'all') {
-          const tt = { totalLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0 };
-          crmReps.forEach(r => { const sm = r.summary || {}; tt.totalLeads += (+sm.totalLeads || 0); tt.meetingsScheduled += (+sm.meetingsScheduled || 0); tt.meetingsCompleted += (+sm.meetingsCompleted || 0); tt.meetingsCancelled += (+sm.meetingsCancelled || 0); tt.registrations += (+sm.registrations || 0); tt.registrationValue += (+sm.registrationValue || 0); tt.contracts += (+sm.contracts || 0); tt.contractValue += (+sm.contractValue || 0); });
+          const tt = { totalLeads: 0, meetingsScheduled: 0, meetingsCompleted: 0, meetingsCancelled: 0, registrations: 0, registrationValue: 0, contracts: 0, contractValue: 0, contractsCancelled: 0 };
+          crmReps.forEach(r => { const sm = r.summary || {}; tt.totalLeads += (+sm.totalLeads || 0); tt.meetingsScheduled += (+sm.meetingsScheduled || 0); tt.meetingsCompleted += (+sm.meetingsCompleted || 0); tt.meetingsCancelled += (+sm.meetingsCancelled || 0); tt.registrations += (+sm.registrations || 0); tt.registrationValue += (+sm.registrationValue || 0); tt.contracts += (+sm.contracts || 0); tt.contractValue += (+sm.contractValue || 0); tt.contractsCancelled += (+sm.contractsCancelled || 0); });
           crmTotals = tt;
         }
       }
@@ -4343,7 +4346,7 @@ const selectProject = async (client, project) => {
       // גם טאב ה-CRM של אריקה מקבל את הכרטיס המשותף — אותם ערכים, אותה תגית שינוי.
       if (vrAds || vrZohoCrm) {
         // עיצוב מחודש: אותם ערכים, אותה תגית שינוי, אותה לחיצה לרשימת לידים — בכרטיס report-ui.
-        const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'ממתינים לטיפול ב-CRM': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature,
+        const VR_ICON = { 'תקציב': Wallet, 'לידים': Users, 'עלות לליד': Tag, 'פגישות שתואמו': CalendarCheck, 'פגישות שבוצעו': CheckCircle2, 'פגישות עתידיות': CalendarClock, 'פגישות שבוטלו': XCircle, 'ממתינים לטיפול ב-CRM': UserX, 'הרשמות': ClipboardList, 'חוזים': FileSignature, 'סגרו וביטלו': XCircle,
           // מדדים שקיימים רק אצל אריקה (Zoho) ו-KLOSS (Salesforce). בלעדיהם הכרטיסים שלהם
           // היו מקבלים את העיצוב אבל בלי אייקון, בזמן שהשאר כן.
           'תקציב שנוצל': Wallet, 'עלות ממוצעת לקליק': MousePointerClick, 'עברו להזדמנות': Handshake, 'הזדמנויות': Handshake,
@@ -6336,11 +6339,13 @@ const selectProject = async (client, project) => {
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות עתידיות', formatNum(_cs.meetingsUpcoming || 0), 'cyan', _cs.meetingsUpcoming || 0, prevCrmTotals?.meetingsUpcoming, false, _tabCrmLeads?.meetingsUpcoming) : null}
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('פגישות שבוטלו', formatNum(_cs.meetingsCancelled || 0), 'red', _cs.meetingsCancelled || 0, prevCrmTotals?.meetingsCancelled, false, _tabCrmLeads?.meetingsCancelled) : null}
           {!['zoho','salesforce'].includes(_cs.crmType) ? kpi('ממתינים לטיפול ב-CRM', formatNum(_cs.leadsToHandle || 0), 'amber', _cs.leadsToHandle || 0, null, false, null) : null}
-          {crmTotals && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations,
+          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('הרשמות', formatNum(crmTotals.registrations || 0), 'green', crmTotals.registrations, prevCrmTotals?.registrations, false, _tabCrmLeads?.registrations,
             (vrAds && activeT.spend > 0 && (crmTotals?.registrationValue || 0) > 0) ? ('שווי ' + formatCurrencyCompact(crmTotals.registrationValue)) : undefined) : null}
           {!vrAds && activeT.spend > 0 && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('שווי הרשמות', formatCurrencyCompact(crmTotals?.registrationValue || 0), 'green', crmTotals?.registrationValue || 0, prevCrmTotals?.registrationValue || null) : null}
-          {crmTotals && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts,
+          {crmTotals && !['zoho','salesforce'].includes(_cs.crmType) ? kpi('חוזים', formatNum(crmTotals.contracts || 0), 'pink', crmTotals.contracts, prevCrmTotals?.contracts, false, _tabCrmLeads?.contracts,
             (vrAds && activeT.spend > 0) ? [ (crmTotals?.contractValue || 0) > 0 ? 'שווי ' + formatCurrencyCompact(crmTotals.contractValue) : null, (crmTotals?.contracts || 0) > 0 ? 'עלות לחוזה ' + formatCurrency(activeT.spend / crmTotals.contracts) : null ].filter(Boolean).join(' · ') || undefined : undefined) : null}
+          {/* פיירברי (אלפא, 9.11): לידים בסטטוס "לקוח סגר וביטל" — נפרד מהחוזים */}
+          {crmTotals && _cs.crmType === 'fireberry' ? kpi('סגרו וביטלו', formatNum(crmTotals.contractsCancelled || 0), 'red', crmTotals.contractsCancelled || 0, prevCrmTotals?.contractsCancelled, false, _tabCrmLeads?.contractsCancelled) : null}
           {!vrAds && activeT.spend > 0 && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('שווי חוזים', formatCurrencyCompact(crmTotals?.contractValue || 0), 'green', crmTotals?.contractValue || 0, prevCrmTotals?.contractValue || null) : null}
           {!vrAds && activeT.spend > 0 && !['zoho','salesforce','fireberry'].includes(_cs.crmType) ? kpi('עלות לחוזה', (crmTotals?.contracts > 0) ? formatCurrency(activeT.spend / crmTotals.contracts) : '-', 'red', (crmTotals?.contracts > 0) ? activeT.spend / crmTotals.contracts : 0, (prevCrmTotals?.contracts > 0 && activeP?.spend) ? activeP.spend / prevCrmTotals.contracts : null, true) : null}
           </>)}

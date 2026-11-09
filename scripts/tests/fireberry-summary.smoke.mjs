@@ -169,8 +169,28 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   eq(all.meetingsCancelled.length, 1, 'משפך: בוטלה לפי סטטוס הפגישה')
   eq(R.namedLeads.google.allLeads.length, 1, 'משפך: פיצול לגוגל')
   eq(R.namedLeads.facebook.allLeads.length, 3, 'משפך: פיצול לפייסבוק')
-  ok(!('registrations' in all), 'אין רשימת הרשמות — "אין נתון" ולא אפס')
   ok(!('phone' in all.allLeads[0]), 'אין טלפון ברשימות השמיות')
+}
+
+// ── הרשמות, חוזים, סגרו וביטלו — לפי סטטוס הליד (ויטלי, 9.11) ─────────────────
+{
+  const leads = [
+    lead('r1', '2026-10-02T09:00:00', { statuscode: 'שוריינה עסקה' }),
+    lead('r2', '2026-10-03T09:00:00', { statuscode: 'לקוח סגר' }),
+    lead('r3', '2026-10-04T09:00:00', { statuscode: 'לקוח סגר וביטל', originatingleadcode: 'גוגל' }),
+    lead('r4', '2026-10-05T09:00:00', { statuscode: 'התקיימה פגישה' }),
+    lead('r5', '2026-09-20T09:00:00', { statuscode: 'לקוח סגר' }),   // נכנס לפני התקופה — לא בקוהורט
+  ]
+  const R = computeFireberrySummary({ leads, meetings: [] }, { since: '2026-10-01', until: '2026-10-31', now: new Date('2026-10-31T23:00:00') })
+  eq(R.totals.registrations, 3, 'הרשמות = שוריינה + סגר + סגר וביטל')
+  eq(R.totals.contracts, 1, 'חוזים = לקוח סגר בלבד')
+  eq(R.totals.contractsCancelled, 1, 'סגרו וביטלו בנפרד, לא בחוזים')
+  eq(R.sources['גוגל'].contractsCancelled, 1, 'סגרו וביטלו לפי מקור')
+  eq(R.namedLeads.all.contracts.length, 1, 'משפך: רשימת חוזים')
+  eq(R.namedLeads.all.registrations.length, 3, 'משפך: רשימת הרשמות')
+  const fbRow = R.sourceRows.find(r => r.source === 'פייסבוק')
+  eq(fbRow.contracts, 1, 'שורת המקור נושאת חוזים')
+  eq(R.totals.contractValue, 0, 'אין שווי חוזים בפיירברי')
 }
 
 // ── זמני תגובה מההערות ──────────────────────────────────────────────────────
