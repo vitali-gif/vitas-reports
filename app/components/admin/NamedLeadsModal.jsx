@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { Users, X, Search, Phone, CalendarPlus, CalendarCheck, Megaphone } from 'lucide-react'
+import { Users, X, Search, Phone, CalendarPlus, CalendarCheck, Megaphone, Copy, Check } from 'lucide-react'
 import { REVIEW_LABEL } from '../../../lib/objection-normalize.js'
 
 // רשימת הלידים שמאחורי כרטיס (ויטלי, 3.11: "לעצב בצורה מקצועית יותר לפי ה-DESIGN SYSTEM").
@@ -10,10 +10,31 @@ const dmy = (s) => {
   const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
   return m ? `${m[3]}.${m[2]}.${m[1]}` : ''
 }
+// "העתק" (ויטלי, 9.11: לשלוח את רשימת הפגישות בקבוצת וואטסאפ) — טקסט פשוט, שורה לכל ליד, מה שמוצג (גם אחרי חיפוש).
+export function leadsAsText(title, rows) {
+  const lines = rows.map((e, i) => [
+    `${i + 1}. ${e.name || '-'}`,
+    e.phone || '',
+    e.source || '',
+    e.ad ? `מודעה: ${e.ad}` : '',
+    e.leadDate ? `כניסת ליד ${dmy(e.leadDate)}` : '',
+    e.apptDate ? `תיאום פגישה ${dmy(e.apptDate)}` : '',
+    e.objection ? `התנגדות: ${e.objection}` : '',
+  ].filter(Boolean).join(' · '))
+  return `*${title}* (${rows.length})\n\n${lines.join('\n')}`
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true } catch {}
+  try {
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'
+    document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); document.body.removeChild(ta); return ok
+  } catch { return false }
+}
 const initial = (name) => (String(name || '').trim().match(/[\p{L}\p{N}]/u) || ['?'])[0]
 
 export default function NamedLeadsModal({ title, names, isClientView, onClose }) {
   const [q, setQ] = useState('')
+  const [copied, setCopied] = useState(false)
   const rows = useMemo(() => (names || []).map(e => (typeof e === 'string' ? { name: e } : (e || {}))), [names])
   const shown = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -29,6 +50,13 @@ export default function NamedLeadsModal({ title, names, isClientView, onClose })
             <h3>{title}</h3>
             <p>{rows.length} רשומות{q && shown.length !== rows.length ? ` · מוצגות ${shown.length}` : ''}</p>
           </div>
+          {shown.length > 0 && (
+            <button type="button" className="nlm-copy" onClick={async () => { if (await copyText(leadsAsText(title, shown))) { setCopied(true); setTimeout(() => setCopied(false), 1800) } }}
+              aria-label="העתקת הרשימה" title="העתקת הרשימה (לוואטסאפ)"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, border: '1px solid var(--border, #E2E8F0)', background: copied ? '#E5F4E4' : 'var(--surface, #fff)', color: 'var(--text, #0B0F1E)', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+              {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}{copied ? 'הועתק' : 'העתק'}
+            </button>
+          )}
           <button type="button" className="cza-x" onClick={onClose} aria-label="סגירה"><X size={20} /></button>
         </div>
         {rows.length > 8 && (
