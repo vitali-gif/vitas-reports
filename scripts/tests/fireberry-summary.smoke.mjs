@@ -191,6 +191,16 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   const fbRow = R.sourceRows.find(r => r.source === 'פייסבוק')
   eq(fbRow.contracts, 1, 'שורת המקור נושאת חוזים')
   eq(R.totals.contractValue, 0, 'אין שווי חוזים בפיירברי')
+  eq(R.namedLeads.all.leadsToHandle.length, 0, 'משפך: רשימת ממתינים (אין "חדש" כאן)')
+  ok(Array.isArray(R.namedLeads.facebook.meetingsUpcoming), 'משפך: רשימת עתידיות קיימת')
+}
+{
+  const leads = [lead('u1', '2026-10-02T09:00:00'), lead('u2', '2026-09-02T09:00:00', { statuscode: 'תואמה פגישה' })]
+  const meetings = [meeting('m1', 'u2', '2026-10-05T10:00:00', '2026-11-20T10:00:00'), meeting('m2', 'u2', '2026-10-06T10:00:00', '2026-11-21T10:00:00')]
+  const R = computeFireberrySummary({ leads, meetings }, { since: '2026-10-01', until: '2026-10-31', now: new Date('2026-10-31T23:00:00') })
+  eq(R.totals.meetingsUpcoming, 2, 'עתידיות: שתי פגישות')
+  eq(R.namedLeads.all.meetingsUpcoming.length, 1, 'עתידיות: ליד ותיק אחד ברשימה, פעם אחת')
+  eq(R.namedLeads.all.leadsToHandle.length, 1, 'ממתינים: הליד בסטטוס חדש')
 }
 
 // ── זמני תגובה מההערות ──────────────────────────────────────────────────────
