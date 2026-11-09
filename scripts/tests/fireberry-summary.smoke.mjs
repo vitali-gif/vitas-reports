@@ -202,6 +202,20 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   eq(R.namedLeads.all.meetingsUpcoming.length, 1, 'עתידיות: ליד ותיק אחד ברשימה, פעם אחת')
   eq(R.namedLeads.all.leadsToHandle.length, 1, 'ממתינים: הליד בסטטוס חדש')
   eq(R.namedLeads.all.cards.meetingsScheduled.length, 1, 'כרטיס תואמו: ליד ותיק עם פגישות שתואמו בתקופה')
+}
+{
+  const leads = [lead('n1', '2026-10-02T09:00:00', { statuscode: 'אין מענה', pcfsystemfield182: 'הערה על הליד' }), lead('n2', '2026-10-03T09:00:00', { statuscode: 'אין מענה' })]
+  const notes = [
+    { objectid: 'n2', createdon: '2026-10-03 10:00:00', by: 'רועי בני', text: 'לא ענה' },
+    { objectid: 'n2', createdon: '2026-10-04 11:00:00', by: 'הודיה כהן', text: 'אין מענה, נשלחה הודעה' },
+    { objectid: 'n2', createdon: '2026-10-05 11:00:00', by: 'משי אלפא', text: '0501234567' },
+  ]
+  const R = computeFireberrySummary({ leads, meetings: [], notes }, { since: '2026-10-01', until: '2026-10-31', now: new Date('2026-10-31T23:00:00') })
+  const nr = Object.fromEntries(R.namedLeads.all.noResponse.map(e => [e.name, e]))
+  eq(nr['ליד n2'].note, 'אין מענה, נשלחה הודעה', 'ללא תיעוד: ההערה האנושית האחרונה (בלי טלפון בלבד)')
+  eq(nr['ליד n2'].noteBy, 'הודיה כהן', 'ללא תיעוד: מי כתב')
+  eq(nr['ליד n1'].note, 'הערה על הליד', 'ללא תיעוד: בלי הערות — ההערה שעל הליד')
+  ok(!('note' in R.namedLeads.all.allLeads[0]), 'בשאר הרשימות אין הערה')
   eq(R.namedLeads.all.meetingsScheduled.length, 0, 'המשפך נשאר קוהורט: הליד הוותיק לא בו')
 }
 
