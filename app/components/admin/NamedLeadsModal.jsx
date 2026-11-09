@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { Users, X, Search, Phone, CalendarPlus, CalendarCheck, Megaphone, Copy, Check } from 'lucide-react'
+import { Users, X, Search, Phone, CalendarPlus, CalendarCheck, Megaphone, Copy, Check, MessageSquareText } from 'lucide-react'
 import { REVIEW_LABEL } from '../../../lib/objection-normalize.js'
 
 // רשימת הלידים שמאחורי כרטיס (ויטלי, 3.11: "לעצב בצורה מקצועית יותר לפי ה-DESIGN SYSTEM").
@@ -20,6 +20,7 @@ export function leadsAsText(title, rows) {
     e.leadDate ? `כניסת ליד ${dmy(e.leadDate)}` : '',
     e.apptDate ? `תיאום פגישה ${dmy(e.apptDate)}` : '',
     e.objection ? `התנגדות: ${e.objection}` : '',
+    e.note ? `הערה אחרונה${e.noteDate ? ' ' + dmy(e.noteDate) : ''}${e.noteBy ? ' (' + e.noteBy + ')' : ''}: ${String(e.note).replace(/\s*\n\s*/g, ' / ')}` : '',
   ].filter(Boolean).join(' · '))
   return `*${title}* (${rows.length})\n\n${lines.join('\n')}`
 }
@@ -39,7 +40,7 @@ export default function NamedLeadsModal({ title, names, isClientView, onClose })
   const shown = useMemo(() => {
     const t = q.trim().toLowerCase()
     if (!t) return rows
-    return rows.filter(e => [e.name, e.phone, e.source, e.ad, e.objection].some(v => String(v || '').toLowerCase().includes(t)))
+    return rows.filter(e => [e.name, e.phone, e.source, e.ad, e.objection, e.note].some(v => String(v || '').toLowerCase().includes(t)))
   }, [rows, q])
   return (
     <div className="modal-overlay active" style={{ zIndex: 9999 }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -79,6 +80,12 @@ export default function NamedLeadsModal({ title, names, isClientView, onClose })
                   </div>
                   {e.source ? <div className="nlm-src">{e.source}</div> : null}
                   {e.ad ? <div className="nlm-ad"><Megaphone size={13} aria-hidden="true" /> <span>מודעה:</span> <b dir="auto">{e.ad}</b></div> : null}
+                  {e.note ? (
+                    <div className="nlm-note" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginTop: 4, fontSize: 13, color: 'var(--text-2, #334155)', background: 'var(--surface-2, #F8FAFC)', borderRadius: 8, padding: '6px 8px' }}>
+                      <MessageSquareText size={14} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }} />
+                      <span><b>הערה אחרונה{e.noteDate ? ' ' + dmy(e.noteDate) : ''}{e.noteBy ? ' · ' + e.noteBy : ''}:</b> <span dir="auto" style={{ whiteSpace: 'pre-line' }}>{e.note}</span></span>
+                    </div>
+                  ) : null}
                   {(e.leadDate || e.apptDate || e.objection) && (
                     <div className="nlm-meta">
                       {e.leadDate ? <span><CalendarPlus size={13} aria-hidden="true" /> כניסת ליד <b dir="ltr">{dmy(e.leadDate)}</b></span> : null}
