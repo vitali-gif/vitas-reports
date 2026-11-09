@@ -51,9 +51,11 @@ async function metaAccounts() {
 async function metaWeeks(acc, cur, prev) {
   const token = metaTokenFor(acc.id)
   const ranges = encodeURIComponent(JSON.stringify([{ since: prev[0], until: prev[1] }, { since: cur[0], until: cur[1] }]))
-  // רמת קמפיין: לכל קמפיין "התוצאה" שלו (extractLeads), כמו "תוצאות" במנהל המודעות; והשם — לסינון ולפיצול.
-  // use_unified_attribution_setting: כמו ad_daily (lib/ads/meta-daily.js). בלעדיו אלפא אקספו קיבלה ליד 1 במקום 229.
-  const rows = await metaFetchAll(`${G}/act_${acc.id}/insights?level=campaign&fields=campaign_name,spend,clicks,impressions,actions&time_ranges=${ranges}&use_unified_attribution_setting=true&limit=500`, token)
+  // רמת מודעה (9.11), כמו ad_daily (lib/ads/meta-daily.js): לכל מודעה "התוצאה" שלה (extractLeads). ברמת קמפיין
+  // קמפיין המרות של אלפא אקספו החזיר גם ליד אחד מטופס (lead_grouped=1) וגם 100 לידים מהאתר, ו-extractLeads בחר
+  // ב-1 — הדוח השבועי הראה ליד אחד ב-30,815 ש"ח. לכל מודעה יש סוג תוצאה אחד, אז הסכום לפי מודעה נכון.
+  // use_unified_attribution_setting: כמו ad_daily. השם של הקמפיין — לסינון ולפיצול.
+  const rows = await metaFetchAll(`${G}/act_${acc.id}/insights?level=ad&fields=campaign_name,spend,clicks,impressions,actions&time_ranges=${ranges}&use_unified_attribution_setting=true&limit=500`, token)
   let name = acc.name
   if (!name) {
     const r = await fetch(`${G}/act_${acc.id}?fields=name,account_status&access_token=${encodeURIComponent(token)}`).then(x => x.json()).catch(() => ({}))
