@@ -36,9 +36,12 @@ eq('sources: top, no zero rows, prev 0 when missing', m.sources.map(s => [s.name
 // חוזים +100% והרשמות +50% — בסיס קטן מ-5, מסוננים. בתיקו של 25% (לידים, פגישות) — העמוק יותר.
 eq('biggest change ignores tiny bases', m.highlight && [m.highlight.label, r(m.highlight.change)], ['פגישות שבוצעו', 25])
 
-// פיירברי — בלי הרשמות וחוזים
+// פיירברי (9.11) — הרשמות וחוזים לפי סטטוס הליד; "סגרו וביטלו" רק כשיש
 const fbm = buildReportModel({ project: 'אקספו', key: '2026-09', prevKey: '2026-08', rows: [{ source: 'crm', summary: { crmType: 'fireberry', totalLeads: 10 } }], prevRows: [] })
-eq('fireberry: no registrations/contracts', fbm.kpis.some(x => x.key === 'contracts' || x.key === 'regs'), false)
+eq('fireberry: registrations + contracts shown', ['regs', 'contracts'].every(k => fbm.kpis.some(x => x.key === k)), true)
+eq('fireberry: no cancelled card at 0', fbm.kpis.some(x => x.key === 'cancelledDeals'), false)
+const fbm2 = buildReportModel({ project: 'אקספו', key: '2026-09', prevKey: '2026-08', rows: [{ source: 'crm', summary: { crmType: 'fireberry', totalLeads: 10, contracts: 1, contractsCancelled: 2 } }], prevRows: [] })
+eq('fireberry: cancelled card when > 0', fbm2.kpis.find(x => x.key === 'cancelledDeals')?.value, 2)
 eq('no previous data → hasPrev false, prev null', [fbm.hasPrev, fbm.kpis[0].prev], [false, null])
 
 // זוהו
