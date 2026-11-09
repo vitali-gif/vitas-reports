@@ -201,6 +201,8 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   eq(R.totals.meetingsUpcoming, 2, 'עתידיות: שתי פגישות')
   eq(R.namedLeads.all.meetingsUpcoming.length, 1, 'עתידיות: ליד ותיק אחד ברשימה, פעם אחת')
   eq(R.namedLeads.all.leadsToHandle.length, 1, 'ממתינים: הליד בסטטוס חדש')
+  eq(R.namedLeads.all.cards.meetingsScheduled.length, 1, 'כרטיס תואמו: ליד ותיק עם פגישות שתואמו בתקופה')
+  eq(R.namedLeads.all.meetingsScheduled.length, 0, 'המשפך נשאר קוהורט: הליד הוותיק לא בו')
 }
 
 // ── זמני תגובה מההערות ──────────────────────────────────────────────────────
