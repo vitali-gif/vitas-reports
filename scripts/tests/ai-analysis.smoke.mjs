@@ -3,6 +3,9 @@
 // הרצה:  node scripts/tests/ai-analysis.smoke.mjs
 import { analysisInput, runAnalysis, weeklyEmailHtml, weekKeys, keyDiagnosis, AI_MODEL, ANALYSIS_SCHEMA } from '../../lib/ai-analysis.js'
 import { buildReportModel } from '../../lib/report-pdf.js'
+// ההנחיה נשלחת כבלוק עם cache_control (9.11)
+const sysText = (s) => Array.isArray(s) ? s.map(b => b.text).join('') : String(s || '')
+
 
 const fail = (m) => { console.error('✗ ' + m); process.exitCode = 1 }
 const eq = (label, a, b) => (JSON.stringify(a) === JSON.stringify(b) ? console.log('✓ ' + label) : fail(`${label}: got ${JSON.stringify(a)}, expected ${JSON.stringify(b)}`))
@@ -48,8 +51,8 @@ eq('not JSON → BAD_OUTPUT', await codeOf({ stop_reason: 'end_turn', content: [
   const fixed = await runAnalysis(input, { client: fix })
   eq('wording: one retry with a note, fixed result kept, both calls billed', [fix.reqs.length, fix.reqs[1].messages[0].content.includes('ביטויים אסורים'), forbiddenInResult(fixed.result).length, fixed.usage.costUsd], [2, true, 0, 0.2])
   eq('wording: still forbidden after retry → WORDING', await codeOf(null, { client: seq(reply(badAns)) }), 'WORDING')
-  eq('prompt lists the forbidden phrases', [/לא קיבלו מענה/.test(fix.reqs[0].system), /ממתינים לטיפול/.test(fix.reqs[0].system)], [true, true])
-  eq('prompt: one team, no firing or replacing, owner decides', [/One team/.test(fix.reqs[0].system), /firing, replacing/.test(fix.reqs[0].system), /owner/.test(fix.reqs[0].system)], [true, true, true])
+  eq('prompt lists the forbidden phrases', [/לא קיבלו מענה/.test(sysText(fix.reqs[0].system)), /ממתינים לטיפול/.test(sysText(fix.reqs[0].system))], [true, true])
+  eq('prompt: one team, no firing or replacing, owner decides', [/One team/.test(sysText(fix.reqs[0].system)), /firing, replacing/.test(sysText(fix.reqs[0].system)), /owner/.test(sysText(fix.reqs[0].system))], [true, true, true])
 }
 
 const keep = process.env.ANTHROPIC_API_KEY; delete process.env.ANTHROPIC_API_KEY

@@ -2,6 +2,9 @@
 import { creativeTests, adsFromRows, TAG_SCHEMA, tagCreative } from '../../lib/ad-tags.js'
 import { buildReportModel, renderReportHtml } from '../../lib/report-pdf.js'
 import { analysisInput } from '../../lib/ai-analysis.js'
+// ההנחיה נשלחת כבלוק עם cache_control (9.11)
+const sysText = (s) => Array.isArray(s) ? s.map(b => b.text).join('') : String(s || '')
+
 
 const eq = (name, got, want) => {
   const ok = JSON.stringify(got) === JSON.stringify(want)
@@ -109,7 +112,8 @@ eq('tag: image sent as base64 when downloaded', [sent.messages[0].content[0].sou
 const { tagSchema, dimensionsFor, verticalOf } = await import('../../lib/ad-tags.js')
 await tagCreative(mock, { image: { media_type: 'image/png', data: 'AAAA' }, title: 't', vertical: 'device' })
 const dev = sent.output_config.format.schema.properties
-eq('device: no renders, no property, prompt names the device', [dev.visual.enum.includes('interior_render'), 'property' in dev, dev.angle.enum.includes('trial'), /medical or cosmetic device/.test(sent.system)], [false, false, true, true])
+eq('device: no renders, no property, prompt names the device', [dev.visual.enum.includes('interior_render'), 'property' in dev, dev.angle.enum.includes('trial'), /medical or cosmetic device/.test(sysText(sent.system))], [false, false, true, true])
+eq('system prompt is cached', Array.isArray(sent.system) && sent.system[0].cache_control?.type, 'ephemeral')
 eq('furniture: product field, renders of the product', [Object.keys(tagSchema('furniture').properties).includes('product'), tagSchema('furniture').properties.visual.enum.includes('render')], [true, true])
 eq('vertical by account: BCure device, KLOSS furniture, unknown real estate', [verticalOf('929034545061247'), verticalOf('295378394595304'), verticalOf('1')], ['device', 'furniture', 'real_estate'])
 eq('tag result carries vertical + version', [r.tags.vertical, r.tags.v], ['real_estate', 2])
