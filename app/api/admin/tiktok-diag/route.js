@@ -5,7 +5,7 @@
  */
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '../../../../lib/auth'
-import { tiktokGet, tiktokAdvertisers } from '../../../../lib/ads/tiktok-api.js'
+import { tiktokGet, tiktokAdvertisers, TIKTOK_ACCOUNTS } from '../../../../lib/ads/tiktok-api.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -25,6 +25,10 @@ export async function GET(req) {
   const until = ymd(new Date()), since = ymd(new Date(Date.now() - (days - 1) * 864e5))
   let advertisers = []
   try { advertisers = await tiktokAdvertisers(token, { appId, secret }) } catch (e) { return J({ error: 'advertiser/get: ' + String(e.message || e) }, 502) }
+  // רק החשבונות שמחוברים לפרויקט (TIKTOK_ACCOUNTS) — כרגע אלפא בלבד
+  const wanted = new Set(TIKTOK_ACCOUNTS.map(a => a.advertiserId))
+  const visible = advertisers.map(a => a.id)
+  advertisers = advertisers.filter(a => wanted.has(a.id))
   const out = []
   for (const a of advertisers) {
     const res = { id: a.id, name: a.name }
@@ -53,5 +57,5 @@ export async function GET(req) {
     }
     out.push(res)
   }
-  return J({ since, until, advertisers: out })
+  return J({ since, until, visibleToToken: visible.length, advertisers: out })
 }
