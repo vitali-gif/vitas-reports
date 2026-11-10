@@ -93,3 +93,8 @@ app/api/cron/prefetch-daily/route.js   קרון שעתי (cron-job.org, דקה 2
   עד שהמיגרציה רצה הקוד נופל חזרה ל-upsert הרגיל.
 - **חשבון מודעות חדש:** מספיק להוסיף ל-`META_AD_ACCOUNT_IDS` / `GOOGLE_ADS_CUSTOMER_IDS`; backfill מתמלא לבד.
 - **מילוי היסטורי:** `AD_DAILY_BACKFILL_SINCE` (ברירת מחדל 2026-01-01), `ZOHO_BACKFILL_SINCE` (2026-01).
+- **TikTok (10.11):** `source = 'tiktok'` ב-`ad_daily`, רמת מודעה × יום (בלי גיל/מגדר). נמשך ב-recent/backfill
+  של prefetch-daily (`lib/ads/tiktok-daily.js`) רק לחשבונות שב-`TIKTOK_ACCOUNTS` (`lib/ads/tiktok-api.js`) ורק
+  כשיש `TIKTOK_ACCESS_TOKEN`. לידים = `result` (Submit form בדף נחיתה / טופס מיידי, לפי יעד הקמפיין).
+  שורות `reports` לחודשים ולטווחים המוכנים נכתבות מיד אחרי ה-recent (`lib/ads/tiktok-reports.js`, דורש
+  מיגרציה 034); טווח מותאם מגיע מ-`/api/reports/range`. חשבון TikTok חדש = שורה ב-`TIKTOK_ACCOUNTS`.

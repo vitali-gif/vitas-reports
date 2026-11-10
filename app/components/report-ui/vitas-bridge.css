@@ -172,6 +172,7 @@
 .vr-ui .vr-tree-row .vr-platform { margin-inline-end: 0; }
 .vr-platform.meta { color: #1C2B33; }
 .vr-platform.google { color: #3C4043; }
+.vr-platform.tiktok { color: #111; }
 .vr-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 .vr-status i { inline-size: 8px; block-size: 8px; border-radius: 50%; background: #98A0B2; }
 .vr-status.on { color: #0E9F6E; } .vr-status.on i { background: #10B981; }

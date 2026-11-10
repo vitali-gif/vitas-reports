@@ -108,7 +108,7 @@ import BackToTop from '../components/BackToTop'
 import BrandLoader from '../components/BrandLoader'
 import ViewPicker from '../components/shell/ViewPicker'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
-import { MetaMark, GoogleMark, SourceMark } from '../components/report-ui/BrandMarks'
+import { MetaMark, GoogleMark, TikTokMark, SourceMark } from '../components/report-ui/BrandMarks'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
 import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays, House, Funnel as FunnelIcon, ChartPie, Network, Gem, Lightbulb, ImageOff } from 'lucide-react'
@@ -894,7 +894,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // טאבי המדיה ("הכל", Facebook, Google) זהים בין כל הלקוחות — אותם כרטיסים, אותה טבלת
   // קמפיינים, אותם פילוחים וגלריות. לכן הם מקבלים את העיצוב המחודש גם ב-KLOSS וב-אריקה
   // (ויטלי, 20.9), בעוד שטאב ה-CRM נשאר לפי מבנה ה-CRM של כל לקוח.
-  const vrAdsShell = view === 'dashboard' && !isDemoProject && ['all', 'facebook', 'google'].includes(dashTab)
+  const vrAdsShell = view === 'dashboard' && !isDemoProject && ['all', 'facebook', 'google', 'tiktok'].includes(dashTab)
   const vrMode = vrAdsShell && dashTab === 'all'
   // vrCrm — המסך השני של הפיילוט: CRM › מקורות הגעה (design/handoff-crm-sources)
   const vrCrm = vrShell && dashTab === 'crm' && crmSubTab === 'sources'
@@ -909,7 +909,8 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   // vrAds — כל טאב מדיה בעיצוב המחודש ("הכל", Facebook, Google): אותם כרטיסים, טבלת קמפיינים, פילוחים וגלריות.
   const vrFb = vrAdsShell && dashTab === 'facebook'
   const vrG = vrAdsShell && dashTab === 'google'
-  const vrAds = vrMode || vrFb || vrG
+  const vrTt = vrAdsShell && dashTab === 'tiktok'   // TikTok (10.11) — אותו עיצוב כמו Facebook/Google
+  const vrAds = vrMode || vrFb || vrG || vrTt
   // המשפך ("משפך לידים") בטאב "הכל" קיים לכל שלושת ה-CRM: renderFunnelBar בונה את
   // התחנות לפי summary.crmType — namedLeads ב-BMBY, funnelCohort ב-Salesforce,
   // funnel.byChannel ב-Zoho. שלבי המדיה (חשיפות, קליקים) זהים לכולם.
@@ -4154,6 +4155,8 @@ const selectProject = async (client, project) => {
       ? currentReports.filter(r => r.source === 'google_search')
       : dashTab === 'google'
       ? currentReports.filter(r => r.source && r.source.startsWith('google'))
+      : dashTab === 'tiktok'
+      ? currentReports.filter(r => r.source === 'tiktok')
       : [];
     const isPmax = dashTab === 'google_pmax' || dashTab === 'google';
     const isFb = dashTab === 'facebook';
@@ -4201,6 +4204,8 @@ const selectProject = async (client, project) => {
 
     // Add CRM leads to "all" tab totals
     let crmTotalLeads = 0;
+    // TikTok (10.11): לידי "טיקטוק" ב-CRM כבר נספרים דרך ה-API של TikTok — רק כשיש שורת TikTok לתקופה.
+    const _ttCounted = currentReports.some(r => r.source === 'tiktok');
     if (dashTab === 'all') {
       const crmReports = currentReports.filter(r => r.source === 'crm');
       crmReports.forEach(r => {
@@ -4210,6 +4215,7 @@ const selectProject = async (client, project) => {
             const src = String(row.source || '').toLowerCase();
             if (/פייסבוק|facebook|fb\b|מטא/.test(src)) return;
             if (/גוגל|google|pmax|search|adwords/.test(src)) return;
+            if (_ttCounted && /טיקטוק|tiktok/.test(src)) return;
             crmTotalLeads += (typeof row.totalLeads === 'number' ? row.totalLeads : parseFloat(String(row.totalLeads).replace(/[^0-9.\-]/g, '')) || 0);
           });
         }
@@ -4230,6 +4236,8 @@ const selectProject = async (client, project) => {
           filteredR = allCrmR.filter(r => /פייסבוק|facebook/i.test(r.source || ''));
         } else if (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') {
           filteredR = allCrmR.filter(r => /גוגל|google|pmax|search/i.test(r.source || ''));
+        } else if (dashTab === 'tiktok') {
+          filteredR = allCrmR.filter(r => /טיקטוק|tiktok/i.test(r.source || ''));
         }
         if (filteredR.length > 0) crmTotals = memoAgg(`crmTotals|${selectedMonth}|${dashTab}`, () => aggregateCrmRows(filteredR).totals);
         // ⚡ Fast path: if heavy CRM rows aren't loaded yet, use the cron-computed summary
@@ -4245,6 +4253,7 @@ const selectProject = async (client, project) => {
     const dashCrmNamedLeads = currentReports.find(r => r.source === 'crm')?.summary?.namedLeads || null;
     const _tabCrmLeads = dashTab === 'facebook' ? dashCrmNamedLeads?.facebook
       : (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') ? dashCrmNamedLeads?.google
+      : dashTab === 'tiktok' ? (dashCrmNamedLeads?.tiktok || null)
       : dashCrmNamedLeads?.all || dashCrmNamedLeads;
 
     let prevData = null;
@@ -4259,6 +4268,8 @@ const selectProject = async (client, project) => {
         ? prevReports.filter(r => r.source === 'google_pmax')
         : dashTab === 'google_search'
         ? prevReports.filter(r => r.source === 'google_search')
+        : dashTab === 'tiktok'
+        ? prevReports.filter(r => r.source === 'tiktok')
         : prevReports.filter(r => r.source && r.source.startsWith('google'));
       if (displayPrev.length) prevData = memoAgg(`adsPrev|${selectedMonth}|${dashTab}`, () => {
         let prevRows = []; displayPrev.forEach(r => { prevRows = prevRows.concat(r.data || []); });
@@ -4271,12 +4282,14 @@ const selectProject = async (client, project) => {
     if (compareEnabled) {
       const prevMonth2 = comparisonPeriodKey(selectedMonth);
       const prevCrmReps = reports.filter(r => r.month === prevMonth2 && r.source === 'crm');
+      const prevReports2Tt = reports.some(r => r.month === prevMonth2 && r.source === 'tiktok');
       if (prevCrmReps.length > 0) {
         let allPrevCrm = [];
         prevCrmReps.forEach(r => { if (r.data) allPrevCrm = allPrevCrm.concat(r.data); });
         let filtPrev = allPrevCrm;
         if (dashTab === 'facebook') filtPrev = allPrevCrm.filter(r => /פייסבוק|facebook/i.test(r.source || ''));
         else if (dashTab === 'google' || dashTab === 'google_pmax' || dashTab === 'google_search') filtPrev = allPrevCrm.filter(r => /גוגל|google|pmax|search/i.test(r.source || ''));
+        else if (dashTab === 'tiktok') filtPrev = allPrevCrm.filter(r => /טיקטוק|tiktok/i.test(r.source || ''));
         if (filtPrev.length > 0) prevCrmTotals = memoAgg(`crmTotalsPrev|${selectedMonth}|${dashTab}`, () => aggregateCrmRows(filtPrev).totals);
         // Compute CRM-only (non-ad) leads for prev period — mirrors crmTotalLeads logic
         if (dashTab === 'all') {
@@ -4284,6 +4297,7 @@ const selectProject = async (client, project) => {
             const src = String(row.source || '').toLowerCase();
             if (/פייסבוק|facebook|fb|מטא/.test(src)) return;
             if (/גוגל|google|pmax|search|adwords/.test(src)) return;
+            if (prevReports2Tt && /טיקטוק|tiktok/.test(src)) return;
             prevCrmTotalLeads += (typeof row.totalLeads === 'number' ? row.totalLeads : parseFloat(String(row.totalLeads).replace(/[^0-9.\-]/g, '')) || 0);
           });
         }
@@ -4650,8 +4664,14 @@ const selectProject = async (client, project) => {
     const hasSearch = anySearch;
     const hasG = anyG;
     const hasCrm = anyCrm;
+    const ttReports = currentReports.filter(r => r.source === 'tiktok');
+    const hasTt = reports.some(r => r.source === 'tiktok');
 
-    let fbTotals = null, gTotals = null;
+    let fbTotals = null, gTotals = null, ttTotals = null;
+    if (hasTt) ttTotals = memoAgg(`ttTotals|${selectedMonth}`, () => {
+      let ttRows = []; ttReports.forEach(r => { if (r.data) ttRows = ttRows.concat(r.data); });
+      return ttRows.length ? aggregateRows(ttRows).totals : adTotalsFromSummaries(ttReports);
+    });
     if (hasFb) fbTotals = memoAgg(`fbTotals|${selectedMonth}`, () => {
       let fbRows = []; fbReports.forEach(r => { if (r.data) fbRows = fbRows.concat(r.data); });
       return fbRows.length ? aggregateRows(fbRows).totals : adTotalsFromSummaries(fbReports);
@@ -4661,7 +4681,7 @@ const selectProject = async (client, project) => {
       return gRows.length ? aggregateRows(gRows).totals : adTotalsFromSummaries(gReports);
     });
 
-    const activeT = dashTab === 'facebook' && fbTotals ? fbTotals : dashTab === 'google' && gTotals ? gTotals : t;
+    const activeT = dashTab === 'facebook' && fbTotals ? fbTotals : dashTab === 'google' && gTotals ? gTotals : dashTab === 'tiktok' && ttTotals ? ttTotals : t;
     const activeP = p;
 
     // Total leads including CRM for "all" tab display
@@ -4697,6 +4717,7 @@ const selectProject = async (client, project) => {
           {hasPmax && <button className={`client-tab ${dashTab === 'google_pmax' ? 'active' : ''}`} onClick={() => setDashTab('google_pmax')}><span className="tab-ico"><GoogleMark size={15} /></span>Google PMax</button>}
             {hasSearch && <button className={`client-tab ${dashTab === 'google_search' ? 'active' : ''}`} onClick={() => setDashTab('google_search')}><span className="tab-ico"><GoogleMark size={15} /></span>Google Search</button>}
             {hasG && <button className={`client-tab ${dashTab === 'google' ? 'active' : ''}`} onClick={() => setDashTab('google')}><span className="tab-ico"><GoogleMark size={15} /></span>Google</button>}
+            {hasTt && <button className={`client-tab ${dashTab === 'tiktok' ? 'active' : ''}`} onClick={() => setDashTab('tiktok')}><span className="tab-ico"><TikTokMark size={15} /></span>TikTok</button>}
             {/* הכפתור מוצג גם ללקוח שאינו PRO — התגית היא השילוט, והלחיצה מגיעה
                 למסך שדרוג ולא לתוכן. להסתיר אותו לגמרי היה משאיר את הלקוח בלי
                 לדעת שהפיצ'ר קיים. */}
@@ -6291,18 +6312,18 @@ const selectProject = async (client, project) => {
             <h3>{'\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05dc\u05d8\u05d5\u05d5\u05d7 \u05d4\u05ea\u05d0\u05e8\u05d9\u05db\u05d9\u05dd \u05e9\u05e0\u05d1\u05d7\u05e8'}</h3>
             <p style={{color:'#64748b',marginTop:'8px'}}>{'\u05d1\u05d7\u05e8 \u05d8\u05d5\u05d5\u05d7 \u05d0\u05d7\u05e8 \u05d0\u05d5 \u05d4\u05e8\u05e5 \u05e1\u05e0\u05db\u05e8\u05d5\u05df'}</p>
           </div>
-        ) : (<div className={(vrFb || vrG) ? 'vfb-root' : undefined}>
-        {(vrFb || vrG) && (
+        ) : (<div className={(vrFb || vrG || vrTt) ? 'vfb-root' : undefined}>
+        {(vrFb || vrG || vrTt) && (
           <div className="vr-section-heading vfb-tab-heading"><div>
-            <h2>{vrFb ? 'Facebook' : 'Google'}</h2>
-            <p>{vrFb ? 'ביצועי הפרסום ב-Meta והתקדמות הלידים המשויכים ל-Facebook ב-CRM' : 'ביצועי הפרסום ב-Google Ads והתקדמות הלידים המשויכים ל-Google ב-CRM'}</p>
+            <h2>{vrFb ? 'Facebook' : vrTt ? 'TikTok' : 'Google'}</h2>
+            <p>{vrFb ? 'ביצועי הפרסום ב-Meta והתקדמות הלידים המשויכים ל-Facebook ב-CRM' : vrTt ? 'ביצועי הפרסום ב-TikTok והתקדמות הלידים המשויכים לטיקטוק ב-CRM' : 'ביצועי הפרסום ב-Google Ads והתקדמות הלידים המשויכים ל-Google ב-CRM'}</p>
           </div></div>
         )}
         {vrMode && <p className="vr-caption vr-metrics-section">פעילות בתקופה · כולל פעילות מלידים שנכנסו לפני התקופה</p>}
-        {(vrFb || vrG) && (
+        {(vrFb || vrG || vrTt) && (
           <div className="vr-section-heading vfb-activity-heading"><div>
             <h2>פעילות בתקופה</h2>
-            <p>{'כולל פעילות בתקופה מלידים שנכנסו קודם · תקציב, לידים וקליקים לפי ' + (vrFb ? 'Meta' : 'Google Ads') + '; פגישות, הרשמות וחוזים לפי שיוך המקור ב-CRM'}</p>
+            <p>{'כולל פעילות בתקופה מלידים שנכנסו קודם · תקציב, לידים וקליקים לפי ' + (vrFb ? 'Meta' : vrTt ? 'TikTok' : 'Google Ads') + '; פגישות, הרשמות וחוזים לפי שיוך המקור ב-CRM'}</p>
           </div></div>
         )}
         <div className={vrAds ? 'vr-metric-grid' : 'kpi-grid'}>
@@ -6669,7 +6690,7 @@ const selectProject = async (client, project) => {
         </div>{buildTable(data.campaigns, prevData?.campaigns, '\u05e7\u05de\u05e4\u05d9\u05d9\u05df', 'campaigns', 'google')}</div>)}
 
         {/* Nested expandable table - Campaign → Ad Set → Ad - for FB, All, Google Search */}
-        {(isFb || dashTab === 'all' || dashTab === 'google_search') && campNames.length > 0 && (() => {
+        {(isFb || dashTab === 'all' || dashTab === 'google_search' || dashTab === 'tiktok') && campNames.length > 0 && (() => {
           // Build hierarchy from raw rows — inject _reportSource from the parent report
           const treeRows = [];
           displayReports.forEach(rep => { if (rep.data) rep.data.forEach(row => treeRows.push({...row, _reportSource: rep.source || ''})); });
@@ -6761,7 +6782,9 @@ const selectProject = async (client, project) => {
                   <bdi className="camp-name" dir={/[\u0590-\u05FF]/.test(name) ? 'rtl' : 'ltr'} title={name}>{name === 'PERFORMANCE_MAX' ? 'Performance Max' : name}</bdi>
                 </td>
                 {_showPlatform && <td style={{fontSize, whiteSpace:'nowrap'}}>
-                  {level === 0 && data.source ? (vrAds
+                  {level === 0 && data.source ? (data.source === 'tiktok'
+                    ? (vrAds ? <span className="vr-platform tiktok"><TikTokMark size={14} />TikTok</span> : <span className="platform-tag tiktok">TIKTOK</span>)
+                    : vrAds
                     ? <span className={`vr-platform ${data.source.includes('google') ? 'google' : 'meta'}`}>{data.source.includes('google') ? <GoogleMark size={14} /> : <MetaMark size={16} />}{data.source.includes('google') ? 'Google' : 'Meta'}</span>
                     : <span className={`platform-tag${data.source.includes('google')?' google':''}`}>{data.source.includes('google')?'GOOGLE':'FACEBOOK'}</span>) : <span style={{color:'#cbd5e1'}}>-</span>}
                 </td>}
@@ -6917,7 +6940,7 @@ const selectProject = async (client, project) => {
 
 {false && !isPmax && !isFb && <div className="section"><div className="section-title"><div className="section-icon" style={{background:'var(--gradient-3)'}}>{'\ud83d\udcdd'}</div>{'\u05de\u05d5\u05d3\u05e2\u05d5\u05ea'} <InfoTip text="כל המודעות עם הביצועים שלהן (כפילויות 'עותק 1' אוחדו)" /></div>{buildTable((() => { const merged = {}; Object.entries(data.ads).forEach(([name, d]) => { const base = name.replace(/[\u200e\u200f\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\uFEFF]/g, '').replace(/\s*#\d+$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*$/, '').replace(/\s*-\s*\u05e2\u05d5\u05ea\u05e7\s*\d*$/, '').trim(); if (!merged[base]) merged[base] = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 }; merged[base].spend += d.spend; merged[base].leads += d.leads; merged[base].clicks += d.clicks; merged[base].impressions += d.impressions; merged[base].reach += (d.reach || 0); }); return merged; })(), null, '\u05de\u05d5\u05d3\u05e2\u05d4', 'ads')}</div>}
 
-        {!isPmax && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section section-demographics">
+        {!isPmax && dashTab !== 'tiktok' && (genderNames.length > 0 || ageNames.length > 0) && (<div className="section section-demographics">
           <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h2>פילוח דמוגרפי</h2><span className="sub">חלוקת ביצועים לפי מגדר וקבוצת גיל</span></div>
         <div className={vrAds ? 'vr-demo-grid' : undefined} style={vrAds ? undefined : {display:'flex',gap:'20px',alignItems:'flex-start'}}>
           <div className={vrAds ? 'vr-demo-block' : undefined} style={vrAds ? undefined : {flex:1,minWidth:0}}>
@@ -7289,7 +7312,7 @@ const selectProject = async (client, project) => {
         </div>)}
       </>
     );
-  }, [focusModes, focusActive, focusApplied, focusLoading, focusMode, vrMode, vrFb, vrG, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, campLegend, campHidden, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedCrmAds, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
+  }, [focusModes, focusActive, focusApplied, focusLoading, focusMode, vrMode, vrFb, vrG, vrTt, vrAds, vrFunnel, vrFunnelMode, vrZohoCrm, selectedMonth, campLegend, campHidden, compareEnabled, reports, dashTab, crmSubTab, funnelChannel, renderFunnelBar, cityMetric, recSubTab, vitasTasks, lockingRecKey, ruleDialog, creatingRule, renderCrmDashboard, renderCrmReportDashboard, renderCrmObjectionsDashboard, renderCrmResponseDashboard, renderCrmMeetingsDashboard, sortConfig, expandedCampaigns, expandedAdSets, expandedCrmSources, expandedCrmAds, expandedAdTree, expandedFunnelCh, expandedFunnelCamp, expandedFunnelAst, expandedAgents, sfTab, sfInfo, sfBranchLens, sfNoteModal, sfObjBranch, sfTimeBranch, sfSrcBranch,
     // meetingsOn ו-selectedProject?.id נקראים בתוך ה-callback (כפתור "ישיבות שיווק" וה-
     // projectId שמועבר ל-MeetingsTab), ולכן הם חייבים להיות כאן: בלעדיהם ה-callback שנוצר
     // כשעוד לא נבחר פרויקט ממשיך להיות זה שרץ, עם meetingsOn=false, והכפתור לא מופיע.
