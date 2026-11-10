@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '../../../../lib/auth'
 import { tiktokGet, tiktokAdvertisers, TIKTOK_ACCOUNTS } from '../../../../lib/ads/tiktok-api.js'
+import { tiktokStatuses } from '../../../../lib/ads/tiktok-daily.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -55,6 +56,9 @@ export async function GET(req) {
         break
       } catch (e) { res[metrics === FULL ? 'fullError' : 'safeError'] = String(e.message || e).slice(0, 300) }
     }
+    // סטטוסים (10.11) — אותה קריאה שהסנכרון היומי עושה (lib/ads/tiktok-daily.js)
+    const st = await tiktokStatuses(a.id, token, fetch)
+    res.statuses = st.error ? { error: st.error } : { ads: st.ads.size, adgroups: st.adgroups.size, campaigns: [...st.campaigns.values()].map(c => c.operation_status) }
     out.push(res)
   }
   return J({ since, until, visibleToToken: visible.length, advertisers: out })

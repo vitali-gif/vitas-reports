@@ -872,6 +872,7 @@
     text-transform: uppercase;
   }
   .platform-tag.google { background: var(--rose-50); color: var(--rose); }
+  .platform-tag.tiktok { background: #f1f1f4; color: #111; }
   .status {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 12px; font-weight: 700;

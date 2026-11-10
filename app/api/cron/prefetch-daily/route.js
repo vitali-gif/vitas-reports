@@ -21,6 +21,7 @@
 import { safeEqual } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import { runDailySync } from '../../../../lib/ads/daily-sync.js'
+import { writeTikTokReports } from '../../../../lib/ads/tiktok-reports.js'
 import { pruneJobLog, logJob, lastRuns } from '../../../../lib/job-log.js'
 import { runCron } from '../../../../lib/cron-background'
 
@@ -60,6 +61,15 @@ async function handle(request) {
   out.recent = { ok: recent.body.ok, jobs: recent.body.jobs, failed: recent.body.failed, deferred: recent.body.deferred, ms: recent.body.ms,
     errors: (recent.body.results || []).filter(r => !r.ok && !r.deferred).map(r => `${r.source}/${r.account}: ${r.error}`).slice(0, 5) }
   await beat()
+
+  // ── 1b. TikTok (10.11): שורות reports לחודשים ולטווחים המוכנים, מתוך ad_daily שה-recent מילא.
+  // רק קריאה/כתיבה ב-DB (שניות). לפני מיגרציה 034 הכתיבה נדחית — נרשם ב-job_log, הקרון ממשיך.
+  {
+    const t0 = Date.now()
+    try { out.tiktokReports = await writeTikTokReports(sb) }
+    catch (e) { out.tiktokReports = { ok: false, errors: [String(e?.message || e).slice(0, 200)] } }
+    await logJob(sb, 'prefetch-daily:tiktok-reports', out.tiktokReports.ok, Date.now() - t0, out.tiktokReports)
+  }
 
   // ── 2. CRM (שלב 4): רענונים קצרים לפני ה-backfill הפתוח, כדי שיקבלו בכלל תור ──────────
   // Zoho: עסקאות שהשתנו ב-3 הימים האחרונים. Salesforce (KLOSS): מה שהשתנה ב-3 הימים האחרונים.

@@ -32,6 +32,18 @@ export function GoogleMark({ size = 16 }) {
   );
 }
 
+/** TikTok — תו מוזיקלי בשחור עם צללי טורקיז/ורוד, מקורב בגודל תגית */
+export function TikTokMark({ size = 16 }) {
+  const d = 'M13.5 3h2.6c.2 1.9 1.6 3.4 3.4 3.6v2.7c-1.3 0-2.5-.4-3.4-1v6.2a5.2 5.2 0 1 1-5.2-5.2c.3 0 .6 0 .9.1v2.8a2.5 2.5 0 1 0 1.7 2.3V3z';
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d={d} fill="#25F4EE" transform="translate(-0.9 -0.6)" />
+      <path d={d} fill="#FE2C55" transform="translate(0.9 0.6)" />
+      <path d={d} fill="#111" />
+    </svg>
+  );
+}
+
 /** yad2 — הבלוב הכתום עם הכיתוב הלבן, מקורב בגודל תגית */
 export function Yad2Mark({ size = 16 }) {
   const w = Math.round(size * 2);
@@ -65,6 +77,7 @@ export function SourceMark({ name, size = 16 }) {
   let mark = null;
   if (/facebook|פייסבוק|meta|instagram|אינסטגרם/.test(n)) mark = <MetaMark size={size} />;
   else if (/google|גוגל/.test(n)) mark = <GoogleMark size={size - 2} />;
+  else if (/tiktok|טיקטוק/.test(n)) mark = <TikTokMark size={size} />;
   else if (/yad2|יד2|יד 2/.test(n)) mark = <Yad2Mark size={size} />;
   else if (/whatsapp|וואטסאפ|ווטסאפ/.test(n)) mark = <WhatsAppMark size={size} />;
   else if (/כוכבית|טלפון|phone/.test(n)) mark = <Phone size={size - 1} aria-hidden="true" />;
