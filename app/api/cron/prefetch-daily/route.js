@@ -66,7 +66,8 @@ async function handle(request) {
   // רק קריאה/כתיבה ב-DB (שניות). לפני מיגרציה 034 הכתיבה נדחית — נרשם ב-job_log, הקרון ממשיך.
   {
     const t0 = Date.now()
-    try { out.tiktokReports = await writeTikTokReports(sb) }
+    // insights (צפיות/קהלים/תמונות) — עד 45 שניות, כדי לא לדחוק את שלבי ה-CRM
+    try { out.tiktokReports = await writeTikTokReports(sb, { insights: !!process.env.TIKTOK_ACCESS_TOKEN, deadlineMs: Date.now() + Math.min(45000, Math.max(0, left() - 160000)) }) }
     catch (e) { out.tiktokReports = { ok: false, errors: [String(e?.message || e).slice(0, 200)] } }
     await logJob(sb, 'prefetch-daily:tiktok-reports', out.tiktokReports.ok, Date.now() - t0, out.tiktokReports)
   }
