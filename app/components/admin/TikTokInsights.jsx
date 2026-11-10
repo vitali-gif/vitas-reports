@@ -185,7 +185,7 @@ function Audience({ audience }) {
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <Bars title="מגדר" rows={a.gender || []} label={k => GENDER[k] || k} />
         <Bars title="גיל" rows={a.age || []} label={ageLabel} />
-        <Bars title="אזור" rows={a.region || []} label={k => k} />
+        <Bars title="אזור" rows={(a.region || []).map(r => ({ ...r, key: r.name || r.key }))} label={k => (/^\d+$/.test(k) ? 'אזור ' + k : k)} />
         <Bars title="מכשיר" rows={a.platform || []} label={k => PLATFORM[k] || k} />
       </div>
     </Section>

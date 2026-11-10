@@ -40,8 +40,9 @@ await assert.rejects(() => fetchTikTokDaily('1', '2026-11-10', '2026-11-10', { t
 
 // 2. ניתוב: רק אקספו חיפה, רק החשבון של אלפא
 const f = projectRowFilter({ name: 'אקספו חיפה' }, 'tiktok')
-assert.ok(f({ account: '7702455288577998900' }))
-assert.ok(!f({ account: '7335437259849646081' }), 'בי-קיור לא נמשך לאקספו')
+assert.ok(f({ account: '7702455288577998900', campaign: 'Expo-Haifa-A-LP-11/2026-LeadG' }))
+assert.ok(!f({ account: '7702455288577998900', campaign: 'Alpha-Followers-11/2026-Community' }), 'קמפיין עוקבים של אלפא לא נספר לאקספו')
+assert.ok(!f({ account: '7335437259849646081', campaign: 'Expo x' }), 'בי-קיור לא נמשך לאקספו')
 assert.equal(projectRowFilter({ name: 'KLOSS' }, 'tiktok'), null)
 
 // 3. מפתחות: אותו פורמט כמו prefetch-ads; רבעון עתידי לא נכתב
@@ -69,6 +70,19 @@ const insFetch = async (url) => {
   return ok({ list: [{ dimensions: { ad_id: '11' }, metrics: { ad_name: 'B - Video1', campaign_name: 'C', adgroup_name: 'G', spend: '30', impressions: '1000', clicks: '5', result: '1', reach: '800', video_play_actions: '900', video_watched_2s: '400', video_watched_6s: '200', video_views_p25: '300', video_views_p50: '150', video_views_p75: '90', video_views_p100: '40', average_video_play: '4.2' } }] })
 }
 const ins = await tiktokInsights('1', '2026-11-01', '2026-11-10', { token: 'T', fetchImpl: insFetch })
+// סינון לקמפיינים של הפרויקט: מודעות לפי שם, קהלים עם filtering של מזהי הקמפיינים
+const seen = []
+const insFetch2 = async (url) => {
+  if (url.includes('campaign/get')) return { status: 200, json: async () => ({ code: 0, data: { list: [{ campaign_id: '31', campaign_name: 'Expo-Haifa-B' }, { campaign_id: '99', campaign_name: 'Alpha-Followers' }] } }) }
+  const q = new URL(url).searchParams; if (q.get('report_type') === 'AUDIENCE') seen.push(q.get('filtering'))
+  if (q.get('report_type') === 'AUDIENCE' && JSON.parse(q.get('dimensions'))[0] === 'province_id') return { status: 200, json: async () => ({ code: 0, data: { list: [{ dimensions: { province_id: '294800' }, metrics: { spend: '5', impressions: '9', clicks: '1' } }] } }) }
+  return insFetch(url)
+}
+const ins2 = await tiktokInsights('1', '2026-11-01', '2026-11-10', { token: 'T', fetchImpl: insFetch2, campaignMatch: c => /expo/i.test(c) })
+assert.deepEqual(ins2.campaignIds, ['31'])
+assert.ok(seen.every(x => x && x.includes('campaign_ids') && x.includes('31') && !x.includes('99')), 'קהלים מסוננים לקמפיין של אקספו')
+assert.equal(ins2.adStats.length, 0, 'המודעה בדוגמה בקמפיין C — לא של אקספו')
+assert.equal(ins2.audience.region[0].name, 'מחוז חיפה')
 assert.equal(ins.adStats.length, 1); assert.equal(ins.adStats[0].leads, 1); assert.equal(ins.adStats[0].video_watched_2s, 400); assert.equal(ins.adStats[0].likes, undefined)
 assert.equal(ins.account.reach, 900)
 assert.equal(ins.audience.gender[0].key, 'FEMALE'); assert.equal(ins.audience.age[0].key, 'AGE_25_34')
