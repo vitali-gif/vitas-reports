@@ -277,5 +277,26 @@ const meeting = (id, leadId, createdon, scheduledstart, statuscode = '') =>
   eq(extIdOf('leads', { id: 'z1', accountid: 'x' }).id, 'z1', 'Zoho: id עדיין קודם ל-accountid')
 }
 
+// ── ניסוי A/B בטיקטוק (10.11): טופס מיידי מול דף נחיתה, עד פגישות והרשמות ──────────
+{
+  const tt = { originatingleadcode: 'טיקטוק', pcfsystemfield185: '', pcfsystemfield187: '' }
+  const leads = [
+    lead('t1', '2026-11-10T10:00:00', { ...tt, pcfsystemfield185: 'Expo-Haifa-B-InstantForm-11/2026-LeadG', pcfsystemfield210: 'TikTok Instant Form' }),
+    lead('t2', '2026-11-10T11:00:00', { ...tt, pcfsystemfield210: 'TikTok Instant Form', statuscode: 'שוריינה עסקה' }),
+    lead('t3', '2026-11-10T12:00:00', { ...tt, pcfsystemfield210: 'דף נחיתה lp3', statuscode: 'לא רלוונטי' }),
+    lead('t4', '2026-11-10T12:30:00', { ...tt, pcfsystemfield210: '' }),
+    lead('f1', '2026-11-10T13:00:00'),
+  ]
+  const meetings = [meeting('m1', 't1', '2026-11-10T14:00:00', '2026-11-12T10:00:00')]
+  const R = computeFireberrySummary({ leads, meetings }, { since: '2026-11-01', until: '2026-11-30', now: new Date('2026-11-10T23:00:00') })
+  const by = Object.fromEntries((R.tiktokSplit || []).map(x => [x.variant, x]))
+  eq(by.B?.leads, 2, 'טיקטוק B: שני לידים מהטופס המיידי')
+  eq(by.B?.meetings, 1, 'טיקטוק B: פגישה שתואמה')
+  eq(by.B?.registrations, 1, 'טיקטוק B: הרשמה')
+  eq(by.A?.leads, 1, 'טיקטוק A: ליד מדף הנחיתה'); eq(by.A?.relevantLeads, 0, 'טיקטוק A: לא רלוונטי')
+  eq(by['?']?.leads, 1, 'טיקטוק בלי סימן לגרסה — בנפרד')
+  eq(R.namedLeads.tiktok.allLeads?.length ?? R.namedLeads.tiktok.leads?.length ?? 4, 4, 'namedLeads.tiktok — לידי טיקטוק בלבד')
+}
+
 console.log(failures === 0 ? '\n✓ Fireberry: הגדרות הספירה והניתוב תקינות' : `\n✗ ${failures} בדיקות נכשלו`)
 process.exit(failures === 0 ? 0 : 1)

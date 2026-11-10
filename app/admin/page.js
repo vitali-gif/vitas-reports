@@ -109,6 +109,7 @@ import BrandLoader from '../components/BrandLoader'
 import ViewPicker from '../components/shell/ViewPicker'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
 import { MetaMark, GoogleMark, TikTokMark, SourceMark } from '../components/report-ui/BrandMarks'
+import TikTokInsights from '../components/admin/TikTokInsights'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
 import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays, House, Funnel as FunnelIcon, ChartPie, Network, Gem, Lightbulb, ImageOff } from 'lucide-react'
@@ -6875,6 +6876,8 @@ const selectProject = async (client, project) => {
           );
         })()}
 
+        {/* TikTok (10.11): A/B, צפיות, גלריה, קהלים, מעורבות — app/components/admin/TikTokInsights.jsx */}
+        {dashTab === 'tiktok' && <TikTokInsights insights={ttReports[0]?.summary?.insights || null} split={crmReports[0]?.summary?.tiktokSplit || null} rows={ttReports.flatMap(r => r.data || [])} />}
         {/* Standard ad groups table (Facebook + Search/Display) */}
         {/* Ad-sets table removed for All/Google Search - nested campaigns table covers it */}
 

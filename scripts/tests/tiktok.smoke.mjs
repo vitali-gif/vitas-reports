@@ -5,6 +5,7 @@ import { tiktokPeriodKeys } from '../../lib/ads/tiktok-reports.js'
 import { projectRowFilter } from '../../lib/ads/routing.js'
 import { tiktokRow } from '../../lib/ads/range-rows.js'
 import { periodFacts } from '../../lib/report-pdf.js'
+import { tiktokInsights, tiktokAdMedia } from '../../lib/ads/tiktok-insights.js'
 
 // 1. מיפוי התשובה של TikTok + דפדוף; result = לידים; שורה ריקה לא נשמרת
 const pages = [
@@ -54,5 +55,25 @@ assert.equal(tt.summary.spend, 50); assert.equal(tt.summary.cpl, 25); assert.equ
 const facts = periodFacts([{ source: 'facebook', summary: { spend: 100, leads: 4 } }, { source: 'tiktok', summary: tt.summary, data: tt.data }])
 assert.equal(facts.ads.spend, 150); assert.equal(facts.ads.leads, 6); assert.equal(facts.tiktok.spend, 50)
 assert.ok(facts.campaigns.some(c => c.platform === 'TikTok'))
+
+// 5. insights: מדד לא נתמך → נפילה לרשימה מצומצמת; קהל; כשל בחלק אחד לא מפיל את השאר
+const insFetch = async (url) => {
+  const u = new URL(url), q = u.searchParams, metrics = JSON.parse(q.get('metrics') || '[]'), dims = JSON.parse(q.get('dimensions') || '[]')
+  const ok = (data) => ({ status: 200, json: async () => ({ code: 0, data }) })
+  if (q.get('report_type') === 'AUDIENCE') {
+    if (dims.includes('province_id')) return { status: 200, json: async () => ({ code: 40002, message: 'bad dim' }) }
+    return ok({ list: [{ dimensions: { [dims[0]]: dims[0] === 'gender' ? 'FEMALE' : 'AGE_25_34' }, metrics: { spend: '10', impressions: '100', clicks: '3', conversion: '1' } }] })
+  }
+  if (q.get('data_level') === 'AUCTION_ADVERTISER') return ok({ list: [{ metrics: { reach: '900', frequency: '1.5', impressions: '1350' } }] })
+  if (metrics.includes('likes')) return { status: 200, json: async () => ({ code: 40002, message: 'invalid metric likes' }) }
+  return ok({ list: [{ dimensions: { ad_id: '11' }, metrics: { ad_name: 'B - Video1', campaign_name: 'C', adgroup_name: 'G', spend: '30', impressions: '1000', clicks: '5', result: '1', reach: '800', video_play_actions: '900', video_watched_2s: '400', video_watched_6s: '200', video_views_p25: '300', video_views_p50: '150', video_views_p75: '90', video_views_p100: '40', average_video_play: '4.2' } }] })
+}
+const ins = await tiktokInsights('1', '2026-11-01', '2026-11-10', { token: 'T', fetchImpl: insFetch })
+assert.equal(ins.adStats.length, 1); assert.equal(ins.adStats[0].leads, 1); assert.equal(ins.adStats[0].video_watched_2s, 400); assert.equal(ins.adStats[0].likes, undefined)
+assert.equal(ins.account.reach, 900)
+assert.equal(ins.audience.gender[0].key, 'FEMALE'); assert.equal(ins.audience.age[0].key, 'AGE_25_34')
+assert.deepEqual(ins.audience.region, []); assert.ok(ins.errors.region)
+const med = await tiktokAdMedia('1', 'T', async (url) => ({ status: 200, json: async () => ({ code: 0, data: url.includes('ad/get') ? { list: [{ ad_id: '11', video_id: 'v1' }, { ad_id: '12', tiktok_item_id: '777' }] } : { list: [{ video_id: 'v1', video_cover_url: 'https://c/1.jpg', preview_url: 'https://p/1.mp4' }] } }) }))
+assert.equal(med['11'].cover, 'https://c/1.jpg'); assert.equal(med['12'].itemId, '777')
 
 console.log('✓ tiktok smoke')
