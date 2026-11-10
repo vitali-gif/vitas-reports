@@ -5,7 +5,7 @@
  */
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '../../../../lib/auth'
-import { tiktokGet, tiktokAdvertisers, TIKTOK_ACCOUNTS } from '../../../../lib/ads/tiktok-api.js'
+import { tiktokGet, tiktokAdvertisers, TIKTOK_ACCOUNTS, tiktokCampaignMatches } from '../../../../lib/ads/tiktok-api.js'
 import { tiktokStatuses } from '../../../../lib/ads/tiktok-daily.js'
 import { tiktokInsights, tiktokAdMedia } from '../../../../lib/ads/tiktok-insights.js'
 
@@ -62,9 +62,10 @@ export async function GET(req) {
     res.statuses = st.error ? { error: st.error } : { ads: st.ads.size, adgroups: st.adgroups.size, campaigns: [...st.campaigns.values()].map(c => c.operation_status) }
     // insights (10.11) — מה שהטאב מציג: צפיות, קהלים, תמונות. מספרים ושגיאות בלבד.
     try {
-      const ins = await tiktokInsights(a.id, since, until, { token })
+      const cfg = TIKTOK_ACCOUNTS.find(x => x.advertiserId === a.id)
+      const ins = await tiktokInsights(a.id, since, until, { token, campaignMatch: (c) => tiktokCampaignMatches(cfg, c) })
       res.insights = { adStats: ins.adStats.length, adStatKeys: Object.keys(ins.adStats[0] || {}), account: ins.account,
-        audience: Object.fromEntries(Object.entries(ins.audience).map(([k, v]) => [k, v.slice(0, 4).map(x => x.key)])), errors: ins.errors || null }
+        audience: Object.fromEntries(Object.entries(ins.audience).map(([k, v]) => [k, v.slice(0, 4).map(x => x.name || x.key)])), campaignIds: ins.campaignIds || null, errors: ins.errors || null }
       const media = await tiktokAdMedia(a.id, token)
       res.media = Object.values(media).map(m => ({ cover: !!m.cover, preview: !!m.preview, itemId: !!m.itemId }))
     } catch (e) { res.insightsError = String(e.message || e).slice(0, 300) }
