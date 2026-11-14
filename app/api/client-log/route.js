@@ -47,7 +47,7 @@ const excludeIgnored = (q, list) => q.not('email', 'in', `(${list.map(e => `"${e
 
 // POST â log session events from client dashboard
 // פעולות בתוך הכניסה (lib/usage-track.js, מיגרציה 029): רק השמות והשדות האלה נשמרים, טקסט קצר בלבד.
-const ACTIONS = { tab: ['tab'], crm_view: ['view'], period: ['period'], compare: [], section: ['title'], help: ['title'], ai_open: [], modal: ['kind'] }
+const ACTIONS = { tab: ['tab'], crm_view: ['view'], period: ['period'], compare: [], section: ['title'], help: ['title'], ai_open: [], modal: ['kind'], tour: ['step'] }
 const DEVICES = new Set(['mobile', 'tablet', 'desktop'])
 const cleanText = (v, n = 80) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n)
 const okSec = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.min(Math.round(Number(v)), 86400) : null)

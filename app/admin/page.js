@@ -110,6 +110,8 @@ import ViewPicker from '../components/shell/ViewPicker'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
 import { MetaMark, GoogleMark, TikTokMark, SourceMark } from '../components/report-ui/BrandMarks'
 import TikTokInsights from '../components/admin/TikTokInsights'
+import ProjectTour from '../components/admin/ProjectTour'
+import { tourSteps } from '../../lib/tour-insights.js'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
 import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays, House, Funnel as FunnelIcon, ChartPie, Network, Gem, Lightbulb, ImageOff } from 'lucide-react'
@@ -124,6 +126,8 @@ import { ProBadge, MeetingsProLock } from '../components/ProGate'
 // טאב "המלצות חכמות" מוסתר בכל הלקוחות עד שהתוכן שלו ישופר (ויטלי, 21.9).
 // להחזרה: להפוך ל-true. הרינדור עצמו נשאר בקוד ולא נמחק.
 const RECOMMENDATIONS_TAB_ON = false
+// הסיור '3 דברים שכדאי לראות' (14.11): כרגע רק לאדמין. לפתוח ללקוחות: true (ויטלי יחליט).
+const TOUR_FOR_CLIENTS = false
 
 // תצוגות ה-CRM לבורר המובייל. הסדר והתוויות זהים לשורת תתי־הטאבים בדסקטופ —
 // הבורר מחליף את אופן הבחירה, לא את מה שאפשר לבחור.
@@ -4710,6 +4714,32 @@ const selectProject = async (client, project) => {
             ) })()}
           </div>
         )}
+        {/* "3 דברים שכדאי לראות" (ויטלי, 14.11) — lib/tour-insights.js. בשלב ראשון אדמין בלבד (TOUR_FOR_CLIENTS). */}
+        {(TOUR_FOR_CLIENTS || !isClientView) && !isDemoProject && (() => {
+          const _steps = tourSteps({ crm: crmReports[0]?.summary || null, hasTikTok: ttReports.some(r => (r.summary?.spend || 0) > 0) })
+          const _pulse = (el) => { if (!el) return false; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('ptour-pulse'); setTimeout(() => el.classList.remove('ptour-pulse'), 2600); return true }
+          const _go = (step) => {
+            trackUsage('tour', { step: step.id })
+            const g = step.go || {}
+            if (g.tab && g.tab !== dashTab) setDashTab(g.tab)
+            if (g.crmSub) setCrmSubTab(g.crmSub)
+            if (g.compare && !compareEnabled) onComparisonToggle(true)
+            setTimeout(() => {
+              if (g.card) {
+                const lbl = [...document.querySelectorAll('.vr-metric-grid *, .kpi-grid *')].find(e => e.children.length === 0 && e.textContent.trim() === g.card)
+                const card = lbl && (lbl.closest('.vr-metric, .kpi, [role="button"], button') || lbl.parentElement)
+                if (_pulse(card)) { setTimeout(() => lbl.click(), 700); return }
+              }
+              if (g.section) {
+                const h = [...document.querySelectorAll('h2, h3')].find(e => e.textContent.includes(g.section))
+                if (_pulse(h && (h.closest('.section, .vr-section, section') || h))) return
+              }
+              if (g.compare) { if (_pulse([...document.querySelectorAll('label, button, span')].find(e => e.children.length === 0 && e.textContent.trim() === 'השוואה לאותה תקופה'))) return }
+              _pulse(document.querySelector('.client-tabs-main'))
+            }, 900)
+          }
+          return <ProjectTour steps={_steps} onGo={_go} onOpen={() => trackUsage('tour', { step: 'open' })} />
+        })()}
         {/* Source Tabs */}
         <div className="client-tabs client-tabs-main">
           <button className={`client-tab ${dashTab === 'all' ? 'active' : ''}`} onClick={() => setDashTab('all')}><LayoutDashboard size={16} aria-hidden="true" className="tab-ico" />{'\u05d4\u05db\u05dc'}</button>
