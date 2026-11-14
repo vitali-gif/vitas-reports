@@ -110,6 +110,8 @@ import ViewPicker from '../components/shell/ViewPicker'
 import { VitasPresentation, MetricCard, Funnel, ReportSection } from '../components/report-ui/VitasPresentation'
 import { MetaMark, GoogleMark, TikTokMark, SourceMark } from '../components/report-ui/BrandMarks'
 import TikTokInsights from '../components/admin/TikTokInsights'
+import ProjectTour from '../components/admin/ProjectTour'
+import { tourSteps } from '../../lib/tour-insights.js'
 import { CohortFunnel } from '../components/report-ui/CrmSources'
 import SourceDistribution from '../components/report-ui/SourceDistribution'
 import { Wallet, Users, Tag, CalendarCheck, CheckCircle2, CalendarClock, XCircle, UserX, ClipboardList, FileSignature, Eye, MousePointerClick, Handshake, ChevronDown, ChevronLeft, RefreshCw, Phone, UserCheck, FileText, Clock, PhoneOff, Info, Ban, ListChecks, MessageSquareWarning, MapPin, Trophy, Building2, NotebookPen, Download, LayoutDashboard, CalendarDays, House, Funnel as FunnelIcon, ChartPie, Network, Gem, Lightbulb, ImageOff } from 'lucide-react'
@@ -124,6 +126,8 @@ import { ProBadge, MeetingsProLock } from '../components/ProGate'
 // טאב "המלצות חכמות" מוסתר בכל הלקוחות עד שהתוכן שלו ישופר (ויטלי, 21.9).
 // להחזרה: להפוך ל-true. הרינדור עצמו נשאר בקוד ולא נמחק.
 const RECOMMENDATIONS_TAB_ON = false
+// הסיור '3 דברים שכדאי לראות' (14.11): כרגע רק לאדמין. לפתוח ללקוחות: true (ויטלי יחליט).
+const TOUR_FOR_CLIENTS = false
 
 // תצוגות ה-CRM לבורר המובייל. הסדר והתוויות זהים לשורת תתי־הטאבים בדסקטופ —
 // הבורר מחליף את אופן הבחירה, לא את מה שאפשר לבחור.
@@ -4710,6 +4714,38 @@ const selectProject = async (client, project) => {
             ) })()}
           </div>
         )}
+        {/* "3 דברים שכדאי לראות" (ויטלי, 14.11) — lib/tour-insights.js. בשלב ראשון אדמין בלבד (TOUR_FOR_CLIENTS). */}
+        {(TOUR_FOR_CLIENTS || !isClientView) && !isDemoProject && (() => {
+          const _steps = tourSteps({ crm: crmReports[0]?.summary || null, hasTikTok: ttReports.some(r => (r.summary?.spend || 0) > 0) })
+          const _wait = (ms) => new Promise(r => setTimeout(r, ms))
+          const _cardLabel = (txt) => [...document.querySelectorAll('.vr-metric-grid *, .kpi-grid *')].find(e => e.children.length === 0 && e.textContent.trim() === txt)
+          // מעביר לטאב / תצוגת ה-CRM של הצעד ומחזיר את האלמנט להאיר (null = לא נמצא בתקופה הזו)
+          const _locate = async (step) => {
+            const g = step.go || {}
+            if (g.tab && g.tab !== dashTab) setDashTab(g.tab)
+            if (g.crmSub) setCrmSubTab(g.crmSub)
+            for (let i = 0; i < 12; i++) {
+              await _wait(250)
+              if (g.card) { const l = _cardLabel(g.card); if (l) return l.closest('.vr-metric, .kpi, [role="button"], button') || l.parentElement }
+              if (g.section) {
+                const h = [...document.querySelectorAll('h2, h3')].find(e => e.textContent.includes(g.section) && e.getBoundingClientRect().height > 0)
+                if (h) {
+                  // הכרטיס שמחזיק את הכותרת והתוכן — לא הכותרת לבדה (עולים עד שיש גובה של תוכן)
+                  const box = h.closest('.section, .vr-section, section, .chart-card, .card')
+                  if (box) return box
+                  let el = h
+                  for (let k = 0; k < 4 && el.parentElement && el.getBoundingClientRect().height < 140; k++) el = el.parentElement
+                  return el
+                }
+              }
+              if (g.compare) { const t = [...document.querySelectorAll('label, button, span, div')].find(e => e.children.length <= 2 && e.textContent.trim() === 'השוואה לאותה תקופה'); if (t) return t.closest('label, button') || t }
+              if (!g.card && !g.section && !g.compare) return document.querySelector('.client-tabs-main')
+            }
+            return null
+          }
+          const _openList = (step) => { const l = step.go?.card && _cardLabel(step.go.card); if (l) l.click() }
+          return <ProjectTour steps={_steps} locate={_locate} openList={_openList} onEvent={(step) => trackUsage('tour', { step })} />
+        })()}
         {/* Source Tabs */}
         <div className="client-tabs client-tabs-main">
           <button className={`client-tab ${dashTab === 'all' ? 'active' : ''}`} onClick={() => setDashTab('all')}><LayoutDashboard size={16} aria-hidden="true" className="tab-ico" />{'\u05d4\u05db\u05dc'}</button>
