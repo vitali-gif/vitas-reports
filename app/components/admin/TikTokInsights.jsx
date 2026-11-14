@@ -119,7 +119,7 @@ function Gallery({ stats, media }) {
   if (!rows.length) return null;
   return (
     <Section color="amber" title="המודעות" sub="לפי לידים" icon={<><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></>}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(165px, 45%), 1fr))', gap: 14 }}>
         {rows.map(s => {
           const m = (media || {})[s.adId] || {};
           const showEmbed = open === s.adId && m.itemId;
