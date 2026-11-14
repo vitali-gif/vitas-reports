@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Users, X, Search, Phone, CalendarPlus, CalendarCheck, Megaphone, Copy, Check, MessageSquareText } from 'lucide-react'
 import { REVIEW_LABEL } from '../../../lib/objection-normalize.js'
 
@@ -36,6 +36,12 @@ const initial = (name) => (String(name || '').trim().match(/[\p{L}\p{N}]/u) || [
 export default function NamedLeadsModal({ title, names, isClientView, onClose }) {
   const [q, setQ] = useState('')
   const [copied, setCopied] = useState(false)
+  // Esc סוגר (בדיקת QA, 14.11: במחשב החלון נשאר פתוח וחסם את הטאבים)
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
   const rows = useMemo(() => (names || []).map(e => (typeof e === 'string' ? { name: e } : (e || {}))), [names])
   const shown = useMemo(() => {
     const t = q.trim().toLowerCase()
