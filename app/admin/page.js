@@ -4717,28 +4717,34 @@ const selectProject = async (client, project) => {
         {/* "3 דברים שכדאי לראות" (ויטלי, 14.11) — lib/tour-insights.js. בשלב ראשון אדמין בלבד (TOUR_FOR_CLIENTS). */}
         {(TOUR_FOR_CLIENTS || !isClientView) && !isDemoProject && (() => {
           const _steps = tourSteps({ crm: crmReports[0]?.summary || null, hasTikTok: ttReports.some(r => (r.summary?.spend || 0) > 0) })
-          const _pulse = (el) => { if (!el) return false; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('ptour-pulse'); setTimeout(() => el.classList.remove('ptour-pulse'), 2600); return true }
-          const _go = (step) => {
-            trackUsage('tour', { step: step.id })
+          const _wait = (ms) => new Promise(r => setTimeout(r, ms))
+          const _cardLabel = (txt) => [...document.querySelectorAll('.vr-metric-grid *, .kpi-grid *')].find(e => e.children.length === 0 && e.textContent.trim() === txt)
+          // מעביר לטאב / תצוגת ה-CRM של הצעד ומחזיר את האלמנט להאיר (null = לא נמצא בתקופה הזו)
+          const _locate = async (step) => {
             const g = step.go || {}
             if (g.tab && g.tab !== dashTab) setDashTab(g.tab)
             if (g.crmSub) setCrmSubTab(g.crmSub)
-            if (g.compare && !compareEnabled) onComparisonToggle(true)
-            setTimeout(() => {
-              if (g.card) {
-                const lbl = [...document.querySelectorAll('.vr-metric-grid *, .kpi-grid *')].find(e => e.children.length === 0 && e.textContent.trim() === g.card)
-                const card = lbl && (lbl.closest('.vr-metric, .kpi, [role="button"], button') || lbl.parentElement)
-                if (_pulse(card)) { setTimeout(() => lbl.click(), 700); return }
-              }
+            for (let i = 0; i < 12; i++) {
+              await _wait(250)
+              if (g.card) { const l = _cardLabel(g.card); if (l) return l.closest('.vr-metric, .kpi, [role="button"], button') || l.parentElement }
               if (g.section) {
-                const h = [...document.querySelectorAll('h2, h3')].find(e => e.textContent.includes(g.section))
-                if (_pulse(h && (h.closest('.section, .vr-section, section') || h))) return
+                const h = [...document.querySelectorAll('h2, h3')].find(e => e.textContent.includes(g.section) && e.getBoundingClientRect().height > 0)
+                if (h) {
+                  // הכרטיס שמחזיק את הכותרת והתוכן — לא הכותרת לבדה (עולים עד שיש גובה של תוכן)
+                  const box = h.closest('.section, .vr-section, section, .chart-card, .card')
+                  if (box) return box
+                  let el = h
+                  for (let k = 0; k < 4 && el.parentElement && el.getBoundingClientRect().height < 140; k++) el = el.parentElement
+                  return el
+                }
               }
-              if (g.compare) { if (_pulse([...document.querySelectorAll('label, button, span')].find(e => e.children.length === 0 && e.textContent.trim() === 'השוואה לאותה תקופה'))) return }
-              _pulse(document.querySelector('.client-tabs-main'))
-            }, 900)
+              if (g.compare) { const t = [...document.querySelectorAll('label, button, span, div')].find(e => e.children.length <= 2 && e.textContent.trim() === 'השוואה לאותה תקופה'); if (t) return t.closest('label, button') || t }
+              if (!g.card && !g.section && !g.compare) return document.querySelector('.client-tabs-main')
+            }
+            return null
           }
-          return <ProjectTour steps={_steps} onGo={_go} onOpen={() => trackUsage('tour', { step: 'open' })} />
+          const _openList = (step) => { const l = step.go?.card && _cardLabel(step.go.card); if (l) l.click() }
+          return <ProjectTour steps={_steps} locate={_locate} openList={_openList} onEvent={(step) => trackUsage('tour', { step })} />
         })()}
         {/* Source Tabs */}
         <div className="client-tabs client-tabs-main">
