@@ -13,9 +13,20 @@ import './components/auth/signin.css';
 // שדרוג העיצוב (29.10) — נטען אחרון כדי לגבור על השכבות הקודמות. ראו את ראש הקובץ.
 import './components/report-ui/cluzo-polish.css';
 
+// תצוגת הקישור בוואטסאפ / מייל / סלאק (ויטלי, 15.11): בלי og:image וואטסאפ לקח את אייקון האפליקציה
+// והציג ריבוע קטן. תמונה רחבה 1200×630 (public/og-image.png) מוצגת כתצוגה גדולה.
+// עמוד הבית (/) מגיע מ-cluzo-site עם תגיות משלו; כאן זה חל על /client, /admin ושאר העמודים.
+const OG_TITLE = 'Cluzo by Vitas - הדשבורד שלך'
+const OG_DESC = 'לידים, פגישות, עסקאות ופרסום במקום אחד. מתעדכן כל שעה.'
 export const metadata = {
+  metadataBase: new URL('https://reports.vitas.co.il'),
   title: 'Cluzo by Vitas - מערכת דוחות',
-  description: 'מערכת דוחות ללקוחות',
+  description: OG_DESC,
+  openGraph: {
+    title: OG_TITLE, description: OG_DESC, siteName: 'Cluzo by Vitas', locale: 'he_IL', type: 'website',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Cluzo by Vitas - הדשבורד של הלקוחות של VITAS' }],
+  },
+  twitter: { card: 'summary_large_image', title: OG_TITLE, description: OG_DESC, images: ['/og-image.png'] },
 };
 
 export default function RootLayout({ children }) {
