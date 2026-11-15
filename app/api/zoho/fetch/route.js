@@ -19,8 +19,8 @@
 
 import { requireFetchAccess } from '../../../../lib/auth'
 import { createClient } from '@supabase/supabase-js'
-import { computeZohoSummary, filterDigitalLeads } from '../../../../lib/crm/zoho-summary.js'
-import { upsertRawRecords, rebuildCompactIfChanged } from '../../../../lib/crm/raw-store.js'
+import { computeZohoSummary, filterDigitalLeads, israelDateOf, israelOffset } from '../../../../lib/crm/zoho-summary.js'
+import { upsertRawRecords, rebuildCompactIfChanged, pruneVanishedZohoLeads } from '../../../../lib/crm/raw-store.js'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300  // was 60 — per-brand loop (BCureLaser+ISMOOTH) + sequential deals fetch on last30 exceeded 60s → 504 (shown as blank 'HTTP ' in cron alerts)
@@ -111,6 +111,7 @@ async function zohoFetch(accessToken, url) {
 // `converted` is 'both' | 'true' | 'false' (Leads only) — needed to include converted leads.
 async function searchPaginated(accessToken, module, criteria, fields, converted = null, maxPages = 20) {
   const out = []
+  out.truncated = false   // נעצר על תקרת העמודים כשיש עוד רשומות — המשיכה חלקית (לא מוחקים מהתמונה לפיה)
   let page = 1
   while (page <= maxPages) {
     const params = new URLSearchParams({ criteria, fields, per_page: '200', page: String(page) })
@@ -119,7 +120,7 @@ async function searchPaginated(accessToken, module, criteria, fields, converted 
     const json = await zohoFetch(accessToken, url)
     const recs = json.data || []
     out.push(...recs)
-    if (json.info && json.info.more_records) page++
+    if (json.info && json.info.more_records) { page++; if (page > maxPages) out.truncated = true }
     else break
   }
   return out
@@ -234,7 +235,7 @@ async function runSync(opts = {}) {
 
   const leadCriteria =
     `((segment:equals:${__brand.segment})and(Lead_Source:equals:דיגיטל)` +
-    `and(Created_Time:between:${since}T00:00:00+03:00,${until}T23:59:59+03:00))`
+    `and(Created_Time:between:${since}T00:00:00${israelOffset(since)},${until}T23:59:59${israelOffset(until)}))`
 
   let rawLeads = []
   try {
@@ -267,7 +268,11 @@ async function runSync(opts = {}) {
     try {
       const [ls, ds] = await Promise.all([upsertRawRecords(supabase, __proj.id, 'zoho', 'leads', rawLeads), upsertRawRecords(supabase, __proj.id, 'zoho', 'deals', linkedDeals)])
       snapshot = { leads: ls, deals: ds }
-      try { snapshot.compact = await rebuildCompactIfChanged(supabase, __proj.id, 'zoho', [ls, ds]) } catch (e) { snapshot.compact = { error: String(e?.message || e) } }
+      // לידים שמוזגו / נמחקו ב-Zoho מאז שנשמרו — יוצאים מהתמונה (lib/crm/raw-store.js, 15.11)
+      let pr = null
+      try { pr = await pruneVanishedZohoLeads(supabase, __proj.id, { since, until, fetchedIds: rawLeads.map(l => l.id), truncated: !!rawLeads.truncated, dayOf: israelDateOf }); snapshot.pruned = { count: pr.pruned, skipped: pr.skipped } }
+      catch (e) { snapshot.pruned = { error: String(e?.message || e).slice(0, 200) } }
+      try { snapshot.compact = await rebuildCompactIfChanged(supabase, __proj.id, 'zoho', [ls, ds, pr]) } catch (e) { snapshot.compact = { error: String(e?.message || e) } }
     } catch (e) { snapshot = { error: String(e?.message || e) } }
   }
 
