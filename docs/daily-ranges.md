@@ -98,3 +98,6 @@ app/api/cron/prefetch-daily/route.js   קרון שעתי (cron-job.org, דקה 2
   כשיש `TIKTOK_ACCESS_TOKEN`. לידים = `result` (Submit form בדף נחיתה / טופס מיידי, לפי יעד הקמפיין).
   שורות `reports` לחודשים ולטווחים המוכנים נכתבות מיד אחרי ה-recent (`lib/ads/tiktok-reports.js`, דורש
   מיגרציה 034); טווח מותאם מגיע מ-`/api/reports/range`. חשבון TikTok חדש = שורה ב-`TIKTOK_ACCOUNTS`.
+- **לידים שנמחקו / מוזגו ב-CRM:** `crm_raw` רק מוסיף ומעדכן. אחרי משיכה מלאה לטווח, רשומות שבתמונה בטווח
+  שה-CRM כבר לא מחזיר — נמחקות מהתמונה: BMBY (`pruneVanishedLids`, 3.11) ו-Zoho (`pruneVanishedZohoLeads`, 15.11,
+  "ליד כפול" שמוזג במהלך היום; תקרה 25%). Zoho מחשב ימים בשעון ישראל האמיתי (חורף +02:00) מ-15.11.

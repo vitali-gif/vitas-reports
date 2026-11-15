@@ -1,6 +1,7 @@
 // scripts/tests/zoho-summary.smoke.mjs — בדיקת עשן לפונקציה הטהורה computeZohoSummary (שלב 4).
 // הרצה:  node scripts/tests/zoho-summary.smoke.mjs
-import { computeZohoSummary, filterDigitalLeads, israelDateOf } from '../../lib/crm/zoho-summary.js'
+import { computeZohoSummary, filterDigitalLeads, israelDateOf, israelOffset } from '../../lib/crm/zoho-summary.js'
+import { vanishedZohoLeads } from '../../lib/crm/raw-store.js'
 import { computeCrmRow, totalKeysFor, getPath } from '../../lib/crm/compute.js'
 
 const fail = (m) => { console.error('✗ ' + m); process.exitCode = 1 }
@@ -19,7 +20,9 @@ const deals = [
 
 const leads = filterDigitalLeads(rawLeads)
 eq('filterDigitalLeads keeps facebook/google/facebook_* and drops others', leads.map(l => l.id), ['L1', 'L2', 'L3'])
-eq('israelDateOf uses +03:00', israelDateOf('2026-09-10T23:30:00+00:00'), '2026-09-11')
+eq('israelDateOf: summer +03:00', israelDateOf('2026-09-10T23:30:00+00:00'), '2026-09-11')
+eq('israelDateOf: winter +02:00 (15.11)', israelDateOf('2026-11-14T22:30:00+00:00'), '2026-11-15')
+eq('israelDateOf: winter, 23:30 Israel stays on its day', israelDateOf('2026-11-14T21:30:00+00:00'), '2026-11-14')
 
 const R = computeZohoSummary({ leads, deals }, { since: '2026-09-08', until: '2026-09-15' })
 eq('leads in window', R.leads.map(l => l.id), ['L1', 'L2'])
@@ -42,5 +45,22 @@ eq('computeCrmRow(zoho) shape', [row.row_count, row.data.length, row.summary.crm
 eq('totalKeysFor(zoho) dotted paths resolve', getPath(row.summary, totalKeysFor('zoho')[3]), 1)
 // שלב 4ב: Salesforce מחושב גם הוא (ציפייה ישנה: null)
 eq('computeCrmRow(salesforce) computes', computeCrmRow('salesforce', { entities: {} }, { since: '2026-09-01', until: '2026-09-02', key: 'x' })?.summary?.crmType, 'salesforce')
+
+// שעון ישראל לקריטריון החיפוש
+eq('israelOffset winter', israelOffset('2026-11-15'), '+02:00')
+eq('israelOffset summer', israelOffset('2026-08-01'), '+03:00')
+// לידים שמוזגו ב-Zoho יוצאים מהתמונה (15.11)
+{
+  const day = (ts) => israelDateOf(ts)
+  const snap = Array.from({ length: 46 }, (_, i) => ({ ext_id: 'L' + i, payload: { Created_Time: '2026-11-14T10:00:00+02:00' } }))
+    .concat([{ ext_id: 'OUT', payload: { Created_Time: '2026-11-13T10:00:00+02:00' } }])
+  const fetched = snap.slice(0, 41).map(c => c.ext_id)
+  const v = vanishedZohoLeads(snap, fetched, { since: '2026-11-14', until: '2026-11-14', dayOf: day })
+  eq('vanished: 5 merged leads of 14.11', v.ids.length, 5)
+  eq('vanished: lead of another day untouched', v.ids.includes('OUT'), false)
+  eq('vanished: truncated fetch prunes nothing', vanishedZohoLeads(snap, fetched, { since: '2026-11-14', until: '2026-11-14', dayOf: day, truncated: true }).ids.length, 0)
+  eq('vanished: over 25% missing prunes nothing', vanishedZohoLeads(snap, fetched.slice(0, 20), { since: '2026-11-14', until: '2026-11-14', dayOf: day }).ids.length, 0)
+  eq('vanished: empty fetch prunes nothing', vanishedZohoLeads(snap, [], { since: '2026-11-14', until: '2026-11-14', dayOf: day }).ids.length, 0)
+}
 
 if (process.exitCode) console.error('\nבדיקת העשן נכשלה'); else console.log('\n✓ בדיקת העשן עברה')
