@@ -29,19 +29,22 @@ const zs = { crmType: 'zoho', totalLeads: 550, devices: { 'לא הוצע': 532, 
   agentPerformance: [{ agent: 'א', leads: 94, purchased: 44 }, { agent: 'ב', leads: 45, purchased: 4 }, { agent: 'ג', leads: 37, purchased: 0 }] }
 const creative = { dim: 'אנשים בתמונה', best: { label: 'עם אנשים', cpp: 800 }, other: { label: 'בלי אנשים', cpp: 1874 }, cost: 'cpp', costLabel: 'עלות לרכישה', gap: 57 }
 const z = tourSteps({ crm: zs, spend: { facebook: 30623, google: 43455 }, creative })
-assert.deepEqual(z.map(s => s.id), ['z-bottom', 'z-channels', 'z-drill', 'z-creative', 'z-agents', 'z-response', 'z-devices', 'z-objection', 'z-tools'])
-assert.match(z[1].text, /Google עלות לרכישה ₪439/); assert.match(z[1].text, /Facebook עלות לרכישה ₪696/)
-assert.match(z[2].text, /Google/); assert.match(z[2].text, /Brand-Search/); assert.ok(!/123456/.test(z[2].text)); assert.ok(z[2].go.interact)
-assert.match(z[4].stat, /47%↔9%/); assert.ok(!/\bא\b|\bב\b/.test(z[4].text))
-assert.ok(z[5].note && /357/.test(z[5].note.text)); assert.ok(z[6].note && z[6].note.loss)
-assert.ok(z[7].note && /16 מתוך 240/.test(z[7].note.text)); assert.match(z[7].text, /יקר לי.*התייעצות עם רופא/)
-assert.ok(!z[0].note && !z[1].note)
+assert.deepEqual(z.map(s => s.id), ['period', 'z-tabs', 'z-bottom', 'z-channels', 'z-drill', 'z-agents', 'z-response', 'z-devices', 'z-objection', 'z-fb-ads', 'z-creative', 'z-demo', 'z-google-ads'])
+assert.equal(tourSteps({ crm: zs, spend: { facebook: 1, google: 1 }, canExport: true }).at(-1).id, 'z-export')
+assert.ok(!z.some(s => s.go.compare))
+assert.match(z[3].text, /Google עלות לרכישה ₪439/); assert.match(z[3].text, /Facebook עלות לרכישה ₪696/)
+assert.match(z[4].text, /Google/); assert.match(z[4].text, /Brand-Search/); assert.ok(!/123456/.test(z[4].text)); assert.ok(z[4].go.interact)
+assert.match(z[5].stat, /47%↔9%/); assert.match(z[5].text, /^אצל א, הנציג המוביל/)
+assert.ok(z[6].note && /357/.test(z[6].note.text)); assert.ok(z[7].note && z[7].note.loss)
+assert.ok(z[8].note && /16 מתוך 240/.test(z[8].note.text)); assert.match(z[8].text, /יקר לי.*התייעצות עם רופא/)
+assert.match(z[10].text, /₪800/)
+assert.ok(!z[2].note && !z[3].note)
 // ISMOOTH: Google מוציא יותר ממה שמכר — הממצא נכנס (ויטלי אישר)
 const zi = tourSteps({ crm: { crmType: 'zoho', totalLeads: 70, funnel: { leads: 70, purchased: 11, netRevenue: 12400, byChannel: [
   { channel: 'google', leads: 39, purchased: 3, netRevenue: 3798, conversionRate: 7.7, campaigns: [] },
   { channel: 'facebook', leads: 17, purchased: 5, netRevenue: 4997, conversionRate: 29, campaigns: [] }] } }, spend: { facebook: 6144, google: 18638 } })
 assert.match(zi.find(s => s.id === 'z-channels').text, /ב-Google ההוצאה \(₪18\.6 אלף\) עדיין גבוהה/)
-assert.equal(zi.at(-1).id, 'z-tools')
+assert.equal(zi[0].id, 'period')
 
 // Salesforce: מענה תוך שעה + סיבת הפסד
 const k = tourSteps({ crm: { crmType: 'salesforce', totalLeads: 472, relevantLeads: 472, responseTime: { measured: 420, within1h: 17 }, lossReasons: [{ reason: 'מחיר', count: 20 }], lossTotal: 33 } })
@@ -50,7 +53,7 @@ assert.equal(k[0].go.sfTab, 'timing'); assert.equal(k[1].go.sfTab, 'branches')
 // KLOSS: הצעות מחיר שלא נסגרו + פער סניפים (סניף מעל 100% לא בהשוואה)
 const k2 = tourSteps({ crm: { crmType: 'salesforce', totalLeads: 600, funnelCohort: { quotes: 80, paid: 22 },
   byBranch: { 'נתניה': { leads: 69, opportunities: 62 }, 'באר שבע': { leads: 91, opportunities: 33 }, 'רדיזיין': { leads: 100, opportunities: 128 }, 'לא ידוע': { leads: 2, opportunities: 0 } } } })
-assert.deepEqual(k2.map(s => s.id).sort(), ['branches', 'compare', 'quotes'])
+assert.deepEqual(k2.map(s => s.id).sort(), ['branches', 'period', 'quotes'])
 assert.match(k2.find(s => s.id === 'branches').text, /נתניה 90%.*באר שבע 36%/)
 // BMBY: המקור עם הכי הרבה פגישות
 const b = tourSteps({ crm: { crmType: 'bmby', totalLeads: 10, relevantLeads: 9, sources: { 'yad2': { totalLeads: 13, meetingsScheduled: 4 }, 'אתר': { totalLeads: 35, meetingsScheduled: 0 } } }, max: 3 })
@@ -60,7 +63,7 @@ assert.deepEqual(tourSteps({ crm: expo, hasTikTok: true }).map(s => s.id), ['res
 assert.match(k[1].text, /"מחיר" \(20 מתוך 33\)/)
 
 // בלי CRM — רק ההשוואה; שום צעד לא מזכיר שם של אדם
-assert.deepEqual(tourSteps({ crm: null }).map(s => s.id), ['compare'])
+assert.deepEqual(tourSteps({ crm: null }).map(s => s.id), ['period'])
 for (const s of [...e, ...reh, ...z, ...k]) assert.ok(s.text && s.todo && s.go && s.stat)
 
 console.log('✓ tour smoke')

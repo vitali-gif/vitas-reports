@@ -1,5 +1,5 @@
 'use client'
-import { FolderOpen, CalendarDays, GitCompareArrows, LayoutGrid, MousePointerClick, Info, FileText } from 'lucide-react'
+import { FolderOpen, CalendarDays, LayoutGrid, MousePointerClick, Info, FileText } from 'lucide-react'
 
 // מדריך "איך הדשבורד עובד" ללקוח (נפתח בכניסה הראשונה ומכפתור העזרה). הוצא מ-app/client/page.js ב-3.11.
 // ויטלי, 3.11: "לעדכן את הטקסט" — מה שיש בדשבורד היום (השוואה, תתי-הטאבים של CRM, כרטיסים
@@ -7,7 +7,6 @@ import { FolderOpen, CalendarDays, GitCompareArrows, LayoutGrid, MousePointerCli
 const STEPS = [
     { icon: FolderOpen, title: 'בוחרים פרויקט', desc: 'בסרגל הצד מופיעים הפרויקטים שלך. לחיצה על פרויקט פותחת את הדוח שלו.' },
     { icon: CalendarDays, title: 'בוחרים תקופה', desc: 'בראש המסך: החודש, 7 או 14 ימים אחרונים, או טווח תאריכים משלך. כל טווח נטען מיד.' },
-    { icon: GitCompareArrows, title: 'משווים', desc: '"השוואה לאותה תקופה" מראה ליד כל מדד את השינוי מול התקופה הקודמת באותו אורך.' },
     { icon: LayoutGrid, title: 'הטאבים', desc: '"הכל" הוא התמונה המלאה. "CRM" מראה מה קרה ללידים אצל צוות המכירות: מקורות הגעה, זמני תגובה, התנגדויות, יישובים ופגישות. "Facebook" ו-"Google" מראים את הפרסום בכל פלטפורמה.' },
     { icon: MousePointerClick, title: 'לוחצים על מספר', desc: 'לחיצה על כרטיס עם מספר, למשל פגישות או לידים, פותחת את הרשימה שמאחוריו.' },
     { icon: Info, title: '"איך נמדד"', desc: 'מתחת לחלק מהמספרים מוסבר איך הם מחושבים. המספרים מה-CRM מבוססים על מה שתועד במערכת.' },

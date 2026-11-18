@@ -47,7 +47,7 @@ const excludeIgnored = (q, list) => q.not('email', 'in', `(${list.map(e => `"${e
 
 // POST â log session events from client dashboard
 // פעולות בתוך הכניסה (lib/usage-track.js, מיגרציה 029): רק השמות והשדות האלה נשמרים, טקסט קצר בלבד.
-const ACTIONS = { tab: ['tab'], crm_view: ['view'], period: ['period'], compare: [], section: ['title'], help: ['title'], ai_open: [], modal: ['kind'], tour: ['step'] }
+const ACTIONS = { tab: ['tab'], crm_view: ['view'], period: ['period'], compare: [], section: ['title'], help: ['title'], ai_open: [], modal: ['kind'], tour: ['step', 'n', 'of'] }
 const DEVICES = new Set(['mobile', 'tablet', 'desktop'])
 const cleanText = (v, n = 80) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n)
 const okSec = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.min(Math.round(Number(v)), 86400) : null)
@@ -220,7 +220,7 @@ async function usageView(url, view) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const { data: evs, error: evErr } = await notIgnored(supabaseAdmin.from('client_events').select('email, name, detail, at').gte('at', since)).order('at', { ascending: false }).limit(20000)
   const users = new Map()
-  const U = (email) => users.get(email) || users.set(email, { email, client: null, sessions: 0, days: new Set(), durSec: 0, activeSec: 0, activeKnown: 0, lastAt: null, devices: {}, projects: new Set(), tabs: {}, sections: {}, help: {}, crmViews: {}, ai: 0, compare: 0, modals: 0, periods: { month: 0, range: 0 } }).get(email)
+  const U = (email) => users.get(email) || users.set(email, { email, client: null, sessions: 0, days: new Set(), durSec: 0, activeSec: 0, activeKnown: 0, lastAt: null, devices: {}, projects: new Set(), tabs: {}, sections: {}, help: {}, crmViews: {}, ai: 0, compare: 0, modals: 0, periods: { month: 0, range: 0 }, tour: { offer: 0, start: 0, done: 0, skip: 0, dismiss: 0, maxN: 0, of: 0 } }).get(email)
   for (const x of ss || []) {
     const u = U(x.email)
     u.client = u.client || x.client_name
@@ -243,6 +243,12 @@ async function usageView(url, view) {
     else if (e.name === 'ai_open') u.ai++
     else if (e.name === 'compare') u.compare++
     else if (e.name === 'modal') u.modals++
+    else if (e.name === 'tour') {   // הסיור (ויטלי, 18.11): הוצע / התחיל / עד איזה צעד / סיים
+      const st = String(d.step || ''), t = u.tour
+      if (['offer', 'start', 'done', 'skip', 'dismiss'].includes(st)) t[st]++
+      const n = Number(d.n), of = Number(d.of)
+      if (n > t.maxN) { t.maxN = n; t.of = of || t.of }
+    }
     else if (e.name === 'period') u.periods[String(d.period || '').includes('_') ? 'range' : 'month']++
   }
   const top = (o, n = 8) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n)
@@ -250,7 +256,7 @@ async function usageView(url, view) {
     email: u.email, client: u.client, sessions: u.sessions, days: u.days.size, durSec: u.durSec,
     activeSec: u.activeKnown ? u.activeSec : null, activeSessions: u.activeKnown, lastAt: u.lastAt, devices: u.devices, projects: [...u.projects],
     tabs: top(u.tabs, 12), sections: top(u.sections, 40), help: top(u.help, 10), crmViews: top(u.crmViews, 10),
-    ai: u.ai, compare: u.compare, modals: u.modals, periods: u.periods,
+    ai: u.ai, compare: u.compare, modals: u.modals, periods: u.periods, tour: u.tour,
   })).sort((a, b) => String(b.lastAt || '').localeCompare(String(a.lastAt || '')))
   return NextResponse.json({ since, days, eventsReady: !evErr, users: out }, { headers: { 'Cache-Control': 'no-store' } })
 }
