@@ -170,7 +170,7 @@ export function topFindings(tests, max = 3) {
   return out.filter(f => f.gap >= 10).sort((a, b) => (a.indicative - b.indicative) || (b.gap - a.gap)).slice(0, max)
 }
 
-export function CreativeHighlights({ projectId, periodKey, onMore }) {
+export function CreativeHighlights({ projectId, periodKey, onMore, onFindings }) {
   const [year, setYear] = useState(undefined)
   useEffect(() => {
     let off = false
@@ -181,6 +181,7 @@ export function CreativeHighlights({ projectId, periodKey, onMore }) {
     return () => { off = true }
   }, [projectId, periodKey])
   const finds = useMemo(() => topFindings(year?.tests), [year])
+  useEffect(() => { onFindings?.(finds) }, [finds])   // eslint-disable-line react-hooks/exhaustive-deps
   if (!finds.length) return null
   return (
     <div className="section cth" aria-label="מה עובד במודעות">

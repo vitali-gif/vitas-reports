@@ -311,6 +311,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [refreshStartTime, setRefreshStartTime] = useState(null)
   const [refreshElapsed, setRefreshElapsed] = useState(0)
   const [dashTab, setDashTab] = useState('all')
+  const [tourCreative, setTourCreative] = useState(null)   // הממצא הראשון של "מה עובד במודעות" — לסיור של Zoho
   const [crmSubTab, setCrmSubTab] = useState('sources')
   // ויטלי, 5.11: כל מעבר טאב (ראשי או תת-טאב) מקפיץ לראש העמוד. בטעינה הראשונה — לא.
   const _tabScrollInit = useRef(false)
@@ -4716,7 +4717,8 @@ const selectProject = async (client, project) => {
         )}
         {/* "3 דברים שכדאי לראות" (ויטלי, 14.11) — lib/tour-insights.js. בשלב ראשון אדמין בלבד (TOUR_FOR_CLIENTS). */}
         {(TOUR_FOR_CLIENTS || !isClientView) && !isDemoProject && (() => {
-          const _steps = tourSteps({ crm: crmReports[0]?.summary || null, hasTikTok: ttReports.some(r => (r.summary?.spend || 0) > 0) })
+          const _steps = tourSteps({ crm: crmReports[0]?.summary || null, hasTikTok: ttReports.some(r => (r.summary?.spend || 0) > 0),
+            spend: { facebook: (fbTotals && fbTotals.spend) || 0, google: (gTotals && gTotals.spend) || 0 }, creative: tourCreative })
           const _wait = (ms) => new Promise(r => setTimeout(r, ms))
           const _cardLabel = (txt) => [...document.querySelectorAll('.vr-metric-grid *, .kpi-grid *')].find(e => e.children.length === 0 && e.textContent.trim() === txt)
           // מעביר לטאב / תצוגת ה-CRM של הצעד ומחזיר את האלמנט להאיר (null = לא נמצא בתקופה הזו)
@@ -4724,6 +4726,7 @@ const selectProject = async (client, project) => {
             const g = step.go || {}
             if (g.tab && g.tab !== dashTab) setDashTab(g.tab)
             if (g.crmSub) setCrmSubTab(g.crmSub)
+            if (g.sfTab) setSfTab(g.sfTab)   // KLOSS: התצוגות של Salesforce (רשת / סניפים / תזמון ...)
             for (let i = 0; i < 12; i++) {
               await _wait(250)
               if (g.card) { const l = _cardLabel(g.card); if (l) return l.closest('.vr-metric, .kpi, [role="button"], button') || l.parentElement }
@@ -4738,8 +4741,9 @@ const selectProject = async (client, project) => {
                   return el
                 }
               }
+              if (g.selector) { const el = document.querySelector(g.selector); if (el && el.getBoundingClientRect().height > 0) return el }
               if (g.compare) { const t = [...document.querySelectorAll('label, button, span, div')].find(e => e.children.length <= 2 && e.textContent.trim() === 'השוואה לאותה תקופה'); if (t) return t.closest('label, button') || t }
-              if (!g.card && !g.section && !g.compare) return document.querySelector('.client-tabs-main')
+              if (!g.card && !g.section && !g.compare && !g.selector) return document.querySelector('.client-tabs-main')
             }
             return null
           }
@@ -6307,6 +6311,30 @@ const selectProject = async (client, project) => {
                     </table>
                   </div>
                 </div>
+                {/* התנגדויות והצעת מכשיר (ויטלי, 18.11): הנתונים היו בסיכום של Zoho ולא הוצגו. הסיור מוביל לכאן. */}
+                {(_objList.length > 0 || _devList.length > 0) && (
+                  <div className="zoho-obj-dev" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',gap:16}}>
+                    {[['התנגדויות', 'הסיבות שהצוות רשם ב-Zoho ללידים שלא התקדמו', _objList, '#e11d48'], ['הצעת מכשיר', 'איזה מכשיר הוצע לליד, לפי השדה ב-Zoho', _devList, '#4f46e5']].filter(([, , list]) => list.length).map(([title, sub, list, color]) => {
+                      const tot = list.reduce((a, [, n]) => a + (Number(n) || 0), 0)
+                      return (
+                        <div key={title} className="section" style={{marginTop:0}}>
+                          <div className="section-head"><div className="ico rose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="10" y2="18"/></svg></div><h2>{title}</h2><span className="sub">{sub}</span></div>
+                          <div style={{display:'grid',gap:10}}>
+                            {list.slice(0, 10).map(([name, n]) => {
+                              const pc = tot > 0 ? (n / tot) * 100 : 0
+                              return (
+                                <div key={name}>
+                                  <div style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:13.5}}><bdi style={{fontWeight:600}}>{name || 'לא צוין'}</bdi><span style={{color:'var(--text-secondary)',fontVariantNumeric:'tabular-nums'}}>{formatNum(n)} · {pc.toFixed(pc >= 10 ? 0 : 1)}%</span></div>
+                                  <div style={{height:7,borderRadius:4,background:'var(--border, #eef1f7)',marginTop:4}}><div style={{width:pc + '%',height:'100%',borderRadius:4,background:color}} /></div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
             </VitasPresentation>)
           }
 
@@ -6472,7 +6500,7 @@ const selectProject = async (client, project) => {
         {dashTab === 'all' && (!hasCrm || vrFunnelMode) ? renderFunnelBar(vrFunnelMode) : null}
 
         {/* "מה עובד במודעות" — שלושת הממצאים החזקים בראש הדשבורד (ויטלי, 6.11). הניתוח המלא בטאב Facebook. */}
-        {(dashTab === 'all' || dashTab === 'facebook') && hasFb && <CreativeHighlights projectId={selectedProject?.id} periodKey={selectedMonth}
+        {(dashTab === 'all' || dashTab === 'facebook') && hasFb && <CreativeHighlights projectId={selectedProject?.id} periodKey={selectedMonth} onFindings={(f) => setTourCreative(f?.[0] || null)}
           onMore={() => { const go = () => document.getElementById('creative-tests')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); if (dashTab !== 'facebook') { setDashTab('facebook'); setTimeout(go, 400) } else go() }} />}
 
         {/* פילוח פנימי לפי פרויקט — לקוח בחשבון מודעות אחד שמזהה את הבניין ברמת המודעה.
