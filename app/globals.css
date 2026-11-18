@@ -4722,6 +4722,7 @@ textarea:focus-visible,
 
 /* ── "3 דברים שכדאי לראות" — סיור מודרך (ProjectTour, 14.11) ────────────────── */
 .ptour { margin: 0 0 12px; }
+@media (max-width: 639px) { .ptour, .ptour-layer { display: none !important; } }   /* בטלפון אין סיור (ויטלי, 18.11) */
 .ptour-chip { display: inline-flex; align-items: center; gap: 7px; border: 0; background: var(--indigo, #5B5EF4); color: #fff; border-radius: 999px; padding: 8px 16px; font: 700 13.5px var(--font, Heebo, sans-serif); cursor: pointer; box-shadow: 0 4px 14px rgba(91, 94, 244, .3); }
 .ptour-chip:focus-visible { outline: 2px solid var(--indigo, #5B5EF4); outline-offset: 3px; }
 .ptour-layer { position: fixed; inset: 0; z-index: 9000; pointer-events: none; }

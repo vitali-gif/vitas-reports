@@ -21,6 +21,14 @@ export default function ProjectTour({ steps, locate, openList, onEvent, label = 
   const boxRef = useRef(null);
   const [boxPos, setBoxPos] = useState(null);
   const [narrow, setNarrow] = useState(false);
+  // בטלפון אין סיור (ויטלי, 18.11)
+  const [phone, setPhone] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const on = () => { setPhone(mq.matches); if (mq.matches) { setIdx(-1); setRect(null); elRef.current = null; } };
+    on(); mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
 
   const measure = useCallback(() => {
     const el = elRef.current;
@@ -87,7 +95,7 @@ export default function ProjectTour({ steps, locate, openList, onEvent, label = 
     setBoxPos({ top, left });
   }, [rect, idx, narrow, busy]);
 
-  if (!steps || !steps.length) return null;
+  if (!steps || !steps.length || phone) return null;
   const s = idx >= 0 ? steps[idx] : null;
   const last = idx === steps.length - 1;
   const W = typeof window !== 'undefined' ? window.innerWidth : 0, H = typeof window !== 'undefined' ? window.innerHeight : 0;
