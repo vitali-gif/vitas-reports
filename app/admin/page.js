@@ -4724,6 +4724,7 @@ const selectProject = async (client, project) => {
             const g = step.go || {}
             if (g.tab && g.tab !== dashTab) setDashTab(g.tab)
             if (g.crmSub) setCrmSubTab(g.crmSub)
+            if (g.sfTab) setSfTab(g.sfTab)   // KLOSS: התצוגות של Salesforce (רשת / סניפים / תזמון ...)
             for (let i = 0; i < 12; i++) {
               await _wait(250)
               if (g.card) { const l = _cardLabel(g.card); if (l) return l.closest('.vr-metric, .kpi, [role="button"], button') || l.parentElement }
@@ -6307,6 +6308,30 @@ const selectProject = async (client, project) => {
                     </table>
                   </div>
                 </div>
+                {/* התנגדויות והצעת מכשיר (ויטלי, 18.11): הנתונים היו בסיכום של Zoho ולא הוצגו. הסיור מוביל לכאן. */}
+                {(_objList.length > 0 || _devList.length > 0) && (
+                  <div className="zoho-obj-dev" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',gap:16}}>
+                    {[['התנגדויות', 'הסיבות שהצוות רשם ב-Zoho ללידים שלא התקדמו', _objList, '#e11d48'], ['הצעת מכשיר', 'איזה מכשיר הוצע לליד, לפי השדה ב-Zoho', _devList, '#4f46e5']].filter(([, , list]) => list.length).map(([title, sub, list, color]) => {
+                      const tot = list.reduce((a, [, n]) => a + (Number(n) || 0), 0)
+                      return (
+                        <div key={title} className="section" style={{marginTop:0}}>
+                          <div className="section-head"><div className="ico rose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="10" y2="18"/></svg></div><h2>{title}</h2><span className="sub">{sub}</span></div>
+                          <div style={{display:'grid',gap:10}}>
+                            {list.slice(0, 10).map(([name, n]) => {
+                              const pc = tot > 0 ? (n / tot) * 100 : 0
+                              return (
+                                <div key={name}>
+                                  <div style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:13.5}}><bdi style={{fontWeight:600}}>{name || 'לא צוין'}</bdi><span style={{color:'var(--text-secondary)',fontVariantNumeric:'tabular-nums'}}>{formatNum(n)} · {pc.toFixed(pc >= 10 ? 0 : 1)}%</span></div>
+                                  <div style={{height:7,borderRadius:4,background:'var(--border, #eef1f7)',marginTop:4}}><div style={{width:pc + '%',height:'100%',borderRadius:4,background:color}} /></div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
             </VitasPresentation>)
           }
 
