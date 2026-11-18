@@ -311,6 +311,7 @@ export default function AdminPage({ isClientView = false, allowedProjectIds = nu
   const [refreshStartTime, setRefreshStartTime] = useState(null)
   const [refreshElapsed, setRefreshElapsed] = useState(0)
   const [dashTab, setDashTab] = useState('all')
+  const [tourCreative, setTourCreative] = useState(null)   // הממצא הראשון של "מה עובד במודעות" — לסיור של Zoho
   const [crmSubTab, setCrmSubTab] = useState('sources')
   // ויטלי, 5.11: כל מעבר טאב (ראשי או תת-טאב) מקפיץ לראש העמוד. בטעינה הראשונה — לא.
   const _tabScrollInit = useRef(false)
@@ -4716,7 +4717,8 @@ const selectProject = async (client, project) => {
         )}
         {/* "3 דברים שכדאי לראות" (ויטלי, 14.11) — lib/tour-insights.js. בשלב ראשון אדמין בלבד (TOUR_FOR_CLIENTS). */}
         {(TOUR_FOR_CLIENTS || !isClientView) && !isDemoProject && (() => {
-          const _steps = tourSteps({ crm: crmReports[0]?.summary || null, hasTikTok: ttReports.some(r => (r.summary?.spend || 0) > 0) })
+          const _steps = tourSteps({ crm: crmReports[0]?.summary || null, hasTikTok: ttReports.some(r => (r.summary?.spend || 0) > 0),
+            spend: { facebook: (fbTotals && fbTotals.spend) || 0, google: (gTotals && gTotals.spend) || 0 }, creative: tourCreative })
           const _wait = (ms) => new Promise(r => setTimeout(r, ms))
           const _cardLabel = (txt) => [...document.querySelectorAll('.vr-metric-grid *, .kpi-grid *')].find(e => e.children.length === 0 && e.textContent.trim() === txt)
           // מעביר לטאב / תצוגת ה-CRM של הצעד ומחזיר את האלמנט להאיר (null = לא נמצא בתקופה הזו)
@@ -4739,8 +4741,9 @@ const selectProject = async (client, project) => {
                   return el
                 }
               }
+              if (g.selector) { const el = document.querySelector(g.selector); if (el && el.getBoundingClientRect().height > 0) return el }
               if (g.compare) { const t = [...document.querySelectorAll('label, button, span, div')].find(e => e.children.length <= 2 && e.textContent.trim() === 'השוואה לאותה תקופה'); if (t) return t.closest('label, button') || t }
-              if (!g.card && !g.section && !g.compare) return document.querySelector('.client-tabs-main')
+              if (!g.card && !g.section && !g.compare && !g.selector) return document.querySelector('.client-tabs-main')
             }
             return null
           }
@@ -6497,7 +6500,7 @@ const selectProject = async (client, project) => {
         {dashTab === 'all' && (!hasCrm || vrFunnelMode) ? renderFunnelBar(vrFunnelMode) : null}
 
         {/* "מה עובד במודעות" — שלושת הממצאים החזקים בראש הדשבורד (ויטלי, 6.11). הניתוח המלא בטאב Facebook. */}
-        {(dashTab === 'all' || dashTab === 'facebook') && hasFb && <CreativeHighlights projectId={selectedProject?.id} periodKey={selectedMonth}
+        {(dashTab === 'all' || dashTab === 'facebook') && hasFb && <CreativeHighlights projectId={selectedProject?.id} periodKey={selectedMonth} onFindings={(f) => setTourCreative(f?.[0] || null)}
           onMore={() => { const go = () => document.getElementById('creative-tests')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); if (dashTab !== 'facebook') { setDashTab('facebook'); setTimeout(go, 400) } else go() }} />}
 
         {/* פילוח פנימי לפי פרויקט — לקוח בחשבון מודעות אחד שמזהה את הבניין ברמת המודעה.

@@ -4745,4 +4745,12 @@ textarea:focus-visible,
 .ptour-btn.ghost { background: transparent; color: var(--indigo, #5B5EF4); border: 1px solid var(--border, #dce3f1); }
 .ptour-btn:focus-visible, .ptour-skip:focus-visible, .ptour-x:focus-visible { outline: 2px solid var(--indigo, #5B5EF4); outline-offset: 2px; }
 .ptour-skip { display: block; margin: 8px auto 0; border: 0; background: transparent; color: var(--text-secondary, #64748b); font: 500 12.5px var(--font, Heebo, sans-serif); cursor: pointer; text-decoration: underline; }
-@media (prefers-reduced-motion: reduce) { .ptour-ring { transition: none; } }
+/* סיור מלא (אריקה כרמל, 18.11): סרגל התקדמות, והערה על שדה שלא מתמלא ב-CRM */
+.ptour-progress { flex: 1; height: 4px; margin: 0 10px; border-radius: 4px; background: rgba(91, 94, 244, .14); overflow: hidden; }
+.ptour-progress i { display: block; height: 100%; border-radius: 4px; background: var(--indigo, #5B5EF4); transition: width .3s; }
+.ptour-note { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; padding: 9px 11px; border-radius: 10px; background: rgba(245, 158, 11, .1); border-inline-start: 3px solid #f59e0b; font-size: 12.5px; line-height: 1.55; }
+.ptour-note svg { flex: none; margin-top: 2px; color: #b45309; }
+.ptour-note b { color: #92400e; }
+.ptour-note span { display: block; margin-top: 2px; color: var(--text-secondary, #64748b); }
+.ptour-try { margin: 8px 0 0; font-size: 12.5px; font-weight: 600; color: var(--indigo, #5B5EF4); }
+@media (prefers-reduced-motion: reduce) { .ptour-ring, .ptour-progress i { transition: none; } }

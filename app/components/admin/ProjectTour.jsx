@@ -9,7 +9,7 @@
  * (אפשר ללחוץ על הכרטיס עצמו). כשנפתח חלון (רשימת לידים) הוא מעל הסיור (z-index 9999 מול 9000).
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Sparkles, X, ChevronLeft, ChevronRight, List } from 'lucide-react';
+import { Sparkles, X, ChevronLeft, ChevronRight, List, PenLine } from 'lucide-react';
 
 const PAD = 8;
 
@@ -48,6 +48,14 @@ export default function ProjectTour({ steps, locate, openList, onEvent, label = 
     }
     measure(); setBusy(false);
   }, [steps, locate, measure, onEvent]);
+
+  // צעד שבו לוחצים בתוך האלמנט (טבלה שנפתחת) — הטבעת גדלה יחד איתו
+  useEffect(() => {
+    const el = elRef.current
+    if (idx < 0 || !el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => measure()); ro.observe(el)
+    return () => ro.disconnect()
+  }, [idx, busy, measure]);
 
   const close = useCallback((how) => { onEvent?.(how); setIdx(-1); setRect(null); elRef.current = null; }, [onEvent]);
 
@@ -88,7 +96,7 @@ export default function ProjectTour({ steps, locate, openList, onEvent, label = 
     <>
       <div className="ptour">
         <button type="button" className="ptour-chip" onClick={() => go(0)}>
-          <Sparkles size={15} aria-hidden="true" /><span>{label.replace(/^3/, String(steps.length))}</span>
+          <Sparkles size={15} aria-hidden="true" /><span>{steps.length > 5 ? `סיור בדשבורד · ${steps.length} צעדים` : label.replace(/^3/, String(steps.length))}</span>
         </button>
       </div>
       {s && (
@@ -104,12 +112,20 @@ export default function ProjectTour({ steps, locate, openList, onEvent, label = 
             style={!narrow && boxPos ? { top: boxPos.top, left: boxPos.left } : undefined}>
             <div className="ptour-box-head">
               <span className="ptour-count">{idx + 1} מתוך {steps.length}</span>
+              {steps.length > 3 && <span className="ptour-progress" aria-hidden="true"><i style={{ width: ((idx + 1) / steps.length) * 100 + '%' }} /></span>}
               <button type="button" className="ptour-x" onClick={() => close('skip')} aria-label="סיום סיור"><X size={16} /></button>
             </div>
             <div className="ptour-box-main">
               <span className="ptour-stat">{s.stat}</span>
               <div className="ptour-body"><b>{s.title}</b><span>{s.text}</span><small>{s.todo}</small></div>
             </div>
+            {s.note && (
+              <div className="ptour-note">
+                <PenLine size={15} aria-hidden="true" />
+                <div><b>חסר רישום ב-CRM</b> {s.note.text}{s.note.loss && <span>מה מפסידים: {s.note.loss}</span>}</div>
+              </div>
+            )}
+            {s.go?.interact && rect && !busy && <p className="ptour-try">👆 אפשר ללחוץ בתוך האזור המואר</p>}
             {busy ? <p className="ptour-wait">עוברים למקום...</p> : !rect ? <p className="ptour-wait">החלק הזה לא מוצג כרגע בתקופה שנבחרה.</p> : null}
             <div className="ptour-actions">
               {s.go?.card && rect ? <button type="button" className="ptour-btn ghost" onClick={() => { onEvent?.('list:' + s.id); openList?.(s) }}><List size={15} aria-hidden="true" />פתחו את הרשימה</button> : null}

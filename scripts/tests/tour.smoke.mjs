@@ -17,11 +17,31 @@ const reh = tourSteps({ crm: { totalLeads: 56, relevantLeads: 15, leadsToHandle:
 assert.ok(reh.some(s => s.id === 'relevance' && s.text.includes('15 מתוך 56')))
 
 // Zoho: שעות קלנדריות (לא "שעות עבודה"); מכשיר והתנגדות נוחתים על החלקים החדשים בטאב ה-CRM (18.11)
-const z = tourSteps({ crm: { crmType: 'zoho', totalLeads: 378, relevantLeads: 366, devices: { 'לא הוצע': 365, 'פרו': 9 }, objections: { 'יקר לי': 9 },
-  responseTime: { buckets: { '0-15m': 9, '15m-1h': 13, '1h-4h': 23, '4h-8h': 11, '8h-24h': 29, '1d-3d': 23, '3d+': 10 } } } })
-assert.equal(z[0].id, 'response'); assert.ok(!/עבודה/.test(z[0].text))
-assert.deepEqual(z.map(s => s.id), ['response', 'devices', 'objection'])
-assert.deepEqual(z[1].go, { tab: 'crm', section: 'הצעת מכשיר' })
+// Zoho (אריקה כרמל, 18.11): סיור מלא מהכסף ועד המכירה, עם הערות על שדות שלא מתמלאים
+const zs = { crmType: 'zoho', totalLeads: 550, devices: { 'לא הוצע': 532, 'פרו': 13, 'פלוס': 3 },
+  objections: { 'אחר': 1, 'יקר לי': 13, 'התייעצות עם רופא': 2 },
+  responseTime: { noResponseCount: 357, buckets: { '0-15m': 12, '15m-1h': 18, '1h-4h': 33, '4h-8h': 17, '8h-24h': 52, '1d-3d': 44, '3d+': 17 } },
+  funnel: { leads: 550, purchased: 168, netRevenue: 248152, leadsNotConverted: 240, byChannel: [
+    { channel: 'google', leads: 282, purchased: 99, netRevenue: 150284, conversionRate: 35.1, campaigns: [{ campaign: 'Brand-Search', purchased: 58 }, { campaign: '123456', purchased: 70 }] },
+    { channel: 'facebook', leads: 183, purchased: 44, netRevenue: 59998, conversionRate: 24, campaigns: [] },
+    { channel: 'אתר חברה', leads: 58, purchased: 20, netRevenue: 29910, conversionRate: 34.5, campaigns: [] },
+    { channel: 'וואטסאפ', leads: 27, purchased: 5, netRevenue: 7960, conversionRate: 18.5, campaigns: [] }] },
+  agentPerformance: [{ agent: 'א', leads: 94, purchased: 44 }, { agent: 'ב', leads: 45, purchased: 4 }, { agent: 'ג', leads: 37, purchased: 0 }] }
+const creative = { dim: 'אנשים בתמונה', best: { label: 'עם אנשים', cpp: 800 }, other: { label: 'בלי אנשים', cpp: 1874 }, cost: 'cpp', costLabel: 'עלות לרכישה', gap: 57 }
+const z = tourSteps({ crm: zs, spend: { facebook: 30623, google: 43455 }, creative })
+assert.deepEqual(z.map(s => s.id), ['z-bottom', 'z-channels', 'z-drill', 'z-creative', 'z-agents', 'z-response', 'z-devices', 'z-objection', 'z-tools'])
+assert.match(z[1].text, /Google עלות לרכישה ₪439/); assert.match(z[1].text, /Facebook עלות לרכישה ₪696/)
+assert.match(z[2].text, /Google/); assert.match(z[2].text, /Brand-Search/); assert.ok(!/123456/.test(z[2].text)); assert.ok(z[2].go.interact)
+assert.match(z[4].stat, /47%↔9%/); assert.ok(!/\bא\b|\bב\b/.test(z[4].text))
+assert.ok(z[5].note && /357/.test(z[5].note.text)); assert.ok(z[6].note && z[6].note.loss)
+assert.ok(z[7].note && /16 מתוך 240/.test(z[7].note.text)); assert.match(z[7].text, /יקר לי.*התייעצות עם רופא/)
+assert.ok(!z[0].note && !z[1].note)
+// ISMOOTH: Google מוציא יותר ממה שמכר — הממצא נכנס (ויטלי אישר)
+const zi = tourSteps({ crm: { crmType: 'zoho', totalLeads: 70, funnel: { leads: 70, purchased: 11, netRevenue: 12400, byChannel: [
+  { channel: 'google', leads: 39, purchased: 3, netRevenue: 3798, conversionRate: 7.7, campaigns: [] },
+  { channel: 'facebook', leads: 17, purchased: 5, netRevenue: 4997, conversionRate: 29, campaigns: [] }] } }, spend: { facebook: 6144, google: 18638 } })
+assert.match(zi.find(s => s.id === 'z-channels').text, /ב-Google ההוצאה \(₪18\.6 אלף\) עדיין גבוהה/)
+assert.equal(zi.at(-1).id, 'z-tools')
 
 // Salesforce: מענה תוך שעה + סיבת הפסד
 const k = tourSteps({ crm: { crmType: 'salesforce', totalLeads: 472, relevantLeads: 472, responseTime: { measured: 420, within1h: 17 }, lossReasons: [{ reason: 'מחיר', count: 20 }], lossTotal: 33 } })
