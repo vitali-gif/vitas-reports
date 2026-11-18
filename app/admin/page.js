@@ -4718,7 +4718,7 @@ const selectProject = async (client, project) => {
         {/* "3 דברים שכדאי לראות" (ויטלי, 14.11) — lib/tour-insights.js. בשלב ראשון אדמין בלבד (TOUR_FOR_CLIENTS). */}
         {(TOUR_FOR_CLIENTS || !isClientView) && !isDemoProject && (() => {
           const _steps = tourSteps({ crm: crmReports[0]?.summary || null, hasTikTok: ttReports.some(r => (r.summary?.spend || 0) > 0),
-            spend: { facebook: (fbTotals && fbTotals.spend) || 0, google: (gTotals && gTotals.spend) || 0 }, creative: tourCreative })
+            spend: { facebook: (fbTotals && fbTotals.spend) || 0, google: (gTotals && gTotals.spend) || 0 }, creative: tourCreative, canExport: !isClientView })
           const _wait = (ms) => new Promise(r => setTimeout(r, ms))
           const _cardLabel = (txt) => [...document.querySelectorAll('.vr-metric-grid *, .kpi-grid *')].find(e => e.children.length === 0 && e.textContent.trim() === txt)
           // מעביר לטאב / תצוגת ה-CRM של הצעד ומחזיר את האלמנט להאיר (null = לא נמצא בתקופה הזו)
@@ -4731,7 +4731,8 @@ const selectProject = async (client, project) => {
               await _wait(250)
               if (g.card) { const l = _cardLabel(g.card); if (l) return l.closest('.vr-metric, .kpi, [role="button"], button') || l.parentElement }
               if (g.section) {
-                const h = [...document.querySelectorAll('h2, h3')].find(e => e.textContent.includes(g.section) && e.getBoundingClientRect().height > 0)
+                const _secs = [].concat(g.section)
+                const h = [...document.querySelectorAll('h2, h3')].find(e => _secs.some(t => e.textContent.includes(t)) && e.getBoundingClientRect().height > 0)
                 if (h) {
                   // הכרטיס שמחזיק את הכותרת והתוכן — לא הכותרת לבדה (עולים עד שיש גובה של תוכן)
                   const box = h.closest('.section, .vr-section, section, .chart-card, .card')
@@ -4748,7 +4749,10 @@ const selectProject = async (client, project) => {
             return null
           }
           const _openList = (step) => { const l = step.go?.card && _cardLabel(step.go.card); if (l) l.click() }
-          return <ProjectTour steps={_steps} locate={_locate} openList={_openList} onEvent={(step) => trackUsage('tour', { step })} />
+          // חלון שקופץ פעם בחודש לכל פרויקט: "להתחיל סיור" או "לא עכשיו" (ויטלי, 18.11)
+          const _offerKey = 'cz-tour-offer:' + (selectedProject?.id || '') + ':' + new Date().toISOString().slice(0, 7)
+          return <ProjectTour key={selectedProject?.id} steps={_steps} locate={_locate} openList={_openList} offerKey={_offerKey}
+            onEvent={(step, extra) => trackUsage('tour', { step, ...(extra || {}) })} />
         })()}
         {/* Source Tabs */}
         <div className="client-tabs client-tabs-main">
@@ -6057,12 +6061,22 @@ const selectProject = async (client, project) => {
       for (const k in adAcc){ const p=k.split('\u0000'); _fbAdArr.push({camp:p[0],adset:p[1],adName:p[2],spend:adAcc[k]}) }
     }
     const _isFb = (ch) => /facebook|פייס/i.test(ch||'')
+    // Google (ויטלי, 18.11: "רואים רק תקציב ו-ROAS של פייסבוק"): תקציב לערוץ ולקמפיין, לפי שם הקמפיין ב-UTM.
+    // מילות חיפוש ומודעות של Google — בלי תקציב (אין התאמה אמינה בין ה-UTM לנתוני Google Ads).
+    const _isGch = (ch) => /google|גוגל/i.test(ch||'')
+    // שמות שונים בין Google Ads ל-UTM: "Bcurelaser-Brand(Heb)-3/2026-Search" מול "Bcurelaser-Brand(HEB)-Search",
+    // "Bcurelaser-4/2026-PMax #2" מול "Bcurelaser-PMax" — בלי תאריך ובלי מספור, ובלי סימנים
+    const _gk = (v) => _nn(_normName(v).replace(/\b\d{1,2}\/\d{4}\b/g, '').replace(/#\s*\d+/g, ''))
+    const _gCampSpend = {}; let _gChSpend = 0
+    reports.filter(r => r.month === selectedMonth && r.source && r.source.startsWith('google')).forEach(r => { (r.data || []).forEach(row => {
+      const sp = Number(row.spend) || 0; _gChSpend += sp; const k = _gk(row.campaign); if (k) _gCampSpend[k] = (_gCampSpend[k] || 0) + sp
+    })})
     let _fbQnSpend = 0; for (const k in _fbCampSpend) { if (/questionnaire/i.test(k)) _fbQnSpend += _fbCampSpend[k] }
     const _isGeel = (camp) => /geel[\s_-]*remarketing/i.test(_normName(camp))
-    const _spCamp = (ch,camp) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return _fbQnSpend; return _fbCampSpend[_normName(camp)]||0 }
+    const _spCamp = (ch,camp) => { if(_isGch(ch)) { const v=_gCampSpend[_gk(camp)]; return v>0 ? v : null } if(!_isFb(ch)) return null; if(_isGeel(camp)) return _fbQnSpend; return _fbCampSpend[_normName(camp)]||0 }
     const _spAdset = (ch,camp,adset) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), t=_nn(adset); if(!t||t.indexOf('ללא')>=0) return null; const exact=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset)===t); if(exact.length) return {spend:exact.reduce((a,x)=>a+x.spend,0)}; const m=_fbAdsetArr.filter(x=>x.camp===c && _nn(x.adset).includes(t)); return m.length===1 ? {spend:m[0].spend} : null }
     const _spAd = (ch,camp,adset,label) => { if(!_isFb(ch)) return null; if(_isGeel(camp)) return null; const c=_normName(camp), a=_nn(adset); const L=_nn(label); if(!L) return null; const inA=x=>(!a||a.indexOf('ללא')>=0||_nn(x.adset).includes(a)); let m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L && inA(x)); if(m.length) return {spend:m.reduce((z,x)=>z+x.spend,0)}; m=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName)===L); if(m.length===1) return {spend:m[0].spend}; const tok=(_nn(label).match(/ad\d+/)||[])[0]; if(tok){ const m2=_fbAdArr.filter(x=>x.camp===c && _nn(x.adName).indexOf(tok)===0 && inA(x)); if(m2.length===1) return {spend:m2[0].spend}; } return null }
-    const _naT = 'לא זמין - נתוני הוצאה ו-ROAS קיימים ל-Facebook בלבד'
+    const _naT = 'לא זמין - תקציב ו-ROAS קיימים ל-Facebook ול-Google (עד רמת הקמפיין)'
     const _fbCell = (res, fs) => { if(res==null) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">-</span></td>; const v=typeof res==='object'?res.spend:res; const ap=typeof res==='object'&&res.approx; return <td style={{fontSize:fs,whiteSpace:'nowrap',color:ap?'#94a3b8':undefined}}>{ap?'~':''}{formatCurrency(v)}</td> }
     const _roasCell = (rev, res, fs) => { const sp=res==null?null:(typeof res==='object'?res.spend:res); if(sp==null||sp<=0) return <td style={{fontSize:fs,color:'#cbd5e1'}} title={_naT}><span className="vr-sr-only">{_naT}</span><span aria-hidden="true">-</span></td>; const r=(rev||0)/sp; return <td style={{fontSize:fs,whiteSpace:'nowrap',fontWeight:600,color:r>=1?'var(--emerald)':'var(--rose)'}}>{r.toFixed(2)}x</td> }
             const _agents = _zs.agentPerformance || []
@@ -6194,12 +6208,12 @@ const selectProject = async (client, project) => {
                   <div className="section-head"><div className="ico indigo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h2>משפך לפי ערוץ</h2><span className="sub">לחצו על שורה לפירוט</span></div>
                   {/* אותו סרגל פעולות של כל שאר הטבלאות במערכת (ויטלי, 21.9). */}
                   {tableToolbar({
-                    hint: '💡 לחץ על ערוץ ← קמפיין ← קבוצת מודעות / מילת חיפוש ← מודעה כדי לצלול פנימה · הוצאה ו-ROAS קיימים ל-Facebook בלבד: קמפיין מדויק, רמות עמוקות יותר משוערות (~)',
+                    hint: '💡 לחץ על ערוץ ← קמפיין ← קבוצת מודעות / מילת חיפוש ← מודעה כדי לצלול פנימה · תקציב ו-ROAS: Facebook עד רמת המודעה (מתחת לקמפיין משוער ~), Google עד רמת הקמפיין',
                     allOpen: _funnelAllOpen, onToggleAll: toggleFunnelAll, onExport: exportFunnelCsv,
                   })}
                   <div className="table-wrapper">
                     <table className="data-table">
-                      <thead><tr><th scope="col">ערוץ</th><th scope="col">סוג</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">רכשו</th><th scope="col">אחוז המרה</th><th scope="col">שווי נטו</th><th scope="col" title="בשורות: Facebook בלבד. בשורת הסיכום: Facebook + Google">תקציב</th><th scope="col" title="בשורות: מול תקציב Facebook. בשורת הסיכום: מול התקציב הכולל">ROAS</th></tr></thead>
+                      <thead><tr><th scope="col">ערוץ</th><th scope="col">סוג</th><th scope="col">לידים</th><th scope="col">הזדמנויות</th><th scope="col">רכשו</th><th scope="col">אחוז המרה</th><th scope="col">שווי נטו</th><th scope="col" title="Facebook ו-Google. בשורת הסיכום: שניהם יחד">תקציב</th><th scope="col" title="שווי נטו חלקי התקציב">ROAS</th></tr></thead>
                       <tbody>
                         {(() => {
                           const out = [];
@@ -6210,7 +6224,7 @@ const selectProject = async (client, project) => {
                               <tr key={c.channel} className={'vr-erika-lvl0' + (chOpen ? ' vr-erika-open' : '')} style={{fontWeight:600, cursor: camps.length ? 'pointer' : 'default'}} onClick={camps.length ? () => toggleFunnelCh(c.channel) : undefined}>
                                 <td style={{fontWeight:600}}>{_twist(camps.length > 0, chOpen, 'הערוץ ' + c.channel, () => toggleFunnelCh(c.channel))}{_lvlTag('ערוץ')}<bdi>{c.channel}</bdi></td>
                                 <td><SourceMark name={c.channel} /></td>
-                                <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>{_fbCell(_isFb(c.channel) ? _fbTotalSpend : null)}{_roasCell(c.netRevenue, _isFb(c.channel) ? _fbTotalSpend : null)}
+                                <td>{formatNum(c.leads)}</td><td>{formatNum(c.opportunities)}</td><td>{formatNum(c.purchased)}</td><td style={{color:'var(--violet)',fontWeight:600}}>{(c.conversionRate||0)+'%'}</td><td>{formatCurrency(c.netRevenue||0)}</td>{_fbCell(_isFb(c.channel) ? _fbTotalSpend : _isGch(c.channel) && (_gChSpend || _gTotalSpend) > 0 ? (_gChSpend || _gTotalSpend) : null)}{_roasCell(c.netRevenue, _isFb(c.channel) ? _fbTotalSpend : _isGch(c.channel) && (_gChSpend || _gTotalSpend) > 0 ? (_gChSpend || _gTotalSpend) : null)}
                               </tr>
                             );
                             if (!chOpen) return;
@@ -6274,7 +6288,7 @@ const selectProject = async (client, project) => {
                       את ההכנסות כפי שהן. לכן הכרטיס תמיד נמוך בכ-15%. */}
                   {_totalAdSpend > 0 && ((_fn.netRevenue || 0) > 0) ? (
                     <p className="vr-erika-note">
-                      שורת הסיכום מחלקת את ההכנסות בתקציב הכולל (Facebook + Google). השורות שמעליה מציגות תקציב ו-ROAS של Facebook בלבד, כי אלה הנתונים שניתן לשייך לקמפיין. הכרטיס שבראש העמוד נמוך בכ-15% כי הוא מחושב ללא מע״מ.
+                      שורת הסיכום מחלקת את ההכנסות בתקציב הכולל (Facebook + Google). בשורות של Google התקציב מגיע עד רמת הקמפיין, ומתחתיו (מילות חיפוש ומודעות) אין התאמה אמינה. הכרטיס שבראש העמוד נמוך בכ-15% כי הוא מחושב ללא מע״מ.
                     </p>
                   ) : null}
                 </div>
@@ -7525,7 +7539,7 @@ const selectProject = async (client, project) => {
               onApplyPreset={applyPreset}
               onApplyRange={applyCustomRange}
               comparisonOn={compareEnabled}
-              onToggleComparison={() => onComparisonToggle(!compareEnabled)}
+              /* "השוואה לאותה תקופה" מוסתרת (ויטלי, 18.11: "לא באמת עובד") — onToggleComparison={() => onComparisonToggle(!compareEnabled)} */
               showQuarters={!(/bcurelaser|ismooth/i.test(selectedProject?.name || '') || reports.some(r => r.project_id === selectedProject?.id && r.source === 'crm' && r.summary?.crmType === 'zoho'))}
               allowedPresets={isDemoProject ? DEMO_PRESETS : undefined}
               /* בורר הפרויקט במובייל. visibleClients כבר מסונן להרשאות של

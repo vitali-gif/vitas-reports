@@ -4753,5 +4753,20 @@ textarea:focus-visible,
 .ptour-note svg { flex: none; margin-top: 2px; color: #b45309; }
 .ptour-note b { color: #92400e; }
 .ptour-note span { display: block; margin-top: 2px; color: var(--text-secondary, #64748b); }
+.ptour-box.mini { width: auto; max-width: min(560px, calc(100vw - 24px)); padding: 8px 10px; }
+.ptour-mini { display: flex; align-items: center; gap: 8px; }
+.ptour-mini-open { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; padding: 4px; border-radius: 8px; }
+.ptour-mini-open b { font-size: 14px; }
+.ptour-mini-open:focus-visible { outline: 2px solid var(--indigo, #5B5EF4); outline-offset: 2px; }
+/* חלון ההצעה שקופץ בכניסה (ויטלי, 18.11) */
+.ptour-offer-wrap { position: fixed; inset: 0; z-index: 9500; background: rgba(11, 15, 30, .55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.ptour-offer { position: relative; width: min(420px, 100%); background: var(--card, #fff); color: var(--text-primary, #142044); border-radius: 18px; padding: 26px 24px 18px; box-shadow: 0 24px 60px rgba(11, 15, 30, .35); text-align: center; font-family: var(--font, Heebo, sans-serif); }
+.ptour-offer .ptour-x { position: absolute; top: 12px; left: 12px; }
+.ptour-offer-ico { display: inline-flex; width: 46px; height: 46px; align-items: center; justify-content: center; border-radius: 14px; background: rgba(91, 94, 244, .1); color: var(--indigo, #5B5EF4); margin-bottom: 10px; }
+.ptour-offer h3 { margin: 0 0 6px; font-size: 19px; font-weight: 800; }
+.ptour-offer-text { margin: 0 0 20px; font-size: 14px; line-height: 1.65; color: var(--text-secondary, #475569); }
+.ptour-offer-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+.ptour-offer-actions .ptour-btn { padding: 10px 20px; font-size: 14.5px; }
+.ptour-offer small { display: block; margin-top: 12px; font-size: 12px; color: var(--text-secondary, #64748b); }
 .ptour-try { margin: 8px 0 0; font-size: 12.5px; font-weight: 600; color: var(--indigo, #5B5EF4); }
 @media (prefers-reduced-motion: reduce) { .ptour-ring, .ptour-progress i { transition: none; } }

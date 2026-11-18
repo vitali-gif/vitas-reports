@@ -8,7 +8,7 @@ import { apiFetch } from '../../../lib/api-fetch'
 const TABS = { all: 'הכל', crm: 'CRM', facebook: 'Facebook', google: 'Google', google_pmax: 'Google PMax', google_search: 'Google Search', meetings: 'ישיבות שיווק', recommendations: 'המלצות חכמות', value: 'ערך הדשבורד' }
 const CRM_VIEWS = { sources: 'מקורות הגעה', response: 'זמני תגובה', objections: 'התנגדויות', reports: 'יישובים', meetings: 'פגישות שבוצעו' }
 const DEVICES = { mobile: 'טלפון', tablet: 'טאבלט', desktop: 'מחשב' }
-const EVENT_LABEL = { tab: 'טאב', crm_view: 'CRM', period: 'תקופה', compare: 'השוואה', section: 'צפה', help: 'איך זה עוזר לך', ai_open: 'ניתוח דוח', modal: 'פתח רשימת לידים' }
+const EVENT_LABEL = { tab: 'טאב', crm_view: 'CRM', period: 'תקופה', compare: 'השוואה', section: 'צפה', help: 'איך זה עוזר לך', ai_open: 'ניתוח דוח', modal: 'פתח רשימת לידים', tour: 'סיור' }
 
 const fmtMin = (sec) => { if (sec == null) return '-'; const m = Math.round(sec / 60); return m < 60 ? `${m} דק׳` : `${Math.floor(m / 60)} שע׳ ${m % 60} דק׳` }
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-')
@@ -31,6 +31,7 @@ function eventText(e) {
   if (e.name === 'crm_view') return CRM_VIEWS[d.view] || d.view
   if (e.name === 'period') return periodLabel(d.period)
   if (e.name === 'section' || e.name === 'help') return d.title
+  if (e.name === 'tour') return ({ offer: 'הוצע', start: 'התחיל', done: 'סיים', skip: 'יצא באמצע', dismiss: 'סגר בלי להתחיל' })[d.step] || (d.n ? `צעד ${d.n} מתוך ${d.of}` : d.step)
   return ''
 }
 
@@ -51,6 +52,11 @@ function insights(u) {
   const times = (n) => (n === 1 ? 'פעם אחת' : `${n} פעמים`)
   if (u.compare) out.push(`השתמש בהשוואה ${times(u.compare)}`)
   if (u.modals) out.push(`פתח רשימות לידים ${times(u.modals)}`)
+  const t = u.tour
+  if (t && (t.offer || t.start)) {
+    if (!t.start) out.push(`הסיור הוצע לו ${times(t.offer)} ולא התחיל אותו`)
+    else out.push(`התחיל את הסיור ${times(t.start)}, הגיע עד צעד ${t.maxN} מתוך ${t.of}` + (t.done ? ', וסיים אותו' : ''))
+  }
   if (u.lastAt && (Date.now() - new Date(u.lastAt).getTime()) / 864e5 > 14) out.push('לא נכנס יותר משבועיים - אולי שווה לשלוח לו תזכורת או דוח')
   return out
 }
