@@ -55,7 +55,7 @@ ad_daily לפי חשבון, crm_sync), לעדכן את הקובץ במאגר, ו
 ## עמוד הבית
 
 עמוד הבית (/) של reports.vitas.co.il מגיע מהמאגר **cluzo-site** (פרויקט Vercel נפרד), דרך rewrite
-ב-`next.config.js` כשמשתנה הסביבה `CLUZO_SITE_URL` מוגדר. `app/page.js` כאן הוא גיבוי בלבד —
+ב-`next.config.js` כשמשתנה הסביבה `CLUZO_SITE_URL` מוגדר. גם `/privacy` ו-`/terms` (מדיניות הפרטיות ותנאי השימוש של Cluzo) מגיעים משם. `app/page.js` כאן הוא גיבוי בלבד —
 שינויים בעמוד הבית עושים ב-cluzo-site. `public/brand/cluzo/icon-512.png` נשאר כאן: גוגל מכירה אותו.
 
 ## טווחי תאריכים מיידיים
