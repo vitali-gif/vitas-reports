@@ -50,6 +50,13 @@ const nextConfig = {
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },
+      // הדשבורד (אדמין ולקוח) לא נכנס למנועי חיפוש — מכיל נתוני לקוחות (פרטיות, 19.11).
+      // כותרת ולא robots.txt: חסימה ב-robots.txt מונעת מגוגל לראות את ה-noindex.
+      { source: '/admin/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+      { source: '/admin', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+      { source: '/client/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+      { source: '/client', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+      { source: '/onboard/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
       // תשובות ה-API לא נשמרות בשום מטמון ביניים — הן מכילות נתוני לקוח.
       {
         source: '/api/:path*',
