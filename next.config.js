@@ -44,9 +44,10 @@ const nextConfig = {
       beforeFiles: [
         { source: '/', destination: `${CLUZO_SITE_URL}/` },
         { source: '/site-assets/:path+', destination: `${CLUZO_SITE_URL}/site-assets/:path+` },
-        // מדיניות הפרטיות ותנאי השימוש של Cluzo (cluzo-site/app/privacy, app/terms), 19.11
+        // מדיניות הפרטיות, תנאי השימוש והצהרת הנגישות של Cluzo (cluzo-site/app/privacy, terms, accessibility), 19.11
         { source: '/privacy', destination: `${CLUZO_SITE_URL}/privacy` },
         { source: '/terms', destination: `${CLUZO_SITE_URL}/terms` },
+        { source: '/accessibility', destination: `${CLUZO_SITE_URL}/accessibility` },
       ],
     }
   },
